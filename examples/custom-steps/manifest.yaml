@@ -1,0 +1,46 @@
+# Example manifest.yaml for PTD Custom Steps
+#
+# This file should be placed in: infra/__work__/<workload>/customizations/manifest.yaml
+
+version: 1
+
+# Global settings for custom steps
+settings:
+  # Require manual approval before running custom steps (default: false)
+  requireApproval: false
+
+  # Continue running other steps if a custom step fails (default: false)
+  continueOnError: false
+
+  # Timeout for custom step execution in minutes (default: 60)
+  timeout: 60
+
+# List of custom steps to execute
+customSteps:
+  # Example: Simple S3 bucket creation
+  - name: custom-s3
+    description: "Creates a custom S3 bucket for additional data storage"
+    path: simple-s3-bucket/
+
+    # Insert this step after the persistent step
+    insertAfter: persistent
+
+    # This step doesn't require proxy access to the cluster
+    proxyRequired: false
+
+    # Enable/disable the step (default: true if omitted)
+    enabled: true
+
+  # Example: Custom step that depends on multiple other steps
+  # - name: custom-monitoring
+  #   description: "Sets up custom monitoring dashboards"
+  #   path: custom-monitoring/
+  #   insertAfter: helm
+  #   proxyRequired: true
+
+  # Example: Disabled custom step
+  # - name: experimental-feature
+  #   description: "Experimental feature (currently disabled)"
+  #   path: experimental-feature/
+  #   insertAfter: sites
+  #   enabled: false

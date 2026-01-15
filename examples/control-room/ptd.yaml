@@ -1,0 +1,41 @@
+# Example Control Room Configuration
+#
+# This file configures a PTD Control Room - the central management hub
+# that coordinates workloads across your organization.
+#
+# Place this file at: infra/__ctrl__/<control-room-name>/ptd.yaml
+
+apiVersion: posit.team/v1
+kind: AWSControlRoomConfig
+spec:
+  # AWS account ID where the control room will be deployed
+  account_id: "123456789012"
+
+  # Kubernetes version for the EKS cluster
+  eks_k8s_version: "1.33"
+
+  # Enable Tailscale for secure remote access (optional)
+  tailscale_enabled: true
+
+  # List of IAM principals allowed to assume roles in this control room
+  # Can be email addresses (for IAM Identity Center users) or IAM role ARNs
+  trusted_principals:
+    - admin@example.com
+    - developer@example.com
+    # IAM roles can also be trusted
+    - arn:aws:iam::123456789012:role/github-actions
+
+  # Primary domain for the control room services
+  domain: control-room.example.posit.team
+
+  # Front door domain for external access
+  front_door: cr.example.posit.team
+
+  # AWS region for deployment
+  region: us-east-2
+
+  # Resource tags applied to all AWS resources
+  resource_tags:
+    rs:owner: team@example.com
+    rs:project: posit-team
+    rs:environment: production
