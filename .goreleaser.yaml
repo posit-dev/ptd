@@ -1,20 +1,21 @@
-# NB: This is early-days, really just a stub to help build the ptd cli locally.
-#  It's not a part of CI/CD, but serves to consistently provide support for building for different arch and os.
-#  As well as passing a version string to the binary.
+# GoReleaser configuration for PTD CLI
+# Used for local builds. CI releases use the release.yml workflow.
 version: 2
 
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - sh -c 'cd lib && go mod tidy'
     - sh -c 'cd cmd && go mod tidy'
 
 builds:
   - env:
-      - CGO_ENABLED=1
+      - CGO_ENABLED=0
     goos:
       - linux
       - darwin
+    goarch:
+      - amd64
+      - arm64
     dir: ./cmd
     ldflags:
       - -s -w

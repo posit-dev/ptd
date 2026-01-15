@@ -25,8 +25,7 @@ docs/
 ├── cli/                    # PTD CLI documentation
 ├── team-operator/          # Team Operator documentation
 ├── guides/                 # How-to guides
-├── infrastructure/         # Infrastructure documentation
-└── partner-delivery/       # Partner delivery materials
+└── infrastructure/         # Infrastructure documentation
 ```
 
 ## Contributing
