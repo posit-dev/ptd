@@ -1,0 +1,116 @@
+# Example Site Configuration
+#
+# This file configures a Site within a PTD Workload. A site represents
+# a complete Posit Team environment with Workbench, Connect, and Package Manager.
+#
+# Place this file at: infra/__work__/<workload-name>/site_<site-name>/site.yaml
+
+apiVersion: core.posit.team/v1beta1
+kind: Site
+spec:
+  # Disable pre-pulling images to reduce startup time
+  disablePrePullImages: true
+
+  # Workbench configuration
+  workbench:
+    # Number of Workbench replicas for load balancing
+    replicas: 2
+
+    # Container images
+    image: ghcr.io/rstudio/rstudio-workbench:ubuntu2204-2026.01.0
+    defaultSessionImage: ghcr.io/rstudio/workbench-session:ubuntu2204-r4.4.3_4.3.3-py3.12.11_3.11.13
+    imagePullPolicy: Always
+
+    # Domain prefix (becomes <prefix>.<site-domain>)
+    domainPrefix: dev
+
+    # Authentication configuration
+    auth:
+      # Options: oidc, saml, ldap, pam
+      type: "oidc"
+      clientId: "your-oidc-client-id"
+      issuer: "https://your-identity-provider.com"
+      scopes:
+        - "offline_access"
+        - "groups"
+
+    # Automatically create local user accounts on first login
+    createUsersAutomatically: true
+
+    # API settings for programmatic access
+    apiSettings:
+      workbenchApiEnabled: 1
+      workbenchApiAdminEnabled: 1
+      workbenchApiSuperAdminEnabled: 1
+
+    # VS Code session configuration
+    vsCodeConfig:
+      sessionTimeoutKillHours: 4
+
+    # Positron session configuration
+    positronConfig:
+      sessionTimeoutKillHours: 4
+
+    # Optional: Databricks integration
+    # databricks:
+    #   workspace-name:
+    #     name: "Databricks Workspace"
+    #     url: "https://your-workspace.cloud.databricks.com"
+    #     clientId: "your-databricks-client-id"
+
+    # Optional: Snowflake integration
+    # snowflake:
+    #   clientId: "your-snowflake-client-id"
+    #   accountId: your-snowflake-account
+
+    # Experimental features (optional)
+    # experimentalFeatures:
+    #   enableManagedCredentialJobs: true
+
+  # Connect configuration
+  connect:
+    # Number of Connect replicas for high availability
+    replicas: 2
+
+    # Container images
+    image: ghcr.io/rstudio/rstudio-connect:ubuntu2204-2025.12.1
+    sessionImage: ghcr.io/rstudio/rstudio-connect-content-init:ubuntu2204-2025.12.1
+    imagePullPolicy: Always
+
+    # Domain prefix (becomes <prefix>.<site-domain>)
+    domainPrefix: pub
+
+    # Authentication configuration
+    auth:
+      type: "oidc"
+      clientId: "your-oidc-client-id"
+      issuer: "https://your-identity-provider.com"
+
+    # Email configuration (optional)
+    # experimentalFeatures:
+    #   mailDisplayName: "Posit Connect"
+    #   mailSender: "do-not-reply@example.com"
+    #   mailTarget: "support@example.com"
+
+  # Package Manager configuration
+  packageManager:
+    image: ghcr.io/rstudio/rstudio-package-manager:ubuntu2204-2025.09.2
+    imagePullPolicy: Always
+
+    # Domain prefix (becomes <prefix>.<site-domain>)
+    domainPrefix: pkg
+
+  # Chronicle configuration (audit logging)
+  chronicle:
+    image: ghcr.io/rstudio/chronicle:2025.08.0
+    agentImage: ghcr.io/rstudio/chronicle-agent:2025.08.0
+
+  # Custom ingress annotations (optional)
+  # ingressAnnotations:
+  #   nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+
+  # Extra service accounts for custom integrations (optional)
+  # extraSiteServiceAccounts:
+  #   - nameSuffix: custom-app
+  #     annotations:
+  #       eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/custom-role

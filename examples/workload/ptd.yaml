@@ -1,0 +1,78 @@
+# Example Workload Configuration
+#
+# This file configures a PTD Workload - a complete Posit Team deployment
+# with Workbench, Connect, and Package Manager.
+#
+# Place this file at: infra/__work__/<workload-name>/ptd.yaml
+
+apiVersion: posit.team/v1
+kind: AWSWorkloadConfig
+spec:
+  # AWS account ID where the workload will be deployed
+  account_id: "123456789012"
+
+  # Control room that manages this workload
+  control_room_account_id: "123456789012"
+  control_room_cluster_name: control-room-production
+  control_room_domain: cr.example.posit.team
+
+  # AWS region for deployment
+  region: us-east-2
+
+  # RDS PostgreSQL configuration
+  db_engine_version: "15.12"
+  db_instance_class: db.m5d.large
+  db_performance_insights_enabled: true
+  db_deletion_protection: true
+  db_max_allocated_storage: 1024
+
+  # Additional PostgreSQL databases beyond the default
+  extra_postgres_dbs:
+    - analytics
+
+  # FSx for OpenZFS shared storage
+  fsx_openzfs_storage_capacity: 900
+  fsx_openzfs_throughput_capacity: 320
+
+  # Domain configuration source
+  # Options: ANNOTATION_JSON, ROUTE53_PRIVATE_ZONE
+  domain_source: ANNOTATION_JSON
+
+  # Enable Keycloak for authentication (if not using external IdP)
+  keycloak_enabled: false
+
+  # Enable cluster autoscaling
+  autoscaling_enabled: true
+
+  # EKS cluster configuration
+  clusters:
+    # Cluster name - use a date-based naming convention for easy upgrades
+    "20250115":
+      spec:
+        cluster_version: "1.33"
+
+        # Node pool sizing
+        mp_min_size: 3
+        mp_max_size: 10
+        mp_instance_type: r6a.2xlarge
+
+        # Root disk size in GB
+        root_disk_size: 200
+
+        # Traffic routing weight (for blue/green deployments)
+        routing_weight: "100"
+
+        # Component versions
+        components:
+          traefik_forward_auth_version: "0.0.14"
+
+  # Site configurations - each site is a separate Posit Team environment
+  sites:
+    main:
+      spec:
+        domain: analytics.example.com
+        use_traefik_forward_auth: false
+    dev:
+      spec:
+        domain: analytics-dev.example.com
+        use_traefik_forward_auth: false
