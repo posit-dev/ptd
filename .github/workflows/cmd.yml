@@ -1,0 +1,75 @@
+name: cmd
+
+on:
+  push:
+    branches: [main]
+    tags: [v*]
+    paths: [cmd/**,lib/**,.github/workflows/cli.yml]
+
+  pull_request:
+    paths: [cmd/**,lib/**,.github/workflows/cli.yml]
+
+  merge_group:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: extractions/setup-just@v2
+
+      - name: Install cli requirements
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgpgme-dev libbtrfs-dev
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cmd/go.mod
+          cache: true
+          cache-dependency-path: |
+            cmd/go.sum
+            lib/go.sum
+
+      - name: Test cmd
+        run: just test-cmd
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: extractions/setup-just@v2
+
+      - name: Install requirements
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgpgme-dev libbtrfs-dev
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cmd/go.mod
+          cache: true
+          cache-dependency-path: |
+            cmd/go.sum
+            lib/go.sum
+
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          install-only: true
+
+      - run: just cli
+
+      - name: Archive cli
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli
+          path: |
+            dist/*
