@@ -1,0 +1,8 @@
+*.esm.js binary
+*.min.js binary
+docs/_freeze/** linguist-generated=true
+docs/_freeze/**/*.js binary
+docs/_site/site_libs/**/*.js binary
+docs/presentation/**/libs/**/*.js binary
+team-operator/client-go/** linguist-generated=true
+team-operator/client-go/**/*.go binary
