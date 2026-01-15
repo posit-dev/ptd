@@ -194,6 +194,8 @@ $ ptd assume azure-target
 
 Ensure a target is converged by running infrastructure deployment steps. This command orchestrates the deployment using Pulumi to bring the target to its desired state.
 
+See [Ensure Command Flow](ensure-flow.md) for details on resources managed by this command.
+
 **Usage:**
 ```bash
 ptd ensure <target> [flags]
@@ -835,6 +837,7 @@ targets:
 ## Related Documentation
 
 - [Custom Targets Configuration Directory](custom-targets-config-dir.md) - Configure custom target directories
+- [Ensure Command Flow](ensure-flow.md)
 - [Main README](./README.md) - Project overview
 - [Development Environment Guide](https://positpbc.atlassian.net/wiki/spaces/PTD/pages/1141997738/Development+Environment) - Setup prerequisites
 - [Justfile](./Justfile) - Build and development tasks
