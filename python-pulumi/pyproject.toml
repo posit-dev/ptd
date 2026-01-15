@@ -1,0 +1,93 @@
+[project]
+name = "ptd"
+version = "0.1.0"
+description = "Posit Team Dedicated python pulumi package"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "Posit Team Dedicated Humans", email = "ptd@posit.co" },
+]
+classifiers = [
+  "Private :: Do Not Upload"
+]
+dependencies = [
+  "PyYAML>=6.0.1,<7.0.0",
+  "bcrypt>=4.1.2,<5.0.0",
+  "click>=8.1.7,<9.0.0",
+  "deepmerge>=1.1.1,<2.0.0",
+  "requests>=2.31.0,<3.0.0",
+  "azure-containerregistry>=1.2.0,<2.0.0",
+  "azure-identity>=1.19.0,<2.0.0",
+  "azure-keyvault-secrets>=4.9.0,<5.0.0",
+  # NOTE: The pulumi dependencies are pinned to exact versions so that the plugins used in
+  # each pulumi stack state remain stable.
+  "pulumi==3.187.0",
+  "pulumi_aws==6.65.0",
+  "pulumi-azuread==6.2.0",
+  "pulumi_azure_native==3.5.1",
+  "pulumi_command==1.0.1",
+  "pulumi_kubernetes==4.19.0",
+  "pulumi_mailgun==3.5.7",
+  "pulumi_postgresql==3.14.0",
+  "pulumi_random==4.16.0",
+  "pulumi_tailscale==0.17.4",
+  "pulumi_tls==5.2.0",
+  "pysocks==1.7.1",
+  "boto3==1.36.17",
+  # NOTE: cryptography is a transitive dependency of pyopenssl and must be pinned here to
+  # appease Snyk. The constraint requested by pyopenssl is !=40.0.0,!=40.0.1,<42,>=38.0.0
+  "cryptography>=41.0.7,<42.0.0",
+  # NOTE: pulumi needs pkg_resources from setuptools but doesn't declare it
+  "setuptools>=69.0.3,<70.0.0",
+  "pytest>=8.3.5",
+  "coverage>=7.7.0",
+  "ruff>=0.11.0",
+  "pip>=25.0.1",
+]
+
+[project.urls]
+Documentation = "https://github.com/rstudio/ptd#readme"
+Issues = "https://github.com/rstudio/ptd/issues"
+Source = "https://github.com/rstudio/ptd"
+Kanban = "https://github.com/orgs/rstudio/projects/174/views/1"
+
+[dirs.env]
+virtual = ".venv"
+
+[tool.coverage.run]
+source_pkgs = ["ptd"]
+branch = true
+parallel = true
+
+[tool.coverage.paths]
+source = ["src", "tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+# NOTE: This configuration will cause any unrecognized warnings to be treated as errors
+# see: https://docs.pytest.org/en/7.1.x/how-to/capture-warnings.html#controlling-warnings
+filterwarnings = [
+  "error",
+  "ignore::DeprecationWarning"
+]
+
+[tool.uv.sources]
+python-pulumi = { workspace = true }
+
+[tool.uv]
+package = true
+
+[dependency-groups]
+dev = [
+    "ptd",
+]

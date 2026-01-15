@@ -1,0 +1,75 @@
+# To delete these alerts, simply removing the configMap that uses this method will not work.
+# Replace file contents with the following and apply in order to delete the alerts:
+# apiVersion: 1
+# deleteRules:
+#   - orgId: 1
+#     uid: healthchecks
+#
+# See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: healthchecks
+      folder: Healthchecks
+      interval: 1m
+      rules:
+        - uid: healthcheckcs
+          title: Healthchecks
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                disableTextWrap: false
+                editorMode: builder
+                expr: probe_http_status_code
+                fullMetaSearch: false
+                includeNullMetadata: true
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+                useBackend: false
+            - refId: C
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 200
+                            - 200
+                        type: outside_range
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: Alerting
+          execErrState: Error
+          for: 5m
+          annotations:
+            description: Calls the health check for each component of each PTD site and errors on non-200 response.
+            summary: "Health check failed! \nCluster: {{ $labels.cluster }} \nSite: {{ $labels.ptd_site }}\nComponent: {{ $labels.ptd_component }}\nCheck Type: {{ $labels.check_type }}\nURL: {{ $labels.health_check_url }}"
+          labels:
+            opsgenie: "1"
+          isPaused: false
