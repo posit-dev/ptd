@@ -1,0 +1,165 @@
+---
+title: "Posit Team Dedicated"
+subtitle: |
+  The convenience of SaaS<br>
+  The governance & control of self-hosted
+title-slide-attributes:
+  data-background-color: white
+  data-background-image: _extensions/jthomasmock/positslides/assets/backgrounds/sample-title-slide-option-3.png
+  data-background-size: contain
+format:
+  positslides-revealjs:
+    width: "1600"
+    height: "900"
+    progress: false
+    history: true
+    chalkboard: true
+    transition: fade
+    navigation: grid
+    slide-tone: true
+    slide-number: c/t
+    # logo: _extensions/jthomasmock/positslides/posit-logo-fullcolor-TM.svg
+    navigation-mode: vertical
+    scrollable: true
+    theme: local.scss
+    format:
+    drop:
+      engine: pyodide
+---
+
+# {background-image="_extensions/jthomasmock/positslides/assets/backgrounds/30-70-dark.png" background-size="contain" }
+
+<h2 style="position: absolute; top: 25px; left: 525px;">current state</h2>
+
+<br>
+<br>
+
+:::: {.columns}
+
+::: {.column width="35%"}
+&nbsp;
+:::
+
+::: {.column width="65%"}
+- Any current IT workload challenges?
+- What internal SLOs do you deliver today?
+- How do you manage GRC today?
+- What jurisdictions do you need to operate in?
+- Do you need access to on-prem hardware?
+- Which cloud, which SSO?
+
+:::
+
+::::
+
+# {background-image="_extensions/jthomasmock/positslides/assets/backgrounds/30-70-dark.png" background-size="contain"}
+
+<h2 style="position: absolute; top: 25px; left: 525px;">Single-tenant SaaS</h2>
+
+<br>
+<br>
+
+:::: {.columns}
+
+::: {.column width="35%"}
+&nbsp;
+:::
+
+::: {.column width="65%"}
+- Take the best of SaaS and self-hosted worlds
+- Not a generic managed service provider
+- Direct input from product teams
+- Expertise from Solutions Engineering and Product Development
+
+> Avoid the outsourced IT model, want the clarity of shared responsibility model.
+
+:::
+
+::::
+
+# &nbsp;&nbsp; Posit Team concepts {background-image="_extensions/jthomasmock/positslides/assets/backgrounds/toc-light.png" background-size="contain"}
+
+![](posit_team_overview.png)
+
+# &nbsp;&nbsp; account architecture {background-image="_extensions/jthomasmock/positslides/assets/backgrounds/toc-light.png" background-size="contain"}
+
+:::: {.columns}
+
+::: {.column width="35%"}
+- Posit operators can only access workload accounts from a cloud-based secure operations center
+- Posit does not have access to existing data plane accounts
+- Both Posit and customer have access to workload account
+- Workload account contains both acceptance and production environments
+
+:::
+
+::: {.column width="65%"}
+
+```{r}
+result <- system2(
+    "../../.local/bin/d2", c("--layout=elk", "accounts.d2", "accounts.svg", "> /dev/null"),
+    stdout = TRUE
+)
+result <- system2(
+    "../../.local/bin/d2", c("--layout=elk", "workload.d2", "workload.png", "> /dev/null"),
+    stdout = TRUE
+)
+knitr::include_graphics("accounts.svg")
+```
+:::
+
+::::
+
+# &nbsp;&nbsp; shared responsibility {background-image="_extensions/jthomasmock/positslides/assets/backgrounds/toc-light.png" background-size="contain"}
+
+```{mermaid}
+journey
+    section Posit Dedicated Operators
+      Configure & provision infra: 5: Operator
+      Monitor & maintain: 5: Operator
+      Respond to alerts: 3: Operator
+      Plan and test upgrades: 5: Operator
+    section Shared
+      Audit account activity: 5: Operator, IT
+      Review and approve upgrades: 3: IT, Data Admin
+    section Data Scientist
+      Select packages: 5: Data Admin
+      Develop projects: 5: Data Scientist
+      Running sessions and jobs: 5: Data Scientist
+```
+
+
+# {background-image="_extensions/jthomasmock/positslides/assets/backgrounds/30-70-light.png" background-size="contain" visibility="hidden"}
+<h2 style="position: absolute; top: 25px; left: 525px;">When</h2>
+
+<br>
+<br>
+
+:::: {.columns}
+
+::: {.column width="35%"}
+&nbsp;
+:::
+
+::: {.column width="65%"}
+```{mermaid}
+timeline
+    title Roadmap
+    2023Q4 : internal preview
+    2024Q1 : pilot customer
+    2024Q2 : additional SSO integrations and datastores
+```
+
+:::
+
+::::
+
+::: {.notes}
+TODO notes about timeline
+:::
+
+# Fin {.has-dark-background background-image="_extensions/jthomasmock/positslides/assets/backgrounds/dark-section-3.png" background-size="contain"}
+
+::: {.notes}
+TODO figure out how to apply the dark background class to make the title text light on this slide
+:::

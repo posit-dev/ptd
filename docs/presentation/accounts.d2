@@ -1,0 +1,117 @@
+grid-rows: 4
+style.fill: transparent
+
+classes: {
+  white square: {
+    label: ""
+    width: 120
+    style: {
+      fill: white
+      stroke: cornflowerblue
+      stroke-width: 10
+    }
+  }
+  block: {
+    style: {
+      text-transform: uppercase
+      font-color: white
+      fill: darkcyan
+      stroke: black
+    }
+  }
+}
+
+control: posit dedicated named operator control room {
+  #width: 800
+  class: block
+  style: {
+    fill: beige
+    stroke: purple
+    font-color: black
+    stroke-width: 8
+  }
+  grid-rows: 1
+  operator workstation.icon: https://icons.terrastruct.com/essentials%2F005-programmer.svg
+  monitoring: {
+    width: 200
+    icon: https://icons.terrastruct.com/essentials%2F001-analytics.svg
+  }
+  alerting.icon: https://icons.terrastruct.com/essentials%2F213-alarm.svg
+  AV.icon: https://icons.terrastruct.com/infra%2F033-protection.svg
+}
+
+infra: workload account {
+  #width: 800
+  class: block
+  style: {
+    fill: lightcyan
+    stroke: darkcyan
+    font-color: black
+    stroke-width: 8
+  }
+  grid-rows: 1
+  grid-columns: 2
+  # grid-gap: 0
+
+  team-box: "" {
+    grid-rows: 3
+    style.fill: transparent
+    style.fill-pattern: dots
+
+    team: {
+      grid-gap: 0 
+      grid-rows: 1
+      Workbench: {
+        icon: https://solutions.posit.co/architecting/architectures/pwb.png
+        height: 150
+      }
+      Connect: {
+        icon: https://solutions.posit.co/architecting/architectures/icon-rsc.svg
+        height: 150
+      }
+      Package Manager: {
+        icon: https://solutions.posit.co/architecting/architectures/icon-rspm.svg
+      }
+    }
+
+    Kubernetes: {
+      width: 400
+      icon: https://icons.terrastruct.com/azure%2F_Companies%2FKubernetes.svg
+    }
+
+    "Storage: home dirs, packages": {
+      width: 400
+      icon: https://icons.terrastruct.com/essentials%2F245-folder.svg
+    }
+  }
+  persistent: "" {
+    grid-columns: 1
+    SSO.icon: https://icons.terrastruct.com/essentials%2F216-key.svg
+    PSQL.icon: https://icons.terrastruct.com/dev%2Fpostgresql.svg
+    logs.icon: https://icons.terrastruct.com/essentials%2F215-funnel.svg
+  }
+}
+
+data: existing data plane accounts {
+  grid-rows: 1
+  class: block
+  style: {
+    fill: honeydew
+    stroke: black
+    font-color: black
+    stroke-width: 8
+  }
+  databases: {
+    width: 200
+    icon: https://icons.terrastruct.com/essentials%2F119-database.svg
+  }
+  hardware: {
+    width: 200
+    icon: https://icons.terrastruct.com/infra%2F021-hardware.svg
+  }
+  lake: {
+    width: 300
+    icon: https://icons.terrastruct.com/infra%2F012-data.svg
+  }
+  firewall.icon: https://icons.terrastruct.com/infra%2F003-firewall.svg
+}

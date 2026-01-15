@@ -1,0 +1,48 @@
+---
+title: Posit Team Dedicated Security Checklist
+---
+
+## Introduction and Scope
+
+This document serves as a security checklist for ptd:Control Room. It outlines the minimum necessary security requirements to ensure compliance with relevant regulations and standards. These are highlighted responsibilities in addition or duplicative of existing security controls.
+
+
+
+## Security Checklist
+
+* SSO  
+  + Customer SSO is be provisioned using OIDC
+  + Internal Access to backend resources for the maintenance and deployment use Posit Okta 
+* Code Protections  
+    + Release branches require PRs to merge.
+    + All applications in GitHub Org uses only approved GitHub Apps  
+    + Access to ptd repos are backed by Okta
+    + CodeOwners is restricted to director level with 1 backup designate
+    + Secret Scanning is present as PR Check 
+* Posit Activity and Access Logging   
+    + Logging of Posit admin activity is sent to DataDog with documented [RBAC](https://docs.datadoghq.com/logs/guide/logs-rbac-permissions/?tab=ui) 
+    + All audit logs from control room are sent to Customer SIEM
+* Physical Security
+    + Infrastructure is provided by AWS and is protected by AWS physical security protections
+    + Access to ptd:control room is be restricted to Posit workstations
+* IaC  
+    + Pulumi is used for all Infra and [ workspace ](https://www.pulumi.com/ai/answers/sP5XapFF1mXSwxnFxgmQsD/provisioning-aws-workspaces-in-the-us-west-2-region) deployments, also see code protections 
+* Encryption
+    + FIPS level encryption is required for data at rest and in transit.
+* Monitoring and Alerting  
+    + CloudTrail and GuardDuty alerts are sent to customer facing logging/alerting stack.  
+* MDM  
+    + CrowdStrike is installed on all AWS Workspaces  
+* Vendor Security 
+    + Initial list and updates to vendors used for service delivery is communicated to the customer.
+* Incident Response
+  + Customer notification is required for all security incidents.
+
+## Conclusion
+
+By following this compliance checklist, we can ensure that ptd:Control Room meets all the minimum necessary security compliance requirements.
+
+
+[1] Latacora. "The SOC Starting Point". Available at: https://www.latacora.com/blog/2020/03/12/the-soc-starting/  
+[2] MVSP. "MVSP Website". Available at: https://mvsp.dev/mvsp.en/
+

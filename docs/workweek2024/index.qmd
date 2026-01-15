@@ -1,0 +1,350 @@
+---
+title: ✨  Posit Team Dedicated   ✨
+author: '<code>@cole</code>, <code>@meatballhat</code>'
+format:
+  revealjs:
+    theme:
+      - night
+      - local.scss
+    embed-resources: true
+    footer: '<strong style="font-size:1.5em;text-shadow: 2px 2px 3px black;"><code>#ptd</code> work week 2024</strong>'
+    transition: slide
+
+# Ferit's doc entitled "Work Week Product Sessions": https://docs.google.com/document/d/18f4V3DXH5uNXD3LF9Ymga9uD0TyRWNjjXbCnJVHpOXc/edit
+# Brain Dumping: https://docs.google.com/document/d/15eEXbv-osFsz3LLfKewRy5g10gRqVUpc3576lSFJwog/edit
+---
+
+# hello, fellow travelers
+
+<p style="font-size:2em;text-align:center">
+🎒 👜 🧮 🧭 🗺️ 📜 ⚗️ 🛃
+</p>
+
+::: {.notes}
+Thanks for joining us on this quick sidequest from the "Top N"! We're joining you today to
+represent Posit Team Dedicated, or "PTD".
+:::
+
+# whomst? {background-image="pyramid-cake.png"}
+
+<p style="margin:300px">
+&nbsp;
+</p>
+
+::: {.notes}
+We, PTD, are a small team of humans who have previously worked on other product teams and
+within Solution Engineering. We've been working closely with product teams, sales,
+solution engineering, really everyone, to make sure we're asking good questions and
+building on knowledge gained from practical experience.
+:::
+
+
+# 🤔 ⁉️
+
+::: {.incremental}
+- What is PTD?
+- For whom is PTD?
+- Why PTD now?
+:::
+
+::: {.notes}
+We're going to try to answer a few questions including "What is PTD?",
+"For whom is PTD?", and "Why PTD now?".
+:::
+
+---
+
+## {background-image="xy-base.png"}
+
+---
+
+## axes
+
+::: {.incremental}
+- $x = GRC$ <q style="display:block;color:#faa;">Governance, Risk Management, and Compliance</q>
+- $y = IT$ <q style="display:block;color:#afa;">IT Capacity</q>
+:::
+
+::: {.notes}
+The axes here are x="GRC", meaning "Governance, Risk Management, and Compliance"
+requirements, and y="IT" for "IT capacity", which roughly means available humans with
+knowledge, skills, and time to operate Posit products.
+:::
+
+---
+
+## {background-image="xy-base.png"}
+
+# how do they do it?
+
+::: {.notes}
+So how do they meet their data science needs with Posit products today?
+
+We're going to make some broad generalizations that will probably fall apart at the edges,
+but please suspend your disbelief for a bit.
+:::
+
+---
+
+## {background-image="xy-blhl.png"}
+
+<h3 style="margin-left:200px;">posit.cloud</h3>
+
+::: {.notes}
+They use posit.cloud!
+
+For example, consider the Higher Education customers, both instructors and students, who
+need a fully managed offering. They're using open data sets, and access controls are often
+managed at the individual level.
+:::
+
+---
+
+## {background-image="xy-thhl.png"}
+
+<h3 style="margin-left:200px;">
+self-hosted &amp; self-managed
+</h3>
+
+::: {.notes}
+They run it themselves! (including Posit documentation and Posit customer success)
+
+This could include a huge swath of the customer base.
+:::
+
+---
+
+## {background-image="xy-trhl.png"}
+
+<h3 style="margin-left:200px;">
+self-hosted &amp; self-managed (high GRC)
+</h3>
+
+::: {.notes}
+For example, consider the Credit Card Company where both GRC requirements and IT capacity
+are high. They're very comfortable with Kubernetes and AWS, with operational knowledge
+across all engineering teams.
+:::
+
+---
+
+## {background-image="xy-brhl.png"}
+
+<h3 style="margin-left:200px;">
+outsourced to managed service providers
+</h3>
+
+::: {.notes}
+They pay someone else to do it!
+
+Consider the Healthcare Provider where GRC requirements are high, but IT capacity is
+fairly low. There's no Kubernetes here, and may not even be elastic cloud resources
+available.
+:::
+
+---
+
+## {background-image="xy-rhhl-arrows.png"}
+
+<h3 style="margin-left:200px;">
+IT capacity drain? 😯
+</h3>
+
+::: {.notes}
+Many organizations are struggling to retain the IT capacity necessary to operate
+self-hosted, self-managed installations, but are reluctant to resort to outsourcing to MSP
+due to the high GRC requirements.
+:::
+
+# perfect world? {background-image="xy-rhhl.png"}
+
+<!--<h2 style="margin-top:0px;">
+perfect world?
+</h2>-->
+
+::: {.notes}
+So what would a perfect world look like for these customers with high GRC requirements?
+:::
+
+# perfect world?
+
+::: {.incremental}
+- meet GRC requirements 🔏
+- less work to validate upgrades are safe ⌛💨
+- customer-specific change (security, experimental feature) 🛠️
+:::
+
+::: {.notes}
+Meeting GRC requirements is required! Let's make sure all the checkboxes are checked,
+locks are locked, and there's an audit trail to prove it.
+
+These organizations know that keeping up to date is important, but the cost/benefit often
+favors staying on older versions rather than risking data and productivity loss.
+
+Integrating with other systems often requires changes that can't or shouldn't be built
+into Posit products. Supporting teams with specialized needs often requires enabling
+experimental features, but running an unsupported build is not an option.
+:::
+
+# so what are we doing?
+
+::: {.incremental}
+- (story time first)
+:::
+
+::: {.notes}
+A story not foreign to Customer Success, Sales, or Solutions Engineering
+
+Showing Posit Team. Folks are getting excited.
+
+So you run this for us right?
+
+So we can run it on Windows?
+:::
+
+---
+
+<img src="ptd-workflow.png">
+
+::: {.notes}
+Named Operator = Person
+
+Control Room = One source for all Posit actions
+
+Very simple requests - coordinated with customers
+:::
+
+---
+
+## glossary
+
+::: {.incremental}
+- control room - <q style="display:block;color:#faa">Posit-owned, secure & named access to workload accounts, check-boxes</q>
+- workload - <q style="display:block;color:#ff007b;">customer-owned, data access, user facing</q>
+:::
+
+
+---
+
+<img src="ptd-architecture.png">
+
+::: {.notes}
+To show you some of the tools we are using
+
+Pulumi manages most of the persistent state
+
+EKS is ephemeral and replaceable
+:::
+
+# zoom in on k8s
+
+---
+
+<img src="team-operator-components.png">
+
+::: {.notes}
+Inside of EKS we deploy the products in off-host execution
+
+This is managed entirely by the Team Operator
+:::
+
+---
+
+<img src="team-operator-outputs.png">
+
+::: {.notes}
+Lots of things that the operator does (or will do)
+
+Goal is to write code to manage Posit Team
+
+(lower the human effort)
+:::
+
+# goals
+
+---
+
+<img src="ptd-product.png">
+
+::: {.notes}
+
+Make the products better
+
+Our team has a history of being involved w/ product teams
+
+:::
+
+---
+
+<img src="ptd-experiment.png">
+
+::: {.notes}
+
+Goal of reducing time from commit to customer value
+
+Easier to run experiments
+
+DORA Metrics
+
+Interact w/ Product Teams to enable custom builds per site
+:::
+
+---
+
+<img src="ptd-saas.png" alt="saas time">
+
+::: {.notes}
+
+Allow users to focus on interacting and providing value in the browser
+
+We handle setup and configuration for you
+
+:::
+
+# control room
+
+## monitoring
+
+<img src="grafana-time.png" alt="grafana time">
+
+## argo
+
+<img src="argo-time.png" alt="argo time">
+
+## JSM
+
+<img src="jsm.png" alt="jsm">
+
+# up next
+
+## internal staging environment
+
+- uee dedicated internally
+
+- every engineering team has a deployment target
+
+## training resources
+
+<img src="training.png" alt="training resources">
+
+## chronicle
+
+<img src="chronicle.png" >
+
+## first customer eval
+
+This week! 🎉
+
+## office hours!
+
+2:30 Thursday in <q>Alexander Mitchell</q>
+
+# questions
+
+# fin
+
+<p>colophon</p>
+
+<!--
+vim:tw=90
+-->

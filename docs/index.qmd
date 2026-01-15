@@ -1,0 +1,18 @@
+---
+title: "Posit Team Dedicated"
+---
+
+## Posit Team Dedicated
+
+Posit Team Dedicated is a Single-Tenant SaaS distribution. PTD offers an enterprise customer the governance and compliance story of self-hosted products, with the convenience of SaaS. The pricing is based on both licenses + management fee. PTD includes the full team suite (Workbench, Connect, Package Manager, Chronicle), configured to work together seamlessly. A customer can choose both their cloud and their region.
+
+## Security standards
+
+* [PTD Security standards](security.html)
+
+## Presentations
+
+* [The PTD overview presentation](presentation/index.html)
+* [The WorkWeek 2024 PTD presentation](workweek2024/index.html)
+
+
