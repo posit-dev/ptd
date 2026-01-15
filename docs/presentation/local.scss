@@ -1,0 +1,39 @@
+/*-- scss:defaults --*/
+
+
+/*-- scss:rules --*/
+
+// TODO this is useful when using logo that is not baked into the background
+// and also putting slide numbers at the bottom
+//.slide-logo {
+//    display: block !important;
+//    position: fixed !important;
+//    bottom: 0 !important;
+//    right: 130px !important;
+//    max-height: 40px !important;
+//    height: 100% !important;
+//    width: auto !important;
+//    color: $body-color !important;
+//}
+//.slide-number,
+//.reveal.has-logo .slide-number {
+//    bottom: 14px !important;
+//    right: 50px !important;
+//    top: unset !important;
+//    color: #777777 !important;
+//}
+
+// don't show the slide numbers on the title slide
+.reveal .slide-number>a[href*='title-slide'] {
+    display: none;
+}
+
+// override the positioning of the account-architecture diagram
+// thank you @rodriin!
+#account-architecture img {
+    position: absolute;
+    top: -50px;
+    left: 700px;
+    max-width: 110%;
+    max-height: 110%;
+}
