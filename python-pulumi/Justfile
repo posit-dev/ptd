@@ -1,0 +1,21 @@
+default: test lint format-check
+
+test *args:
+    uv run pytest {{args}}
+
+coverage:
+    uv run coverage run -m pytest
+    uv run coverage combine
+    uv run coverage report
+    uv run coverage json
+
+check: lint format-check
+
+lint *args:
+    uv run ruff check {{args}}
+
+format:
+    uv run ruff format
+
+format-check:
+    uv run ruff format --check

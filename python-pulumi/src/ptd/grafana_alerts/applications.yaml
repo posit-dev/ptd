@@ -1,0 +1,71 @@
+# To delete these alerts, simply removing the configMap that uses this method will not work.
+# Replace file contents with the following and apply in order to delete the alerts:
+# apiVersion: 1
+# deleteRules:
+#   - orgId: 1
+#     uid: loki_wal_disk_full_failures
+#
+# See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: Applications
+      folder: Posit Alerts
+      interval: 1m
+      rules:
+        - uid: loki_wal_disk_full_failures
+          title: Loki WAL Disk Full Failures
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: loki_ingester_wal_disk_full_failures_total
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            description: Loki ingester has experienced WAL disk full failures. This indicates storage issues with the Loki WAL directory in cluster {{ $labels.cluster }}.
+            summary: Loki WAL disk full failures detected in {{ $labels.cluster }}
+          labels:
+            opsgenie: "1"
+          isPaused: false
+

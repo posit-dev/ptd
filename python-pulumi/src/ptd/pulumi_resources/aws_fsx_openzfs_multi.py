@@ -1,0 +1,117 @@
+from __future__ import annotations
+
+import dataclasses
+
+import pulumi
+import pulumi_aws as aws
+
+
+@dataclasses.dataclass
+class AWSFsxOpenZfsMultiArgs:
+    copy_tags_to_backups: pulumi.Input[bool]
+    copy_tags_to_volumes: pulumi.Input[bool]
+    daily_automatic_backup_start_time: pulumi.Input[str]
+    deployment_type: pulumi.Input[str]
+    root_volume_configuration: AWSFsxOpenZfsMultiRootVolumeConfigurationArgs
+    route_table_ids: list[str] | list[pulumi.Output[str]]
+    security_group_ids: pulumi.Input[list[pulumi.Input[str]]]
+    storage_capacity: pulumi.Input[int]
+    subnet_ids: list[str] | list[pulumi.Output[str]]
+    tags: dict[str, str]
+    throughput_capacity: pulumi.Input[int]
+
+
+@dataclasses.dataclass
+class AWSFsxOpenZfsMultiRootVolumeConfigurationArgs:
+    copy_tags_to_snapshots: pulumi.Input[bool]
+    data_compression_type: pulumi.Input[str]
+    nfs_exports: AWSFsxOpenZfsMultiRootVolumeConfigurationNfsExportsArgs
+
+
+@dataclasses.dataclass
+class AWSFsxOpenZfsMultiRootVolumeConfigurationNfsExportsArgs:
+    client_configurations: list[AWSFsxOpenZfsMultiRootVolumeConfigurationNfsExportsClientConfigurationArgs]
+
+
+@dataclasses.dataclass
+class AWSFsxOpenZfsMultiRootVolumeConfigurationNfsExportsClientConfigurationArgs:
+    clients: pulumi.Input[str]
+    options: pulumi.Input[list[pulumi.Input[str]]]
+
+
+class AWSFsxOpenZfsMulti(pulumi.ComponentResource):
+    """
+    A component resource that creates an AWS FSx for OpenZFS file system using the native Pulumi AWS provider.
+    This replaces the previous custom dynamic resource implementation.
+    """
+
+    # Expose the important outputs
+    dns_name: pulumi.Output[str]
+    root_volume_id: pulumi.Output[str]
+    file_system_id: pulumi.Output[str]
+
+    def __init__(
+        self,
+        name: str,
+        props: AWSFsxOpenZfsMultiArgs,
+        opts: pulumi.ResourceOptions | None = None,
+    ):
+        super().__init__("ptd:aws:AWSFsxOpenZfsMulti", name, None, opts)
+
+        # Convert our custom args to the format expected by aws.fsx.OpenZfsFileSystem
+        client_configurations = [
+            aws.fsx.OpenZfsFileSystemRootVolumeConfigurationNfsExportsClientConfigurationArgs(
+                clients=client_config.clients,
+                options=client_config.options,
+            )
+            for client_config in props.root_volume_configuration.nfs_exports.client_configurations
+        ]
+
+        nfs_exports = aws.fsx.OpenZfsFileSystemRootVolumeConfigurationNfsExportsArgs(
+            client_configurations=client_configurations,
+        )
+
+        root_volume_configuration = aws.fsx.OpenZfsFileSystemRootVolumeConfigurationArgs(
+            copy_tags_to_snapshots=props.root_volume_configuration.copy_tags_to_snapshots,
+            data_compression_type=props.root_volume_configuration.data_compression_type,
+            nfs_exports=nfs_exports,
+        )
+
+        # Create the FSx for OpenZFS file system using the native provider
+        # Note: For MULTI_AZ deployments, we need to specify preferred_subnet_id
+        preferred_subnet_id = None
+        if props.deployment_type == "MULTI_AZ_1" and len(props.subnet_ids) > 0:
+            # Use the first subnet as preferred for MULTI_AZ
+            preferred_subnet_id = props.subnet_ids[0]
+
+        self.file_system = aws.fsx.OpenZfsFileSystem(
+            f"{name}-filesystem",
+            deployment_type=props.deployment_type,
+            preferred_subnet_id=preferred_subnet_id,
+            subnet_ids=props.subnet_ids,
+            security_group_ids=props.security_group_ids,
+            storage_capacity=props.storage_capacity,
+            storage_type="SSD",  # Fixed to SSD as in the original implementation
+            throughput_capacity=props.throughput_capacity,
+            copy_tags_to_backups=props.copy_tags_to_backups,
+            copy_tags_to_volumes=props.copy_tags_to_volumes,
+            daily_automatic_backup_start_time=props.daily_automatic_backup_start_time,
+            route_table_ids=props.route_table_ids,
+            root_volume_configuration=root_volume_configuration,
+            tags=props.tags,
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
+        # Export the outputs
+        self.dns_name = self.file_system.dns_name
+        self.root_volume_id = self.file_system.root_volume_id
+        self.file_system_id = self.file_system.id
+
+        # Register the outputs with the component resource
+        self.register_outputs(
+            {
+                "dns_name": self.dns_name,
+                "root_volume_id": self.root_volume_id,
+                "file_system_id": self.file_system_id,
+            }
+        )
