@@ -1,0 +1,6 @@
+apiVersion: posit.team/v1
+kind: AzureWorkloadConfig
+metadata:
+  name: test-az-staging
+spec:
+  region: eastus2
