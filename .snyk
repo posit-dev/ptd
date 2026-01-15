@@ -1,0 +1,57 @@
+# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
+version: v1.25.1
+# ignores vulnerabilities until expiry date; change duration by modifying expiry date
+ignore:
+  'snyk:lic:pip:certifi:MPL-2.0':
+    - '*':
+        reason: EJM this package is needed for Mozilla CA
+        expires: 2025-02-14T00:00:00.000Z
+        created: 2023-11-03T19:12:34.356Z
+  'snyk:lic:pip:pytest-base-url:MPL-2.0':
+    - '*':
+        reason: EJM this package is needed for using playwright test automation
+        expires: 2025-02-14T00:00:00.000Z
+        created: 2023-12-03T14:34:00.356Z
+  'SNYK:LIC:PIP:TEXT-UNIDECODE:ARTISTIC-2.0':
+    - '*':
+        reason: EJM this package is needed for using playwright test automation
+        expires: 2025-02-14T00:00:00.000Z
+        created: 2023-12-03T14:34:00.356Z
+  'SNYK:LIC:PIP:PATHSPEC:MPL-2.0':
+    - '*':
+        reason: EJM this package is needed for python formatting
+        expires: 2025-02-14T00:00:00.000Z
+        created: 2023-12-21T12:07:00.356Z
+  'snyk:lic:golang:github.com:hashicorp:go-multierror:MPL-2.0':
+    - '*':
+        reason: EJM this package is needed for using pulumi
+        expires: 2026-02-14T00:00:00.000Z
+        created: 2024-11-19T14:34:00.356Z
+  'snyk:lic:golang:github.com:hashicorp:errwrap:MPL-2.0':
+    - '*':
+        reason: EJM this package is needed for using pulumi
+        expires: 2026-02-14T00:00:00.000Z
+        created: 2024-11-19T14:34:00.356Z
+  'snyk:lic:golang:github.com:hashicorp:hcl:v2:MPL-2.0':
+    - '*':
+        reason: EJM this package is needed for using pulumi
+        expires: 2026-02-14T00:00:00.000Z
+        created: 2024-11-19T14:34:00.356Z
+  'snyk:lic:golang:github.com:hashicorp:hcl:MPL-2.0':
+    - '*':
+        reason: EJM this package is needed for using pulumi
+        expires: 2026-02-14T00:00:00.000Z
+        created: 2024-11-19T14:34:00.356Z
+  'snyk:lic:golang:github.com:letsencrypt:boulder:MPL-2.0':
+    - '*':
+        reason: EJM this package is needed for using letsencrypt
+        expires: 2026-02-14T00:00:00.000Z
+        created: 2025-09-11T14:34:00.356Z
+patch: {}
+exclude:
+  global:
+    - docs/**
+    - e2e/**
+    - cmd/**/*_test.go
+    - lib/**/*_test.go
+    - lib/helpers/oidc.go
