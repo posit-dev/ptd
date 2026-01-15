@@ -1,0 +1,67 @@
+name: python-pulumi
+
+on:
+  push:
+    branches: [main]
+    tags: [v*]
+    paths: [python-pulumi/**,.github/workflows/python-pulumi.yml]
+  pull_request:
+    paths: [python-pulumi/**,.github/workflows/python-pulumi.yml]
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: extractions/setup-just@v2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install
+        working-directory: python-pulumi
+
+      - name: Install deps
+        run: uv sync
+        working-directory: python-pulumi
+
+      - run: just test
+        working-directory: python-pulumi
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: extractions/setup-just@v2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install
+        working-directory: python-pulumi
+
+      - name: Install deps
+        run: uv sync
+        working-directory: python-pulumi
+
+      - run: just format-check
+        working-directory: python-pulumi
+
+      - run: just lint
+        working-directory: python-pulumi

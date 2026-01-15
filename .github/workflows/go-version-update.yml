@@ -1,0 +1,138 @@
+name: Update to the Latest Go Toolchain
+# from https://github.com/rstudio/rstudio-workbench-vscode-ext/blob/main/.github/workflows/update-go-version.yml
+
+on:
+  schedule:
+    # Go releases seem to come out on Tuesdays and Thursdays, so check every
+    # Friday during off-peak hours (2:00 AM EST).
+    - cron: "0 7 * * 5"
+  workflow_dispatch: # Allow manual triggers
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  build-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+      - id: matrix
+        name: Build go module matrix
+        run: |
+          echo "matrix=$(go run .github/scripts/generate-go-update-matrix.go)" >> "${GITHUB_OUTPUT}"
+  update-go:
+    runs-on: ubuntu-latest
+    needs: [build-matrix]
+    strategy:
+      fail-fast: false
+      matrix:
+        env: ${{ fromJSON(needs.build-matrix.outputs.matrix) }}
+    steps:
+      - name: Get the latest stable Go version from go.dev
+        id: latest
+        run: |
+          LATEST_GO=$(curl -s "https://go.dev/dl/?mode=json" | jq -r 'map(select(.stable == true)) | .[0].version | sub("^go"; "")')
+          echo "version=$LATEST_GO" >> $GITHUB_OUTPUT
+          echo "Latest stable Go version: $LATEST_GO"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        id: setup-go
+        with:
+            go-version: 'stable'
+
+      - name: Check the current Go version used for release builds
+        id: current
+        run: |
+          # Get the first module from the comma-separated list
+          FIRST_MODULE=$(echo "${{ matrix.env.module }}" | cut -d',' -f1)
+          cd "$FIRST_MODULE"
+          CURRENT_GO=$(go list -m -f '{{.GoVersion}}')
+          echo "version=$CURRENT_GO" >> $GITHUB_OUTPUT
+          echo "Current Go version in $FIRST_MODULE: $CURRENT_GO"
+
+      - name: Check for existing PRs
+        id: existing_prs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Look for PRs opened by this workflow.
+          EXISTING_PRS=$(gh pr list --author='github-actions[bot]' --label=dependencies --json=title,number,headRefName --state=open)
+          echo "existing_prs=$EXISTING_PRS" >> $GITHUB_OUTPUT
+
+          # Check if a PR already exists for this specific Go version and group.
+          TARGET_TITLE="Bump the Go toolchain for ${{ matrix.env.group }} to ${{ steps.latest.outputs.version }}"
+          MATCHING_PR=$(echo "$EXISTING_PRS" | jq -r --arg title "$TARGET_TITLE" '.[] | select(.title == $title) | .number')
+
+          if [ -n "$MATCHING_PR" ]; then
+            echo "matching_pr_exists=true" >> $GITHUB_OUTPUT
+            echo "matching_pr_number=$MATCHING_PR" >> $GITHUB_OUTPUT
+            echo "PR already exists for ${{ steps.latest.outputs.version }}: #$MATCHING_PR"
+          else
+            echo "matching_pr_exists=false" >> $GITHUB_OUTPUT
+            echo "No existing PR found for ${{ steps.latest.outputs.version }}"
+          fi
+
+      - name: Check if we need to update
+        id: check
+        run: |
+          if [ "${{ steps.latest.outputs.version }}" != "${{ steps.current.outputs.version }}" ]; then
+            if [ "${{ steps.existing_prs.outputs.matching_pr_exists }}" == "true" ]; then
+              echo "needs_update=false" >> $GITHUB_OUTPUT
+              echo "Matching PR already exists: #${{ steps.existing_prs.outputs.matching_pr_number }}"
+            else
+              echo "needs_update=true" >> $GITHUB_OUTPUT
+              echo "Needs update: ${{ steps.current.outputs.version }} -> ${{ steps.latest.outputs.version }}"
+            fi
+          else
+            echo "needs_update=false" >> $GITHUB_OUTPUT
+            echo "No update needed"
+          fi
+
+      - name: Update the Go version used for release builds
+        if: steps.check.outputs.needs_update == 'true'
+        run: |
+          # Update all modules in the group
+          IFS=',' read -ra MODULES <<< "${{ matrix.env.module }}"
+          for MODULE in "${MODULES[@]}"; do
+            echo "Updating $MODULE with Go version ${{ steps.latest.outputs.version }}"
+            cd "$MODULE"
+            go mod edit -go=${{ steps.latest.outputs.version }}
+            cd - > /dev/null
+          done
+
+      - name: Generate a github app token
+        # without an app token, the PR opened in the next step will not trigger GHA workflows
+        # https://docs.github.com/en/actions/tutorials/authenticate-with-github_token#granting-additional-permissions
+        id: generate-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.PTD_GITHUB_APP_ID }}
+          private-key: ${{ secrets.PTD_GITHUB_APP_SECRET }}
+
+      - name: Create the Pull Request
+        if: steps.check.outputs.needs_update == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ steps.generate-token.outputs.token }}
+          base: 'main'
+          commit-message: "Bump the Go toolchain for ${{ matrix.env.group }} to ${{ steps.latest.outputs.version }}."
+          title: "Bump the Go toolchain for ${{ matrix.env.group }} to ${{ steps.latest.outputs.version }}"
+          body: |
+            This commit bumps the version of the Go toolchain for the following modules from `${{ steps.current.outputs.version }}` to  `${{ steps.latest.outputs.version }}`:
+
+            ${{ matrix.env.module }}
+
+            <sub>Created by the [`update-go-version` GitHub Actions workflow](https://github.com/rstudio/ptd/actions/workflows/update-go-version.yml).</sub>
+          branch: bump-${{ matrix.env.group }}-go-toolchain-to-${{ steps.latest.outputs.version }}
+          labels: dependencies

@@ -1,0 +1,68 @@
+name: Critical User Journey Tests
+
+on:
+  # E2E tests require a running flightdeck instance
+  # Since flightdeck is now in posit-dev/team-operator, this workflow
+  # only runs when manually triggered with a URL
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Base URL to test against (e.g., ganso01-staging.posit.team)'
+        required: true
+        type: string
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install e2e deps
+        run: uv --project e2e sync
+
+      - uses: extractions/setup-just@v2
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('e2e/uv.lock') }}
+
+      - name: Install Playwright browsers and deps
+        run: uv run --project e2e playwright install --with-deps
+
+      - name: Run the CUJ group of tests
+        id: e2e-tests
+        run: just test-e2e
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: ${{ inputs.url }}
+
+      - name: Convert test results to CTRF
+        if: always()
+        run: npx junit-to-ctrf test-results/junit.xml -o test-results/ctrf-report.json
+
+      - name: Publish test report
+        uses: ctrf-io/github-test-reporter@v1
+        if: always()
+        with:
+          report-path: test-results/ctrf-report.json
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-test-results
+          path: test-results/
+          retention-days: 30

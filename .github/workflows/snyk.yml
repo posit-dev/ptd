@@ -1,0 +1,74 @@
+name: Snyk security scanning
+
+on:
+  push:
+    branches: [main]
+    tags: [v*]
+
+  pull_request:
+    branches: [main]
+
+  merge_group:
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: snyk/actions/setup@0.4.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install
+        working-directory: python-pulumi
+
+      - name: Install deps
+        run: uv sync
+        working-directory: python-pulumi
+
+      - uses: warjiang/setup-skopeo@main
+
+      - uses: actions/setup-go@v5
+        id: setup-go
+        with:
+          go-version-file: cmd/go.mod
+          cache: true
+
+      - uses: extractions/setup-just@v2
+
+      - uses: actions/cache@v4
+        with:
+          path: .local/bin
+          key: ${{ runner.os }}-local-bins-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-local-bins-
+
+      - run: just git-ssh
+
+      - run: just deps
+
+      - run: go version
+
+      - run: |
+          git diff --exit-code
+          git diff --staged --exit-code
+
+      - name: Snyk check for open source dependency vulnerabilities
+        # Scan specific projects instead of --all-projects to avoid Snyk CLI packageURL validation issues
+        # Note: cmd/go.mod excluded due to Snyk CLI bug with Go module name validation
+        # Note: python-pulumi excluded - Snyk doesn't support uv/pyproject.toml
+        run: |
+          snyk monitor --policy-path=.snyk --file=lib/go.mod
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Snyk static code analysis
+        run: snyk code test --report --project-name="ptd-static-analysis" --threshold=medium
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}

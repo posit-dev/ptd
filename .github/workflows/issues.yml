@@ -1,0 +1,22 @@
+name: issues
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  add-to-project:
+    name: Add issue to PTD project board
+    runs-on: ubuntu-latest
+    steps:
+    - name: Generate a token
+      id: generate-token
+      uses: actions/create-github-app-token@v2
+      with:
+        app-id: ${{ vars.PTD_GITHUB_APP_ID }}
+        private-key: ${{ secrets.PTD_GITHUB_APP_SECRET }}
+    - name: Add issue to PTD project board
+      uses: actions/add-to-project@main
+      with:
+        github-token: ${{ steps.generate-token.outputs.token }}
+        project-url: https://github.com/orgs/rstudio/projects/174
+
