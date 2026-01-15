@@ -1,0 +1,18 @@
+# CODEOWNERS for posit-dev/ptd
+# These owners will be requested for review on PRs
+
+# Default owners for everything
+* @posit-dev/ptd-maintainers
+
+# Go CLI and libraries
+/cmd/ @posit-dev/ptd-maintainers
+/lib/ @posit-dev/ptd-maintainers
+
+# Python Pulumi IaC
+/python-pulumi/ @posit-dev/ptd-maintainers
+
+# Documentation
+/docs/ @posit-dev/ptd-maintainers
+
+# CI/CD
+/.github/ @posit-dev/ptd-maintainers
