@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/posit-dev/ptd/compare/v1.0.0...v1.0.1) (2026-01-16)
+
+
+### Bug Fixes
+
+* add missing site yaml for sites step ([e28e8e5](https://github.com/posit-dev/ptd/commit/e28e8e5a80ea788b5d33c26eae7f7e1c78e4368e))
+
 # 1.0.0 (2026-01-15)
 
 
