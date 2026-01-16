@@ -32,6 +32,7 @@ The CLI searches for configuration files in the following order:
 
 All configuration can be overridden using environment variables with the `PTD_` prefix:
 - `PTD_VERBOSE=true` - Enable verbose logging
+- `PTD_TARGETS_CONFIG_DIR` - Path to targets configuration directory, applies to all commands which accept a control room or workload target name (see [Custom Targets Configuration Directory](custom-targets-config-dir.md))
 - `PROJECT_ROOT` - Override project root directory
 
 ### Global Flags
@@ -41,6 +42,9 @@ All commands support these global flags:
 | Flag | Short | Type | Default | Description |
 |------|-------|------|---------|-------------|
 | `--verbose` | `-v` | bool | false | Enable verbose/debug output |
+| `--targets-config-dir` | | string | `./infra` | Path to targets configuration directory (absolute or relative to project root) |
+
+**Note:** `--targets-config-dir` applies to all commands which accept a control room or workload target name. For detailed information about configuring custom targets directories, see the [Custom Targets Configuration Directory](custom-targets-config-dir.md) guide.
 
 ### Project Root Detection
 
@@ -161,10 +165,10 @@ ptd assume <target> [flags]
 
 Export AWS credentials for a target:
 ```bash
-$ ptd assume ganso01-staging
+$ ptd assume testing01-staging
 # Exporting session for arn:aws:sts::123456789012:assumed-role/admin.posit.team/user@example.com
 # In order to use this directly, run:
-# eval $(ptd assume ganso01-staging)
+# eval $(ptd assume testing01-staging)
 export AWS_ACCESS_KEY_ID=ASIA...
 export AWS_SECRET_ACCESS_KEY=...
 export AWS_SESSION_TOKEN=...
@@ -172,7 +176,7 @@ export AWS_SESSION_TOKEN=...
 
 Evaluate credentials directly in your shell:
 ```bash
-eval $(ptd assume ganso01-staging)
+eval $(ptd assume testing01-staging)
 ```
 
 For Azure targets:
@@ -189,6 +193,8 @@ $ ptd assume azure-target
 ### `ptd ensure`
 
 Ensure a target is converged by running infrastructure deployment steps. This command orchestrates the deployment using Pulumi to bring the target to its desired state.
+
+See [Ensure Command Flow](ensure-flow.md) for details on resources managed by this command.
 
 **Usage:**
 ```bash
@@ -208,6 +214,7 @@ ptd ensure <target> [flags]
 | `--refresh` | `-r` | bool | false | Refresh the stack state before applying |
 | `--auto-apply` | `-a` | bool | false | Skip manual approval and automatically apply changes |
 | `--destroy` | | bool | false | Destroy the Pulumi stack |
+| `--list-steps` | `-l` | bool | false | List all steps for the target (including custom steps) and exit |
 | `--start-at-step` | | string | "" | Start at a specific step (supports tab completion) |
 | `--only-steps` | | []string | nil | Only run specific steps (supports tab completion) |
 | `--exclude-resources` | | []string | nil | Exclude specific resources from the ensure process |
@@ -283,44 +290,49 @@ Common control room steps (in order):
 
 **Examples:**
 
+List all available steps for a target:
+```bash
+ptd ensure testing01-staging --list-steps
+```
+
 Full deployment with preview:
 ```bash
-ptd ensure ganso01-staging
+ptd ensure testing01-staging
 ```
 
 Auto-apply without manual confirmation:
 ```bash
-ptd ensure ganso01-staging --auto-apply
+ptd ensure testing01-staging --auto-apply
 ```
 
 Run only specific steps:
 ```bash
-ptd ensure ganso01-staging --only-steps cluster,helm
+ptd ensure testing01-staging --only-steps cluster,helm
 ```
 
 Start at a specific step:
 ```bash
-ptd ensure ganso01-staging --start-at-step helm
+ptd ensure testing01-staging --start-at-step helm
 ```
 
 Destroy a stack (runs steps in reverse order):
 ```bash
-ptd ensure ganso01-staging --destroy
+ptd ensure testing01-staging --destroy
 ```
 
 Target specific resources:
 ```bash
-ptd ensure ganso01-staging --target-resources my-resource
+ptd ensure testing01-staging --target-resources my-resource
 ```
 
 Exclude resources:
 ```bash
-ptd ensure ganso01-staging --exclude-resources problematic-resource
+ptd ensure testing01-staging --exclude-resources problematic-resource
 ```
 
 Dry run to see what would change:
 ```bash
-ptd ensure ganso01-staging --dry-run
+ptd ensure testing01-staging --dry-run
 ```
 
 **Implementation:** `/cmd/ensure.go:50`
@@ -349,12 +361,12 @@ ptd workon <cluster> [step] [flags]
 
 Open shell with target credentials:
 ```bash
-ptd workon ganso01-staging
+ptd workon testing01-staging
 ```
 
 Work on a specific step (opens shell in Pulumi stack directory):
 ```bash
-ptd workon ganso01-staging helm
+ptd workon testing01-staging helm
 ```
 
 **What it does:**
@@ -370,7 +382,7 @@ ptd workon ganso01-staging helm
 
 **Example session:**
 ```bash
-$ ptd workon ganso01-staging helm
+$ ptd workon testing01-staging helm
 Starting interactive shell in /path/to/stack with session identity arn:aws:sts::123456789012:assumed-role/admin.posit.team/user@example.com
 To exit the shell, type 'exit' or press Ctrl+D
 (shell opens with environment configured)
@@ -401,17 +413,17 @@ ptd proxy <target> [flags]
 
 Start proxy in foreground (blocks until Ctrl+C):
 ```bash
-ptd proxy ganso01-staging
+ptd proxy testing01-staging
 ```
 
 Start proxy in background:
 ```bash
-ptd proxy ganso01-staging --daemon
+ptd proxy testing01-staging --daemon
 ```
 
 Stop running proxy:
 ```bash
-ptd proxy ganso01-staging --stop
+ptd proxy testing01-staging --stop
 ```
 
 **Implementation:** `/cmd/proxy.go:26`
@@ -453,17 +465,17 @@ ptd k9s <cluster> [flags]
 
 Open k9s in default namespace:
 ```bash
-ptd k9s ganso01-staging
+ptd k9s testing01-staging
 ```
 
 Open k9s in specific namespace:
 ```bash
-ptd k9s ganso01-staging -n kube-system
+ptd k9s testing01-staging -n kube-system
 ```
 
 Pass additional k9s arguments:
 ```bash
-ptd k9s ganso01-staging --args="--readonly"
+ptd k9s testing01-staging --args="--readonly"
 ```
 
 **What it does:**
@@ -485,8 +497,8 @@ ptd k9s ganso01-staging --args="--readonly"
 - Checks Tailscale connection status if enabled
 
 **Cluster naming patterns:**
-- Control room: `main01-{environment}` (e.g., `main01-staging`)
-- Workload: `{target_name}-{release}` (e.g., `ganso01-main`)
+- Control room: `main01-{environment}` (e.g., `control01-staging`)
+- Workload: `{target_name}-{release}` (e.g., `testing01-main`)
 
 ---
 
@@ -504,7 +516,7 @@ ptd hash <target>
 
 **Example:**
 ```bash
-$ ptd hash ganso01-staging
+$ ptd hash testing01-staging
 a1b2c3d4
 ```
 
@@ -527,72 +539,38 @@ Generate the admin principal role CloudFormation template for AWS accounts.
 
 **Usage:**
 ```bash
-ptd admin generate-role [flags]
+ptd admin generate-role <control-room-target> [flags]
 ```
 
-**Flags:**
-
-| Flag | Short | Type | Default | Description |
-|------|-------|------|---------|-------------|
-| `--production` | `-p` | bool | true | Generate production role (vs staging) |
+**Arguments:**
+- `<control-room-target>` - Control room target name (e.g., `control01-staging`)
 
 **Examples:**
 
-Generate production role template:
 ```bash
-ptd admin generate-role > admin-role-prod.yaml
+ptd admin generate-role control01-staging > admin-role.yaml
 ```
 
-Generate staging role template:
-```bash
-ptd admin generate-role --production=false > admin-role-staging.yaml
-```
 
 **What it generates:**
 - CloudFormation template with:
   - Managed policy: `PositTeamDedicatedAdminPolicy`
   - IAM role: `admin.posit.team`
-  - Trust policy for authorized principals
+  - Trust policy for authorized principals (from control room config)
   - Permissions boundary
   - Self-protection policies
 
-**Implementation:** `/cmd/admin.go:56`
 
 **Usage:**
 Deploy the generated template to AWS accounts to set up admin access:
 ```bash
-ptd admin generate-role > template.yaml
+ptd admin generate-role control01-staging > template.yaml
 aws cloudformation create-stack \
   --stack-name ptd-admin-role \
   --template-body file://template.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameters ParameterKey=TrustedPrincipals,ParameterValue="arn:aws:iam::123456789012:user/admin"
 ```
-
-#### `ptd admin export-accounts`
-
-Export AWS account IDs for PTD accounts as shell export commands.
-
-**Usage:**
-```bash
-ptd admin export-accounts
-```
-
-**Example Output:**
-```bash
-export PTD_AWS_ACCOUNT_LAB_PRODUCTION=123456789012
-export PTD_AWS_ACCOUNT_LAB_STAGING=234567890123
-export PTD_AWS_ACCOUNT_PRODUCTION=345678901234
-export PTD_AWS_ACCOUNT_STAGING=456789012345
-export PTD_AWS_ACCOUNT_TEAM=567890123456
-```
-
-**Usage:**
-```bash
-eval $(ptd admin export-accounts)
-```
-
-**Implementation:** `/cmd/admin.go:36`
 
 ---
 
@@ -734,20 +712,20 @@ ptd --verbose <command>  # Enable debug logging
 
 ```bash
 # 1. Ensure control room is up
-ptd ensure main01-staging --auto-apply
+ptd ensure control01-staging --auto-apply
 
 # 2. Deploy workload
-ptd ensure ganso01-staging --auto-apply
+ptd ensure testing01-staging --auto-apply
 
 # 3. Access the cluster
-ptd k9s ganso01-staging
+ptd k9s testing01-staging
 ```
 
 ### Debug a deployment
 
 ```bash
 # 1. Open interactive shell
-ptd workon ganso01-staging helm
+ptd workon testing01-staging helm
 
 # 2. Manually run Pulumi commands
 pulumi preview
@@ -762,23 +740,23 @@ pulumi logs
 
 ```bash
 # Preview changes
-ptd ensure ganso01-staging
+ptd ensure testing01-staging
 
 # Apply after review
-ptd ensure ganso01-staging --auto-apply
+ptd ensure testing01-staging --auto-apply
 ```
 
 ### Access private resources
 
 ```bash
 # Start proxy in background
-ptd proxy ganso01-staging --daemon
+ptd proxy testing01-staging --daemon
 
 # Configure application to use SOCKS5 proxy on localhost:1080
 export HTTPS_PROXY=socks5://localhost:1080
 
 # When done, stop proxy
-ptd proxy ganso01-staging --stop
+ptd proxy testing01-staging --stop
 ```
 
 ---
@@ -846,7 +824,7 @@ Target configurations are defined in `ptd.yaml` files throughout the `/infra` di
 Example structure:
 ```yaml
 targets:
-  ganso01-staging:
+  testing01-staging:
     cloud_provider: aws
     region: us-east-1
     control_room: false
@@ -858,10 +836,13 @@ targets:
 
 ## Related Documentation
 
-- [Main README](../../README.md) - Project overview
-- [Getting Started](../GETTING_STARTED.md) - Setup prerequisites
-- [Configuration Guide](../CONFIGURATION.md) - Configuration reference
-- [Justfile](../../Justfile) - Build and development tasks
+- [Custom Targets Configuration Directory](custom-targets-config-dir.md) - Configure custom target directories
+- [Ensure Command Flow](ensure-flow.md)
+- [Main README](./README.md) - Project overview
+- [Development Environment Guide](https://positpbc.atlassian.net/wiki/spaces/PTD/pages/1141997738/Development+Environment) - Setup prerequisites
+- [Justfile](./Justfile) - Build and development tasks
+- [Team Operator](./team-operator/README.md) - Kubernetes operator
+- [Python Pulumi (Legacy)](./python-pulumi/README.md) - Legacy Python CLI
 
 ---
 
@@ -904,4 +885,4 @@ type Step interface {
 
 ---
 
-*Last updated: 2025*
+*Last updated: 2026*

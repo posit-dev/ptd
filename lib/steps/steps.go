@@ -17,7 +17,6 @@ var createStack = pulumi.Stack
 var runPulumi = pulumiRefreshPreviewUpCancel
 
 var ControlRoomSteps = []Step{
-	&BootstrapStep{},
 	&WorkspacesStep{},
 	&PersistentStep{},
 	&PostgresConfigStep{},
