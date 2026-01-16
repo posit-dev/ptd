@@ -397,6 +397,41 @@ class AlloyConfig(pulumi.ComponentResource):
                     }}
                 }}
 
+                // Scrape cAdvisor metrics from kubelet for container resource usage
+                discovery.kubernetes "nodes" {{
+                    role = "node"
+                }}
+
+                discovery.relabel "kubelet" {{
+                    targets = discovery.kubernetes.nodes.targets
+
+                    rule {{
+                        target_label = "__address__"
+                        replacement  = "kubernetes.default.svc:443"
+                    }}
+
+                    rule {{
+                        source_labels = ["__meta_kubernetes_node_name"]
+                        regex         = "(.+)"
+                        replacement   = "/api/v1/nodes/${{1}}/proxy/metrics/cadvisor"
+                        target_label  = "__metrics_path__"
+                    }}
+                }}
+
+                prometheus.scrape "kubelet_cadvisor" {{
+                    targets      = discovery.relabel.kubelet.output
+                    scheme       = "https"
+                    bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+                    tls_config {{
+                        ca_file              = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+                        insecure_skip_verify = false
+                    }}
+                    forward_to = [prometheus.relabel.default.receiver]
+                    clustering {{
+                        enabled = true
+                    }}
+                }}
+
                 prometheus.scrape "nodes" {{
                     targets    = prometheus.exporter.unix.nodes.targets
                     forward_to = [prometheus.relabel.default.receiver]

@@ -89,12 +89,23 @@ Grafana Alloy is the telemetry collection agent that runs on every node in the c
   - Kubernetes pods in `posit-team`, `posit-team-system`, and `loki` namespaces
   - Node exporters (CPU, memory, disk, network)
   - kube-state-metrics for cluster state
+  - **kubelet cAdvisor** for container-level resource usage metrics
   - Blackbox exporter for health checks
   - Cloud provider metrics for managed storage and database services
 - Collects logs from:
   - Kubernetes pods in `posit-team` and `posit-team-system` namespaces
   - Optionally system logs via journald (controlled by `grafana_scrape_system_logs`)
 - Runs with clustering enabled for high availability
+
+**Container Metrics (via cAdvisor)**: The following container-level metrics are collected for debugging resource issues like OOMKilled pods:
+- `container_memory_working_set_bytes` - Active memory usage (what OOM killer evaluates)
+- `container_memory_usage_bytes` - Total memory usage including cache
+- `container_memory_rss` - Resident Set Size (anonymous memory)
+- `container_memory_cache` - Cache memory
+- `container_spec_memory_limit_bytes` - Configured memory limits
+- `container_cpu_usage_seconds_total` - CPU usage per container
+- `container_network_*` - Network I/O metrics
+- `container_fs_*` - Filesystem usage and I/O metrics
 
 **Helm Chart**: `grafana/alloy`
 
@@ -240,6 +251,47 @@ datasources:
 
 Access Grafana at `https://grafana.<workload-domain>` for metrics visualization and log exploration.
 
+## Debugging OOMKilled Pods
+
+When pods are terminated due to OOM (Out of Memory), use these queries in Grafana to investigate:
+
+### Identify OOMKilled Pods
+```promql
+# See which containers were OOMKilled
+kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}
+```
+
+### Memory Usage Before Termination
+```promql
+# Working set memory (what OOM killer evaluates) by container
+container_memory_working_set_bytes{namespace="posit-team"}
+
+# Memory usage as percentage of limit
+(container_memory_working_set_bytes{namespace="posit-team"}
+  / container_spec_memory_limit_bytes{namespace="posit-team"}) * 100
+```
+
+### Historical Memory Trends
+```promql
+# Memory usage over time for a specific pod
+container_memory_working_set_bytes{pod="<pod-name>", namespace="posit-team"}
+
+# Memory usage rate of change
+rate(container_memory_usage_bytes{namespace="posit-team"}[5m])
+```
+
+### Container Resource Limits
+```promql
+# Compare memory limits vs requests
+container_spec_memory_limit_bytes{namespace="posit-team"}
+container_spec_memory_reservation_limit_bytes{namespace="posit-team"}
+```
+
+### Key Metrics for Investigation:
+- **`container_memory_working_set_bytes`**: The memory value that triggers OOM kills when it exceeds the limit
+- **`container_memory_rss`**: Anonymous memory (heap, stack) - typically the largest component
+- **`container_memory_cache`**: File cache - can be evicted, usually not the OOM cause
+- **`container_spec_memory_limit_bytes`**: The configured limit that triggers OOM when exceeded
 
 ## Related Documentation
 
