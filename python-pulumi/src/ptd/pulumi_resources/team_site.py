@@ -166,13 +166,7 @@ class TeamSite(pulumi.ComponentResource):
 
         self.site = kubernetes.yaml.ConfigFile(
             self.site_name,
-            file=str(
-                ptd.paths.top()
-                / "team-operator"
-                / "config"
-                / "samples"
-                / f"core.posit.team_{api_version_path}_site.yaml"
-            ),
+            file=str(ptd.paths.HERE / "site_templates" / f"core.posit.team_{api_version_path}_site.yaml"),
             transformations=(
                 [
                     *list(self.transformations),
