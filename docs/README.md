@@ -11,12 +11,15 @@ Welcome to the Posit Team Dedicated (PTD) documentation.
 
 ### For Operators
 
-- [Site Management Guide](guides/product-team-site-management.md) - Managing Posit Team sites
 - [Team Operator Overview](team-operator/README.md) - Understanding the Kubernetes operator
+- [Monitoring](guides/monitoring.md) - The Grafana monitoring stack
 
 ### Infrastructure
 
 - [Kubernetes Guide](infrastructure/kubernetes.md) - Kubernetes-specific documentation
+
+### Misc
+- [Known Issues](KNOWN_ISSUES.md) - Known issues and rough edges
 
 ## Documentation Structure
 
