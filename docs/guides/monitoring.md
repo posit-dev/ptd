@@ -97,15 +97,48 @@ Grafana Alloy is the telemetry collection agent that runs on every node in the c
   - Optionally system logs via journald (controlled by `grafana_scrape_system_logs`)
 - Runs with clustering enabled for high availability
 
-**Container Metrics (via cAdvisor)**: The following container-level metrics are collected for debugging resource issues like OOMKilled pods:
-- `container_memory_working_set_bytes` - Active memory usage (what OOM killer evaluates)
+**Container Metrics (via cAdvisor)**: The following container-level metrics are collected for debugging resource issues:
+
+#### Memory Metrics
+- `container_memory_working_set_bytes` - Active memory usage (what the OOM killer evaluates against limits)
 - `container_memory_usage_bytes` - Total memory usage including cache
-- `container_memory_rss` - Resident Set Size (anonymous memory)
-- `container_memory_cache` - Cache memory
-- `container_spec_memory_limit_bytes` - Configured memory limits
-- `container_cpu_usage_seconds_total` - CPU usage per container
-- `container_network_*` - Network I/O metrics
-- `container_fs_*` - Filesystem usage and I/O metrics
+- `container_memory_rss` - Resident Set Size (anonymous memory: heap, stack)
+- `container_memory_cache` - Page cache memory (can be reclaimed)
+- `container_memory_swap` - Swap space usage
+- `container_memory_failcnt` - Number of times memory allocation failed (OOM events)
+- `container_spec_memory_limit_bytes` - Configured memory limit
+- `container_spec_memory_reservation_limit_bytes` - Configured memory request
+
+#### CPU Metrics
+- `container_cpu_usage_seconds_total` - Cumulative CPU time consumed
+- `container_cpu_cfs_throttled_seconds_total` - Total time container was throttled due to CPU limits
+- `container_cpu_cfs_throttled_periods_total` - Number of throttled periods
+- `container_cpu_cfs_periods_total` - Total number of CPU CFS scheduler periods
+- `container_spec_cpu_quota` - CPU limit in microseconds per 100ms period (-1 if unlimited)
+- `container_spec_cpu_shares` - CPU request weight (relative to other containers)
+
+#### Network Metrics
+- `container_network_receive_bytes_total` - Bytes received
+- `container_network_transmit_bytes_total` - Bytes transmitted
+- `container_network_receive_packets_total` - Packets received
+- `container_network_transmit_packets_total` - Packets transmitted
+- `container_network_receive_errors_total` - Errors receiving packets
+- `container_network_transmit_errors_total` - Errors transmitting packets
+- `container_network_receive_packets_dropped_total` - Inbound packets dropped
+- `container_network_transmit_packets_dropped_total` - Outbound packets dropped
+
+#### Filesystem Metrics
+- `container_fs_usage_bytes` - Current filesystem usage
+- `container_fs_limit_bytes` - Filesystem capacity
+- `container_fs_reads_bytes_total` - Bytes read from filesystem
+- `container_fs_writes_bytes_total` - Bytes written to filesystem
+- `container_fs_reads_total` - Number of read operations
+- `container_fs_writes_total` - Number of write operations
+
+#### Container Lifecycle Metrics
+- `container_start_time_seconds` - Unix timestamp when container started
+- `kube_pod_container_status_restarts_total` - Number of container restarts (from kube-state-metrics)
+- `kube_pod_container_status_last_terminated_reason` - Reason for last termination (from kube-state-metrics)
 
 **Helm Chart**: `grafana/alloy`
 
@@ -251,17 +284,24 @@ datasources:
 
 Access Grafana at `https://grafana.<workload-domain>` for metrics visualization and log exploration.
 
-## Debugging OOMKilled Pods
+## Container Troubleshooting with Metrics
 
-When pods are terminated due to OOM (Out of Memory), use these queries in Grafana to investigate:
+This section provides practical Grafana queries for diagnosing common container issues.
 
-### Identify OOMKilled Pods
+### Memory Issues and OOMKilled Pods
+
+When pods are terminated due to OOM (Out of Memory), use these queries to investigate:
+
+#### Identify OOMKilled Pods
 ```promql
 # See which containers were OOMKilled
 kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}
+
+# Count OOM events by pod over time
+sum by (pod, namespace) (container_memory_failcnt{namespace="posit-team"})
 ```
 
-### Memory Usage Before Termination
+#### Memory Usage Analysis
 ```promql
 # Working set memory (what OOM killer evaluates) by container
 container_memory_working_set_bytes{namespace="posit-team"}
@@ -269,29 +309,222 @@ container_memory_working_set_bytes{namespace="posit-team"}
 # Memory usage as percentage of limit
 (container_memory_working_set_bytes{namespace="posit-team"}
   / container_spec_memory_limit_bytes{namespace="posit-team"}) * 100
+
+# Memory breakdown: RSS vs cache
+container_memory_rss{namespace="posit-team"}
+container_memory_cache{namespace="posit-team"}
+
+# Containers approaching memory limit (>90%)
+(container_memory_working_set_bytes{namespace="posit-team"}
+  / container_spec_memory_limit_bytes{namespace="posit-team"}) > 0.9
 ```
 
-### Historical Memory Trends
+#### Historical Memory Trends
 ```promql
 # Memory usage over time for a specific pod
 container_memory_working_set_bytes{pod="<pod-name>", namespace="posit-team"}
 
-# Memory usage rate of change
-rate(container_memory_usage_bytes{namespace="posit-team"}[5m])
+# Memory growth rate (bytes per second)
+rate(container_memory_working_set_bytes{namespace="posit-team"}[5m])
+
+# Peak memory usage in last hour
+max_over_time(container_memory_working_set_bytes{namespace="posit-team"}[1h])
 ```
 
-### Container Resource Limits
+**Key Investigation Points:**
+- `container_memory_working_set_bytes` exceeding `container_spec_memory_limit_bytes` triggers OOM
+- High `container_memory_rss` indicates application memory pressure (heap, stack)
+- High `container_memory_cache` can usually be reclaimed and is not the root cause
+- Check if `container_memory_failcnt` is incrementing (indicates memory allocation failures)
+
+### CPU Throttling and Performance
+
+CPU throttling occurs when containers hit their CPU limits, causing performance degradation.
+
+#### Detect CPU Throttling
 ```promql
-# Compare memory limits vs requests
-container_spec_memory_limit_bytes{namespace="posit-team"}
-container_spec_memory_reservation_limit_bytes{namespace="posit-team"}
+# Percentage of time container was throttled
+rate(container_cpu_cfs_throttled_seconds_total{namespace="posit-team"}[5m])
+  / rate(container_cpu_cfs_periods_total{namespace="posit-team"}[5m]) * 100
+
+# Containers being throttled more than 10% of the time
+(rate(container_cpu_cfs_throttled_periods_total{namespace="posit-team"}[5m])
+  / rate(container_cpu_cfs_periods_total{namespace="posit-team"}[5m])) > 0.1
 ```
 
-### Key Metrics for Investigation:
-- **`container_memory_working_set_bytes`**: The memory value that triggers OOM kills when it exceeds the limit
-- **`container_memory_rss`**: Anonymous memory (heap, stack) - typically the largest component
-- **`container_memory_cache`**: File cache - can be evicted, usually not the OOM cause
-- **`container_spec_memory_limit_bytes`**: The configured limit that triggers OOM when exceeded
+#### CPU Usage Analysis
+```promql
+# CPU usage rate (cores) per container
+rate(container_cpu_usage_seconds_total{namespace="posit-team"}[5m])
+
+# CPU usage as percentage of limit (quota/100000 = cores)
+rate(container_cpu_usage_seconds_total{namespace="posit-team"}[5m])
+  / (container_spec_cpu_quota{namespace="posit-team"} / 100000) * 100
+
+# Total throttled time per container
+rate(container_cpu_cfs_throttled_seconds_total{namespace="posit-team"}[5m])
+```
+
+#### CPU Requests vs Usage
+```promql
+# CPU shares (requests) vs actual usage
+container_spec_cpu_shares{namespace="posit-team"}
+rate(container_cpu_usage_seconds_total{namespace="posit-team"}[5m])
+```
+
+**Key Investigation Points:**
+- Throttling >25% indicates containers need higher CPU limits
+- CPU usage consistently at limit suggests CPU-bound workload
+- Compare throttling patterns across similar pods to identify outliers
+- Check if `container_spec_cpu_quota` is set too low for the workload
+
+### Network Issues
+
+Diagnose network connectivity, throughput, and error issues.
+
+#### Network Throughput
+```promql
+# Receive throughput (bytes/second)
+rate(container_network_receive_bytes_total{namespace="posit-team"}[5m])
+
+# Transmit throughput (bytes/second)
+rate(container_network_transmit_bytes_total{namespace="posit-team"}[5m])
+
+# Total network throughput per pod
+sum by (pod) (
+  rate(container_network_receive_bytes_total{namespace="posit-team"}[5m]) +
+  rate(container_network_transmit_bytes_total{namespace="posit-team"}[5m])
+)
+```
+
+#### Network Errors and Drops
+```promql
+# Packet errors
+rate(container_network_receive_errors_total{namespace="posit-team"}[5m])
+rate(container_network_transmit_errors_total{namespace="posit-team"}[5m])
+
+# Dropped packets (indicates network congestion or buffer overflow)
+rate(container_network_receive_packets_dropped_total{namespace="posit-team"}[5m])
+rate(container_network_transmit_packets_dropped_total{namespace="posit-team"}[5m])
+
+# Containers with any packet drops
+(rate(container_network_receive_packets_dropped_total{namespace="posit-team"}[5m]) +
+ rate(container_network_transmit_packets_dropped_total{namespace="posit-team"}[5m])) > 0
+```
+
+#### Network Packet Rate
+```promql
+# Packets per second
+rate(container_network_receive_packets_total{namespace="posit-team"}[5m])
+rate(container_network_transmit_packets_total{namespace="posit-team"}[5m])
+```
+
+**Key Investigation Points:**
+- Non-zero error rates indicate network interface or driver issues
+- Dropped packets suggest network congestion or insufficient buffer space
+- Compare throughput against expected workload to identify bottlenecks
+- Sudden changes in packet rates may indicate connectivity problems
+
+### Disk I/O Issues
+
+Diagnose filesystem usage and I/O performance problems.
+
+#### Filesystem Usage
+```promql
+# Filesystem usage by container
+container_fs_usage_bytes{namespace="posit-team"}
+
+# Filesystem usage as percentage of capacity
+(container_fs_usage_bytes{namespace="posit-team"}
+  / container_fs_limit_bytes{namespace="posit-team"}) * 100
+
+# Containers with >80% disk usage
+(container_fs_usage_bytes{namespace="posit-team"}
+  / container_fs_limit_bytes{namespace="posit-team"}) > 0.8
+```
+
+#### Disk I/O Throughput
+```promql
+# Read throughput (bytes/second)
+rate(container_fs_reads_bytes_total{namespace="posit-team"}[5m])
+
+# Write throughput (bytes/second)
+rate(container_fs_writes_bytes_total{namespace="posit-team"}[5m])
+
+# Total I/O throughput
+sum by (pod) (
+  rate(container_fs_reads_bytes_total{namespace="posit-team"}[5m]) +
+  rate(container_fs_writes_bytes_total{namespace="posit-team"}[5m])
+)
+```
+
+#### Disk I/O Operations
+```promql
+# Read IOPS (operations per second)
+rate(container_fs_reads_total{namespace="posit-team"}[5m])
+
+# Write IOPS
+rate(container_fs_writes_total{namespace="posit-team"}[5m])
+
+# Top containers by IOPS
+topk(10,
+  rate(container_fs_reads_total{namespace="posit-team"}[5m]) +
+  rate(container_fs_writes_total{namespace="posit-team"}[5m])
+)
+```
+
+**Key Investigation Points:**
+- Filesystem usage >90% can cause application errors and pod evictions
+- High IOPS with low throughput suggests small file operations
+- Sudden spikes in write operations may indicate logging or caching issues
+- Compare I/O patterns against storage backend limits (EBS, Azure Disk)
+
+### Container Restart and Lifecycle Issues
+
+Track container restarts, crashes, and lifecycle problems.
+
+#### Container Restart Patterns
+```promql
+# Containers with recent restarts
+kube_pod_container_status_restarts_total{namespace="posit-team"} > 0
+
+# Restart rate (restarts per minute)
+rate(kube_pod_container_status_restarts_total{namespace="posit-team"}[5m]) * 60
+
+# Top restarting containers
+topk(10, kube_pod_container_status_restarts_total{namespace="posit-team"})
+```
+
+#### Termination Reasons
+```promql
+# See why containers terminated
+kube_pod_container_status_last_terminated_reason{namespace="posit-team"}
+
+# Count terminations by reason
+count by (reason) (kube_pod_container_status_last_terminated_reason{namespace="posit-team"})
+
+# OOMKilled containers specifically
+kube_pod_container_status_last_terminated_reason{reason="OOMKilled", namespace="posit-team"}
+```
+
+#### Container Age and Uptime
+```promql
+# Container uptime (seconds)
+time() - container_start_time_seconds{namespace="posit-team"}
+
+# Containers younger than 1 hour (recently restarted)
+(time() - container_start_time_seconds{namespace="posit-team"}) < 3600
+
+# Average container age by pod
+avg by (pod) (time() - container_start_time_seconds{namespace="posit-team"})
+```
+
+**Key Investigation Points:**
+- Restart rate >0 indicates instability (crashes, OOM, failed health checks)
+- Check `kube_pod_container_status_last_terminated_reason` to understand why
+- Frequent restarts with "Error" reason suggest application bugs
+- OOMKilled restarts indicate insufficient memory limits
+- Short uptime combined with high restart count suggests crash loops
 
 ## Related Documentation
 
