@@ -210,7 +210,7 @@ class TeamOperator(pulumi.ComponentResource):
 
         # Build patch commands for CRDs (names are standard, not transformed)
         crd_commands = [
-            f'kubectl patch crd {crd} --type=merge -p \'{{"metadata":{{"labels":{{"app.kubernetes.io/managed-by":"Helm"}},"annotations":{{"meta.helm.sh/release-name":"{release_name}","meta.helm.sh/release-namespace":"{release_namespace}"}}}}}}\' 2>/dev/null || echo "  {crd} not found or already adopted"'
+            f'kubectl patch crd {crd} --type=merge -p \'{{"metadata":{{"labels":{{"app.kubernetes.io/managed-by":"Helm"}},"annotations":{{"meta.helm.sh/release-name":"{release_name}","meta.helm.sh/release-namespace":"{release_namespace}","helm.sh/resource-policy":"keep"}}}}}}\' 2>/dev/null || echo "  {crd} not found or already adopted"'
             for crd in KUSTOMIZE_CRDS
         ]
 
