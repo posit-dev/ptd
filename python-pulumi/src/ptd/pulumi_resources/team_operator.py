@@ -23,7 +23,7 @@ KUSTOMIZE_CRDS = [
 KUSTOMIZE_MANAGED_BY_LABEL = "posit.team/managed-by=ptd.pulumi_resources.team_operator"
 
 # Default Helm chart version (OCI charts require explicit version, no "latest")
-DEFAULT_CHART_VERSION = "v1.1.0"
+DEFAULT_CHART_VERSION = "v1.3.0"
 
 
 class TeamOperator(pulumi.ComponentResource):

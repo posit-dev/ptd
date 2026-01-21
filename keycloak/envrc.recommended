@@ -1,0 +1,9 @@
+# modify passwords and database names to taste
+
+export POSTGRES_DB=keycloak_db
+export POSTGRES_USER=keycloak_db_user
+export POSTGRES_PASSWORD=keycloak_db_user_password
+export KEYCLOAK_ADMIN=admin
+export KEYCLOAK_ADMIN_PASSWORD=password
+
+
