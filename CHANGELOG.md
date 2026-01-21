@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/posit-dev/ptd/compare/v1.0.1...v1.0.2) (2026-01-21)
+
+
+### Bug Fixes
+
+* add helm.sh/resource-policy: keep to CRD patch ([e175604](https://github.com/posit-dev/ptd/commit/e175604caacb464371f22cf37393b35d8ee9ed9c))
+
 ## [1.0.1](https://github.com/posit-dev/ptd/compare/v1.0.0...v1.0.1) (2026-01-16)
 
 
