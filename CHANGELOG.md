@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/posit-dev/ptd/compare/v1.0.2...v1.1.0) (2026-01-21)
+
+
+### Features
+
+* **monitoring:** add container metrics collection for pod debugging ([23b597f](https://github.com/posit-dev/ptd/commit/23b597f72a6a01c356cb2a7d64453901041a3f09))
+
 ## [1.0.2](https://github.com/posit-dev/ptd/compare/v1.0.1...v1.0.2) (2026-01-21)
 
 
