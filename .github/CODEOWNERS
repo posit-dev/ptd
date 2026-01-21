@@ -2,17 +2,17 @@
 # These owners will be requested for review on PRs
 
 # Default owners for everything
-* @posit-dev/ptd-maintainers
+* @posit-dev/ptd-dev
 
 # Go CLI and libraries
-/cmd/ @posit-dev/ptd-maintainers
-/lib/ @posit-dev/ptd-maintainers
+/cmd/ @posit-dev/ptd-dev
+/lib/ @posit-dev/ptd-dev
 
 # Python Pulumi IaC
-/python-pulumi/ @posit-dev/ptd-maintainers
+/python-pulumi/ @posit-dev/ptd-dev
 
 # Documentation
-/docs/ @posit-dev/ptd-maintainers
+/docs/ @posit-dev/ptd-dev
 
 # CI/CD
-/.github/ @posit-dev/ptd-maintainers
+/.github/ @posit-dev/ptd-dev
