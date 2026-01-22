@@ -67,6 +67,7 @@ class TeamOperator(pulumi.ComponentResource):
 
         self._define_image()
         self._define_posit_team_namespace()
+        self._define_protected_crds()
         self._define_migration_resources()
         self._define_helm_release()
 
@@ -84,8 +85,84 @@ class TeamOperator(pulumi.ComponentResource):
         self.posit_team_namespace = kubernetes.core.v1.Namespace(
             f"{self.workload.compound_name}-{self.release}-{ptd.POSIT_TEAM_NAMESPACE}",
             metadata={"name": ptd.POSIT_TEAM_NAMESPACE},
-            opts=pulumi.ResourceOptions(parent=self),
+            opts=pulumi.ResourceOptions(
+                parent=self,
+                retain_on_delete=True,  # Don't delete namespace during migration
+            ),
         )
+
+    def _define_protected_crds(self):
+        """Create placeholder CRD resources with retain_on_delete to prevent deletion during migration.
+
+        When migrating from kustomize to Helm, Pulumi sees old kustomize-managed CRD resources
+        as orphaned and deletes them. This causes cascade deletion of Site custom resources.
+
+        This method creates CRD resources with:
+        - retain_on_delete=True: Prevents Pulumi from deleting CRDs even if removed from code
+        - aliases: Links to old kustomize resource URNs so Pulumi recognizes them as existing
+        - Minimal spec: Helm will update with full spec; we just need to prevent deletion
+
+        The CRDs are created with skip_await to avoid waiting for Helm to populate them.
+        """
+        self.protected_crds = []
+
+        # Old kustomize.Directory resource name pattern
+        old_kustomize_name = f"{self.workload.compound_name}-{self.release}-team-operator-kustomization"
+
+        for crd_name in KUSTOMIZE_CRDS:
+            # Parse CRD name: plural.group (e.g., "chronicles.core.posit.team")
+            parts = crd_name.split(".", 1)  # Split into [plural, group]
+            plural = parts[0]
+            group = parts[1] if len(parts) > 1 else ""
+
+            # Create a protected CRD resource
+            # The actual CRD spec will be managed by Helm; we just need Pulumi to not delete it
+            crd = kubernetes.apiextensions.v1.CustomResourceDefinition(
+                f"{self.workload.compound_name}-{self.release}-{crd_name}-protected",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=crd_name,
+                    annotations={
+                        # Mark as protected to prevent Helm uninstall from deleting
+                        "helm.sh/resource-policy": "keep",
+                    },
+                ),
+                spec=kubernetes.apiextensions.v1.CustomResourceDefinitionSpecArgs(
+                    group=group,
+                    names=kubernetes.apiextensions.v1.CustomResourceDefinitionNamesArgs(
+                        kind=plural.title().rstrip("s"),
+                        plural=plural,
+                        singular=plural.rstrip("s"),
+                    ),
+                    scope="Namespaced",
+                    versions=[
+                        kubernetes.apiextensions.v1.CustomResourceDefinitionVersionArgs(
+                            name="v1alpha1",
+                            served=True,
+                            storage=True,
+                            schema=kubernetes.apiextensions.v1.CustomResourceValidationArgs(
+                                open_apiv3_schema=kubernetes.apiextensions.v1.JSONSchemaPropsArgs(
+                                    type="object",
+                                    x_kubernetes_preserve_unknown_fields=True,
+                                ),
+                            ),
+                        ),
+                    ],
+                ),
+                opts=pulumi.ResourceOptions(
+                    parent=self,
+                    retain_on_delete=True,  # CRITICAL: Don't delete CRDs when removed from Pulumi
+                    ignore_changes=["*"],  # Helm manages the actual spec
+                    aliases=[
+                        # Alias to old kustomize.Directory child resource URN
+                        pulumi.Alias(
+                            name=f"{old_kustomize_name}-{crd_name}",
+                            type_="kubernetes:apiextensions.k8s.io/v1:CustomResourceDefinition",
+                            parent=self,
+                        ),
+                    ],
+                ),
+            )
+            self.protected_crds.append(crd)
 
     def _define_migration_resources(self):
         """Create resources to migrate from kustomize to Helm.
@@ -297,7 +374,7 @@ echo "Migration complete - Helm will now create fresh resources"
         chart_version = self.cluster_cfg.team_operator_chart_version or DEFAULT_CHART_VERSION
 
         # Dependencies for the Helm release
-        depends = [self.posit_team_namespace]
+        depends = [self.posit_team_namespace] + self.protected_crds
         if self.migration_job:
             depends.append(self.migration_job)
 
@@ -307,6 +384,7 @@ echo "Migration complete - Helm will now create fresh resources"
             version=chart_version,
             namespace=ptd.POSIT_TEAM_SYSTEM_NAMESPACE,
             create_namespace=True,
+            skip_crds=True,  # CRDs managed separately with retain_on_delete protection
             values=helm_values,
         )
 
