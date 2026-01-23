@@ -428,6 +428,12 @@ class WorkloadClusterConfig:
     custom_k8s_resources: list[str] | None = None  # List of subfolder names from custom_k8s_resources/ to apply
     # Tolerations for team-operator pods (controller and migration job)
     team_operator_tolerations: tuple[Toleration, ...] = ()
+    # Skip CRD installation during Helm deployment (for safe migration from kustomize).
+    # When True, CRDs are not rendered by Helm templates (crd.enable=false) and the
+    # Helm release skips the crds/ directory. This allows the migration job to patch
+    # existing CRDs with Helm ownership labels without risk of accidental deletion.
+    # After migration, set to False to let Helm manage CRDs going forward.
+    team_operator_skip_crds: bool = False
 
 
 def load_workload_cluster_site_dict(
