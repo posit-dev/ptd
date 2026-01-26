@@ -60,6 +60,15 @@ class AzureTraefik(pulumi.ComponentResource):
             ),
             atomic=True,
             values={
+                "resources": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "128Mi",
+                    },
+                    "limits": {
+                        "memory": "128Mi",
+                    },
+                },
                 "logs": {
                     "general": {
                         "level": "DEBUG",

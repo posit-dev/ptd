@@ -104,6 +104,15 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                 "valuesContent": loki_identity.client_id.apply(
                     lambda client_id: yaml.dump(
                         {
+                            "resources": {
+                                "requests": {
+                                    "cpu": "100m",
+                                    "memory": "512Mi",
+                                },
+                                "limits": {
+                                    "memory": "512Mi",
+                                },
+                            },
                             "gateway": {
                                 "image": {
                                     "registry": "quay.io",
@@ -217,6 +226,15 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                 "valuesContent": mimir_identity.client_id.apply(
                     lambda client_id: yaml.dump(
                         {
+                            "resources": {
+                                "requests": {
+                                    "cpu": "100m",
+                                    "memory": "512Mi",
+                                },
+                                "limits": {
+                                    "memory": "512Mi",
+                                },
+                            },
                             "serviceAccount": {
                                 "create": True,
                                 "name": str(ptd.Roles.MIMIR),
@@ -327,6 +345,15 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "50m",
+                                "memory": "128Mi",
+                            },
+                            "limits": {
+                                "memory": "128Mi",
+                            },
+                        },
                         "serviceAccount": {
                             "create": True,
                             "name": str(ptd.Roles.ALLOY),
@@ -502,6 +529,15 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                 "valuesContent": identity.client_id.apply(
                     lambda client_id: yaml.dump(
                         {
+                            "resources": {
+                                "requests": {
+                                    "cpu": "50m",
+                                    "memory": "64Mi",
+                                },
+                                "limits": {
+                                    "memory": "64Mi",
+                                },
+                            },
                             "provider": "azure",
                             "domainFilters": [*sorted([site.domain for site in self.workload.cfg.sites.values()])],
                             "extraArgs": {
@@ -554,6 +590,15 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi",
+                            },
+                            "limits": {
+                                "memory": "256Mi",
+                            },
+                        },
                         "envFromSecret": "grafana-db-url",
                         "grafana.ini": {
                             "server": {
@@ -665,9 +710,18 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "10m",
+                                "memory": "64Mi",
+                            },
+                            "limits": {
+                                "memory": "64Mi",
+                            },
+                        },
                         "metricLabelsAllowlist": [
                             "pods=[launcher-instance-id]",
-                        ]
+                        ],
                     }
                 ),
             },
