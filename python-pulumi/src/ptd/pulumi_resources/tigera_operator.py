@@ -54,6 +54,15 @@ class TigeraOperator(pulumi.ComponentResource):
             ),
             atomic=False,
             values={
+                "resources": {
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "128Mi",
+                    },
+                    "limits": {
+                        "memory": "128Mi",
+                    },
+                },
                 "installation": {
                     "enabled": True,
                     "registry": "quay.io",

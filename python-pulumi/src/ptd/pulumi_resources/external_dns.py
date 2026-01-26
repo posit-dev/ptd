@@ -56,6 +56,15 @@ class ExternalDNS(pulumi.ComponentResource):
             ),
             atomic=True,
             values={
+                "resources": {
+                    "requests": {
+                        "cpu": "50m",
+                        "memory": "64Mi",
+                    },
+                    "limits": {
+                        "memory": "64Mi",
+                    },
+                },
                 "provider": "aws",
                 "serviceAccount": {
                     "create": True,
