@@ -340,6 +340,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "512Mi",
+                            },
+                            "limits": {
+                                "memory": "512Mi",
+                            },
+                        },
                         "gateway": {
                             "image": {
                                 "registry": "quay.io",
@@ -457,6 +466,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi",
+                            },
+                            "limits": {
+                                "memory": "256Mi",
+                            },
+                        },
                         "envFromSecret": "grafana-db-url",
                         "grafana.ini": {
                             "server": {
@@ -543,6 +561,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "512Mi",
+                            },
+                            "limits": {
+                                "memory": "512Mi",
+                            },
+                        },
                         "serviceAccount": {
                             "create": True,
                             "name": str(ptd.Roles.MIMIR),
@@ -1252,6 +1279,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "50m",
+                                "memory": "128Mi",
+                            },
+                            "limits": {
+                                "memory": "128Mi",
+                            },
+                        },
                         "serviceAccount": {
                             "create": True,
                             "name": str(ptd.Roles.ALLOY),
