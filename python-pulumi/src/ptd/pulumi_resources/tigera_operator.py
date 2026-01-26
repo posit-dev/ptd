@@ -58,9 +58,11 @@ class TigeraOperator(pulumi.ComponentResource):
                     "requests": {
                         "cpu": "100m",
                         "memory": "128Mi",
+                        "ephemeral-storage": "1Gi",
                     },
                     "limits": {
                         "memory": "128Mi",
+                        "ephemeral-storage": "2Gi",
                     },
                 },
                 "installation": {
