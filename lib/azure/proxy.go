@@ -150,7 +150,7 @@ func (p *ProxySession) Start(ctx context.Context) error {
 		p.socksCommand.Env = append(p.socksCommand.Env, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	slog.Debug("Starting proxy session tunnel command", "command", p.tunnelCommand.String(), "env", p.tunnelCommand.Env)
+	slog.Debug("Starting Azure network tunnel", "bastion_name", p.target.BastionName(), "tunnel_port", "22001")
 	if ctx.Value("verbose") != nil && ctx.Value("verbose").(bool) {
 		slog.Debug("Verbose turned on, attaching command output to stdout and stderr")
 		p.tunnelCommand.Stdout = os.Stdout
@@ -170,7 +170,7 @@ func (p *ProxySession) Start(ctx context.Context) error {
 		return fmt.Errorf("tunnel session did not start successfully on port 22001")
 	}
 
-	slog.Debug("Starting proxy session socks command", "command", p.socksCommand.String(), "env", p.socksCommand.Env)
+	slog.Debug("Starting SOCKS proxy", "local_port", p.localPort)
 	if ctx.Value("verbose") != nil && ctx.Value("verbose").(bool) {
 		slog.Debug("Verbose turned on, attaching command output to stdout and stderr")
 		p.socksCommand.Stdout = os.Stdout
