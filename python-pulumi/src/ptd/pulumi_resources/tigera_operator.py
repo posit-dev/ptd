@@ -89,7 +89,7 @@ class TigeraOperator(pulumi.ComponentResource):
                         "type": "Calico",
                     },
                     "nonPrivileged": "Enabled",
-                }
+                },
             },
             opts=pulumi.ResourceOptions(parent=self, depends_on=self.namespace),
         )
