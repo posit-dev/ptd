@@ -67,10 +67,11 @@ type AWSWorkloadConfig struct {
 	PublicLoadBalancer                      bool                                `json:"public_load_balancer" yaml:"public_load_balancer"`
 	Region                                  string                              `json:"region" yaml:"region"`
 	ResourceTags                            map[string]string                   `json:"resource_tags" yaml:"resource_tags"`
-	RoleArn          *string `json:"role_arn" yaml:"role_arn"`
-	TailscaleEnabled bool    `json:"tailscale_enabled" yaml:"tailscale_enabled"`
+	RoleArn                                 *string                             `json:"role_arn" yaml:"role_arn"`
+	TailscaleEnabled                        bool                                `json:"tailscale_enabled" yaml:"tailscale_enabled"`
 	TrustedPrincipals                       []string                            `json:"trusted_principals" yaml:"trusted_principals"`
 	HostedZoneID                            *string                             `json:"hosted_zone_id" yaml:"hosted_zone_id"`
+	HostedZoneManagementEnabled             *bool                               `json:"hosted_zone_management_enabled,omitempty" yaml:"hosted_zone_management_enabled,omitempty"`
 	VpcAzCount                              int                                 `json:"vpc_az_count" yaml:"vpc_az_count"`
 	VpcCidr                                 string                              `json:"vpc_cidr" yaml:"vpc_cidr"`
 }
@@ -97,8 +98,8 @@ type AzureWorkloadConfig struct {
 	ControlPlaneNodeCount      int                                   `yaml:"control_plane_node_count"`
 	WorkerNodeCount            int                                   `yaml:"worker_node_count"`
 	DBStorageSizeGB            int                                   `yaml:"db_storage_size_gb"`
-	ResourceTags map[string]string       `yaml:"resource_tags"`
-	Sites        map[string]SiteConfig `json:"sites" yaml:"sites"` // didn't find this on the python side.
+	ResourceTags               map[string]string                     `yaml:"resource_tags"`
+	Sites                      map[string]SiteConfig                 `json:"sites" yaml:"sites"` // didn't find this on the python side.
 	ProtectPersistentResources bool                                  `yaml:"protect_persistent_resources"`
 	Network                    NetworkConfig                         `yaml:"network"`
 }
