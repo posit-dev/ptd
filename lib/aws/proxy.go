@@ -107,7 +107,7 @@ func (p *ProxySession) Start(ctx context.Context) error {
 	}
 
 	slog.Info("Adding SSH key", "bastion_id", bastionId)
-	slog.Debug("SSH key command", "command", addSshKeyCommand)
+	slog.Debug("Sending temporary SSH key via SSM", "region", p.region, "ssm_document", SSMRunShellDocumentName, "ttl_seconds", 60)
 	err = SsmSendCommand(ctx, awsCreds, p.region, bastionId, addSshKeyCommand)
 	if err != nil {
 		return err
@@ -133,7 +133,7 @@ func (p *ProxySession) Start(ctx context.Context) error {
 	p.command.Env = append(p.command.Env, fmt.Sprintf("AWS_REGION=%s", p.region))
 	// add the session manager plugin path
 	p.command.Env = append(p.command.Env, "PATH="+os.Getenv("PATH")+":"+SessionManagerPluginDir)
-	slog.Debug("Starting proxy session command", "command", p.command.String(), "env", p.command.Env)
+	slog.Debug("Starting SSH SOCKS proxy via SSM", "bastion_id", bastionId, "local_port", p.localPort, "region", p.region, "ssm_document", SSMStartSSHSessionDocumentName)
 
 	if ctx.Value("verbose") != nil && ctx.Value("verbose").(bool) {
 		slog.Debug("Verbose turned on, attaching command output to stdout and stderr")
