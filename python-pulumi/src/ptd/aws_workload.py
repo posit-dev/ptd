@@ -222,7 +222,9 @@ class AWSWorkloadConfig(ptd.WorkloadConfig):
             # When zones are disabled, validate requirements
             for site_name, site in self.sites.items():
                 if not site.certificate_arn:
-                    error_msg = f"Site '{site_name}': certificate_arn is required when hosted_zone_management_enabled is False"
+                    error_msg = (
+                        f"Site '{site_name}': certificate_arn is required when hosted_zone_management_enabled is False"
+                    )
                     raise ValueError(error_msg)
                 if site.certificate_validation_enabled:
                     error_msg = (
