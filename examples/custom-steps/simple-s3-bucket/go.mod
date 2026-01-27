@@ -3,7 +3,7 @@ module github.com/posit-dev/ptd/examples/custom-steps/simple-s3-bucket
 go 1.25.3
 
 require (
-	github.com/posit-dev/ptd/lib v0.0.0-00010101000000-000000000000
+	github.com/posit-dev/ptd/lib v0.0.0-20260127184423-6453cc65f826
 	github.com/pulumi/pulumi-aws/sdk/v6 v6.83.0
 	github.com/pulumi/pulumi/sdk/v3 v3.193.0
 )
@@ -106,5 +106,3 @@ require (
 	lukechampine.com/frand v1.5.1 // indirect
 	sigs.k8s.io/yaml v1.5.0 // indirect
 )
-
-replace github.com/posit-dev/ptd/lib => ../../../lib

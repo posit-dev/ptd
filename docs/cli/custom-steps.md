@@ -60,7 +60,7 @@ func main() {
 Initialize the Go module:
 
 ```bash
-go mod init github.com/posit-dev/ptd/workloads/your-workload/my-custom-step
+go mod init github.com/<org>/<project>/<workload>/my-custom-step
 go get github.com/pulumi/pulumi/sdk/v3@latest
 go get github.com/pulumi/pulumi-aws/sdk/v6@latest
 go mod tidy
@@ -119,7 +119,7 @@ customSteps:         # Required: List of custom steps
 
 ### Insertion points
 
-See [steps.go](../../lib/steps/steps.go) for the current enumeration of standard steps for both workloads and control rooms.
+See [steps.go](lib/steps/steps.go) for the current enumeration of standard steps for both workloads and control rooms.
 
 You can insert custom steps:
 - After any step: `insertAfter: persistent`
@@ -149,7 +149,7 @@ customizations/
 
 ```bash
 cd customizations/my-step
-go mod init github.com/posit-dev/ptd/workloads/<workload>/my-step
+go mod init github.com/<project>/<org>/<workload>/my-step
 
 # Add Pulumi dependencies
 go get github.com/pulumi/pulumi/sdk/v3@latest
@@ -176,16 +176,13 @@ require github.com/pulumi/pulumi-aws/sdk/v6 v6.65.0  // Newer version!
 
 ### Using the PTD Library
 
-Custom steps can access useful functions and types from the PTD library. Until the library is available as an open source package, you can use a relative path in your `go.mod` file:
+Custom steps can access useful functions and types from the PTD library, which is published as an open source package (alternatively if you have the CLI project locally, you can use a relative path in your `go.mod` file):
 
 ```bash
 cd customizations/my-step
 
 # Add the PTD library as a dependency
-go get github.com/posit-dev/ptd/lib
-
-# Add a replace directive to use the local copy
-go mod edit -replace github.com/posit-dev/ptd/lib=../../../lib
+go get github.com/posit-dev/ptd/lib@latest
 
 go mod tidy
 ```
@@ -194,10 +191,17 @@ Your `go.mod` will include:
 
 ```go
 require (
+    github.com/posit-dev/ptd/lib v0.0.0-20260127184423-6453cc65f826
+)
+```
+
+To reference your local copy of the CLI project
+```
+require (
     github.com/posit-dev/ptd/lib v0.0.0-00010101000000-000000000000
 )
 
-replace github.com/posit-dev/ptd/lib => ../../../lib
+replace github.com/posit-dev/ptd/lib => {relative path to the /lib directory}
 ```
 
 #### Available Library Packages
@@ -223,6 +227,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 
+	"github.com/posit-dev/ptd/lib/consts"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/types"
 )
@@ -250,6 +255,7 @@ func main() {
 		for k, v := range workload.ResourceTags {
 			requiredTags[k] = pulumi.String(v)
 		}
+		requiredTags[consts.POSIT_TEAM_MANAGED_BY_TAG] = pulumi.String(ctx.Project())
 
 		// Create resources with the tags
 		bucket, err := s3.NewBucketV2(ctx, "my-bucket", &s3.BucketV2Args{
@@ -264,8 +270,6 @@ func main() {
 	})
 }
 ```
-
-**Note**: Once the PTD library is published as an open source package, you'll be able to remove the `replace` directive and use the published version directly.
 
 ## CLI Usage
 
