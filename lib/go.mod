@@ -1,4 +1,4 @@
-module github.com/rstudio/ptd/lib
+module github.com/posit-dev/ptd/lib
 
 go 1.25.3
 

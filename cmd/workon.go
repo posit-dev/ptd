@@ -5,9 +5,9 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/rstudio/ptd/cmd/internal/legacy"
-	"github.com/rstudio/ptd/lib/pulumi"
-	"github.com/rstudio/ptd/lib/steps"
+	"github.com/posit-dev/ptd/cmd/internal/legacy"
+	"github.com/posit-dev/ptd/lib/pulumi"
+	"github.com/posit-dev/ptd/lib/steps"
 	"github.com/spf13/cobra"
 )
 

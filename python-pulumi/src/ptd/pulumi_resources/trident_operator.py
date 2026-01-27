@@ -34,7 +34,7 @@ class TridentOperator(pulumi.ComponentResource):
         self.release = release
         self.workload = workload
 
-        # commented out until we resolve: https://github.com/rstudio/ptd/issues/2073
+        # commented out until we resolve: https://github.com/posit-dev/ptd/issues/45
         # self._define_managed_identity()
         # self._define_helm_release()
         # self._define_netapp_backend()

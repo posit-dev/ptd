@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/rstudio/ptd/lib/helpers"
-	"github.com/rstudio/ptd/lib/pulumi"
-	"github.com/rstudio/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/helpers"
+	"github.com/posit-dev/ptd/lib/pulumi"
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 type Target struct {

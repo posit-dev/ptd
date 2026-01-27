@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/rstudio/ptd/lib/secrets"
-	"github.com/rstudio/ptd/lib/types"
+
+	"github.com/posit-dev/ptd/lib/secrets"
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 type SecretStore struct {

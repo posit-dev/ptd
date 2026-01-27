@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/rstudio/ptd/cmd/internal"
-	"github.com/rstudio/ptd/lib/helpers"
+	"github.com/posit-dev/ptd/cmd/internal"
+	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

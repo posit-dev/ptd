@@ -9,10 +9,10 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 
-	"github.com/rstudio/ptd/lib/azure"
-	"github.com/rstudio/ptd/lib/helpers"
-	ptdpulumi "github.com/rstudio/ptd/lib/pulumi"
-	"github.com/rstudio/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/azure"
+	"github.com/posit-dev/ptd/lib/helpers"
+	ptdpulumi "github.com/posit-dev/ptd/lib/pulumi"
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 type AKSStep struct {
