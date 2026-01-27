@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/rstudio/ptd/lib/aws"
-	"github.com/rstudio/ptd/lib/azure"
-	"github.com/rstudio/ptd/lib/consts"
-	"github.com/rstudio/ptd/lib/secrets"
-	"github.com/rstudio/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/aws"
+	"github.com/posit-dev/ptd/lib/azure"
+	"github.com/posit-dev/ptd/lib/consts"
+	"github.com/posit-dev/ptd/lib/secrets"
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 type BootstrapStep struct {

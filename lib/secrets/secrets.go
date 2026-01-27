@@ -2,8 +2,9 @@ package secrets
 
 import (
 	"fmt"
-	"github.com/rstudio/ptd/lib/helpers"
 	"strings"
+
+	"github.com/posit-dev/ptd/lib/helpers"
 )
 
 type SiteSecret struct {

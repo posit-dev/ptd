@@ -6,11 +6,11 @@ import (
 	"log/slog"
 	"path/filepath"
 
+	"github.com/posit-dev/ptd/lib/customization"
+	"github.com/posit-dev/ptd/lib/helpers"
+	"github.com/posit-dev/ptd/lib/pulumi"
+	"github.com/posit-dev/ptd/lib/types"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
-	"github.com/rstudio/ptd/lib/customization"
-	"github.com/rstudio/ptd/lib/helpers"
-	"github.com/rstudio/ptd/lib/pulumi"
-	"github.com/rstudio/ptd/lib/types"
 )
 
 // CustomStep represents a custom Go-based Pulumi step defined in a workload's customizations directory

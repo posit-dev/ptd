@@ -7,11 +7,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/rstudio/ptd/lib/aws"
-	"github.com/rstudio/ptd/lib/azure"
-	"github.com/rstudio/ptd/lib/helpers"
-	"github.com/rstudio/ptd/lib/steps"
-	"github.com/rstudio/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/aws"
+	"github.com/posit-dev/ptd/lib/azure"
+	"github.com/posit-dev/ptd/lib/helpers"
+	"github.com/posit-dev/ptd/lib/steps"
+	"github.com/posit-dev/ptd/lib/types"
 	"github.com/spf13/cobra"
 )
 
