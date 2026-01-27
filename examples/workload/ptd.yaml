@@ -41,6 +41,10 @@ spec:
   # Enable Keycloak for authentication (if not using external IdP)
   keycloak_enabled: false
 
+  # Enable hosted zone management (set to false for externally managed DNS)
+  # When false, you must provide certificate_arn for each site
+  # hosted_zone_management_enabled: true
+
   # Enable cluster autoscaling
   autoscaling_enabled: true
 
@@ -72,7 +76,13 @@ spec:
       spec:
         domain: analytics.example.com
         use_traefik_forward_auth: false
+        # Required when hosted_zone_management_enabled is false:
+        # certificate_arn: arn:aws:acm:us-east-2:123456789012:certificate/example-id
+        # certificate_validation_enabled: false
     dev:
       spec:
         domain: analytics-dev.example.com
         use_traefik_forward_auth: false
+        # Required when hosted_zone_management_enabled is false:
+        # certificate_arn: arn:aws:acm:us-east-2:123456789012:certificate/example-id
+        # certificate_validation_enabled: false

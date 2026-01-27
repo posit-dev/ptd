@@ -99,6 +99,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         enabled_cluster_log_types: set[str] | None = None,
         *args,
         tailscale_enabled: bool = False,
+        customer_managed_bastion_id: str | None = None,
         protect_persistent_resources: bool = True,
         eks_role_name: str = "",
         iam_permissions_boundary: str = "",
@@ -118,6 +119,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         self.protect_persistent_resources = protect_persistent_resources
         self.iam_permissions_boundary = iam_permissions_boundary
         self.tailscale_enabled = tailscale_enabled
+        self.customer_managed_bastion_id = customer_managed_bastion_id
 
         # optional variables added later
         self.default_node_role = None
@@ -251,7 +253,8 @@ class AWSEKSCluster(pulumi.ComponentResource):
 
         if self.tailscale_enabled:
             self.setup_tailscale_access()
-        else:
+        elif not self.customer_managed_bastion_id:
+            # NB: prevents bastion sg configuration if customer managed bastion is used.
             self.setup_bastion_access()
 
         self.cluster_subnet_ids = subnet_ids
