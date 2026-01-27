@@ -6,12 +6,12 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/rstudio/ptd/cmd/internal/legacy"
-	"github.com/rstudio/ptd/lib/consts"
+	"github.com/posit-dev/ptd/cmd/internal/legacy"
+	"github.com/posit-dev/ptd/lib/consts"
 
-	"github.com/rstudio/ptd/lib/aws"
-	"github.com/rstudio/ptd/lib/helpers"
-	"github.com/rstudio/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/aws"
+	"github.com/posit-dev/ptd/lib/helpers"
+	"github.com/posit-dev/ptd/lib/types"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )

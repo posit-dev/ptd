@@ -1,11 +1,11 @@
-module github.com/rstudio/ptd/examples/custom-steps/simple-s3-bucket
+module github.com/posit-dev/ptd/examples/custom-steps/simple-s3-bucket
 
 go 1.25.3
 
 require (
+	github.com/posit-dev/ptd/lib v0.0.0-00010101000000-000000000000
 	github.com/pulumi/pulumi-aws/sdk/v6 v6.83.0
 	github.com/pulumi/pulumi/sdk/v3 v3.193.0
-	github.com/rstudio/ptd/lib v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -107,4 +107,4 @@ require (
 	sigs.k8s.io/yaml v1.5.0 // indirect
 )
 
-replace github.com/rstudio/ptd/lib => ../../../lib
+replace github.com/posit-dev/ptd/lib => ../../../lib

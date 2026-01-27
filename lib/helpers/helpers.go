@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rstudio/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/types"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	yaml "sigs.k8s.io/yaml/goyaml.v3"

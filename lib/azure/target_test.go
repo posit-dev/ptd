@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rstudio/ptd/lib/azure/cli"
-	"github.com/rstudio/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/azure/cli"
+	"github.com/posit-dev/ptd/lib/types"
 	"github.com/stretchr/testify/assert"
 )
 

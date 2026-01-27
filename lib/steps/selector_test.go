@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rstudio/ptd/lib/types"
-	"github.com/rstudio/ptd/lib/types/typestest"
+	"github.com/posit-dev/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/types/typestest"
 
 	"github.com/stretchr/testify/assert"
 )

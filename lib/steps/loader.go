@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/rstudio/ptd/lib/customization"
+	"github.com/posit-dev/ptd/lib/customization"
 )
 
 // LoadStepsForWorkload loads standard steps and merges in custom steps from manifest if present

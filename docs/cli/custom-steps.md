@@ -60,7 +60,7 @@ func main() {
 Initialize the Go module:
 
 ```bash
-go mod init github.com/rstudio/ptd/workloads/your-workload/my-custom-step
+go mod init github.com/posit-dev/ptd/workloads/your-workload/my-custom-step
 go get github.com/pulumi/pulumi/sdk/v3@latest
 go get github.com/pulumi/pulumi-aws/sdk/v6@latest
 go mod tidy
@@ -149,7 +149,7 @@ customizations/
 
 ```bash
 cd customizations/my-step
-go mod init github.com/rstudio/ptd/workloads/<workload>/my-step
+go mod init github.com/posit-dev/ptd/workloads/<workload>/my-step
 
 # Add Pulumi dependencies
 go get github.com/pulumi/pulumi/sdk/v3@latest
@@ -182,10 +182,10 @@ Custom steps can access useful functions and types from the PTD library. Until t
 cd customizations/my-step
 
 # Add the PTD library as a dependency
-go get github.com/rstudio/ptd/lib
+go get github.com/posit-dev/ptd/lib
 
 # Add a replace directive to use the local copy
-go mod edit -replace github.com/rstudio/ptd/lib=../../../lib
+go mod edit -replace github.com/posit-dev/ptd/lib=../../../lib
 
 go mod tidy
 ```
@@ -194,20 +194,20 @@ Your `go.mod` will include:
 
 ```go
 require (
-    github.com/rstudio/ptd/lib v0.0.0-00010101000000-000000000000
+    github.com/posit-dev/ptd/lib v0.0.0-00010101000000-000000000000
 )
 
-replace github.com/rstudio/ptd/lib => ../../../lib
+replace github.com/posit-dev/ptd/lib => ../../../lib
 ```
 
 #### Available Library Packages
 
 The PTD library provides several useful packages:
 
-- **`github.com/rstudio/ptd/lib/helpers`**: Utility functions including:
+- **`github.com/posit-dev/ptd/lib/helpers`**: Utility functions including:
   - `LoadPtdYaml(path string)`: Load and parse the ptd.yaml configuration file
 
-- **`github.com/rstudio/ptd/lib/types`**: Configuration types including:
+- **`github.com/posit-dev/ptd/lib/types`**: Configuration types including:
   - `AWSWorkloadConfig`: AWS workload configuration with resource tags
   - `AzureWorkloadConfig`: Azure workload configuration with resource tags
 
@@ -223,8 +223,8 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 
-	"github.com/rstudio/ptd/lib/helpers"
-	"github.com/rstudio/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/helpers"
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 func main() {

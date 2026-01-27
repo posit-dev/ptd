@@ -5,7 +5,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
-	"github.com/rstudio/ptd/lib/consts"
+	"github.com/posit-dev/ptd/lib/consts"
 )
 
 func KmsKeyExists(ctx context.Context, c *Credentials, region string, keyId string) bool {

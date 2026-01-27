@@ -6,12 +6,12 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optdestroy"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optpreview"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optrefresh"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optup"
-	"github.com/rstudio/ptd/lib/helpers"
 )
 
 func RefreshStack(ctx context.Context, stack auto.Stack) (refreshResult auto.RefreshResult, err error) {

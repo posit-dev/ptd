@@ -48,10 +48,9 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/rstudio/ptd#readme"
-Issues = "https://github.com/rstudio/ptd/issues"
-Source = "https://github.com/rstudio/ptd"
-Kanban = "https://github.com/orgs/rstudio/projects/174/views/1"
+Documentation = "https://github.com/posit-dev/ptd#readme"
+Issues = "https://github.com/posit-dev/ptd/issues"
+Source = "https://github.com/posit-dev/ptd"
 
 [dirs.env]
 virtual = ".venv"

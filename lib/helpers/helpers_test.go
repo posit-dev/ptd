@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/rstudio/ptd/lib/testdata"
-	"github.com/rstudio/ptd/lib/types"
-	"github.com/rstudio/ptd/lib/types/typestest"
+	"github.com/posit-dev/ptd/lib/testdata"
+	"github.com/posit-dev/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/types/typestest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
