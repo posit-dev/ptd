@@ -181,7 +181,7 @@ Custom steps can access useful functions and types from the PTD library, which i
 ```bash
 cd customizations/my-step
 
-# Add the PTD library as a dependency
+# Add a versioned release of the PTD library as a dependency
 go get github.com/posit-dev/ptd/lib@latest
 
 go mod tidy
@@ -195,7 +195,16 @@ require (
 )
 ```
 
-To reference your local copy of the CLI project
+To instead reference your local copy of the CLI project
+```bash
+cd customizations/my-step
+go get github.com/posit-dev/ptd/lib
+
+# Add a replace directive to use the local copy
+go mod edit -replace github.com/posit-dev/ptd/lib={relative path to the /lib directory}
+```
+
+Your `go.mod` will include:
 ```
 require (
     github.com/posit-dev/ptd/lib v0.0.0-00010101000000-000000000000
