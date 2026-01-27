@@ -8,7 +8,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 
-	"github.com/rstudio/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 // Plugins required for the Pulumi stack. These should possibly be moved to a

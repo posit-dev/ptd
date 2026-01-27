@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/rstudio/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 // ValidateUserNodePoolName validates that a node pool name meets AKS requirements

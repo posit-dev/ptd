@@ -7,8 +7,8 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 
-	"github.com/rstudio/ptd/lib/helpers"
-	"github.com/rstudio/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/helpers"
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 func main() {

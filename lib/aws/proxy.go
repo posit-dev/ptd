@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rstudio/ptd/lib/helpers"
-	"github.com/rstudio/ptd/lib/proxy"
+	"github.com/posit-dev/ptd/lib/helpers"
+	"github.com/posit-dev/ptd/lib/proxy"
 	"tailscale.com/client/local"
 )
 

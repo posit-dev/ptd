@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/rstudio/ptd/cmd/internal/legacy"
+	"github.com/posit-dev/ptd/cmd/internal/legacy"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rstudio/ptd/lib/types/typestest"
+	"github.com/posit-dev/ptd/lib/types/typestest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

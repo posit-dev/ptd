@@ -3,10 +3,11 @@ package azure
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/rstudio/ptd/lib/types"
 
-	"github.com/rstudio/ptd/lib/azure/cli"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/posit-dev/ptd/lib/types"
+
+	"github.com/posit-dev/ptd/lib/azure/cli"
 )
 
 type Credentials struct {

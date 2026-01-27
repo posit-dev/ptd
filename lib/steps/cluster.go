@@ -3,8 +3,9 @@ package steps
 import (
 	"context"
 	"fmt"
-	"github.com/rstudio/ptd/lib/pulumi"
-	"github.com/rstudio/ptd/lib/types"
+
+	"github.com/posit-dev/ptd/lib/pulumi"
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 type ClusterStep struct {

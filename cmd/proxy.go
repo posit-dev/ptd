@@ -1,15 +1,16 @@
 package main
 
 import (
-	"github.com/rstudio/ptd/lib/azure"
 	"log/slog"
 	"os"
 	"path"
 
-	"github.com/rstudio/ptd/cmd/internal"
-	"github.com/rstudio/ptd/cmd/internal/legacy"
-	"github.com/rstudio/ptd/lib/aws"
-	"github.com/rstudio/ptd/lib/proxy"
+	"github.com/posit-dev/ptd/lib/azure"
+
+	"github.com/posit-dev/ptd/cmd/internal"
+	"github.com/posit-dev/ptd/cmd/internal/legacy"
+	"github.com/posit-dev/ptd/lib/aws"
+	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/spf13/cobra"
 )
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/rstudio/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 type selector struct {
