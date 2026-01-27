@@ -3,8 +3,9 @@ package aws
 import (
 	"context"
 	"fmt"
-	"github.com/rstudio/ptd/lib/types"
 	"strings"
+
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 type Registry struct {

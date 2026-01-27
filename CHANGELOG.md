@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/posit-dev/ptd/compare/v1.1.0...v1.1.1) (2026-01-27)
+
+
+### Bug Fixes
+
+* clean up repo references to use posit-dev ([470b829](https://github.com/posit-dev/ptd/commit/470b829129af20257a60cff878e4e9dcc9f6b11d))
+
 # [1.1.0](https://github.com/posit-dev/ptd/compare/v1.0.2...v1.1.0) (2026-01-21)
 
 

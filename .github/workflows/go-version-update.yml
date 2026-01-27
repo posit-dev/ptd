@@ -133,6 +133,6 @@ jobs:
 
             ${{ matrix.env.module }}
 
-            <sub>Created by the [`update-go-version` GitHub Actions workflow](https://github.com/rstudio/ptd/actions/workflows/update-go-version.yml).</sub>
+            <sub>Created by the [`go-version-update` GitHub Actions workflow](https://github.com/posit-dev/ptd/actions/workflows/go-version-update.yml).</sub>
           branch: bump-${{ matrix.env.group }}-go-toolchain-to-${{ steps.latest.outputs.version }}
           labels: dependencies

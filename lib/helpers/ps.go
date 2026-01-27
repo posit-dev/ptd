@@ -1,7 +1,10 @@
 package helpers
 
-import "os"
-import "log/slog"
+import (
+	"log/slog"
+	"os"
+	"syscall"
+)
 
 func KillProcess(pid int) error {
 	process, err := os.FindProcess(pid)
@@ -26,7 +29,7 @@ func ProcessRunning(pid int) bool {
 		return false
 	}
 
-	err = process.Signal(os.Interrupt) // Sending an interrupt signal to check if the process is running
+	err = process.Signal(syscall.Signal(0)) // Send signal 0 to check if process exists without disturbing it
 	if err != nil {
 		slog.Debug("Process does not appear to be running", "pid", pid, "error", err)
 		return false
