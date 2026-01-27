@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"slices"
 
+	"github.com/posit-dev/ptd/lib/pulumi"
+	"github.com/posit-dev/ptd/lib/types"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
-	"github.com/rstudio/ptd/lib/pulumi"
-	"github.com/rstudio/ptd/lib/types"
 )
 
 // These aren't the prettiest, but they allow us to easily mock the Pulumi

@@ -53,6 +53,7 @@ class AWSWorkloadEKS(pulumi.ComponentResource):
             subnet_ids=[s["SubnetId"] for s in subnets],
             tags=self.required_tags,
             tailscale_enabled=self.workload.cfg.tailscale_enabled,
+            customer_managed_bastion_id=self.workload.cfg.customer_managed_bastion_id,
             version=cluster_cfg.cluster_version,
             protect_persistent_resources=self.workload.cfg.protect_persistent_resources,
             eks_role_name=f"{full_name}-eks.posit.team",

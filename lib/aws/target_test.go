@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/rstudio/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/types"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -8,8 +8,8 @@ import (
 	psdk "github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/rstudio/ptd/lib/testdata"
-	"github.com/rstudio/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/testdata"
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 type stepTestHandler struct {

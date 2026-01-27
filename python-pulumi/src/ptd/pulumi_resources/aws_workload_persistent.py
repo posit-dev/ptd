@@ -158,7 +158,8 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
         self._define_fsx_nfs_sg()
         self._define_efs_nfs_sg()
         self._define_lbc_iam()
-        self._define_externaldns_iam()
+        if self.workload.cfg.external_dns_enabled:
+            self._define_externaldns_iam()
         self._define_traefik_forward_auth_iam()
         self._define_mimir()
         self._define_loki_bucket()
@@ -176,32 +177,48 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
             "cert_arns": self.cert_arns,
             "fs_dns_name": self.fsx_openzfs_fs.dns_name.apply(str),
             "fs_root_volume_id": self.fsx_openzfs_fs.root_volume_id.apply(str),
-            "domain_ns_map": {
-                v.domain: v.zone.name_servers for v in self.internal_sites.values() if v.zone is not None
-            },
-            # Add hosted zone name servers as individual outputs for each domain
-            "hosted_zone_name_servers": {
-                site_name: {
-                    "domain": site.domain,
-                    "name_servers": site.zone.name_servers if site.zone else None,
-                    "zone_id": site.zone.zone_id if site.zone else site.zone_id,
-                }
-                for site_name, site in self.internal_sites.items()
-            },
-            # Add certificate validation records (CNAME records needed for DNS validation)
-            "certificate_validation_records": {
-                domain: records.apply(
-                    lambda recs: [
-                        {
-                            "name": rec.name,
-                            "type": rec.type,
-                            "value": rec.records[0] if rec.records else None,
-                        }
-                        for rec in recs
-                    ]
-                )
-                for domain, records in self.cert_validation_records.items()
-            },
+        }
+
+        # Add hosted zone outputs only if zone management is enabled
+        if self.workload.cfg.hosted_zone_management_enabled:
+            outputs = outputs | {
+                "domain_ns_map": {
+                    v.domain: v.zone.name_servers for v in self.internal_sites.values() if v.zone is not None
+                },
+                # Add hosted zone name servers as individual outputs for each domain
+                "hosted_zone_name_servers": {
+                    site_name: {
+                        "domain": site.domain,
+                        "name_servers": site.zone.name_servers if site.zone else None,
+                        "zone_id": site.zone.zone_id if site.zone else site.zone_id,
+                    }
+                    for site_name, site in self.internal_sites.items()
+                },
+                # Add certificate validation records (CNAME records needed for DNS validation)
+                "certificate_validation_records": {
+                    domain: records.apply(
+                        lambda recs: [
+                            {
+                                "name": rec.name,
+                                "type": rec.type,
+                                "value": rec.records[0] if rec.records else None,
+                            }
+                            for rec in recs
+                        ]
+                    )
+                    for domain, records in self.cert_validation_records.items()
+                },
+            }
+        else:
+            # Indicate zones are externally managed
+            outputs = outputs | {
+                "domain_ns_map": {},
+                "hosted_zone_name_servers": [],
+                "hosted_zone_info": "Hosted zones are externally managed",
+                "certificate_validation_records": {},
+            }
+
+        outputs = outputs | {
             "mimir_bucket": self.mimir_bucket.bucket,
             "mimir_password": self.mimir_password.result,
             "packagemanager_bucket": self.packagemanager_bucket.bucket,
@@ -559,7 +576,11 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
         domain: str,
         alias: str,
         site_config: ptd.aws_workload.AWSSiteConfig | None = None,
-    ) -> aws.route53.Zone:
+    ) -> aws.route53.Zone | None:
+        # Return None if hosted zone management is disabled
+        if not self.workload.cfg.hosted_zone_management_enabled:
+            return None
+
         name = f"{domain}-zone"
         if zone_id is not None:
             return aws.route53.Zone.get(name, id=zone_id)
@@ -646,6 +667,20 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
 
     def _define_zones_and_domain_certs(self):
         self.cert_arns = []
+
+        # Handle disabled zone management
+        if not self.workload.cfg.hosted_zone_management_enabled:
+            # Process only certificates (zones must exist externally)
+            for site_name, site in self.workload.cfg.sites.items():
+                # Validation already done in config validation
+                # Just use the provided certificate
+                self.internal_sites[site_name].certificate = site.certificate_arn
+                self.internal_sites[site_name].zone = None
+                self.internal_sites[site_name].zone_id = site.zone_id  # May be None if not provided
+                # Add certificate ARN to list for use by other resources
+                if site.certificate_arn:
+                    self.cert_arns.append(site.certificate_arn)
+            return
 
         # Group sites by domain to avoid duplicate resources for the same domain
         domains_to_sites = {}

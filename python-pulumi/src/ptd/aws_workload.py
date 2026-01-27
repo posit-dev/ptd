@@ -172,6 +172,7 @@ class AWSWorkloadConfig(ptd.WorkloadConfig):
     domain_source: ptd.ClusterDomainSource = ptd.ClusterDomainSource.LABEL
     keycloak_enabled: bool = False
     external_dns_enabled: bool = True
+    hosted_zone_management_enabled: bool = True
     external_id: uuid.UUID | None = None
     extra_cluster_oidc_urls: list[str] = dataclasses.field(default_factory=list)
     extra_postgres_dbs: list[str] = dataclasses.field(default_factory=list)
@@ -214,6 +215,27 @@ class AWSWorkloadConfig(ptd.WorkloadConfig):
     @property
     def hosted_zone_id(self) -> str | None:
         return self.sites[ptd.MAIN].zone_id
+
+    def __post_init__(self) -> None:
+        """Validate hosted zone configuration consistency."""
+        if not self.hosted_zone_management_enabled:
+            # When zones are disabled, validate requirements
+            for site_name, site in self.sites.items():
+                if not site.certificate_arn:
+                    error_msg = (
+                        f"Site '{site_name}': certificate_arn is required when hosted_zone_management_enabled is False"
+                    )
+                    raise ValueError(error_msg)
+                if site.certificate_validation_enabled:
+                    error_msg = (
+                        f"Site '{site_name}': certificate_validation_enabled must be False "
+                        "when hosted_zone_management_enabled is False"
+                    )
+                    raise ValueError(error_msg)
+
+            # Require explicit ExternalDNS configuration
+            # Note: external_dns_enabled has a default value of True, so we can't check for None
+            # Instead, we'll document this requirement and potentially add a warning
 
 
 @dataclasses.dataclass(frozen=True)

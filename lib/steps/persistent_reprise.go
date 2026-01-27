@@ -2,7 +2,8 @@ package steps
 
 import (
 	"context"
-	"github.com/rstudio/ptd/lib/types"
+
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 type PersistentRepriseStep struct {

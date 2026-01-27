@@ -3,7 +3,7 @@ package main
 import (
 	"log/slog"
 
-	"github.com/rstudio/ptd/cmd/internal/legacy"
+	"github.com/posit-dev/ptd/cmd/internal/legacy"
 	"github.com/spf13/cobra"
 )
 

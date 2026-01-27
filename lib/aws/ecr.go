@@ -6,8 +6,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrTypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
-	"github.com/rstudio/ptd/lib/helpers"
-	"github.com/rstudio/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/helpers"
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 func GetEcrAuthToken(ctx context.Context, c *Credentials, region string) (string, error) {

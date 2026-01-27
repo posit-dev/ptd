@@ -3,8 +3,8 @@ package pulumi
 import (
 	"context"
 
+	"github.com/posit-dev/ptd/lib/types"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
-	"github.com/rstudio/ptd/lib/types"
 )
 
 // LocalStack creates a new Go Pulumi stack based on local source files with remote state backend

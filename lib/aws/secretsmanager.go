@@ -5,7 +5,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
-	"github.com/rstudio/ptd/lib/consts"
+	"github.com/posit-dev/ptd/lib/consts"
 )
 
 func getSecretValue(ctx context.Context, c *Credentials, region string, secretName string) (secretString string, err error) {
