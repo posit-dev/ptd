@@ -84,7 +84,10 @@ class TeamOperator(pulumi.ComponentResource):
         self.posit_team_namespace = kubernetes.core.v1.Namespace(
             f"{self.workload.compound_name}-{self.release}-{ptd.POSIT_TEAM_NAMESPACE}",
             metadata={"name": ptd.POSIT_TEAM_NAMESPACE},
-            opts=pulumi.ResourceOptions(parent=self),
+            opts=pulumi.ResourceOptions(
+                parent=self,
+                retain_on_delete=True,  # Don't delete namespace during migration
+            ),
         )
 
     def _define_migration_resources(self):
@@ -288,6 +291,15 @@ echo "Migration complete - Helm will now create fresh resources"
                     for t in self.cluster_cfg.team_operator_tolerations
                 ],
             },
+            # CRD configuration for safe migration from kustomize to Helm.
+            # When skip_crds=True: crd.enable=False prevents Helm from rendering CRD templates,
+            # allowing migration job to patch existing CRDs without risk of deletion.
+            # When skip_crds=False (default): Helm manages CRDs normally.
+            # crd.keep=True adds helm.sh/resource-policy: keep as defense-in-depth.
+            "crd": {
+                "enable": not self.cluster_cfg.team_operator_skip_crds,
+                "keep": True,
+            },
         }
 
         # OCI Helm chart from public repository
@@ -308,6 +320,10 @@ echo "Migration complete - Helm will now create fresh resources"
             namespace=ptd.POSIT_TEAM_SYSTEM_NAMESPACE,
             create_namespace=True,
             values=helm_values,
+            # Skip CRDs at Helm level (belt-and-suspenders with crd.enable in values).
+            # This tells Helm CLI to skip the crds/ directory if the chart ever moves
+            # CRDs there. Combined with crd.enable=False, provides complete CRD skip.
+            skip_crds=self.cluster_cfg.team_operator_skip_crds,
         )
 
         self.helm_release = kubernetes.helm.v3.Release(
