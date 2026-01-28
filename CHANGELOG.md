@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/posit-dev/ptd/compare/v1.1.1...v1.1.2) (2026-01-28)
+
+
+### Bug Fixes
+
+* **fsx:** ignore daily_automatic_backup_start_time in diffs ([ecf7cb0](https://github.com/posit-dev/ptd/commit/ecf7cb0f2018d69d298a6be775dc306abb94d0db)), closes [#5](https://github.com/posit-dev/ptd/issues/5)
+
 ## [1.1.1](https://github.com/posit-dev/ptd/compare/v1.1.0...v1.1.1) (2026-01-27)
 
 
