@@ -91,6 +91,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "valuesContent": yaml.dump(
                     {
                         "controller": {
+                            "resources": {
+                                "requests": {
+                                    "cpu": "10m",
+                                    "memory": "40Mi",
+                                },
+                                "limits": {
+                                    "memory": "40Mi",
+                                },
+                            },
                             "serviceAccount": {
                                 "create": True,
                                 "name": f"controller.{ptd.Roles.AWS_FSX_OPENZFS_CSI_DRIVER}",
@@ -167,6 +176,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "30m",
+                                "memory": "128Mi",
+                            },
+                            "limits": {
+                                "memory": "128Mi",
+                            },
+                        },
                         "rotationPollInterval": "15s",
                         "enableSecretRotation": True,
                         "syncSecret": {
@@ -195,6 +213,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "10m",
+                                "memory": "50Mi",
+                            },
+                            "limits": {
+                                "memory": "50Mi",
+                            },
+                        },
                         "tolerations": [
                             {
                                 "key": "workload-type",
@@ -202,7 +229,7 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                                 "value": "session",
                                 "effect": "NoSchedule",
                             },
-                        ]
+                        ],
                     }
                 ),
             },
@@ -227,6 +254,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi",
+                            },
+                            "limits": {
+                                "memory": "256Mi",
+                            },
+                        },
                         "clusterName": cluster_name,
                         "serviceAccount": {
                             "create": True,
@@ -262,7 +298,19 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "chart": "metrics-server",
                 "targetNamespace": ptd.KUBE_SYSTEM_NAMESPACE,
                 "version": version,
-                "valuesContent": yaml.dump({}),
+                "valuesContent": yaml.dump(
+                    {
+                        "resources": {
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "200Mi",
+                            },
+                            "limits": {
+                                "memory": "200Mi",
+                            },
+                        },
+                    }
+                ),
             },
             opts=pulumi.ResourceOptions(provider=self.kube_providers[release]),
         )
@@ -292,6 +340,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "512Mi",
+                            },
+                            "limits": {
+                                "memory": "512Mi",
+                            },
+                        },
                         "gateway": {
                             "image": {
                                 "registry": "quay.io",
@@ -409,6 +466,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi",
+                            },
+                            "limits": {
+                                "memory": "256Mi",
+                            },
+                        },
                         "envFromSecret": "grafana-db-url",
                         "grafana.ini": {
                             "server": {
@@ -495,6 +561,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "512Mi",
+                            },
+                            "limits": {
+                                "memory": "512Mi",
+                            },
+                        },
                         "serviceAccount": {
                             "create": True,
                             "name": str(ptd.Roles.MIMIR),
@@ -619,9 +694,18 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "10m",
+                                "memory": "64Mi",
+                            },
+                            "limits": {
+                                "memory": "64Mi",
+                            },
+                        },
                         "metricLabelsAllowlist": [
                             "pods=[launcher-instance-id]",
-                        ]
+                        ],
                     }
                 ),
             },
@@ -654,6 +738,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "128Mi",
+                            },
+                            "limits": {
+                                "memory": "128Mi",
+                            },
+                        },
                         "image": {
                             "registry": "ghcr.io/traefik",
                         },
@@ -1186,6 +1279,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
+                        "resources": {
+                            "requests": {
+                                "cpu": "50m",
+                                "memory": "128Mi",
+                            },
+                            "limits": {
+                                "memory": "128Mi",
+                            },
+                        },
                         "serviceAccount": {
                             "create": True,
                             "name": str(ptd.Roles.ALLOY),

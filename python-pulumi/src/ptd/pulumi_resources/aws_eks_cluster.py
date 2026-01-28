@@ -1188,6 +1188,17 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 tags=self.eks.tags,
                 configuration_values=json.dumps(
                     {
+                        "controller": {
+                            "resources": {
+                                "requests": {
+                                    "cpu": "10m",
+                                    "memory": "40Mi",
+                                },
+                                "limits": {
+                                    "memory": "40Mi",
+                                },
+                            },
+                        },
                         "defaultStorageClass": {
                             "enabled": True,
                         },
@@ -1236,6 +1247,21 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 cluster_name=self.name,
                 service_account_role_arn=sa_role.arn,
                 tags=self.eks.tags,
+                configuration_values=json.dumps(
+                    {
+                        "controller": {
+                            "resources": {
+                                "requests": {
+                                    "cpu": "10m",
+                                    "memory": "40Mi",
+                                },
+                                "limits": {
+                                    "memory": "40Mi",
+                                },
+                            },
+                        },
+                    }
+                ),
             ),
             opts=pulumi.ResourceOptions(parent=self.eks),
         )
