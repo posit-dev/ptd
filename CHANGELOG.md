@@ -1,3 +1,11 @@
+## [1.1.3](https://github.com/posit-dev/ptd/compare/v1.1.2...v1.1.3) (2026-01-28)
+
+
+### Bug Fixes
+
+* **team-operator:** add retain_on_delete protection for CRDs and namespace ([8c2d8ce](https://github.com/posit-dev/ptd/commit/8c2d8ced41953afa6f1a0bd4e5c5db18f3b29880))
+* **team-operator:** simplify to namespace protection only ([39c179a](https://github.com/posit-dev/ptd/commit/39c179a022b3b2078f25a8b316054fbc83a7c45b))
+
 ## [1.1.2](https://github.com/posit-dev/ptd/compare/v1.1.1...v1.1.2) (2026-01-28)
 
 
