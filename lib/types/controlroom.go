@@ -1,5 +1,12 @@
 package types
 
+// EKSAccessEntriesConfig holds configuration for EKS Access Entries
+type EKSAccessEntriesConfig struct {
+	Enabled                    bool                     `json:"enabled" yaml:"enabled"`
+	AdditionalEntries          []map[string]interface{} `json:"additional_entries" yaml:"additional_entries"`
+	IncludeSameAccountPoweruser bool                     `json:"include_same_account_poweruser" yaml:"include_same_account_poweruser"`
+}
+
 // TrustedUserIpAddress represents an IP address for a trusted user
 type TrustedUserIpAddress struct {
 	Ip      string `json:"ip" yaml:"ip"`
@@ -15,12 +22,13 @@ type TrustedUser struct {
 }
 
 type AWSControlRoomConfig struct {
-	AccountID                        string            `json:"account_id" yaml:"account_id"`
-	PowerUserARN                     string            `json:"power_user_arn" yaml:"power_user_arn"`
-	Domain                           string            `json:"domain" yaml:"domain"`
-	Environment                      string            `json:"environment" yaml:"environment"`
-	TrueName                         string            `json:"true_name" yaml:"true_name"`
-	DBAllocatedStorage               int               `json:"db_allocated_storage" yaml:"db_allocated_storage"`
+	AccountID                        string                  `json:"account_id" yaml:"account_id"`
+	PowerUserARN                     string                  `json:"power_user_arn" yaml:"power_user_arn"`
+	Domain                           string                  `json:"domain" yaml:"domain"`
+	Environment                      string                  `json:"environment" yaml:"environment"`
+	TrueName                         string                  `json:"true_name" yaml:"true_name"`
+	EksAccessEntries                 *EKSAccessEntriesConfig `json:"eks_access_entries" yaml:"eks_access_entries"`
+	DBAllocatedStorage               int                     `json:"db_allocated_storage" yaml:"db_allocated_storage"`
 	DBEngineVersion                  string            `json:"db_engine_version" yaml:"db_engine_version"`
 	DBInstanceClass                  string            `json:"db_instance_class" yaml:"db_instance_class"`
 	EksK8sVersion                    *string           `json:"eks_k8s_version" yaml:"eks_k8s_version"`
