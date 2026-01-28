@@ -99,7 +99,13 @@ class AWSFsxOpenZfsMulti(pulumi.ComponentResource):
             route_table_ids=props.route_table_ids,
             root_volume_configuration=root_volume_configuration,
             tags=props.tags,
-            opts=pulumi.ResourceOptions(parent=self),
+            # ignore_changes for daily_automatic_backup_start_time: This field is not
+            # properly read back from AWS after import, causing perpetual diffs.
+            # See: https://github.com/posit-dev/ptd/issues/5
+            opts=pulumi.ResourceOptions(
+                parent=self,
+                ignore_changes=["daily_automatic_backup_start_time"],
+            ),
         )
 
         # Export the outputs
