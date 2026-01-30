@@ -340,20 +340,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
-                        "resources": {
-                            "requests": {
-                                "cpu": "100m",
-                                "memory": "512Mi",
-                            },
-                            "limits": {
-                                "memory": "512Mi",
-                            },
-                        },
                         "gateway": {
                             "image": {
                                 "registry": "quay.io",
                                 "repository": "nginx/nginx-unprivileged",
-                            }
+                            },
+                            "resources": {
+                                "requests": {"cpu": "10m", "memory": "32Mi"},
+                                "limits": {"memory": "32Mi"},
+                            },
                         },
                         "loki": {
                             "auth_enabled": False,
@@ -430,17 +425,29 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                             "persistence": {
                                 "enableStatefulSetAutoDeletePVC": True,
                             },
+                            "resources": {
+                                "requests": {"cpu": "50m", "memory": "128Mi"},
+                                "limits": {"memory": "128Mi"},
+                            },
                         },
                         "read": {
                             "replicas": components.loki_replicas,
                             "persistence": {
                                 "enableStatefulSetAutoDeletePVC": True,
                             },
+                            "resources": {
+                                "requests": {"cpu": "50m", "memory": "128Mi"},
+                                "limits": {"memory": "128Mi"},
+                            },
                         },
                         "write": {
                             "replicas": components.loki_replicas,
                             "persistence": {
                                 "enableStatefulSetAutoDeletePVC": True,
+                            },
+                            "resources": {
+                                "requests": {"cpu": "50m", "memory": "128Mi"},
+                                "limits": {"memory": "128Mi"},
                             },
                         },
                     },
@@ -468,11 +475,11 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                     {
                         "resources": {
                             "requests": {
-                                "cpu": "100m",
-                                "memory": "256Mi",
+                                "cpu": "50m",
+                                "memory": "128Mi",
                             },
                             "limits": {
-                                "memory": "256Mi",
+                                "memory": "128Mi",
                             },
                         },
                         "envFromSecret": "grafana-db-url",
@@ -561,15 +568,6 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
-                        "resources": {
-                            "requests": {
-                                "cpu": "100m",
-                                "memory": "512Mi",
-                            },
-                            "limits": {
-                                "memory": "512Mi",
-                            },
-                        },
                         "serviceAccount": {
                             "create": True,
                             "name": str(ptd.Roles.MIMIR),
@@ -596,6 +594,22 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                                     "max_global_series_per_user": 800000,
                                     "max_label_names_per_series": 45,
                                 },
+                                # Ring health configuration to auto-forget unhealthy members
+                                # and prevent stale entries from blocking queries
+                                "ingester": {
+                                    "ring": {
+                                        "heartbeat_timeout": "1m",
+                                        "auto_forget_unhealthy": True,
+                                        "auto_forget_unhealthy_timeout": "10m",
+                                    },
+                                },
+                                "store_gateway": {
+                                    "sharding_ring": {
+                                        "heartbeat_timeout": "1m",
+                                        "auto_forget_unhealthy": True,
+                                        "auto_forget_unhealthy_timeout": "10m",
+                                    },
+                                },
                             }
                         },
                         "alertmanager": {"enabled": False},
@@ -604,6 +618,10 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                             "persistentVolume": {"size": "20Gi"},
                             "replicas": components.mimir_replicas,
                             "zoneAwareReplication": {"enabled": False},
+                            "resources": {
+                                "requests": {"cpu": "50m", "memory": "256Mi"},
+                                "limits": {"memory": "256Mi"},
+                            },
                             "affinity": {
                                 "nodeAffinity": {
                                     "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -621,9 +639,31 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                                 }
                             },
                         },
+                        "distributor": {
+                            "resources": {
+                                "requests": {"cpu": "50m", "memory": "128Mi"},
+                                "limits": {"memory": "128Mi"},
+                            },
+                        },
+                        "querier": {
+                            "resources": {
+                                "requests": {"cpu": "50m", "memory": "128Mi"},
+                                "limits": {"memory": "128Mi"},
+                            },
+                        },
+                        "query_frontend": {
+                            "resources": {
+                                "requests": {"cpu": "50m", "memory": "128Mi"},
+                                "limits": {"memory": "128Mi"},
+                            },
+                        },
                         "compactor": {
                             "persistentVolume": {"size": "20Gi"},
                             "replicas": components.mimir_replicas,
+                            "resources": {
+                                "requests": {"cpu": "50m", "memory": "128Mi"},
+                                "limits": {"memory": "128Mi"},
+                            },
                             "affinity": {
                                 "nodeAffinity": {
                                     "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -645,6 +685,10 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                             "persistentVolume": {"size": "20Gi"},
                             "replicas": components.mimir_replicas,
                             "zoneAwareReplication": {"enabled": False},
+                            "resources": {
+                                "requests": {"cpu": "50m", "memory": "128Mi"},
+                                "limits": {"memory": "128Mi"},
+                            },
                             "affinity": {
                                 "nodeAffinity": {
                                     "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -664,6 +708,10 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                         },
                         "gateway": {
                             "enabledNonEnterprise": True,
+                            "resources": {
+                                "requests": {"cpu": "10m", "memory": "32Mi"},
+                                "limits": {"memory": "32Mi"},
+                            },
                             "nginx": {
                                 "image": {
                                     "registry": "quay.io",
@@ -1281,11 +1329,11 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                     {
                         "resources": {
                             "requests": {
-                                "cpu": "50m",
-                                "memory": "128Mi",
+                                "cpu": "25m",
+                                "memory": "64Mi",
                             },
                             "limits": {
-                                "memory": "128Mi",
+                                "memory": "64Mi",
                             },
                         },
                         "serviceAccount": {

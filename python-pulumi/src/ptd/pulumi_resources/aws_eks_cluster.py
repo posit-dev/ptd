@@ -1914,6 +1914,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         self._create_alert_configmap("healthchecks", grafana_ns)
         self._create_alert_configmap("nodes", grafana_ns)
         self._create_alert_configmap("applications", grafana_ns)
+        self._create_alert_configmap("mimir", grafana_ns)
 
         # TODO: auth.proxy should be configurable, prod grafana auth will need tighter controls than letting anyone in as an Editor
         k8s.helm.v3.Release(
@@ -2201,6 +2202,22 @@ class AWSEKSCluster(pulumi.ComponentResource):
                             "limits": {
                                 "max_global_series_per_user": 800000,
                                 "max_label_names_per_series": 45,
+                            },
+                            # Ring health configuration to auto-forget unhealthy members
+                            # and prevent stale entries from blocking queries
+                            "ingester": {
+                                "ring": {
+                                    "heartbeat_timeout": "1m",
+                                    "auto_forget_unhealthy": True,
+                                    "auto_forget_unhealthy_timeout": "10m",
+                                },
+                            },
+                            "store_gateway": {
+                                "sharding_ring": {
+                                    "heartbeat_timeout": "1m",
+                                    "auto_forget_unhealthy": True,
+                                    "auto_forget_unhealthy_timeout": "10m",
+                                },
                             },
                         }
                     },
