@@ -1344,13 +1344,10 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                             "faroPort": 12347,
                             "hosts": [f"faro.{self.workload.cfg.domain}"],
                         },
-                        # Alloy is a DaemonSet, needs to run on all nodes including Karpenter session nodes
+                        # Alloy is a DaemonSet, needs to run on all nodes regardless of taints
                         "tolerations": [
                             {
-                                "key": "workload-type",
-                                "operator": "Equal",
-                                "value": "session",
-                                "effect": "NoSchedule",
+                                "operator": "Exists",
                             },
                         ],
                     }
