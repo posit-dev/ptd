@@ -104,20 +104,21 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                 "valuesContent": loki_identity.client_id.apply(
                     lambda client_id: yaml.dump(
                         {
-                            "resources": {
-                                "requests": {
-                                    "cpu": "100m",
-                                    "memory": "512Mi",
-                                },
-                                "limits": {
-                                    "memory": "512Mi",
+                            "singleBinary": {
+                                "resources": {
+                                    "requests": {"cpu": "50m", "memory": "256Mi"},
+                                    "limits": {"memory": "256Mi"},
                                 },
                             },
                             "gateway": {
                                 "image": {
                                     "registry": "quay.io",
                                     "repository": "nginx/nginx-unprivileged",
-                                }
+                                },
+                                "resources": {
+                                    "requests": {"cpu": "10m", "memory": "32Mi"},
+                                    "limits": {"memory": "32Mi"},
+                                },
                             },
                             "loki": {
                                 "auth_enabled": False,
@@ -226,15 +227,6 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                 "valuesContent": mimir_identity.client_id.apply(
                     lambda client_id: yaml.dump(
                         {
-                            "resources": {
-                                "requests": {
-                                    "cpu": "100m",
-                                    "memory": "512Mi",
-                                },
-                                "limits": {
-                                    "memory": "512Mi",
-                                },
-                            },
                             "serviceAccount": {
                                 "create": True,
                                 "name": str(ptd.Roles.MIMIR),
@@ -270,6 +262,22 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                                         "max_global_series_per_user": 800000,
                                         "max_label_names_per_series": 45,
                                     },
+                                    # Ring health configuration to auto-forget unhealthy members
+                                    # and prevent stale entries from blocking queries
+                                    "ingester": {
+                                        "ring": {
+                                            "heartbeat_timeout": "1m",
+                                            "auto_forget_unhealthy": True,
+                                            "auto_forget_unhealthy_timeout": "10m",
+                                        },
+                                    },
+                                    "store_gateway": {
+                                        "sharding_ring": {
+                                            "heartbeat_timeout": "1m",
+                                            "auto_forget_unhealthy": True,
+                                            "auto_forget_unhealthy_timeout": "10m",
+                                        },
+                                    },
                                 },
                             },
                             "minio": {
@@ -277,11 +285,51 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                             },
                             "alertmanager": {"enabled": False},
                             "ruler": {"enabled": False},
-                            "ingester": {"persistentVolume": {"size": "20Gi"}},
-                            "compactor": {"persistentVolume": {"size": "20Gi"}},
-                            "store_gateway": {"persistentVolume": {"size": "20Gi"}},
+                            "ingester": {
+                                "persistentVolume": {"size": "20Gi"},
+                                "resources": {
+                                    "requests": {"cpu": "50m", "memory": "256Mi"},
+                                    "limits": {"memory": "256Mi"},
+                                },
+                            },
+                            "distributor": {
+                                "resources": {
+                                    "requests": {"cpu": "50m", "memory": "128Mi"},
+                                    "limits": {"memory": "128Mi"},
+                                },
+                            },
+                            "querier": {
+                                "resources": {
+                                    "requests": {"cpu": "50m", "memory": "128Mi"},
+                                    "limits": {"memory": "128Mi"},
+                                },
+                            },
+                            "query_frontend": {
+                                "resources": {
+                                    "requests": {"cpu": "50m", "memory": "128Mi"},
+                                    "limits": {"memory": "128Mi"},
+                                },
+                            },
+                            "compactor": {
+                                "persistentVolume": {"size": "20Gi"},
+                                "resources": {
+                                    "requests": {"cpu": "50m", "memory": "128Mi"},
+                                    "limits": {"memory": "128Mi"},
+                                },
+                            },
+                            "store_gateway": {
+                                "persistentVolume": {"size": "20Gi"},
+                                "resources": {
+                                    "requests": {"cpu": "50m", "memory": "128Mi"},
+                                    "limits": {"memory": "128Mi"},
+                                },
+                            },
                             "gateway": {
                                 "enabledNonEnterprise": True,
+                                "resources": {
+                                    "requests": {"cpu": "10m", "memory": "32Mi"},
+                                    "limits": {"memory": "32Mi"},
+                                },
                                 "nginx": {
                                     "image": {
                                         "registry": "quay.io",
@@ -347,11 +395,11 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                     {
                         "resources": {
                             "requests": {
-                                "cpu": "50m",
-                                "memory": "128Mi",
+                                "cpu": "25m",
+                                "memory": "64Mi",
                             },
                             "limits": {
-                                "memory": "128Mi",
+                                "memory": "64Mi",
                             },
                         },
                         "serviceAccount": {
@@ -592,11 +640,11 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                     {
                         "resources": {
                             "requests": {
-                                "cpu": "100m",
-                                "memory": "256Mi",
+                                "cpu": "50m",
+                                "memory": "128Mi",
                             },
                             "limits": {
-                                "memory": "256Mi",
+                                "memory": "128Mi",
                             },
                         },
                         "envFromSecret": "grafana-db-url",

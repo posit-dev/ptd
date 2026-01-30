@@ -169,9 +169,7 @@ class TeamSite(pulumi.ComponentResource):
             # Check if disablePrePullImages is set to true in the Site spec
             disable_prepull = obj.get("spec", {}).get("disablePrePullImages", False)
             if session_node_pools and not disable_prepull:
-                deepmerge.always_merger.merge(
-                    obj, {"spec": {"prepullNodePools": session_node_pools}}
-                )
+                deepmerge.always_merger.merge(obj, {"spec": {"prepullNodePools": session_node_pools}})
 
         api_version_path = self._config_overrides.get("apiVersion", "").split("/")[-1]
 
