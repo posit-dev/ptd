@@ -56,12 +56,12 @@ class TigeraOperator(pulumi.ComponentResource):
             values={
                 "resources": {
                     "requests": {
-                        "cpu": "100m",
-                        "memory": "128Mi",
+                        "cpu": "10m",
+                        "memory": "100Mi",
                         "ephemeral-storage": "1Gi",
                     },
                     "limits": {
-                        "memory": "128Mi",
+                        "memory": "100Mi",
                         "ephemeral-storage": "2Gi",
                     },
                 },
