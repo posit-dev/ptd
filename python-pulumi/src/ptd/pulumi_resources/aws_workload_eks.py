@@ -107,6 +107,11 @@ class AWSWorkloadEKS(pulumi.ComponentResource):
         # Create additional node groups if configured
         if cluster_cfg.additional_node_groups:
             for ng_name, ng_config in cluster_cfg.additional_node_groups.items():
+                # Merge system node label if system_nodes is True
+                labels = dict(ng_config.labels)
+                if ng_config.system_nodes:
+                    labels["posit.team/node-role"] = "system"
+
                 self._create_node_group(
                     cluster_release=cluster_release,
                     node_group_name=ng_name,
@@ -121,7 +126,7 @@ class AWSWorkloadEKS(pulumi.ComponentResource):
                     desired_size=ng_config.desired_size
                     or ng_config.min_size,  # Use desired_size if specified, otherwise min_size
                     taints=ng_config.taints,
-                    labels=ng_config.labels,
+                    labels=labels,
                 )
 
         self._define_tigera_operator(cluster_release)
