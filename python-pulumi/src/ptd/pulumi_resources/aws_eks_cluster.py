@@ -1242,6 +1242,44 @@ class AWSEKSCluster(pulumi.ComponentResource):
 
         return self
 
+    def with_aws_secrets_store_csi_driver(
+        self,
+        version: str | None = None,
+    ) -> typing.Self:
+        """
+        Add the aws-secrets-store-csi-driver EKS addon.
+
+        This addon provides the Secrets Store CSI Driver with AWS Secrets Manager
+        and Parameter Store integration.
+
+        :param version: Optional, String, version of the addon to install.
+            By setting this to None, the latest version will be installed.
+        :return: self
+        """
+        aws.eks.Addon(
+            f"{self.name}-aws-secrets-store-csi-driver",
+            args=aws.eks.AddonArgs(
+                addon_name="aws-secrets-store-csi-driver",
+                addon_version=version,
+                cluster_name=self.name,
+                tags=self.eks.tags,
+                configuration_values=json.dumps(
+                    {
+                        "secrets-store-csi-driver": {
+                            "enableSecretRotation": True,
+                            "rotationPollInterval": "15s",
+                            "syncSecret": {
+                                "enabled": True,
+                            },
+                        },
+                    }
+                ),
+            ),
+            opts=pulumi.ResourceOptions(parent=self.eks),
+        )
+
+        return self
+
     def attach_efs_security_group(
         self,
         efs_file_system_id: str,
