@@ -131,9 +131,8 @@ class TeamSite(pulumi.ComponentResource):
             if obj["kind"] != "Site":
                 return
 
-            # Compute session tolerations and prepull node pools based on Karpenter node pools with session_taints=true
+            # Compute session tolerations based on Karpenter node pools with session_taints=true
             session_tolerations = []
-            session_node_pools = []
             if self.cluster_config and hasattr(self.cluster_config, "karpenter_config"):
                 karpenter_config = self.cluster_config.karpenter_config
                 if karpenter_config and karpenter_config.node_pools:
@@ -148,28 +147,20 @@ class TeamSite(pulumi.ComponentResource):
                             if toleration not in session_tolerations:
                                 session_tolerations.append(toleration)
 
-                            # Track node pool names for prepull targeting
-                            if node_pool.name not in session_node_pools:
-                                session_node_pools.append(node_pool.name)
+            if not session_tolerations:
+                return
 
             # Merge session tolerations into workbench spec
-            if session_tolerations:
-                deepmerge.always_merger.merge(obj, {"spec": {"workbench": {"sessionTolerations": session_tolerations}}})
+            deepmerge.always_merger.merge(obj, {"spec": {"workbench": {"sessionTolerations": session_tolerations}}})
 
-                # Deduplicate tolerations (deepmerge concatenates lists)
-                tolerations = obj["spec"]["workbench"]["sessionTolerations"]
-                seen = {}
-                for t in tolerations:
-                    key = (t.get("key"), t.get("operator"), t.get("value"), t.get("effect"))
-                    if key not in seen:
-                        seen[key] = t
-                obj["spec"]["workbench"]["sessionTolerations"] = list(seen.values())
-
-            # Inject prepull node pool targeting if session-tainted pools exist AND prepull is not disabled
-            # Check if disablePrePullImages is set to true in the Site spec
-            disable_prepull = obj.get("spec", {}).get("disablePrePullImages", False)
-            if session_node_pools and not disable_prepull:
-                deepmerge.always_merger.merge(obj, {"spec": {"prepullNodePools": session_node_pools}})
+            # Deduplicate tolerations (deepmerge concatenates lists)
+            tolerations = obj["spec"]["workbench"]["sessionTolerations"]
+            seen = {}
+            for t in tolerations:
+                key = (t.get("key"), t.get("operator"), t.get("value"), t.get("effect"))
+                if key not in seen:
+                    seen[key] = t
+            obj["spec"]["workbench"]["sessionTolerations"] = list(seen.values())
 
         api_version_path = self._config_overrides.get("apiVersion", "").split("/")[-1]
 
