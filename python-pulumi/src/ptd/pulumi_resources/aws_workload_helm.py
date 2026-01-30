@@ -1037,6 +1037,10 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                     "disruption": {"consolidationPolicy": "WhenEmptyOrUnderutilized", "consolidateAfter": "5m"},
                 }
 
+                # Add system node label if specified (prepull pods will avoid these nodes)
+                if node_pool.system_nodes:
+                    nodepool_spec["template"]["metadata"] = {"labels": {"posit.team/node-role": "system"}}
+
                 # Add weight for NodePool priority
                 nodepool_spec["weight"] = node_pool.weight
 

@@ -361,6 +361,7 @@ class NodeGroupConfig:
     labels: dict[str, str] = dataclasses.field(default_factory=dict)
     ami_type: str | None = None  # If None, will use cluster default
     desired_size: int | None = None  # If None, will use min_size
+    system_nodes: bool = False  # When True, nodes are labeled posit.team/node-role=system and excluded from prepull
 
 
 @dataclasses.dataclass(frozen=True)
