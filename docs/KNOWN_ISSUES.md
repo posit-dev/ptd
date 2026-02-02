@@ -42,12 +42,12 @@ You cannot deploy a standalone workload without first having a control room depl
 ### AWS Certificate Manager Validation
 
 **The Problem:**
-When deploying AWS workloads, the persistent step attempts to provision TLS certificates through AWS Certificate Manager (ACM) and validate them automatically. On the first deployment, this validation typically fails because DNS delegation has not been configured yet.
+When deploying AWS workloads, the persistent step attempts to provision TLS certificates through AWS Certificate Manager (ACM) and validate them automatically. On the first deployment, this validation typically fails because you haven't configured DNS delegation yet.
 
 **Why It Happens:**
 - ACM uses DNS-based validation to verify domain ownership
 - The workload creates DNS records for certificate validation
-- However, DNS delegation from your parent domain to the workload's hosted zone must be configured manually
+- However, you must manually configure DNS delegation from your parent domain to the workload's hosted zone
 - Until DNS delegation is in place, ACM cannot complete the DNS validation challenge
 - This causes the persistent step to hang or timeout waiting for certificate validation
 
