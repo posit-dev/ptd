@@ -2,11 +2,15 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/posit-dev/ptd/lib/types"
 )
+
+// ErrECRDeprecated is returned when ECR functionality is accessed.
+// ECR has been removed in favor of public Docker Hub images.
+var ErrECRDeprecated = errors.New("ECR functionality has been removed; images are now pulled from public Docker Hub")
 
 type Registry struct {
 	accountID string
@@ -28,33 +32,20 @@ func (r Registry) RegistryURI() string {
 	return fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com", r.accountID, r.region)
 }
 
+// GetAuthForCredentials is deprecated - ECR is no longer used.
+// Images are now pulled from public Docker Hub.
 func (r Registry) GetAuthForCredentials(ctx context.Context, c types.Credentials) (username string, password string, err error) {
-	awsCreds, err := OnlyAwsCredentials(c)
-	if err != nil {
-		return
-	}
-	authToken, err := GetEcrAuthToken(ctx, awsCreds, r.region)
-	if err != nil {
-		return
-	}
-	username = "AWS"
-	password = strings.TrimPrefix(authToken, "AWS:")
-	return
+	return "", "", ErrECRDeprecated
 }
 
+// GetLatestDigestForRepository is deprecated - ECR is no longer used.
+// Images are now pulled from public Docker Hub.
 func (r Registry) GetLatestDigestForRepository(ctx context.Context, c types.Credentials, repository string) (string, error) {
-	awsCreds, err := OnlyAwsCredentials(c)
-	if err != nil {
-		return "", err
-	}
-	return LatestDigestForRepository(ctx, awsCreds, r.region, repository)
+	return "", ErrECRDeprecated
 }
 
+// GetLatestImageForRepository is deprecated - ECR is no longer used.
+// Images are now pulled from public Docker Hub.
 func (r Registry) GetLatestImageForRepository(ctx context.Context, c types.Credentials, repository string) (details types.ImageDetails, err error) {
-	awsCreds, err := OnlyAwsCredentials(c)
-	if err != nil {
-		return
-	}
-
-	return LatestImageForRepository(ctx, awsCreds, r.region, repository)
+	return types.ImageDetails{}, ErrECRDeprecated
 }

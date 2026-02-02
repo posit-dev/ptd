@@ -28,9 +28,8 @@ func TestRegistryMethods(t *testing.T) {
 	assert.Equal(t, "111122223333.dkr.ecr.us-east-1.amazonaws.com", registry.RegistryURI())
 }
 
-// This is a simple mock implementation of the GetAuthForCredentials method
-// For a real test, we would need to mock the AWS ECR service
-func TestGetAuthForCredentials_Mock(t *testing.T) {
+// Test that ECR methods return deprecation errors since ECR is no longer used
+func TestGetAuthForCredentials_Deprecated(t *testing.T) {
 	accountID := "123456789012"
 	registry := NewRegistry(accountID, "us-east-1")
 
@@ -42,31 +41,42 @@ func TestGetAuthForCredentials_Mock(t *testing.T) {
 		envVarsVal:   map[string]string{},
 	}
 
-	// We can't actually call the real GetAuthForCredentials since it would try to use AWS
-	// But we can check that the function exists and accepts the right parameters
-	assert.NotPanics(t, func() {
-		// This would normally call the AWS API, but we're not executing it
-		registry.GetAuthForCredentials(context.Background(), creds)
-	})
+	username, password, err := registry.GetAuthForCredentials(context.Background(), creds)
+
+	assert.ErrorIs(t, err, ErrECRDeprecated)
+	assert.Empty(t, username)
+	assert.Empty(t, password)
 }
 
-func TestGetLatestImageForRepository(t *testing.T) {
+func TestGetLatestDigestForRepository_Deprecated(t *testing.T) {
 	accountID := "123456789012"
 	registry := NewRegistry(accountID, "us-west-2")
 
-	// Create a mock credentials object
 	creds := &MockCredentials{
 		accountIDVal: accountID,
 		identityVal:  "arn:aws:iam::123456789012:role/test-role",
 	}
 
-	// Test that the function doesn't panic
-	assert.NotPanics(t, func() {
-		registry.GetLatestImageForRepository(context.Background(), creds, "test-repo")
-	})
+	digest, err := registry.GetLatestDigestForRepository(context.Background(), creds, "test-repo")
 
-	// Without mocking the AWS SDK, we can't fully test this function
-	// A full test would verify it correctly calls through to LatestImageForRepository
+	assert.ErrorIs(t, err, ErrECRDeprecated)
+	assert.Empty(t, digest)
+}
+
+func TestGetLatestImageForRepository_Deprecated(t *testing.T) {
+	accountID := "123456789012"
+	registry := NewRegistry(accountID, "us-west-2")
+
+	creds := &MockCredentials{
+		accountIDVal: accountID,
+		identityVal:  "arn:aws:iam::123456789012:role/test-role",
+	}
+
+	details, err := registry.GetLatestImageForRepository(context.Background(), creds, "test-repo")
+
+	assert.ErrorIs(t, err, ErrECRDeprecated)
+	assert.Empty(t, details.Digest)
+	assert.Nil(t, details.Tags)
 }
 
 // Mock credentials implementation for testing
