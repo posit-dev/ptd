@@ -1,0 +1,67 @@
+# Update Team Operator Version
+#
+# Triggered by repository_dispatch from team-operator releases.
+# Creates a PR to update the default chart version.
+
+name: Update Team Operator Version
+
+on:
+  repository_dispatch:
+    types: [team-operator-release]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Team Operator version (e.g., v1.4.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            VERSION="${{ github.event.client_payload.version }}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Updating to version: $VERSION"
+
+      - name: Update DEFAULT_CHART_VERSION
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          FILE="python-pulumi/src/ptd/pulumi_resources/team_operator.py"
+
+          # Update the version
+          sed -i "s/^DEFAULT_CHART_VERSION = .*/DEFAULT_CHART_VERSION = \"$VERSION\"/" "$FILE"
+
+          # Verify the change
+          grep "DEFAULT_CHART_VERSION" "$FILE"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update team-operator default version to ${{ steps.version.outputs.version }}"
+          title: "chore: update team-operator default version to ${{ steps.version.outputs.version }}"
+          body: |
+            Automated PR to update the default Team Operator Helm chart version.
+
+            **New version:** `${{ steps.version.outputs.version }}`
+
+            This PR was triggered by a new [team-operator release](https://github.com/posit-dev/team-operator/releases/tag/${{ steps.version.outputs.version }}).
+          branch: update-team-operator-${{ steps.version.outputs.version }}
+          delete-branch: true
+          labels: |
+            automated
+            dependencies
