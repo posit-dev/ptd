@@ -408,6 +408,7 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(
                 parent=self.vpc,
                 protect=self.workload.cfg.protect_persistent_resources,
+                ignore_changes=["identifier_prefix"],
             ),
         )
 
