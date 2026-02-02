@@ -49,7 +49,6 @@ class AWSControlRoomConfig:
     eks_node_group_min: int = 3
     eks_node_instance_type: str = "m6a.xlarge"
     hosted_zone_id: str | None = None
-    manage_ecr_repositories: bool = True
     protect_persistent_resources: bool = True
     region: str = "us-east-2"
     resource_tags: dict[str, str] = dataclasses.field(default_factory=dict)

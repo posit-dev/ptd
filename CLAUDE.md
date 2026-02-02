@@ -96,7 +96,6 @@ The Go CLI communicates the infrastructure path to Python Pulumi stacks via the 
 #### AWS Development
 
 - `just aws-unset`: Unset all AWS environment variables
-- `just latest-images`: Show latest ECR images
 
 ## Contributing
 

@@ -44,14 +44,6 @@ def octet_signature(s: str) -> int:
     return sum([ord(c) for c in list(s)]) % 255
 
 
-def ecr_repository_url(aws_account_id: str, repo_name: str, region: str = "us-east-2") -> str:
-    return f"{aws_account_id}.dkr.ecr.{region}.amazonaws.com/{repo_name}"
-
-
-def ecr_repository_arn(aws_account_id: str, repo_name: str, region: str = "us-east-2") -> str:
-    return f"arn:aws:ecr:{region}:{aws_account_id}:repository/{repo_name}"
-
-
 def import_string(import_name: str) -> typing.Any:
     """This function in borrowed and modified from werkzeug.utils.import_string"""
     try:
