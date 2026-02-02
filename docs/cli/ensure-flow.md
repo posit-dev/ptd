@@ -167,15 +167,15 @@ Configures the RDS database created in the persistent step:
 
 **Purpose**: Create the Kubernetes cluster
 
-**Proxy Required**: Yes (EKS), No (AKS)
+**Proxy Required**: Yes (Amazon Elastic Kubernetes Service (EKS)), No (Azure Kubernetes Service (AKS))
 
 This step is selected based on the cloud provider:
 
-#### AWS - EKS Step
+#### AWS - EKS step
 
 **Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_workload_eks.py`)
 
-Creates Amazon EKS clusters:
+Creates EKS clusters:
 - EKS control plane with specified Kubernetes version
 - Enables cluster logging (API, audit, authenticator, controller manager, scheduler)
 - Creates node groups with EC2 launch templates
@@ -183,11 +183,11 @@ Creates Amazon EKS clusters:
 - Sets up OIDC identity provider for IAM roles for service accounts (IRSA)
 - Optionally installs Tigera operator for network policies
 
-#### Azure - AKS Step
+#### Azure - AKS step
 
 **Implementation**: Go Pulumi (`lib/steps/aks.go`)
 
-Creates Azure Kubernetes Service clusters:
+Creates AKS clusters:
 - AKS control plane with private cluster configuration
 - **System node pool**: Runs Kubernetes system components (2-5 nodes, with taint)
 - **User node pools**: Configurable pools for workload pods
