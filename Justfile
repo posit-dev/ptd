@@ -39,34 +39,6 @@ write-kubeconfig cluster_dir=invocation_directory() kubeconfig='./kubeconfig':
 
 # ----------------------------------------------------------------------------
 
-# `just ecr-login` will log you into the ECR repositories that your current AWS context/variables point to
-# this is useful for `docker pull` and `docker push` types of commands, like building custom images, etc.
-ecr-login:
-  #!/bin/bash
-
-  echo "Repositories that exist:"
-  aws ecr describe-repositories | jq -r '.repositories[].repositoryUri' | sed 's/^/  /'
-
-  # just grab the first repo... it should give us the account and region
-  rawRepo=$(aws ecr describe-repositories | jq -r '.repositories[0].repositoryUri')
-
-  echo "Logging in..."
-  # then strip off the image name for actual `docker login`
-  aws ecr get-login-password | docker login --username AWS --password-stdin ${rawRepo//\/*/} | sed 's/^/  /'
-
-skopeo-login:
-  #!/bin/bash
-
-  echo "Repositories that exist:"
-  aws ecr describe-repositories | jq -r '.repositories[].repositoryUri' | sed 's/^/  /'
-
-  # just grab the first repo... it should give us the account and region
-  rawRepo=$(aws ecr describe-repositories | jq -r '.repositories[0].repositoryUri')
-
-  echo "Logging in..."
-  # then strip off the image name for actual `docker login`
-  aws ecr get-login-password | skopeo login --username AWS --password-stdin ${rawRepo//\/*/} | sed 's/^/  /'
-
 # ensure git is set up to use ssh
 git-ssh:
   #!/bin/bash
@@ -82,15 +54,6 @@ aws-unset:
   unset AWS_SESSION_TOKEN
   unset AWS_SECRET_ACCESS_KEY
   unset AWS_ACCESS_KEY_ID
-
-latest-images:
-  #!/usr/bin/env bash
-  for img in $(aws ecr describe-repositories | jq -r '.repositories[].repositoryName'); do
-    echo ""
-    echo "---> < Image list for $img >";
-    aws ecr describe-images --repository-name $img | jq '.imageDetails | sort_by(.imagePushedAt) | reverse | map(.imagePushedAt + " --- " + (.imageTags | join(", ")) ) | .[0:4]'
-    echo "---> </ $img >";
-  done;
 
 ############################################################################
 # Setup and dependencies

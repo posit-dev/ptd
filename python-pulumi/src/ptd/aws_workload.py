@@ -23,8 +23,6 @@ VALID_VPC_ENDPOINT_SERVICES = frozenset(
     [
         "ec2",
         "ec2messages",
-        "ecr.api",
-        "ecr.dkr",
         "fsx",
         "kms",
         "s3",
@@ -37,8 +35,6 @@ VALID_VPC_ENDPOINT_SERVICES = frozenset(
 STANDARD_VPC_ENDPOINT_SERVICES = (
     "ec2",
     "ec2messages",
-    "ecr.api",
-    "ecr.dkr",
     "kms",
     "s3",
     "ssm",
