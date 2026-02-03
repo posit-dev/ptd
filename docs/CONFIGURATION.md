@@ -39,7 +39,7 @@ spec:
   # Required: External access domain
   front_door: cr.example.com
 
-  # EKS cluster version
+  # Amazon Elastic Kubernetes Service (EKS) cluster version
   eks_k8s_version: "1.33"
 
   # Enable Tailscale for remote access
@@ -135,7 +135,7 @@ spec:
   # Disable pre-pulling images
   disablePrePullImages: true
 
-  # Workbench (IDE)
+  # Posit Workbench (IDE)
   workbench:
     replicas: 2
     image: ghcr.io/rstudio/rstudio-workbench:ubuntu2204-2026.01.0
@@ -165,7 +165,7 @@ spec:
     positronConfig:
       sessionTimeoutKillHours: 4
 
-  # Connect (Publishing)
+  # Posit Connect (Publishing)
   connect:
     replicas: 2
     image: ghcr.io/rstudio/rstudio-connect:ubuntu2204-2025.12.1
@@ -178,13 +178,13 @@ spec:
       clientId: "your-client-id"
       issuer: "https://your-idp.com"
 
-  # Package Manager
+  # Posit Package Manager
   packageManager:
     image: ghcr.io/rstudio/rstudio-package-manager:ubuntu2204-2025.09.2
     imagePullPolicy: Always
     domainPrefix: pkg  # -> pkg.analytics.example.com
 
-  # Chronicle (Audit Logging)
+  # Posit Chronicle (Audit Logging)
   chronicle:
     image: ghcr.io/rstudio/chronicle:2025.08.0
     agentImage: ghcr.io/rstudio/chronicle-agent:2025.08.0
@@ -239,7 +239,7 @@ auth:
     - "groups"
 ```
 
-### SAML
+### Security Assertion Markup Language (SAML)
 
 ```yaml
 auth:
@@ -247,7 +247,7 @@ auth:
   idpMetadataUrl: "https://your-idp.com/metadata"
 ```
 
-### LDAP
+### Lightweight Directory Access Protocol (LDAP)
 
 ```yaml
 auth:
