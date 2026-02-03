@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/posit-dev/ptd/compare/v1.2.0...v1.2.1) (2026-02-03)
+
+
+### Bug Fixes
+
+* support workon for custom steps ([2ef2752](https://github.com/posit-dev/ptd/commit/2ef2752392f851a19521e5b714a6db72da6e0226))
+
 # [1.2.0](https://github.com/posit-dev/ptd/compare/v1.1.3...v1.2.0) (2026-02-03)
 
 
