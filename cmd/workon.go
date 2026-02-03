@@ -4,8 +4,11 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/posit-dev/ptd/cmd/internal/legacy"
+	"github.com/posit-dev/ptd/lib/customization"
+	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/pulumi"
 	"github.com/posit-dev/ptd/lib/steps"
 	"github.com/spf13/cobra"
@@ -76,30 +79,57 @@ func runWorkOn(cmd *cobra.Command, target string, step string) {
 
 	// If a step is provided, create/load the Pulumi stack for that step
 	if step != "" {
-		if !steps.ValidStep(step, t.ControlRoom()) {
+		// Check if it's a custom step first
+		yamlPath := helpers.YamlPathForTarget(t)
+		workloadPath := filepath.Dir(yamlPath) // Get the directory, not the yaml file path
+		customStep, isCustom := findCustomStep(workloadPath, step)
+
+		if isCustom {
+			// Handle custom step
+			slog.Info("Working on custom step", "step", step, "path", customStep.Path)
+
+			// Create stack based on local source defined in program path
+			programPath := filepath.Join(workloadPath, "customizations", customStep.Path)
+			stack, err := pulumi.LocalStack(
+				cmd.Context(),
+				t,
+				programPath,
+				step,
+				credEnvVars,
+			)
+			if err != nil {
+				slog.Error("Failed to create custom step stack", "error", err)
+				return
+			}
+
+			shellCommand.Dir = programPath
+			shellCommand.Env = append(shellCommand.Env, "PULUMI_STACK_NAME="+stack.Name())
+
+		} else if steps.ValidStep(step, t.ControlRoom()) {
+			// Handle standard step
+			stack, err := pulumi.NewPythonPulumiStack(
+				cmd.Context(),
+				string(t.CloudProvider()), // ptd-<cloud>-<control-room/workload>-<stackname>
+				targetType,
+				step,
+				t.Name(),
+				t.Region(),
+				t.PulumiBackendUrl(),
+				t.PulumiSecretsProviderKey(),
+				credEnvVars,
+				true,
+			)
+			if err != nil {
+				slog.Error("Failed to create Pulumi stack", "error", err)
+				return
+			}
+
+			// set the command's working directory to the stack's workdir
+			shellCommand.Dir = stack.Workspace().WorkDir()
+		} else {
 			slog.Error("Invalid step provided", "step", step)
 			return
 		}
-
-		stack, err := pulumi.NewPythonPulumiStack(
-			cmd.Context(),
-			string(t.CloudProvider()), // ptd-<cloud>-<control-room/workload>-<stackname>
-			targetType,
-			step,
-			t.Name(),
-			t.Region(),
-			t.PulumiBackendUrl(),
-			t.PulumiSecretsProviderKey(),
-			credEnvVars,
-			true,
-		)
-		if err != nil {
-			slog.Error("Failed to create Pulumi stack", "error", err)
-			return
-		}
-
-		// set the command's working directory to the stack's workdir
-		shellCommand.Dir = stack.Workspace().WorkDir()
 	}
 
 	cmd.Printf("Starting interactive shell in %s with session identity %s\n", shellCommand.Dir, creds.Identity())
@@ -111,4 +141,27 @@ func runWorkOn(cmd *cobra.Command, target string, step string) {
 		slog.Error("Failed to start interactive shell", "error", err)
 		return
 	}
+}
+
+// findCustomStep checks if a step name corresponds to a custom step in the manifest
+func findCustomStep(workloadPath string, stepName string) (*customization.CustomStep, bool) {
+	manifestPath, found := customization.FindManifest(workloadPath)
+	if !found {
+		return nil, false
+	}
+
+	manifest, err := customization.LoadManifest(manifestPath)
+	if err != nil {
+		slog.Debug("Failed to load manifest", "manifestPath", manifestPath, "error", err)
+		return nil, false
+	}
+
+	for _, cs := range manifest.CustomSteps {
+		if cs.Name == stepName && cs.IsEnabled() {
+			slog.Debug("Found matching custom step", "name", cs.Name, "path", cs.Path)
+			return &cs, true
+		}
+	}
+
+	return nil, false
 }
