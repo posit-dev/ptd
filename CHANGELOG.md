@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/posit-dev/ptd/compare/v1.1.3...v1.2.0) (2026-02-03)
+
+
+### Features
+
+* add workflow to handle team-operator version updates ([2541d23](https://github.com/posit-dev/ptd/commit/2541d2336c9cf1838c01eb8323e35280cb17eb28))
+
 ## [1.1.3](https://github.com/posit-dev/ptd/compare/v1.1.2...v1.1.3) (2026-01-28)
 
 
