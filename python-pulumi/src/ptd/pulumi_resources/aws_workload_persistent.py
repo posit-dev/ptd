@@ -835,6 +835,7 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
             self.fsx_openzfs_fs = ptd.pulumi_resources.aws_fsx_openzfs_multi.AWSFsxOpenZfsMulti(
                 self.workload.compound_name,
                 props=ptd.pulumi_resources.aws_fsx_openzfs_multi.AWSFsxOpenZfsMultiArgs(
+                    automatic_backup_retention_days=30,
                     subnet_ids=self.private_subnet_ids[:2],
                     daily_automatic_backup_start_time=self.workload.cfg.fsx_openzfs_daily_automatic_backup_start_time,
                     deployment_type=deployment_type,
@@ -867,6 +868,7 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
         else:
             self.fsx_openzfs_fs = aws.fsx.OpenZfsFileSystem(
                 self.workload.compound_name,
+                automatic_backup_retention_days=30,
                 preferred_subnet_id=(subnet_ids[0] if deployment_type.startswith("MULTI") else None),
                 subnet_ids=subnet_ids,
                 deployment_type=deployment_type,
