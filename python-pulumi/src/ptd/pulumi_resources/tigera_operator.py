@@ -50,7 +50,7 @@ class TigeraOperator(pulumi.ComponentResource):
             namespace="tigera-operator",
             name="tigera-operator",
             repository_opts=k8s.helm.v3.RepositoryOptsArgs(
-                repo="https://docs.projectcalico.org/charts",
+                repo="https://docs.tigera.io/calico/charts",
             ),
             atomic=False,
             values={
