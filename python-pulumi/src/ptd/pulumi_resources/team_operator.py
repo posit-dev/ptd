@@ -90,6 +90,16 @@ class TeamOperator(pulumi.ComponentResource):
             ),
         )
 
+        # Create posit-team-system namespace for the operator and migration resources
+        self.posit_team_system_namespace = kubernetes.core.v1.Namespace(
+            f"{self.workload.compound_name}-{self.release}-{ptd.POSIT_TEAM_SYSTEM_NAMESPACE}",
+            metadata={"name": ptd.POSIT_TEAM_SYSTEM_NAMESPACE},
+            opts=pulumi.ResourceOptions(
+                parent=self,
+                retain_on_delete=True,  # Don't delete namespace during migration
+            ),
+        )
+
     def _define_migration_resources(self):
         """Create resources to migrate from kustomize to Helm.
 
@@ -106,7 +116,7 @@ class TeamOperator(pulumi.ComponentResource):
                 name="helm-migration",
                 namespace=namespace,
             ),
-            opts=pulumi.ResourceOptions(parent=self),
+            opts=pulumi.ResourceOptions(parent=self, depends_on=[self.posit_team_system_namespace]),
         )
 
         # ClusterRole with permissions to patch CRDs and delete old resources
