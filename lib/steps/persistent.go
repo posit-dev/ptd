@@ -122,13 +122,15 @@ func (s *PersistentStep) Run(ctx context.Context) error {
 	}
 
 	// if we're working on a workload, this password may have changed, update if so.
-	newMimirPassword, ok := result.Outputs["mimir_password"].Value.(string)
-	if !ok {
-		return fmt.Errorf("mimir_password not found in outputs")
-	}
-	if newMimirPassword != currentMimirPassword {
-		slog.Info("Updating control room mimir password", "target", s.DstTarget.Name())
-		return updateControlRoomMimirPassword(ctx, s.SrcTarget, s.DstTarget.Name(), newMimirPassword)
+	if !s.DstTarget.ControlRoom() && s.DstTarget.CloudProvider() == types.AWS {
+		newMimirPassword, ok := result.Outputs["mimir_password"].Value.(string)
+		if !ok {
+			return fmt.Errorf("mimir_password not found in outputs")
+		}
+		if newMimirPassword != currentMimirPassword {
+			slog.Info("Updating control room mimir password", "target", s.DstTarget.Name())
+			return updateControlRoomMimirPassword(ctx, s.SrcTarget, s.DstTarget.Name(), newMimirPassword)
+		}
 	}
 
 	// if we're working on a workload, we also need to ensure the secret is updated
