@@ -334,10 +334,6 @@ echo "Migration complete - Helm will now create fresh resources"
             # This tells Helm CLI to skip the crds/ directory if the chart ever moves
             # CRDs there. Combined with crd.enable=False, provides complete CRD skip.
             skip_crds=self.cluster_cfg.team_operator_skip_crds,
-            # Skip await to allow release to complete even if pods aren't ready.
-            # This lets us inspect actual failures in the cluster rather than getting
-            # misleading "service not found" errors from Pulumi's wait logic.
-            skip_await=True,
         )
 
         self.helm_release = kubernetes.helm.v3.Release(
