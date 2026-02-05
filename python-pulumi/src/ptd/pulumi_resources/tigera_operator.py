@@ -54,6 +54,17 @@ class TigeraOperator(pulumi.ComponentResource):
             ),
             atomic=False,
             values={
+                "resources": {
+                    "requests": {
+                        "cpu": "10m",
+                        "memory": "100Mi",
+                        "ephemeral-storage": "1Gi",
+                    },
+                    "limits": {
+                        "memory": "100Mi",
+                        "ephemeral-storage": "2Gi",
+                    },
+                },
                 "installation": {
                     "enabled": True,
                     "registry": "quay.io",
@@ -78,7 +89,7 @@ class TigeraOperator(pulumi.ComponentResource):
                         "type": "Calico",
                     },
                     "nonPrivileged": "Enabled",
-                }
+                },
             },
             opts=pulumi.ResourceOptions(parent=self, depends_on=self.namespace),
         )

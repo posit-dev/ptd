@@ -1188,6 +1188,17 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 tags=self.eks.tags,
                 configuration_values=json.dumps(
                     {
+                        "controller": {
+                            "resources": {
+                                "requests": {
+                                    "cpu": "10m",
+                                    "memory": "40Mi",
+                                },
+                                "limits": {
+                                    "memory": "40Mi",
+                                },
+                            },
+                        },
                         "defaultStorageClass": {
                             "enabled": True,
                         },
@@ -1236,6 +1247,21 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 cluster_name=self.name,
                 service_account_role_arn=sa_role.arn,
                 tags=self.eks.tags,
+                configuration_values=json.dumps(
+                    {
+                        "controller": {
+                            "resources": {
+                                "requests": {
+                                    "cpu": "10m",
+                                    "memory": "40Mi",
+                                },
+                                "limits": {
+                                    "memory": "40Mi",
+                                },
+                            },
+                        },
+                    }
+                ),
             ),
             opts=pulumi.ResourceOptions(parent=self.eks),
         )
@@ -1888,6 +1914,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         self._create_alert_configmap("healthchecks", grafana_ns)
         self._create_alert_configmap("nodes", grafana_ns)
         self._create_alert_configmap("applications", grafana_ns)
+        self._create_alert_configmap("mimir", grafana_ns)
 
         # TODO: auth.proxy should be configurable, prod grafana auth will need tighter controls than letting anyone in as an Editor
         k8s.helm.v3.Release(
@@ -2175,6 +2202,22 @@ class AWSEKSCluster(pulumi.ComponentResource):
                             "limits": {
                                 "max_global_series_per_user": 800000,
                                 "max_label_names_per_series": 45,
+                            },
+                            # Ring health configuration to auto-forget unhealthy members
+                            # and prevent stale entries from blocking queries
+                            "ingester": {
+                                "ring": {
+                                    "heartbeat_timeout": "1m",
+                                    "auto_forget_unhealthy": True,
+                                    "auto_forget_unhealthy_timeout": "10m",
+                                },
+                            },
+                            "store_gateway": {
+                                "sharding_ring": {
+                                    "heartbeat_timeout": "1m",
+                                    "auto_forget_unhealthy": True,
+                                    "auto_forget_unhealthy_timeout": "10m",
+                                },
                             },
                         }
                     },
