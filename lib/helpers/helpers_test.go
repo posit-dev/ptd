@@ -91,9 +91,10 @@ func TestGenerateRandomString(t *testing.T) {
 			assert.Equal(t, tt.length, len(result))
 
 			// Generate another string of same length and verify they're different
-			// This is a probabilistic test, but the chance of two random strings being
-			// identical is extremely low for any reasonable length
-			if tt.length > 0 {
+			// Only check randomness for lengths >= 4 where collision probability
+			// is negligible (1/62^4 ≈ 0.00007%). For shorter lengths, the collision
+			// probability is too high for a reliable test (1/62 ≈ 1.6% for length 1).
+			if tt.length >= 4 {
 				anotherResult := GenerateRandomString(tt.length)
 				assert.NotEqual(t, result, anotherResult, "Generated strings should be random")
 			}
