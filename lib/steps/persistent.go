@@ -122,7 +122,7 @@ func (s *PersistentStep) Run(ctx context.Context) error {
 	}
 
 	// if we're working on a workload, this password may have changed, update if so.
-	if !s.DstTarget.ControlRoom() && s.DstTarget.CloudProvider() == types.AWS {
+	if !s.DstTarget.ControlRoom() {
 		newMimirPassword, ok := result.Outputs["mimir_password"].Value.(string)
 		if !ok {
 			return fmt.Errorf("mimir_password not found in outputs")
