@@ -1,3 +1,16 @@
+# [1.3.0](https://github.com/posit-dev/ptd/compare/v1.2.1...v1.3.0) (2026-02-06)
+
+
+### Bug Fixes
+
+* **lib:** fix flaky TestGenerateRandomString test ([74755d3](https://github.com/posit-dev/ptd/commit/74755d33a3f0b6fe7062935b6b57a9d81244c5b5))
+
+
+### Features
+
+* **control-room:** add EKS access entries support ([b739db1](https://github.com/posit-dev/ptd/commit/b739db163c8fe5de2f5c9d61eeaf1b7727909d85)), closes [#79](https://github.com/posit-dev/ptd/issues/79)
+* **eks:** enable access entries by default ([3a538f6](https://github.com/posit-dev/ptd/commit/3a538f6c10d7a8edb901504122b3fe5379d3471a)), closes [#111](https://github.com/posit-dev/ptd/issues/111)
+
 ## [1.2.1](https://github.com/posit-dev/ptd/compare/v1.2.0...v1.2.1) (2026-02-03)
 
 
