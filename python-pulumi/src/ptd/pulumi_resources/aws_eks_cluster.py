@@ -639,6 +639,13 @@ class AWSEKSCluster(pulumi.ComponentResource):
             )
 
         # Use the legacy aws-auth ConfigMap approach
+        warnings.warn(
+            "aws-auth ConfigMap authentication is deprecated. "
+            "Set eks_access_entries.enabled=True in cluster configuration. "
+            "ConfigMap support will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if node_role is None:
             if self.default_node_role is not None:
                 node_role = self.default_node_role

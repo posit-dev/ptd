@@ -173,8 +173,8 @@ def test_backward_compatibility_patterns():
         ptd_controller_image="v2.0.0",
     )
 
-    # Should have default values for new fields
-    assert old_config.eks_access_entries.enabled is False
+    # Should have default values for new fields (enabled by default now)
+    assert old_config.eks_access_entries.enabled is True
     assert old_config.eks_access_entries.additional_entries == []
 
     # Migration pattern: enable Access Entries but no additional entries
@@ -312,15 +312,15 @@ def test_configuration_immutability():
 
 def test_feature_flag_consistency():
     """Test that feature flag behavior is consistent."""
-    # Default behavior (ConfigMap)
+    # Default behavior (Access Entries enabled by default)
     default_config = ptd.WorkloadClusterConfig()
-    assert default_config.eks_access_entries.enabled is False
+    assert default_config.eks_access_entries.enabled is True
 
-    # Explicit ConfigMap mode
+    # Explicit ConfigMap mode (opt-out)
     configmap_config = ptd.WorkloadClusterConfig(eks_access_entries=ptd.EKSAccessEntriesConfig(enabled=False))
     assert configmap_config.eks_access_entries.enabled is False
 
-    # Access Entries mode
+    # Explicit Access Entries mode
     access_entries_config = ptd.WorkloadClusterConfig(eks_access_entries=ptd.EKSAccessEntriesConfig(enabled=True))
     assert access_entries_config.eks_access_entries.enabled is True
 
@@ -349,20 +349,11 @@ def test_feature_flag_consistency():
 
 def test_poweruser_configuration():
     """Test PowerUser role configuration options."""
-    # Default: PowerUser not included
+    # Default: PowerUser NOT included (only for internal clusters)
     default_config = ptd.WorkloadClusterConfig()
     assert default_config.eks_access_entries.include_same_account_poweruser is False
 
-    # Explicitly exclude PowerUser
-    no_poweruser = ptd.WorkloadClusterConfig(
-        eks_access_entries=ptd.EKSAccessEntriesConfig(
-            enabled=True,
-            include_same_account_poweruser=False,
-        )
-    )
-    assert no_poweruser.eks_access_entries.include_same_account_poweruser is False
-
-    # Include PowerUser
+    # Explicitly include PowerUser (opt-in for internal clusters)
     with_poweruser = ptd.WorkloadClusterConfig(
         eks_access_entries=ptd.EKSAccessEntriesConfig(
             enabled=True,
