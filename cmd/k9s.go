@@ -257,9 +257,6 @@ func setupKubeConfig(cmd *cobra.Command, t types.Target, creds types.Credentials
 
 		updateCmd := exec.CommandContext(ctx, "az", args...)
 
-		// Azure credentials are handled by Azure CLI internally, no env vars needed
-		updateCmd.Env = os.Environ()
-
 		// Execute the command and capture output
 		var stdout, stderr strings.Builder
 		updateCmd.Stdout = &stdout
