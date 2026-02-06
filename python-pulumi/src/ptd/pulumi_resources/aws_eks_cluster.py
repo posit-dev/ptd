@@ -128,6 +128,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         self.default_fargate_node_role = None
         self.fargate_profiles = collections.defaultdict()
         self.oidc_provider = None
+        self.ebs_csi_addon = None  # Set by with_ebs_csi_driver(), used by with_encrypted_ebs_storage_class()
 
         # TODO: evaluate whether to create just one of these / etc.
         assume_role_policy = aws.iam.get_policy_document(
@@ -525,6 +526,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         max_unavailable: int = 1,
         ami_type: str = "AL2_x86_64",
         taints: list[aws.eks.NodeGroupTaintArgs] | None = None,
+        depends_on: list[pulumi.Resource] | None = None,
         *,
         use_name: bool = False,
     ):
@@ -549,6 +551,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         :param ami_type: Optional. The AMI type. Default 'AL2_x86_64'
         :param max_unavailable: Optional. The maximum number of unavailable nodes during an update. Default 1
         :param taints: Optional. The Kubernetes taints to be applied to the nodes in the node group
+        :param depends_on: Optional. Resources that must be created before the node group (e.g., CNI)
         :param opts: Optional. Resource options.
         :return: The AWSEKSCluster component resource
         """
@@ -598,7 +601,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
             ),
             update_config=aws.eks.NodeGroupUpdateConfigArgs(max_unavailable=max_unavailable),
             taints=taints,
-            opts=pulumi.ResourceOptions(parent=self.eks),
+            opts=pulumi.ResourceOptions(parent=self.eks, depends_on=depends_on),
         )
 
         self.node_groups[name] = node_group
@@ -1067,13 +1070,19 @@ class AWSEKSCluster(pulumi.ComponentResource):
         )
 
         # change the original ebs class to be non-default
+        # The ebs-csi-default-sc StorageClass is created by the EBS CSI addon, so we need to
+        # depend on the addon being ready before we can patch it
+        patch_depends_on = [storage_class]
+        if self.ebs_csi_addon is not None:
+            patch_depends_on.append(self.ebs_csi_addon)
+
         k8s.storage.v1.StorageClassPatch(
             f"{self.name}-ebs-csi-default-sc-patch",
             metadata=k8s.meta.v1.ObjectMetaPatchArgs(
                 annotations={"storageclass.kubernetes.io/is-default-class": "false"},
                 name="ebs-csi-default-sc",
             ),
-            opts=pulumi.ResourceOptions(provider=self.provider, parent=self.eks, depends_on=[storage_class]),
+            opts=pulumi.ResourceOptions(provider=self.provider, parent=self.eks, depends_on=patch_depends_on),
         )
 
         return self
@@ -1141,6 +1150,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         resolve_conflicts_on_create: str | None = None,
         resolve_conflicts_on_update: str | None = None,
         role_name: str | None = None,
+        depends_on: list[pulumi.Resource] | None = None,
     ) -> typing.Self:
         """
         Add the aws-ebs-csi-driver eks addon
@@ -1159,6 +1169,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         :param resolve_conflicts_on_create: Optional, String, PRESERVE, or OVERWRITE, or NONE see
             https://docs.aws.amazon.com/eks/latest/APIReference/API_UpdateAddon.html
             Only use with pulumi-aws 6.x and higher.
+        :param depends_on: Optional. Resources that must be created before the addon (e.g., node groups)
         :param opts: Optional. Resource options
         :return: self
         """
@@ -1182,7 +1193,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         )
 
         # Install the addon to the cluster
-        aws.eks.Addon(
+        self.ebs_csi_addon = aws.eks.Addon(
             f"{self.name}-ebs-csi",
             args=aws.eks.AddonArgs(
                 addon_name="aws-ebs-csi-driver",
@@ -1201,7 +1212,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
                     }
                 ),
             ),
-            opts=pulumi.ResourceOptions(parent=self.eks),
+            opts=pulumi.ResourceOptions(parent=self.eks, depends_on=depends_on),
         )
 
         return self
