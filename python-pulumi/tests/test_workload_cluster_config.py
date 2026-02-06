@@ -12,7 +12,7 @@ def test_workload_cluster_config_default_initialization():
     # Test default values
     assert config.team_operator_image == "latest"
     assert config.ptd_controller_image == "latest"
-    assert config.eks_access_entries.enabled is False
+    assert config.eks_access_entries.enabled is True
     assert config.eks_access_entries.additional_entries == []
     assert config.eks_access_entries.include_same_account_poweruser is False
 
@@ -194,8 +194,8 @@ def test_workload_cluster_config_backwards_compatibility():
         ptd_controller_image="v2.0.0",
     )
 
-    # Verify new fields have defaults
-    assert config.eks_access_entries.enabled is False
+    # Verify new fields have defaults (enabled by default now)
+    assert config.eks_access_entries.enabled is True
     assert config.eks_access_entries.additional_entries == []
     assert config.eks_access_entries.include_same_account_poweruser is False
 
