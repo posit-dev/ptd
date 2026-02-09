@@ -22,9 +22,10 @@ type Target struct {
 	secretStore    *SecretStore
 	adminGroupID   string
 	vnetRsgName    string
+	clusters       map[string]types.AzureWorkloadClusterConfig
 }
 
-func NewTarget(targetName string, subscriptionID string, tenantID string, region string, sites map[string]types.SiteConfig, adminGroupID string, vnetRsgName string) Target {
+func NewTarget(targetName string, subscriptionID string, tenantID string, region string, sites map[string]types.SiteConfig, adminGroupID string, vnetRsgName string, clusters map[string]types.AzureWorkloadClusterConfig) Target {
 	if region == "" {
 		region = "eastus2"
 	}
@@ -38,6 +39,7 @@ func NewTarget(targetName string, subscriptionID string, tenantID string, region
 		sites:          sites,
 		adminGroupID:   adminGroupID,
 		vnetRsgName:    vnetRsgName,
+		clusters:       clusters,
 	}
 
 	// add secret store after instantiation so we can consume the vault name
@@ -141,6 +143,10 @@ func (t Target) VaultName() string {
 func (t Target) TailscaleEnabled() bool {
 	// Azure doesn't support tailscale
 	return false
+}
+
+func (t Target) Clusters() map[string]types.AzureWorkloadClusterConfig {
+	return t.clusters
 }
 
 func (t Target) PulumiBackendUrl() string {

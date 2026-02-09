@@ -606,7 +606,7 @@ All commands follow the Cobra pattern:
 ### Key Libraries
 
 Located in `/lib/`:
-- `aws/` - AWS-specific implementations (credentials, ECR, EKS, IAM, proxy, S3, SSM)
+- `aws/` - AWS-specific implementations (credentials, EKS, IAM, proxy, S3, SSM)
 - `azure/` - Azure-specific implementations (credentials, ACR, AKS, Key Vault, proxy, storage)
 - `steps/` - Deployment step definitions (bootstrap, cluster, helm, images, persistent, workspaces, sites)
 - `types/` - Core type definitions (Target, Credentials, etc.)

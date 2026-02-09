@@ -28,7 +28,7 @@ dependencies = [
   "pulumi-azuread==6.2.0",
   "pulumi_azure_native==3.5.1",
   "pulumi_command==1.0.1",
-  "pulumi_kubernetes==4.19.0",
+  "pulumi_kubernetes==4.25.0",
   "pulumi_mailgun==3.5.7",
   "pulumi_postgresql==3.14.0",
   "pulumi_random==4.16.0",

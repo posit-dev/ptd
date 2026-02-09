@@ -6,9 +6,9 @@ PTD Custom Steps allow you to extend the standard provisioning pipeline with cus
 
 ## Key Features
 
-- **Go-only**: Custom steps must be written in Go for type safety and consistency
-- **Isolated dependencies**: Each custom step has its own `go.mod` file
-- **Remote state**: Custom steps store state in the same remote backend as standard steps
+- Go-only: Custom steps must be written in Go for type safety and consistency
+- Isolated dependencies: Each custom step has its own `go.mod` file
+- Remote state: Custom steps store state in the same remote backend as standard steps
 - **Flexible insertion**: Insert custom steps at any point in the deployment sequence
 - **CLI integration**: Custom steps work with all PTD CLI flags (`--only-steps`, `--start-at-step`, etc.)
 
@@ -130,7 +130,7 @@ You can insert custom steps:
 
 ### Module structure
 
-Each custom step is a **completely independent Go module** with its own dependencies:
+Each custom step is a completely independent Go module with its own dependencies:
 
 ```
 customizations/

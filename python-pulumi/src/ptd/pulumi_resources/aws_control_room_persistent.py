@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ipaddress
-import json
 import typing
 
 import pulumi
@@ -26,8 +25,6 @@ class AWSControlRoomPersistent(pulumi.ComponentResource):
 
     vpc: ptd.pulumi_resources.aws_vpc.AWSVpc
     private_subnet_ids: list[pulumi.Output[str]] | list[str]
-    ecrs: dict[str, aws.ecr.Repository | None]
-    ecr_lifecycle_policies: dict[str, aws.ecr.LifecyclePolicy | None]
 
     db: aws.rds.Instance
     releases_bucket: aws.s3.Bucket
@@ -53,13 +50,9 @@ class AWSControlRoomPersistent(pulumi.ComponentResource):
 
         self.cidr_block = typing.cast(ipaddress.IPv4Network, ipaddress.ip_network(f"10.{second_octet}.0.0/16"))
 
-        self.ecrs = dict.fromkeys([c.value for c in ptd.ComponentImages], None)
-        self.ecr_lifecycle_policies = {}
-
         self._define_vpc()
         self._define_tailscale()
         self._define_db()
-        self._define_ecr()
         self._define_releases_bucket()
 
         outputs: dict[str, typing.Any] = {
@@ -74,15 +67,6 @@ class AWSControlRoomPersistent(pulumi.ComponentResource):
             "releases_bucket": self.releases_bucket.bucket,
             "releases_bucket_arn": self.releases_bucket.arn,
         }
-
-        for key, value in outputs.items():
-            pulumi.export(key, value)
-
-        for name, repo in self.ecrs.items():
-            if repo is None:
-                continue
-
-            outputs[f"{name.replace('-', '_')}_ecr"] = repo.id
 
         for key, value in outputs.items():
             pulumi.export(key, value)
@@ -152,8 +136,6 @@ class AWSControlRoomPersistent(pulumi.ComponentResource):
         for service in (
             "ec2",
             "ec2messages",
-            "ecr.api",
-            "ecr.dkr",
             "kms",
             "s3",
             "ssm",
@@ -248,48 +230,6 @@ class AWSControlRoomPersistent(pulumi.ComponentResource):
 
         secret = self.db.master_user_secrets.apply(lambda secrets: secrets[0])
         self.db_secret_arn = secret.apply(lambda s: s.secret_arn)
-
-    # TODO: this is sort-of duplicated from aws_workload_persistent...
-    # NOTE: ECR repositories are deprecated - images now come from public Docker Hub.
-    # force_delete=True is set to allow cleanup in a follow-up PR.
-    def _define_ecr(self):
-        if not self.control_room.cfg.manage_ecr_repositories:
-            return
-
-        for name in list(self.ecrs.keys()):
-            self.ecrs[name] = aws.ecr.Repository(
-                f"{self.name}-ecr-{name}",
-                name=name,
-                force_delete=True,  # Allow deletion even with images present
-                image_scanning_configuration=aws.ecr.RepositoryImageScanningConfigurationArgs(
-                    scan_on_push=True,
-                ),
-                image_tag_mutability="IMMUTABLE",
-                tags=self.required_tags | {"Name": f"{name}-{self.name}"},
-                opts=pulumi.ResourceOptions(parent=self),
-            )
-
-            self.ecr_lifecycle_policies[name] = aws.ecr.LifecyclePolicy(
-                f"{self.name}-ecr-expire-untagged-images-{name}",
-                repository=self.ecrs[name],
-                policy=json.dumps(
-                    {
-                        "rules": [
-                            {
-                                "rulePriority": 1,
-                                "description": "Expire images older than 14 days",
-                                "selection": {
-                                    "tagStatus": "untagged",
-                                    "countType": "sinceImagePushed",
-                                    "countUnit": "days",
-                                    "countNumber": 14,
-                                },
-                                "action": {"type": "expire"},
-                            }
-                        ]
-                    }
-                ),
-            )
 
     def _define_releases_bucket(self):
         """Define an S3 bucket for storing customer release artifacts with signed URL access."""

@@ -41,6 +41,7 @@ class AWSControlRoomConfig:
     true_name: str
 
     power_user_arn: str | None = None
+    eks_access_entries: ptd.EKSAccessEntriesConfig = dataclasses.field(default_factory=ptd.EKSAccessEntriesConfig)
     db_allocated_storage: int = 100
     db_engine_version: str = "16.4"
     db_instance_class: str = "db.t3.small"
@@ -49,7 +50,6 @@ class AWSControlRoomConfig:
     eks_node_group_min: int = 3
     eks_node_instance_type: str = "m6a.xlarge"
     hosted_zone_id: str | None = None
-    manage_ecr_repositories: bool = True
     protect_persistent_resources: bool = True
     region: str = "us-east-2"
     resource_tags: dict[str, str] = dataclasses.field(default_factory=dict)
@@ -184,6 +184,12 @@ class AWSControlRoom:
             )
             for h in trusted_users_raw
         ]
+
+        # Parse eks_access_entries field
+        if "eks_access_entries" in spec:
+            eks_access_entries_dict = spec.pop("eks_access_entries")
+            if isinstance(eks_access_entries_dict, dict):
+                spec["eks_access_entries"] = ptd.EKSAccessEntriesConfig(**eks_access_entries_dict)
 
         self.cfg = AWSControlRoomConfig(**spec)
 

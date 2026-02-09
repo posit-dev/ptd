@@ -133,7 +133,11 @@ class AWSControlRoomCluster(pulumi.ComponentResource):
             ami_type="AL2023_x86_64_STANDARD",
         )
 
-        self.eks.with_aws_auth()
+        self.eks.with_aws_auth(
+            use_eks_access_entries=self.control_room.cfg.eks_access_entries.enabled,
+            additional_access_entries=self.control_room.cfg.eks_access_entries.additional_entries,
+            include_poweruser=self.control_room.cfg.eks_access_entries.include_same_account_poweruser,
+        )
 
         self.eks.with_gp3()
 

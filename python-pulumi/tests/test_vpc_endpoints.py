@@ -41,7 +41,7 @@ def test_vpc_endpoints_config_is_frozen():
 
 def test_vpc_endpoints_config_valid_services():
     """Test that VPCEndpointsConfig accepts all valid service names."""
-    valid_services = ["ec2", "ec2messages", "ecr.api", "ecr.dkr", "kms", "s3", "ssm", "ssmmessages", "fsx"]
+    valid_services = ["ec2", "ec2messages", "kms", "s3", "ssm", "ssmmessages", "fsx"]
 
     for service in valid_services:
         config = ptd.aws_workload.VPCEndpointsConfig(excluded_services=[service])
@@ -63,10 +63,10 @@ def test_vpc_endpoints_config_mixed_valid_invalid_services():
 def test_vpc_endpoints_config_multiple_valid_services():
     """Test that VPCEndpointsConfig accepts multiple valid service names."""
     config = ptd.aws_workload.VPCEndpointsConfig(
-        excluded_services=["fsx", "kms", "ecr.api"],
+        excluded_services=["fsx", "kms", "s3"],
     )
 
-    assert config.excluded_services == ["fsx", "kms", "ecr.api"]
+    assert config.excluded_services == ["fsx", "kms", "s3"]
     assert len(config.excluded_services) == 3
 
 
@@ -80,14 +80,14 @@ def test_vpc_endpoints_config_disable_all_endpoints():
 
 def test_vpc_endpoints_config_exclude_all_services():
     """Test that VPCEndpointsConfig can exclude all services."""
-    all_services = ["ec2", "ec2messages", "ecr.api", "ecr.dkr", "kms", "s3", "ssm", "ssmmessages", "fsx"]
+    all_services = ["ec2", "ec2messages", "kms", "s3", "ssm", "ssmmessages", "fsx"]
     config = ptd.aws_workload.VPCEndpointsConfig(
         enabled=True,
         excluded_services=all_services,
     )
 
     assert config.enabled is True
-    assert len(config.excluded_services) == 9
+    assert len(config.excluded_services) == 7
     assert set(config.excluded_services) == set(all_services)
 
 
@@ -211,7 +211,7 @@ def test_vpc_endpoints_config_dataclass_fields():
 
 def test_vpc_endpoints_config_valid_services_constant():
     """Test that VALID_VPC_ENDPOINT_SERVICES constant contains all expected services."""
-    expected_services = {"ec2", "ec2messages", "ecr.api", "ecr.dkr", "fsx", "kms", "s3", "ssm", "ssmmessages"}
+    expected_services = {"ec2", "ec2messages", "fsx", "kms", "s3", "ssm", "ssmmessages"}
 
     assert expected_services == ptd.aws_workload.VALID_VPC_ENDPOINT_SERVICES
 
