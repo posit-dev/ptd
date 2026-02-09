@@ -214,6 +214,89 @@ func setupKubeConfig(cmd *cobra.Command, t types.Target, creds types.Credentials
 		return kubeconfigPath, nil
 	}
 
+	if t.CloudProvider() == types.Azure {
+		azureTarget := t.(azure.Target)
+
+		// Determine cluster name
+		// Pattern for Azure workloads: {target_name}-{release}
+		var clusterName string
+		targetName := t.Name()
+
+		// Get first release from clusters map (same pattern as AWS)
+		slog.Debug("Azure workload target cluster info", "target", targetName, "clusters_count", len(azureTarget.Clusters()))
+
+		if len(azureTarget.Clusters()) == 0 {
+			return "", fmt.Errorf("no clusters configured for Azure target %s in ptd.yaml", targetName)
+		}
+
+		// Construct cluster name from target name and release key
+		// Pattern: {target_name}-{release}
+		for releaseKey := range azureTarget.Clusters() {
+			slog.Debug("Found cluster release", "release_key", releaseKey)
+			clusterName = fmt.Sprintf("%s-%s", targetName, releaseKey)
+			break
+		}
+
+		// Get resource group name from target
+		resourceGroupName := azureTarget.ResourceGroupName()
+
+		slog.Info("Setting up Azure kubeconfig",
+			"cluster_name", clusterName,
+			"resource_group", resourceGroupName,
+			"region", t.Region(),
+			"target", t.Name())
+
+		// Build az aks get-credentials command
+		args := []string{
+			"aks", "get-credentials",
+			"--name", clusterName,
+			"--resource-group", resourceGroupName,
+			"--file", kubeconfigPath,
+			"--overwrite-existing",
+		}
+
+		updateCmd := exec.CommandContext(ctx, "az", args...)
+
+		// Execute the command and capture output
+		var stdout, stderr strings.Builder
+		updateCmd.Stdout = &stdout
+		updateCmd.Stderr = &stderr
+
+		// Build exact command string for logging
+		cmdArgs := []string{"az"}
+		cmdArgs = append(cmdArgs, args...)
+		exactCommand := strings.Join(cmdArgs, " ")
+
+		slog.Debug("Executing Azure CLI command", "command", exactCommand)
+		if err := updateCmd.Run(); err != nil {
+			exitCode := -1
+			if updateCmd.ProcessState != nil {
+				exitCode = updateCmd.ProcessState.ExitCode()
+			}
+
+			slog.Error("Azure CLI command failed",
+				"command", exactCommand,
+				"exit_code", exitCode,
+				"stderr", stderr.String(),
+				"stdout", stdout.String(),
+				"cluster_name", clusterName,
+				"resource_group", resourceGroupName,
+				"region", t.Region())
+
+			return "", fmt.Errorf("failed to setup kubeconfig for cluster %s in resource group %s (exit code %d): %w\nCommand: %s\nAzure CLI stderr: %s",
+				clusterName, resourceGroupName, exitCode, err, exactCommand, stderr.String())
+		}
+
+		// Always add SOCKS proxy configuration (Azure doesn't support Tailscale)
+		slog.Debug("Adding SOCKS proxy configuration to kubeconfig", "target", t.Name())
+		if err := addProxyToKubeconfig(kubeconfigPath); err != nil {
+			slog.Error("Failed to add proxy configuration to kubeconfig", "error", err)
+			return "", fmt.Errorf("failed to add proxy configuration to kubeconfig: %w", err)
+		}
+
+		return kubeconfigPath, nil
+	}
+
 	return "", fmt.Errorf("kubeconfig setup not implemented for cloud provider: %s", t.CloudProvider())
 }
 

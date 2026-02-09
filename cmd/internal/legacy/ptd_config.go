@@ -124,7 +124,8 @@ func TargetFromName(target string) (t types.Target, err error) {
 			conf.(types.AzureWorkloadConfig).Region,
 			conf.(types.AzureWorkloadConfig).Sites,
 			conf.(types.AzureWorkloadConfig).AdminGroupID,
-			conf.(types.AzureWorkloadConfig).Network.VnetRsgName), nil
+			conf.(types.AzureWorkloadConfig).Network.VnetRsgName,
+			conf.(types.AzureWorkloadConfig).Clusters), nil
 	case types.AWSWorkloadConfig:
 		return aws.NewTarget(
 			target,

@@ -46,8 +46,6 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
     vpc: ptd.pulumi_resources.aws_vpc.AWSVpc | None
     vpc_id: str
     private_subnet_ids: list[pulumi.Output[str]] | list[str]
-    ecrs: dict[str, aws.ecr.Repository | None]
-    ecr_lifecycle_policies: dict[str, aws.ecr.LifecyclePolicy | None]
 
     db: aws.rds.Instance
 
@@ -149,10 +147,6 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
         self._define_team_operator_iam()
         self.cert_validation_records = {}  # Initialize the dict to track validation records
         self._define_zones_and_domain_certs()
-
-        self.ecrs = dict.fromkeys([c.value for c in ptd.ComponentImages], None)
-        self.ecr_lifecycle_policies = {}
-        self._define_ecr()
 
         self._define_fsx_openzfs()
         self._define_fsx_nfs_sg()
@@ -408,6 +402,7 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(
                 parent=self.vpc,
                 protect=self.workload.cfg.protect_persistent_resources,
+                ignore_changes=["identifier_prefix"],
             ),
         )
 
@@ -757,56 +752,6 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
                     ),
                 )
 
-    # TODO: this is sort-of duplicated from aws_control_room_persistent...
-    # NOTE: ECR repositories are deprecated - images now come from public Docker Hub.
-    # force_delete=True is set to allow cleanup in a follow-up PR.
-    def _define_ecr(self):
-        for repo_name in list(self.ecrs.keys()):
-            self.ecrs[repo_name] = aws.ecr.Repository(
-                f"{self.workload.compound_name}-{repo_name}",
-                name=repo_name,
-                force_delete=True,  # Allow deletion even with images present
-                image_scanning_configuration=aws.ecr.RepositoryImageScanningConfigurationArgs(
-                    scan_on_push=True,
-                ),
-                image_tag_mutability="IMMUTABLE",
-                tags=self.required_tags | {"Name": f"{repo_name}-{self.workload.compound_name}"},
-                opts=pulumi.ResourceOptions(parent=self),
-            )
-
-            self.ecr_lifecycle_policies[repo_name] = aws.ecr.LifecyclePolicy(
-                f"{repo_name}-ecr-expire-untagged-images",
-                repository=repo_name,
-                policy=json.dumps(
-                    {
-                        "rules": [
-                            {
-                                "rulePriority": 1,
-                                "description": "Expire images older than 30 days",
-                                "selection": {
-                                    "tagStatus": "untagged",
-                                    "countType": "sinceImagePushed",
-                                    "countUnit": "days",
-                                    "countNumber": 30,
-                                },
-                                "action": {"type": "expire"},
-                            }
-                        ]
-                    }
-                ),
-                opts=pulumi.ResourceOptions(parent=self.ecrs[repo_name]),
-            )
-
-        # Handle deprecated ECR repos that need to be force-deleted
-        # These repos are no longer in ComponentImages but may exist in existing deployments
-        for deprecated_repo_name in ptd.DEPRECATED_ECR_REPOS:
-            aws.ecr.Repository(
-                f"{self.workload.compound_name}-{deprecated_repo_name}",
-                name=deprecated_repo_name,
-                force_delete=True,
-                opts=pulumi.ResourceOptions(parent=self),
-            )
-
     def _define_fsx_openzfs(self) -> None:
         self.fsx_openzfs_role = aws.iam.Role(
             str(ptd.Roles.AWS_FSX_OPENZFS_CSI_DRIVER),
@@ -890,6 +835,7 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
             self.fsx_openzfs_fs = ptd.pulumi_resources.aws_fsx_openzfs_multi.AWSFsxOpenZfsMulti(
                 self.workload.compound_name,
                 props=ptd.pulumi_resources.aws_fsx_openzfs_multi.AWSFsxOpenZfsMultiArgs(
+                    automatic_backup_retention_days=30,
                     subnet_ids=self.private_subnet_ids[:2],
                     daily_automatic_backup_start_time=self.workload.cfg.fsx_openzfs_daily_automatic_backup_start_time,
                     deployment_type=deployment_type,
@@ -922,6 +868,7 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
         else:
             self.fsx_openzfs_fs = aws.fsx.OpenZfsFileSystem(
                 self.workload.compound_name,
+                automatic_backup_retention_days=30,
                 preferred_subnet_id=(subnet_ids[0] if deployment_type.startswith("MULTI") else None),
                 subnet_ids=subnet_ids,
                 deployment_type=deployment_type,

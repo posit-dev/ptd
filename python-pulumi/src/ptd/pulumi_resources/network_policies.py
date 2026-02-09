@@ -214,11 +214,46 @@ class NetworkPolicies(pulumi.ComponentResource):
                         },
                         "spec": {
                             "selector": "app.kubernetes.io/managed-by == 'team-operator' && app.kubernetes.io/name == 'flightdeck'",
+                            "types": ["Ingress", "Egress"],
+                            "ingress": [
+                                # Allow ingress from Traefik (web traffic)
+                                {
+                                    "action": "Allow",
+                                    "protocol": "TCP",
+                                    "source": {
+                                        "namespaceSelector": "projectcalico.org/name == 'traefik'",
+                                    },
+                                    "destination": {
+                                        "ports": [8080],
+                                    },
+                                },
+                                # Allow ingress from Alloy (metrics/monitoring)
+                                {
+                                    "action": "Allow",
+                                    "protocol": "TCP",
+                                    "source": {
+                                        "namespaceSelector": "projectcalico.org/name == 'alloy'",
+                                    },
+                                    "destination": {
+                                        "ports": [8080],
+                                    },
+                                },
+                            ],
                             "egress": [
+                                # Allow access to Kubernetes API server (service CIDR and VPC endpoints)
+                                {
+                                    "action": "Allow",
+                                    "protocol": "TCP",
+                                    "destination": {
+                                        "nets": ["10.0.0.0/8", "172.16.0.0/12"],
+                                        "ports": [443],
+                                    },
+                                },
+                                # Allow access to kube-system for DNS and other cluster services
                                 {
                                     "action": "Allow",
                                     "destination": {"namespaceSelector": "projectcalico.org/name == 'kube-system'"},
-                                }
+                                },
                             ],
                         },
                     }

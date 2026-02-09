@@ -279,14 +279,6 @@ class ComponentImages(enum.StrEnum):
     FLIGHTDECK = "ptd-flightdeck"
 
 
-# Deprecated ECR repositories that should be deleted with force_delete=True
-# Remove this list after all workloads have been cleaned up
-DEPRECATED_ECR_REPOS = [
-    "ptd-controller",
-    "ptd-home",
-]
-
-
 class ComponentNames(enum.StrEnum):
     CHRONICLE = "chronicle"
     CHRONICLE_AGENT = "chronicleAgent"
@@ -375,7 +367,7 @@ class Taint:
 class EKSAccessEntriesConfig:
     """Configuration for EKS Access Entries."""
 
-    enabled: bool = False  # Whether to use EKS Access Entries instead of aws-auth ConfigMap
+    enabled: bool = True  # Whether to use EKS Access Entries instead of aws-auth ConfigMap
     additional_entries: list[dict] = dataclasses.field(default_factory=list)  # Additional access entries to create
     include_same_account_poweruser: bool = False  # Whether to include PowerUser role from the same account
 

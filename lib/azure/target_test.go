@@ -23,7 +23,7 @@ func TestNewTarget(t *testing.T) {
 	}
 
 	// Create a new target
-	target := NewTarget(targetName, subscriptionID, tenantID, region, sites, "", "")
+	target := NewTarget(targetName, subscriptionID, tenantID, region, sites, "", "", nil)
 
 	// Verify basic properties
 	assert.Equal(t, targetName, target.name)
@@ -40,7 +40,7 @@ func TestNewTarget(t *testing.T) {
 
 func TestNewTargetWithDefaultRegion(t *testing.T) {
 	// Test that the default region is used when region is empty
-	target := NewTarget("test", "sub", "tenant", "", nil, "", "")
+	target := NewTarget("test", "sub", "tenant", "", nil, "", "", nil)
 
 	assert.Equal(t, "eastus2", target.region)
 }
@@ -57,7 +57,7 @@ func TestTargetAccessors(t *testing.T) {
 		},
 	}
 
-	target := NewTarget(targetName, subscriptionID, tenantID, region, sites, "", "")
+	target := NewTarget(targetName, subscriptionID, tenantID, region, sites, "", "", nil)
 
 	// Test basic accessor methods
 	t.Run("Name", func(t *testing.T) {
@@ -106,14 +106,14 @@ func TestTargetAccessors(t *testing.T) {
 }
 
 func TestTargetStateBucketName(t *testing.T) {
-	target := NewTarget("test-target", "sub", "tenant", "region", nil, "", "")
+	target := NewTarget("test-target", "sub", "tenant", "region", nil, "", "", nil)
 
 	bucketName := target.StateBucketName()
 	assert.Equal(t, "stptdtesttarget", bucketName)
 }
 
 func TestTargetResourceGroupName(t *testing.T) {
-	target := NewTarget("test-target", "sub", "tenant", "region", nil, "", "")
+	target := NewTarget("test-target", "sub", "tenant", "region", nil, "", "", nil)
 
 	rgName := target.ResourceGroupName()
 	assert.Equal(t, "rsg-ptd-test-target", rgName)
@@ -121,7 +121,7 @@ func TestTargetResourceGroupName(t *testing.T) {
 
 func TestTargetVnetRsgName(t *testing.T) {
 	t.Run("returns empty string when not set", func(t *testing.T) {
-		target := NewTarget("test-target", "sub", "tenant", "region", nil, "", "")
+		target := NewTarget("test-target", "sub", "tenant", "region", nil, "", "", nil)
 
 		vnetRsg := target.VnetRsgName()
 		assert.Equal(t, "", vnetRsg)
@@ -129,7 +129,7 @@ func TestTargetVnetRsgName(t *testing.T) {
 
 	t.Run("returns custom vnet resource group name when set", func(t *testing.T) {
 		customRsg := "custom-vnet-rsg"
-		target := NewTarget("test-target", "sub", "tenant", "region", nil, "", customRsg)
+		target := NewTarget("test-target", "sub", "tenant", "region", nil, "", customRsg, nil)
 
 		vnetRsg := target.VnetRsgName()
 		assert.Equal(t, customRsg, vnetRsg)
@@ -137,7 +137,7 @@ func TestTargetVnetRsgName(t *testing.T) {
 }
 
 func TestTargetBlobStorageName(t *testing.T) {
-	target := NewTarget("test-target", "sub", "tenant", "region", nil, "", "")
+	target := NewTarget("test-target", "sub", "tenant", "region", nil, "", "", nil)
 
 	// We can't predict the exact name since it involves hashing, but we can verify the format
 	storageName := target.BlobStorageName()
@@ -146,7 +146,7 @@ func TestTargetBlobStorageName(t *testing.T) {
 }
 
 func TestTargetVaultName(t *testing.T) {
-	target := NewTarget("test-target", "sub", "tenant", "region", nil, "", "")
+	target := NewTarget("test-target", "sub", "tenant", "region", nil, "", "", nil)
 
 	// We can't predict the exact name since it involves hashing, but we can verify the format
 	vaultName := target.VaultName()
@@ -154,7 +154,7 @@ func TestTargetVaultName(t *testing.T) {
 }
 
 func TestTargetCredentials(t *testing.T) {
-	target := NewTarget("test-target", "sub", "tenant", "region", nil, "", "")
+	target := NewTarget("test-target", "sub", "tenant", "region", nil, "", "", nil)
 
 	// Enable mock mode for Azure CLI
 	cli.SetMockMode(true)

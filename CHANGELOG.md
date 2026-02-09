@@ -1,3 +1,42 @@
+# [1.4.0](https://github.com/posit-dev/ptd/compare/v1.3.0...v1.4.0) (2026-02-09)
+
+
+### Bug Fixes
+
+* remove env copy ([931661d](https://github.com/posit-dev/ptd/commit/931661d22c34e31504c6e13d74c891d0ae6b1267))
+
+
+### Features
+
+* add azure workload support to k9s command ([44d135c](https://github.com/posit-dev/ptd/commit/44d135cea78879a29b525668abc5b4611b17786b))
+
+# [1.3.0](https://github.com/posit-dev/ptd/compare/v1.2.1...v1.3.0) (2026-02-06)
+
+
+### Bug Fixes
+
+* **lib:** fix flaky TestGenerateRandomString test ([74755d3](https://github.com/posit-dev/ptd/commit/74755d33a3f0b6fe7062935b6b57a9d81244c5b5))
+
+
+### Features
+
+* **control-room:** add EKS access entries support ([b739db1](https://github.com/posit-dev/ptd/commit/b739db163c8fe5de2f5c9d61eeaf1b7727909d85)), closes [#79](https://github.com/posit-dev/ptd/issues/79)
+* **eks:** enable access entries by default ([3a538f6](https://github.com/posit-dev/ptd/commit/3a538f6c10d7a8edb901504122b3fe5379d3471a)), closes [#111](https://github.com/posit-dev/ptd/issues/111)
+
+## [1.2.1](https://github.com/posit-dev/ptd/compare/v1.2.0...v1.2.1) (2026-02-03)
+
+
+### Bug Fixes
+
+* support workon for custom steps ([2ef2752](https://github.com/posit-dev/ptd/commit/2ef2752392f851a19521e5b714a6db72da6e0226))
+
+# [1.2.0](https://github.com/posit-dev/ptd/compare/v1.1.3...v1.2.0) (2026-02-03)
+
+
+### Features
+
+* add workflow to handle team-operator version updates ([2541d23](https://github.com/posit-dev/ptd/commit/2541d2336c9cf1838c01eb8323e35280cb17eb28))
+
 ## [1.1.3](https://github.com/posit-dev/ptd/compare/v1.1.2...v1.1.3) (2026-01-28)
 
 

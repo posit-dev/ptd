@@ -8,6 +8,7 @@ import pulumi_aws as aws
 
 @dataclasses.dataclass
 class AWSFsxOpenZfsMultiArgs:
+    automatic_backup_retention_days: pulumi.Input[int]
     copy_tags_to_backups: pulumi.Input[bool]
     copy_tags_to_volumes: pulumi.Input[bool]
     daily_automatic_backup_start_time: pulumi.Input[str]
@@ -86,6 +87,7 @@ class AWSFsxOpenZfsMulti(pulumi.ComponentResource):
 
         self.file_system = aws.fsx.OpenZfsFileSystem(
             f"{name}-filesystem",
+            automatic_backup_retention_days=props.automatic_backup_retention_days,
             deployment_type=props.deployment_type,
             preferred_subnet_id=preferred_subnet_id,
             subnet_ids=props.subnet_ids,
