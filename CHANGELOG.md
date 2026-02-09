@@ -1,3 +1,15 @@
+# [1.4.0](https://github.com/posit-dev/ptd/compare/v1.3.0...v1.4.0) (2026-02-09)
+
+
+### Bug Fixes
+
+* remove env copy ([931661d](https://github.com/posit-dev/ptd/commit/931661d22c34e31504c6e13d74c891d0ae6b1267))
+
+
+### Features
+
+* add azure workload support to k9s command ([44d135c](https://github.com/posit-dev/ptd/commit/44d135cea78879a29b525668abc5b4611b17786b))
+
 # [1.3.0](https://github.com/posit-dev/ptd/compare/v1.2.1...v1.3.0) (2026-02-06)
 
 
