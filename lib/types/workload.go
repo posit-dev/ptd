@@ -69,6 +69,7 @@ type AWSWorkloadConfig struct {
 	ResourceTags                            map[string]string                   `json:"resource_tags" yaml:"resource_tags"`
 	RoleArn                                 *string                             `json:"role_arn" yaml:"role_arn"`
 	TailscaleEnabled                        bool                                `json:"tailscale_enabled" yaml:"tailscale_enabled"`
+	SecretsStoreAddonEnabled                bool                                `json:"secrets_store_addon_enabled" yaml:"secrets_store_addon_enabled"`
 	TrustedPrincipals                       []string                            `json:"trusted_principals" yaml:"trusted_principals"`
 	HostedZoneID                            *string                             `json:"hosted_zone_id" yaml:"hosted_zone_id"`
 	HostedZoneManagementEnabled             *bool                               `json:"hosted_zone_management_enabled,omitempty" yaml:"hosted_zone_management_enabled,omitempty"`
