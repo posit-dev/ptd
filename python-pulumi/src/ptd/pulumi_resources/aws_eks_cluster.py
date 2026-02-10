@@ -1272,6 +1272,14 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 tags=self.eks.tags,
                 configuration_values=json.dumps(
                     {
+                        "tolerations": [
+                            {
+                                "key": "workload-type",
+                                "operator": "Equal",
+                                "value": "session",
+                                "effect": "NoSchedule",
+                            },
+                        ],
                         "secrets-store-csi-driver": {
                             "enableSecretRotation": True,
                             "rotationPollInterval": "15s",
