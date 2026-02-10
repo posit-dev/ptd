@@ -1,0 +1,138 @@
+# To delete these alerts, replace file contents with:
+# apiVersion: 1
+# deleteRules:
+#   - orgId: 1
+#     uid: mimir_ingester_pods_not_ready
+#   - orgId: 1
+#     uid: mimir_remote_write_failures
+#
+# See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+#
+# These alerts monitor workload Mimir health from the control room.
+# They use metrics that Alloy dual-writes to the control room Mimir.
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: Mimir
+      folder: Posit Alerts
+      interval: 1m
+      rules:
+        - uid: mimir_ingester_pods_not_ready
+          title: Mimir Ingester Pods Not Ready
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: |
+                  kube_statefulset_status_replicas_ready{namespace="mimir",statefulset="mimir-ingester"}
+                  <
+                  kube_statefulset_status_replicas{namespace="mimir",statefulset="mimir-ingester"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - B
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 2m
+          annotations:
+            description: >-
+              Mimir ingester pods not ready in cluster {{ $labels.cluster }}.
+              Check: kubectl get pods -n mimir -l app.kubernetes.io/component=ingester
+            summary: Mimir ingester pods not ready in {{ $labels.cluster }}
+          labels:
+            opsgenie: "1"
+          isPaused: false
+
+        - uid: mimir_remote_write_failures
+          title: Mimir Remote Write Failures
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: |
+                  rate(prometheus_remote_storage_samples_failed_total{url=~".*mimir.*"}[5m]) > 0
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - B
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            description: >-
+              Alloy failing to write metrics to Mimir in cluster {{ $labels.cluster }}.
+              Check Alloy: kubectl logs -n alloy -l app.kubernetes.io/name=alloy --tail=100 | grep -i error
+            summary: Metrics remote write to Mimir failing in {{ $labels.cluster }}
+          labels:
+            opsgenie: "1"
+          isPaused: false
