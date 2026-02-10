@@ -1,3 +1,22 @@
+## [1.4.1](https://github.com/posit-dev/ptd/compare/v1.4.0...v1.4.1) (2026-02-10)
+
+
+### Bug Fixes
+
+* **eks:** add explicit resource dependencies for cluster provisioning ([072f84e](https://github.com/posit-dev/ptd/commit/072f84ebdd870cf5cee7b3a3bc6b64602295eb28))
+* **eks:** restore parallel execution for Tigera and node groups ([d6a8587](https://github.com/posit-dev/ptd/commit/d6a858703b16ed37a036dba891f1585a8cf0da69))
+* **persistent:** remove AWS-only guard from mimir password sync ([9e70212](https://github.com/posit-dev/ptd/commit/9e702129903fb69ddc4ebdf98fb8de4d3b6481ac))
+* **persistent:** skip mimir password check for control rooms ([7bec570](https://github.com/posit-dev/ptd/commit/7bec570f3e5145fc6484156ffa39b7c268b45804))
+* **team-operator:** create posit-team-system namespace before migration resources ([b074d4f](https://github.com/posit-dev/ptd/commit/b074d4f1cd67c4ffbff7075bac4fbb71338e1100))
+* **team-operator:** skip await on Helm release to debug failures ([35b38a3](https://github.com/posit-dev/ptd/commit/35b38a3867441d2704b3a259fcecd207bb408cec))
+* **tigera:** update Calico Helm chart repository URL ([511bbb3](https://github.com/posit-dev/ptd/commit/511bbb3bc5217994316b4934be0619a46ab25394))
+
+
+### Reverts
+
+* remove skip_await from team-operator Helm release ([f2c8293](https://github.com/posit-dev/ptd/commit/f2c8293b1214607d71e830b9219936808c72bdd9))
+* **team-operator:** remove explicit posit-team-system namespace ([7b64328](https://github.com/posit-dev/ptd/commit/7b6432843a103a734744f5f6f13310dfb4ed8247))
+
 # [1.4.0](https://github.com/posit-dev/ptd/compare/v1.3.0...v1.4.0) (2026-02-09)
 
 
