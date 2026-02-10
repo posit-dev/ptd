@@ -55,8 +55,9 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
 
             self._define_aws_lbc(release, components.aws_load_balancer_controller_version)
             self._define_aws_fsx_openzfs_csi(release, components.aws_fsx_openzfs_csi_driver_version)
-            self._define_secret_store_csi(release, components.secret_store_csi_driver_version)
-            self._define_secret_store_csi_aws(release, components.secret_store_csi_driver_aws_provider_version)
+            if not self.workload.cfg.secrets_store_addon_enabled:
+                self._define_secret_store_csi(release, components.secret_store_csi_driver_version)
+                self._define_secret_store_csi_aws(release, components.secret_store_csi_driver_aws_provider_version)
             self._define_traefik(release, components.traefik_version, weight, cert_arns_output)
             self._define_metrics_server(release, components.metrics_server_version)
             self._define_loki(release, components.loki_version, components)

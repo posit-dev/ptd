@@ -195,6 +195,7 @@ class AWSWorkloadConfig(ptd.WorkloadConfig):
     # permissions boundary and attached managed policy for PTD-created IAM roles.
     create_admin_policy_as_resource: bool = False
     tailscale_enabled: bool = False
+    secrets_store_addon_enabled: bool = False
     trusted_principals: list[str] = dataclasses.field(default_factory=list)
     vpc_az_count: int = 3
     vpc_cidr: str | None = None
