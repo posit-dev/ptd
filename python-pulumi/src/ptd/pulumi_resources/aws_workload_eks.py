@@ -90,7 +90,8 @@ class AWSWorkloadEKS(pulumi.ComponentResource):
         # Initialize launch templates for this cluster release
         self.launch_templates[cluster_release] = {}
 
-        # Create the main/default node group
+        # Create the main/default node group FIRST - nodes register with API server
+        # even without CNI (kubelet→API is direct, not through pod network)
         self._create_node_group(
             cluster_release=cluster_release,
             node_group_name="default",
@@ -124,17 +125,19 @@ class AWSWorkloadEKS(pulumi.ComponentResource):
                     labels=ng_config.labels,
                 )
 
+        # Install Tigera/Calico CNI - runs in parallel with node group creation
+        # The operator uses hostNetwork so it can schedule on NotReady nodes
         self._define_tigera_operator(cluster_release)
 
         eks_cluster = self.eks_clusters[cluster_release]
-        cluster_cfg = self.workload.cfg.clusters[cluster_release]
         eks_cluster.with_aws_auth(
             use_eks_access_entries=cluster_cfg.eks_access_entries.enabled,
             additional_access_entries=cluster_cfg.eks_access_entries.additional_entries,
             include_poweruser=cluster_cfg.eks_access_entries.include_same_account_poweruser,
         )
         eks_cluster.with_ebs_csi_driver(
-            role_name=f"{full_name}-ebs-csi-driver.posit.team", version=cluster_cfg.ebs_csi_addon_version
+            role_name=f"{full_name}-ebs-csi-driver.posit.team",
+            version=cluster_cfg.ebs_csi_addon_version,
         )
 
         if cluster_cfg.enable_efs_csi_driver:
@@ -172,6 +175,7 @@ class AWSWorkloadEKS(pulumi.ComponentResource):
         desired_size: int,
         taints: list[ptd.Taint] | None = None,
         labels: dict[str, str] | None = None,
+        depends_on: list[pulumi.Resource] | None = None,
     ):
         """Create a launch template and node group with the specified configuration."""
         cluster_cfg = self.workload.cfg.clusters[cluster_release]
@@ -243,15 +247,30 @@ class AWSWorkloadEKS(pulumi.ComponentResource):
             max_nodes=max_size,
             version=cluster_cfg.cluster_version,
             taints=eks_taints,
+            depends_on=depends_on,
         )
 
-    def _define_tigera_operator(self, release: str):
+    def _define_tigera_operator(
+        self,
+        release: str,
+        depends_on: list[pulumi.Resource] | None = None,
+    ) -> ptd.pulumi_resources.tigera_operator.TigeraOperator:
+        """Create Tigera/Calico CNI operator.
+
+        Args:
+            release: The cluster release identifier.
+            depends_on: Resources that must be created before the operator (e.g., node groups).
+
+        Returns:
+            The TigeraOperator so it can be used as a dependency.
+        """
         kube_provider = self.eks_clusters[release].provider
-        ptd.pulumi_resources.tigera_operator.TigeraOperator(
+        return ptd.pulumi_resources.tigera_operator.TigeraOperator(
             name=self.workload.compound_name,
             release=release,
             opts=pulumi.ResourceOptions(
                 parent=self,
                 provider=kube_provider,
+                depends_on=depends_on,
             ),
         )
