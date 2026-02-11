@@ -1035,7 +1035,10 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                             },
                         }
                     },
-                    "disruption": {"consolidationPolicy": "WhenEmptyOrUnderutilized", "consolidateAfter": "5m"},
+                    "disruption": {
+                        "consolidationPolicy": node_pool.consolidation_policy,
+                        "consolidateAfter": node_pool.consolidate_after,
+                    },
                 }
 
                 # Add weight for NodePool priority
