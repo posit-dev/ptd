@@ -149,6 +149,21 @@ func (t Target) Clusters() map[string]types.AzureWorkloadClusterConfig {
 	return t.clusters
 }
 
+// PulumiStorageEnvVars returns environment variables needed for Pulumi azblob backend authentication.
+// The azblob backend uses azidentity.DefaultAzureCredential when no storage key is set.
+// DefaultAzureCredential's ManagedIdentityCredential probe hangs in AWS Workspaces
+// where IMDS exists but isn't Azure IMDS, so we provide the storage key explicitly to bypass the credential chain entirely.
+func (t Target) PulumiStorageEnvVars(ctx context.Context) (map[string]string, error) {
+	storageKey, err := GetStorageAccountKey(ctx, t.credentials, t.subscriptionID, t.ResourceGroupName(), t.StateBucketName())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get storage account key for %s: %w", t.StateBucketName(), err)
+	}
+	return map[string]string{
+		"AZURE_STORAGE_ACCOUNT": t.StateBucketName(),
+		"AZURE_STORAGE_KEY":     storageKey,
+	}, nil
+}
+
 func (t Target) PulumiBackendUrl() string {
 	return fmt.Sprintf("azblob://%s?storage_account=%s", t.BlobStorageName(), t.StateBucketName())
 }
@@ -157,13 +172,28 @@ func (t Target) PulumiSecretsProviderKey() string {
 	return fmt.Sprintf("azurekeyvault://%s.vault.azure.net/keys/posit-team-dedicated", t.VaultName())
 }
 
-func (t Target) BastionName(ctx context.Context) (string, error) {
-	// get the credentials for the target
+// fullPulumiEnvVars returns credential and storage env vars needed for Pulumi stack operations.
+func (t Target) fullPulumiEnvVars(ctx context.Context) (map[string]string, error) {
 	creds, err := t.Credentials(ctx)
+	if err != nil {
+		return nil, err
+	}
+	envVars := creds.EnvVars()
+	storageEnvVars, err := t.PulumiStorageEnvVars(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range storageEnvVars {
+		envVars[k] = v
+	}
+	return envVars, nil
+}
+
+func (t Target) BastionName(ctx context.Context) (string, error) {
+	envVars, err := t.fullPulumiEnvVars(ctx)
 	if err != nil {
 		return "", err
 	}
-	envVars := creds.EnvVars()
 
 	persistentStack, err := pulumi.NewPythonPulumiStack(
 		ctx,
@@ -196,12 +226,10 @@ func (t Target) BastionName(ctx context.Context) (string, error) {
 }
 
 func (t Target) JumpBoxId(ctx context.Context) (string, error) {
-	// get the credentials for the target
-	creds, err := t.Credentials(ctx)
+	envVars, err := t.fullPulumiEnvVars(ctx)
 	if err != nil {
 		return "", err
 	}
-	envVars := creds.EnvVars()
 
 	persistentStack, err := pulumi.NewPythonPulumiStack(
 		ctx,
