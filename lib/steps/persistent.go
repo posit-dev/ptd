@@ -45,7 +45,16 @@ func (s *PersistentStep) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	envVars := creds.EnvVars()
+	envVars, err := prepareEnvVarsForPulumi(ctx, s.DstTarget, creds)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Creating Pulumi stack for persistent step",
+		"target", s.DstTarget.Name(),
+		"cloud", s.DstTarget.CloudProvider(),
+		"backend_url", s.DstTarget.PulumiBackendUrl(),
+		"env_var_count", len(envVars))
 
 	stack, err := pulumi.NewPythonPulumiStack(
 		ctx,

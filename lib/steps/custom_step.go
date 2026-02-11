@@ -67,7 +67,10 @@ func (s *CustomStep) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get credentials: %w", err)
 	}
-	envVars := creds.EnvVars()
+	envVars, err := prepareEnvVarsForPulumi(ctx, s.target, creds)
+	if err != nil {
+		return fmt.Errorf("failed to prepare env vars: %w", err)
+	}
 
 	// Create stack based on local source defined in program path
 	stack, err := pulumi.LocalStack(
