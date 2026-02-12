@@ -4,6 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/posit-dev/ptd/lib/kube"
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 func TestProxyCommandRegistration(t *testing.T) {
@@ -55,14 +58,14 @@ func TestGetAwsCliPath(t *testing.T) {
 
 	// Test with TOP unset
 	os.Unsetenv("TOP")
-	pathResult := getAwsCliPath()
+	pathResult := kube.GetCliPath(types.AWS)
 	if pathResult != "aws" {
 		t.Errorf("Expected default AWS CLI path to be 'aws', got '%s'", pathResult)
 	}
 
 	// Test with TOP set
 	os.Setenv("TOP", "/test/path")
-	pathResult = getAwsCliPath()
+	pathResult = kube.GetCliPath(types.AWS)
 	expected := filepath.Join("/test/path", ".local/bin/aws")
 	if pathResult != expected {
 		t.Errorf("Expected AWS CLI path to be '%s', got '%s'", expected, pathResult)
