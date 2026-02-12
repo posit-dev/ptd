@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path"
 	"slices"
 
-	"github.com/posit-dev/ptd/lib/aws"
-	"github.com/posit-dev/ptd/lib/azure"
-
+	"github.com/posit-dev/ptd/cmd/internal"
 	"github.com/posit-dev/ptd/cmd/internal/legacy"
+	"github.com/posit-dev/ptd/lib/kube"
 	"github.com/posit-dev/ptd/lib/steps"
 	"github.com/posit-dev/ptd/lib/types"
 	"github.com/spf13/cobra"
@@ -154,23 +154,13 @@ func runEnsure(ctx context.Context, target string) {
 
 	// if any of the steps require a proxy, start the proxy session, unless tailscale is enabled
 	if steps.ProxyRequiredSteps(stepsToRun) && !t.TailscaleEnabled() {
-		if t.CloudProvider() == types.AWS {
-			ps := aws.NewProxySession(t.(aws.Target), getAwsCliPath(), "1080", proxyFile)
-			err = ps.Start(ctx)
-			if err != nil {
-				slog.Error("Error starting AWS proxy session", "error", err)
-				return
-			}
-			defer ps.Stop()
-		} else {
-			ps := azure.NewProxySession(t.(azure.Target), getAzureCliPath(), "1080", proxyFile)
-			err = ps.Start(ctx)
-			if err != nil {
-				slog.Error("Error starting Azure proxy session", "error", err)
-				return
-			}
-			defer ps.Stop()
+		proxyFile := path.Join(internal.DataDir(), "proxy.json")
+		stopProxy, err := kube.StartProxy(ctx, t, proxyFile)
+		if err != nil {
+			slog.Error("Error starting proxy session", "error", err)
+			return
 		}
+		defer stopProxy()
 	}
 
 	for _, step := range stepsToRun {

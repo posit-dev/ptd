@@ -683,6 +683,14 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                                 "enabled": True,
                             },
                         },
+                        "ports": {
+                            "traefik": {
+                                "expose": {
+                                    "default": True,
+                                },
+                                "nodePort": 32090,
+                            },
+                        },
                         "service": {"type": "NodePort"},
                     }
                 ),
@@ -826,7 +834,7 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
             "alb.ingress.kubernetes.io/healthcheck-protocol": "HTTP",
             "alb.ingress.kubernetes.io/ssl-policy": "ELBSecurityPolicy-FS-1-2-2019-08",
             "alb.ingress.kubernetes.io/healthcheck-path": "/ping",
-            "alb.ingress.kubernetes.io/healthcheck-port": "9000",
+            "alb.ingress.kubernetes.io/healthcheck-port": "32090",
             "alb.ingress.kubernetes.io/load-balancer-attributes": "routing.http.drop_invalid_header_fields.enabled=true",
         }
 
@@ -1035,7 +1043,10 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                             },
                         }
                     },
-                    "disruption": {"consolidationPolicy": "WhenEmptyOrUnderutilized", "consolidateAfter": "5m"},
+                    "disruption": {
+                        "consolidationPolicy": node_pool.consolidation_policy,
+                        "consolidateAfter": node_pool.consolidate_after,
+                    },
                 }
 
                 # Add weight for NodePool priority

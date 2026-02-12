@@ -101,6 +101,9 @@ class KarpenterNodePool:
     weight: int = 100
     root_volume_size: str = "100Gi"
     session_taints: bool = False  # Default False, opt-in for session isolation
+    # Disruption configuration
+    consolidation_policy: str = "WhenEmptyOrUnderutilized"  # Karpenter consolidation policy
+    consolidate_after: str = "5m"  # Duration after which nodes are considered for consolidation
     # Overprovisioning configuration per nodepool
     overprovisioning_replicas: int = 0  # Number of overprovisioning pods for this pool (0 = disabled)
     overprovisioning_cpu_request: str | None = None  # CPU request per overprovisioning pod
@@ -378,6 +381,8 @@ class AWSWorkload(ptd.workload.AbstractWorkload):
                         weight=pool_spec.get("weight", 100),
                         root_volume_size=pool_spec.get("root_volume_size", "100Gi"),
                         session_taints=session_taints,
+                        consolidation_policy=pool_spec.get("consolidation_policy", "WhenEmptyOrUnderutilized"),
+                        consolidate_after=pool_spec.get("consolidate_after", "5m"),
                         overprovisioning_replicas=pool_spec.get("overprovisioning_replicas", 0),
                         overprovisioning_cpu_request=pool_spec.get("overprovisioning_cpu_request"),
                         overprovisioning_memory_request=pool_spec.get("overprovisioning_memory_request"),

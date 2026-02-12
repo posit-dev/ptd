@@ -1,21 +1,16 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"strings"
+	"path"
 
+	"github.com/posit-dev/ptd/cmd/internal"
 	"github.com/posit-dev/ptd/cmd/internal/legacy"
-	awslib "github.com/posit-dev/ptd/lib/aws"
-	"github.com/posit-dev/ptd/lib/azure"
-	"github.com/posit-dev/ptd/lib/types"
+	"github.com/posit-dev/ptd/lib/kube"
 	"github.com/spf13/cobra"
-	yaml "gopkg.in/yaml.v2"
-	"tailscale.com/client/local"
 )
 
 var namespace string
@@ -39,310 +34,21 @@ var k9sCmd = &cobra.Command{
 	ValidArgsFunction: legacy.ValidTargetArgs,
 }
 
-func listAvailableClusters(ctx context.Context, region string, credEnvVars map[string]string) []string {
-	listCmd := exec.CommandContext(ctx, "aws", "eks", "list-clusters", "--region", region, "--output", "text", "--query", "clusters")
-
-	// Set AWS credentials in the environment
-	listCmd.Env = os.Environ()
-	for k, v := range credEnvVars {
-		listCmd.Env = append(listCmd.Env, k+"="+v)
-	}
-
-	output, err := listCmd.Output()
-	if err != nil {
-		slog.Debug("Failed to list available clusters", "error", err)
-		return nil
-	}
-
-	clusterList := strings.TrimSpace(string(output))
-	if clusterList == "" || clusterList == "None" {
-		return nil
-	}
-
-	return strings.Fields(clusterList)
-}
-
-func addProxyToKubeconfig(kubeconfigPath string) error {
-	// Read the existing kubeconfig
-	content, err := os.ReadFile(kubeconfigPath)
-	if err != nil {
-		return fmt.Errorf("failed to read kubeconfig: %w", err)
-	}
-
-	// Parse the YAML
-	var config map[string]interface{}
-	if err := yaml.Unmarshal(content, &config); err != nil {
-		return fmt.Errorf("failed to parse kubeconfig YAML: %w", err)
-	}
-
-	// Add proxy-url to all clusters
-	if clusters, ok := config["clusters"].([]interface{}); ok {
-		for _, cluster := range clusters {
-			if clusterMap, ok := cluster.(map[interface{}]interface{}); ok {
-				if clusterInfo, ok := clusterMap["cluster"].(map[interface{}]interface{}); ok {
-					clusterInfo["proxy-url"] = "socks5://localhost:1080"
-				}
-			}
-		}
-	}
-
-	// Write the modified kubeconfig back
-	modifiedContent, err := yaml.Marshal(config)
-	if err != nil {
-		return fmt.Errorf("failed to marshal modified kubeconfig: %w", err)
-	}
-
-	if err := os.WriteFile(kubeconfigPath, modifiedContent, 0600); err != nil {
-		return fmt.Errorf("failed to write modified kubeconfig: %w", err)
-	}
-
-	return nil
-}
-
-func setupKubeConfig(cmd *cobra.Command, t types.Target, creds types.Credentials) (string, error) {
-	// Create a temporary kubeconfig file
-	tempDir := os.TempDir()
-	kubeconfigPath := filepath.Join(tempDir, fmt.Sprintf("kubeconfig-%s", t.HashName()))
-	ctx := cmd.Context()
-
-	if t.CloudProvider() == types.AWS {
-		// For AWS EKS, the cluster name pattern depends on whether it's a control room or workload
-		var clusterName string
-		if t.ControlRoom() {
-			// Control room clusters follow the pattern: main01-{environment}
-			// Extract environment from target name (e.g., "main01-staging" -> "staging")
-			targetName := t.Name()
-			if lastDash := strings.LastIndex(targetName, "-"); lastDash != -1 {
-				environment := targetName[lastDash+1:]
-				clusterName = fmt.Sprintf("main01-%s", environment)
-			} else {
-				// Fallback if no dash found
-				clusterName = fmt.Sprintf("main01-%s", targetName)
-			}
-		} else {
-			// Workload clusters follow the pattern: {target_name}-{release}
-			// For now, we'll try to determine the release from the cluster configuration
-			// or use "main" as default if we can't determine it
-			awsTarget := t.(awslib.Target)
-
-			// Try to get the first cluster name from the target's clusters map
-			targetName := t.Name()
-			slog.Debug("Workload target cluster info", "target", targetName, "clusters_count", len(awsTarget.Clusters))
-
-			if len(awsTarget.Clusters) > 0 {
-				// Construct cluster name from target name and release key
-				// Pattern: {target_name}-{release}
-				for releaseKey := range awsTarget.Clusters {
-					slog.Debug("Found cluster release", "release_key", releaseKey)
-					clusterName = fmt.Sprintf("%s-%s", targetName, releaseKey)
-					break
-				}
-			}
-
-			// If no cluster name found, use fallback
-			if clusterName == "" {
-				slog.Debug("No cluster name found, using fallback")
-				clusterName = fmt.Sprintf("%s-main", targetName)
-			}
-		}
-
-		// Set up AWS environment variables for the update-kubeconfig command
-		credEnvVars := creds.EnvVars()
-
-		// Log the cluster name and credentials info for debugging
-		slog.Info("Setting up kubeconfig", "cluster_name", clusterName, "region", t.Region(), "target", t.Name())
-		slog.Debug("AWS credentials info", "identity", creds.Identity(), "account_id", credEnvVars["AWS_ACCOUNT_ID"])
-		// Build command arguments properly
-		args := []string{"--region", t.Region()}
-		if cmd.Flag("verbose").Value.String() == "true" {
-			args = append(args, "--debug")
-		}
-		args = append(args, "eks", "update-kubeconfig", "--name", clusterName, "--kubeconfig", kubeconfigPath)
-
-		updateCmd := exec.CommandContext(ctx, "aws", args...)
-
-		// Set AWS credentials in the environment
-		updateCmd.Env = os.Environ()
-		for k, v := range credEnvVars {
-			updateCmd.Env = append(updateCmd.Env, k+"="+v)
-		}
-
-		// Execute the update-kubeconfig command and capture both stdout and stderr
-		var stdout, stderr strings.Builder
-		updateCmd.Stdout = &stdout
-		updateCmd.Stderr = &stderr
-
-		// Build the exact command string for logging
-		cmdArgs := []string{"aws"}
-		cmdArgs = append(cmdArgs, args...)
-		exactCommand := strings.Join(cmdArgs, " ")
-
-		slog.Debug("Executing AWS command", "command", exactCommand)
-		if err := updateCmd.Run(); err != nil {
-			exitCode := -1
-			if updateCmd.ProcessState != nil {
-				exitCode = updateCmd.ProcessState.ExitCode()
-			}
-
-			slog.Error("AWS CLI command failed",
-				"command", exactCommand,
-				"exit_code", exitCode,
-				"stderr", stderr.String(),
-				"stdout", stdout.String(),
-				"cluster_name", clusterName,
-				"region", t.Region(),
-				"identity", creds.Identity())
-
-			// Try to list available clusters for debugging
-			availableClusters := listAvailableClusters(ctx, t.Region(), credEnvVars)
-			if len(availableClusters) > 0 {
-				slog.Info("Available clusters in region", "region", t.Region(), "clusters", availableClusters)
-			}
-
-			return "", fmt.Errorf("failed to setup kubeconfig for cluster %s in region %s (exit code %d): %w\nCommand: %s\nAWS CLI stderr: %s", clusterName, t.Region(), exitCode, err, exactCommand, stderr.String())
-		}
-
-		// Add SOCKS proxy configuration for non-tailscale clusters
-		if !t.TailscaleEnabled() {
-			slog.Debug("Adding SOCKS proxy configuration to kubeconfig", "target", t.Name())
-			if err := addProxyToKubeconfig(kubeconfigPath); err != nil {
-				slog.Error("Failed to add proxy configuration to kubeconfig", "error", err)
-				return "", fmt.Errorf("failed to add proxy configuration to kubeconfig: %w", err)
-			}
-		}
-
-		return kubeconfigPath, nil
-	}
-
-	if t.CloudProvider() == types.Azure {
-		azureTarget := t.(azure.Target)
-
-		// Determine cluster name
-		// Pattern for Azure workloads: {target_name}-{release}
-		var clusterName string
-		targetName := t.Name()
-
-		// Get first release from clusters map (same pattern as AWS)
-		slog.Debug("Azure workload target cluster info", "target", targetName, "clusters_count", len(azureTarget.Clusters()))
-
-		if len(azureTarget.Clusters()) == 0 {
-			return "", fmt.Errorf("no clusters configured for Azure target %s in ptd.yaml", targetName)
-		}
-
-		// Construct cluster name from target name and release key
-		// Pattern: {target_name}-{release}
-		for releaseKey := range azureTarget.Clusters() {
-			slog.Debug("Found cluster release", "release_key", releaseKey)
-			clusterName = fmt.Sprintf("%s-%s", targetName, releaseKey)
-			break
-		}
-
-		// Get resource group name from target
-		resourceGroupName := azureTarget.ResourceGroupName()
-
-		slog.Info("Setting up Azure kubeconfig",
-			"cluster_name", clusterName,
-			"resource_group", resourceGroupName,
-			"region", t.Region(),
-			"target", t.Name())
-
-		// Build az aks get-credentials command
-		args := []string{
-			"aks", "get-credentials",
-			"--name", clusterName,
-			"--resource-group", resourceGroupName,
-			"--file", kubeconfigPath,
-			"--overwrite-existing",
-		}
-
-		updateCmd := exec.CommandContext(ctx, "az", args...)
-
-		// Execute the command and capture output
-		var stdout, stderr strings.Builder
-		updateCmd.Stdout = &stdout
-		updateCmd.Stderr = &stderr
-
-		// Build exact command string for logging
-		cmdArgs := []string{"az"}
-		cmdArgs = append(cmdArgs, args...)
-		exactCommand := strings.Join(cmdArgs, " ")
-
-		slog.Debug("Executing Azure CLI command", "command", exactCommand)
-		if err := updateCmd.Run(); err != nil {
-			exitCode := -1
-			if updateCmd.ProcessState != nil {
-				exitCode = updateCmd.ProcessState.ExitCode()
-			}
-
-			slog.Error("Azure CLI command failed",
-				"command", exactCommand,
-				"exit_code", exitCode,
-				"stderr", stderr.String(),
-				"stdout", stdout.String(),
-				"cluster_name", clusterName,
-				"resource_group", resourceGroupName,
-				"region", t.Region())
-
-			return "", fmt.Errorf("failed to setup kubeconfig for cluster %s in resource group %s (exit code %d): %w\nCommand: %s\nAzure CLI stderr: %s",
-				clusterName, resourceGroupName, exitCode, err, exactCommand, stderr.String())
-		}
-
-		// Always add SOCKS proxy configuration (Azure doesn't support Tailscale)
-		slog.Debug("Adding SOCKS proxy configuration to kubeconfig", "target", t.Name())
-		if err := addProxyToKubeconfig(kubeconfigPath); err != nil {
-			slog.Error("Failed to add proxy configuration to kubeconfig", "error", err)
-			return "", fmt.Errorf("failed to add proxy configuration to kubeconfig: %w", err)
-		}
-
-		return kubeconfigPath, nil
-	}
-
-	return "", fmt.Errorf("kubeconfig setup not implemented for cloud provider: %s", t.CloudProvider())
-}
-
 func runK9s(cmd *cobra.Command, target string) {
-	// find the relevant ptd.yaml file, load it.
 	t, err := legacy.TargetFromName(target)
 	if err != nil {
 		slog.Error("Could not load relevant ptd.yaml file", "error", err)
 		return
 	}
 
-	if !t.TailscaleEnabled() {
-		if t.CloudProvider() == types.AWS {
-			ps := awslib.NewProxySession(t.(awslib.Target), getAwsCliPath(), "1080", proxyFile)
-			err = ps.Start(cmd.Context())
-			if err != nil {
-				slog.Error("Error starting AWS proxy session", "error", err)
-				return
-			}
-			defer func() {
-				if stopErr := ps.Stop(); stopErr != nil {
-					slog.Error("Failed to stop proxy session", "error", stopErr)
-				}
-			}()
-		} else {
-			ps := azure.NewProxySession(t.(azure.Target), getAzureCliPath(), "1080", proxyFile)
-			err = ps.Start(cmd.Context())
-			if err != nil {
-				slog.Error("Error starting Azure proxy session", "error", err)
-				return
-			}
-			defer func() {
-				if stopErr := ps.Stop(); stopErr != nil {
-					slog.Error("Failed to stop proxy session", "error", stopErr)
-				}
-			}()
-		}
-	} else {
-		client := local.Client{}
-		status, _ := client.Status(context.Background())
-		isTailscaleConnected := status != nil && status.BackendState == "Running"
-
-		if !isTailscaleConnected {
-			slog.Warn("Tailscale is not connected, k9s connection may fail", "target_name", t.Name())
-		}
+	// Start proxy using shared kube package
+	proxyFile := path.Join(internal.DataDir(), "proxy.json")
+	stopProxy, err := kube.StartProxy(cmd.Context(), t, proxyFile)
+	if err != nil {
+		slog.Error("Error starting proxy session", "error", err)
+		return
 	}
+	defer stopProxy()
 
 	creds, err := t.Credentials(cmd.Context())
 	if err != nil {
@@ -350,8 +56,8 @@ func runK9s(cmd *cobra.Command, target string) {
 		return
 	}
 
-	// Set up kubeconfig
-	kubeconfigPath, err := setupKubeConfig(cmd, t, creds)
+	// Set up kubeconfig using native SDK
+	kubeconfigPath, err := kube.SetupKubeConfig(cmd.Context(), t, creds)
 	if err != nil {
 		slog.Error("Failed to setup kubeconfig", "error", err)
 		return
