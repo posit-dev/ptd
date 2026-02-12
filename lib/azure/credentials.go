@@ -83,6 +83,11 @@ func (c *Credentials) TenantID() string {
 	return c.tenantID
 }
 
+// AzureCredential returns the underlying Azure credential for SDK operations.
+func (c *Credentials) AzureCredential() azcore.TokenCredential {
+	return c.credentials
+}
+
 func NewCredentials(subscriptionID string, tenantID string) (c *Credentials) {
 	// Use AzureCLICredential directly instead of DefaultAzureCredential.
 	// DefaultAzureCredential tries ManagedIdentityCredential before CLI auth,
