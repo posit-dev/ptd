@@ -23,5 +23,5 @@ func TestAKSStepInvalidTarget(t *testing.T) {
 	step.Set(tgt, nil, StepOptions{})
 
 	err = step.Run(context.Background())
-	assert.ErrorContains(t, err, "expected Azure target but got different type")
+	assert.ErrorContains(t, err, "expected Azure target for AKS step")
 }

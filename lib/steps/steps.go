@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"slices"
 
-	"github.com/posit-dev/ptd/lib/azure"
 	"github.com/posit-dev/ptd/lib/pulumi"
 	"github.com/posit-dev/ptd/lib/types"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
@@ -176,29 +175,11 @@ func pulumiRefreshPreviewUpCancel(ctx context.Context, stack auto.Stack, options
 }
 
 // prepareEnvVarsForPulumi prepares environment variables for Pulumi stack creation.
-// For Azure targets, it adds AZURE_STORAGE_ACCOUNT and AZURE_STORAGE_KEY which are
-// required for azblob backend authentication (DefaultAzureCredential hangs on non-Azure machines).
 func prepareEnvVarsForPulumi(ctx context.Context, target types.Target, creds types.Credentials) (map[string]string, error) {
 	envVars := make(map[string]string)
 	for k, v := range creds.EnvVars() {
 		envVars[k] = v
 	}
-
-	if target.CloudProvider() == types.Azure {
-		azureTarget, ok := target.(azure.Target)
-		if !ok {
-			return nil, fmt.Errorf("expected Azure target but got different type")
-		}
-
-		storageEnvVars, err := azureTarget.PulumiStorageEnvVars(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for k, v := range storageEnvVars {
-			envVars[k] = v
-		}
-	}
-
 	return envVars, nil
 }
 
