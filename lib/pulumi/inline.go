@@ -15,7 +15,7 @@ import (
 // manifest, but this is fine for now IMO.
 var RequiredPlugins = map[string]string{
 	"aws":          "6.65.0",
-	"azure-native": "3.5.1",
+	"azure-native": "3.8.0",
 }
 
 // Stack creates or fetches a Pulumi stack for the given target and base name (step)
