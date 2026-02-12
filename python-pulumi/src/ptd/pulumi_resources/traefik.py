@@ -149,9 +149,6 @@ class Traefik(pulumi.ComponentResource):
                             "service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval": "10",
                         },
                     },
-                    "ping": {
-                        "entryPoint": "web",
-                    },
                     "ports": {
                         "web": {
                             "redirectTo": "websecure",
