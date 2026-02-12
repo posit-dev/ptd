@@ -823,11 +823,11 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
             "alb.ingress.kubernetes.io/listen-ports": json.dumps([{"HTTP": 80}, {"HTTPS": 443}]),
             "alb.ingress.kubernetes.io/backend-protocol": "HTTP",
             "alb.ingress.kubernetes.io/certificate-arn": ",".join(cert_arns),
-            "alb.ingress.kubernetes.io/target-type": "ip",
             "alb.ingress.kubernetes.io/healthcheck-protocol": "HTTP",
             "alb.ingress.kubernetes.io/ssl-policy": "ELBSecurityPolicy-FS-1-2-2019-08",
             "alb.ingress.kubernetes.io/healthcheck-path": "/ping",
-            "alb.ingress.kubernetes.io/healthcheck-port": "9000",
+            "alb.ingress.kubernetes.io/healthcheck-port": "traffic-port",
+            "alb.ingress.kubernetes.io/success-codes": "200-399",
             "alb.ingress.kubernetes.io/load-balancer-attributes": "routing.http.drop_invalid_header_fields.enabled=true",
         }
 
