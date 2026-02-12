@@ -3,13 +3,12 @@ package main
 import (
 	"log/slog"
 	"os"
+	"os/signal"
 	"path"
-
-	"github.com/posit-dev/ptd/lib/azure"
 
 	"github.com/posit-dev/ptd/cmd/internal"
 	"github.com/posit-dev/ptd/cmd/internal/legacy"
-	"github.com/posit-dev/ptd/lib/aws"
+	"github.com/posit-dev/ptd/lib/kube"
 	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/spf13/cobra"
 )
@@ -37,69 +36,33 @@ var proxyCmd = &cobra.Command{
 			return
 		}
 
-		// find the relevant ptd.yaml file, load it.
 		t, err := legacy.TargetFromName(args[0])
 		if err != nil {
 			slog.Error("Could not load relevant ptd.yaml file", "error", err)
 			return
 		}
 
-		if t.CloudProvider() == "aws" {
-			ps := aws.NewProxySession(t.(aws.Target), getAwsCliPath(), "1080", proxyFile)
-			err = ps.Start(cmd.Context())
-			if err != nil {
-				slog.Error("Error starting proxy session", "error", err)
-				return
-			}
-
-			slog.Info("Proxy session started successfully")
-			if Daemon {
-				slog.Info("Running in daemon mode, proxy session will run in the background")
-				slog.Info("You can stop the proxy session with `ptd proxy <workload> --stop`")
-				return
-			}
-
-			// Wait for the proxy session to be cancelled
-			slog.Info("Press Ctrl+C to stop the proxy session")
-			ps.Wait()
-		} else if t.CloudProvider() == "azure" {
-			ps := azure.NewProxySession(t.(azure.Target), getAzureCliPath(), "1080", proxyFile)
-			err = ps.Start(cmd.Context())
-			if err != nil {
-				slog.Error("Error starting proxy session", "error", err)
-				return
-			}
-
-			slog.Info("Proxy session started successfully")
-			if Daemon {
-				slog.Info("Running in daemon mode, proxy session will run in the background")
-				slog.Info("You can stop the proxy session with `ptd proxy <workload> --stop`")
-				return
-			}
-
-			// Wait for the proxy session to be cancelled
-			slog.Info("Press Ctrl+C to stop the proxy session")
-			ps.Wait()
+		stopProxy, err := kube.StartProxy(cmd.Context(), t, proxyFile)
+		if err != nil {
+			slog.Error("Error starting proxy session", "error", err)
+			return
 		}
+
+		slog.Info("Proxy session started successfully")
+		if Daemon {
+			slog.Info("Running in daemon mode, proxy session will run in the background")
+			slog.Info("You can stop the proxy session with `ptd proxy <workload> --stop`")
+			return
+		}
+
+		// Wait for interrupt signal
+		slog.Info("Press Ctrl+C to stop the proxy session")
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, os.Interrupt)
+		<-sigCh
+		slog.Info("Received interrupt, stopping proxy session")
+		stopProxy()
 	},
-}
-
-func getAwsCliPath() (awsCliPath string) {
-	awsCliPath = "aws"
-	top, ok := os.LookupEnv("TOP")
-	if ok {
-		awsCliPath = path.Join(top, ".local/bin/aws")
-	}
-	return
-}
-
-func getAzureCliPath() (azureCliPath string) {
-	azureCliPath = "az"
-	top, ok := os.LookupEnv("TOP")
-	if ok {
-		azureCliPath = path.Join(top, ".local/bin/az")
-	}
-	return
 }
 
 func stopProxySession() {
