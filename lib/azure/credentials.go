@@ -52,6 +52,11 @@ func (c *Credentials) TenantID() string {
 	return c.tenantID
 }
 
+// AzureCredential returns the underlying Azure credential for SDK operations.
+func (c *Credentials) AzureCredential() *azidentity.DefaultAzureCredential {
+	return c.credentials
+}
+
 func NewCredentials(subscriptionID string, tenantID string) (c *Credentials) {
 	azCreds, _ := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{
 		TenantID: tenantID,
