@@ -869,6 +869,7 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
             self.fsx_openzfs_fs = aws.fsx.OpenZfsFileSystem(
                 self.workload.compound_name,
                 automatic_backup_retention_days=30,
+                daily_automatic_backup_start_time=self.workload.cfg.fsx_openzfs_daily_automatic_backup_start_time,
                 preferred_subnet_id=(subnet_ids[0] if deployment_type.startswith("MULTI") else None),
                 subnet_ids=subnet_ids,
                 deployment_type=deployment_type,
@@ -890,9 +891,13 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
                     ),
                 ),
                 tags=self.required_tags | {"Name": self.workload.compound_name},
+                # ignore_changes for daily_automatic_backup_start_time: This field is not
+                # properly read back from AWS after import, causing perpetual diffs.
+                # See: https://github.com/posit-dev/ptd/issues/5
                 opts=pulumi.ResourceOptions(
                     parent=self.vpc,
                     protect=self.workload.cfg.protect_persistent_resources,
+                    ignore_changes=["daily_automatic_backup_start_time"],
                 ),
             )
 
