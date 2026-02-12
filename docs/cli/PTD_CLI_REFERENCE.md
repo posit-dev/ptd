@@ -346,20 +346,22 @@ ptd ensure testing01-staging --dry-run
 
 ### `ptd workon`
 
-Start an interactive shell with credentials and environment configured for a target. Optionally, work within a specific Pulumi stack directory.
+Start an interactive shell or run a one-shot command with credentials, kubeconfig, and environment configured for a target. Optionally, work within a specific Pulumi stack directory.
 
 **Usage:**
 ```bash
 ptd workon <cluster> [step] [flags]
+ptd workon <cluster> [step] -- <command> [args...]
 ```
 
 **Arguments:**
 - `<cluster>` - Target name (supports auto-completion)
 - `[step]` - Optional: specific Pulumi step/stack to work on
+- `-- <command>` - Optional: run a single command instead of an interactive shell
 
 **Examples:**
 
-Open shell with target credentials:
+Open shell with target credentials and kubeconfig:
 ```bash
 ptd workon testing01-staging
 ```
@@ -369,23 +371,51 @@ Work on a specific step (opens shell in Pulumi stack directory):
 ptd workon testing01-staging helm
 ```
 
+Run a one-shot kubectl command:
+```bash
+ptd workon testing01-staging -- kubectl get pods -n posit-team
+```
+
+Run a one-shot Pulumi command within a step:
+```bash
+ptd workon testing01-staging helm -- pulumi stack export
+```
+
 **What it does:**
 1. Loads target configuration
 2. Assumes appropriate credentials
-3. Creates/loads Pulumi stack if step is specified
-4. Opens an interactive shell with:
-   - Cloud provider credentials set
-   - Working directory set to Pulumi stack (if step specified)
-   - Full environment inherited
+3. Starts a SOCKS proxy if needed (non-tailscale targets)
+4. Sets up kubeconfig using native SDK (no `aws`/`az` CLI dependency)
+5. Creates/loads Pulumi stack if step is specified
+6. Either:
+   - **Interactive mode** (no `--`): opens a shell with full environment
+   - **Command mode** (with `--`): runs the command and exits with its exit code
 
-**Implementation:** `/cmd/workon.go:18`
+**Environment provided:**
+- Cloud provider credentials (AWS/Azure)
+- `KUBECONFIG` pointing to a configured kubeconfig file
+- `PULUMI_STACK_NAME` (if custom step specified)
+- Working directory set to Pulumi stack (if step specified)
 
-**Example session:**
+**Exit code propagation:** In command mode, the exit code of the executed command is propagated. This enables scripting and automation.
+
+**Implementation:** `/cmd/workon.go:25`
+
+**Example sessions:**
 ```bash
+# Interactive shell
 $ ptd workon testing01-staging helm
 Starting interactive shell in /path/to/stack with session identity arn:aws:sts::123456789012:assumed-role/admin.posit.team/user@example.com
 To exit the shell, type 'exit' or press Ctrl+D
-(shell opens with environment configured)
+
+# One-shot command
+$ ptd workon ganso01-staging -- kubectl get nodes
+NAME                                          STATUS   ROLES    AGE   VERSION
+ip-10-152-102-54.us-east-2.compute.internal   Ready    <none>   9d    v1.32.9-eks-ecaa3a6
+
+# Exit code propagation
+$ ptd workon ganso01-staging -- kubectl get nonexistent; echo $?
+1
 ```
 
 ---
