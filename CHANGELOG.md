@@ -1,3 +1,11 @@
+## [1.4.2](https://github.com/posit-dev/ptd/compare/v1.4.1...v1.4.2) (2026-02-13)
+
+
+### Bug Fixes
+
+* do not use key auth for storage accounts due to security warnings ([3e4e860](https://github.com/posit-dev/ptd/commit/3e4e860889f9d52fcfe78d67f7d5de1eb56546c8))
+* enable azure auth in the cli when run in AWS Workspace ([5b846e4](https://github.com/posit-dev/ptd/commit/5b846e4866827ed790874a30dbb05423407f3ee1))
+
 ## [1.4.1](https://github.com/posit-dev/ptd/compare/v1.4.0...v1.4.1) (2026-02-10)
 
 
