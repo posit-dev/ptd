@@ -151,6 +151,60 @@ func TestAzureWorkloadConfigSerialization(t *testing.T) {
 		unmarshaledConfig.Clusters["main"].Components.SecretStoreCsiDriverAzureProviderVersion)
 }
 
+func TestAzureWorkloadConfigBastionInstanceType(t *testing.T) {
+	// Test that bastion_instance_type field is properly serialized/deserialized
+	config := AzureWorkloadConfig{
+		SubscriptionID:          "123456789-abcd-efgh-ijkl-1234567890ab",
+		TenantID:                "abcdefgh-1234-5678-ijkl-1234567890ab",
+		Region:                  "eastus",
+		ClientID:                "12345678-abcd-efgh-ijkl-1234567890ab",
+		SecretsProviderClientID: "98765432-abcd-efgh-ijkl-1234567890ab",
+		BastionInstanceType:     "Standard_B2s",
+		InstanceType:            "Standard_D4s_v3",
+		ControlPlaneNodeCount:   1,
+		WorkerNodeCount:         1,
+		DBStorageSizeGB:         20,
+	}
+
+	// Marshal to YAML
+	yamlData, err := yaml.Marshal(config)
+	assert.NoError(t, err)
+
+	// Verify the YAML contains the bastion_instance_type field
+	yamlString := string(yamlData)
+	assert.Contains(t, yamlString, "bastion_instance_type: Standard_B2s")
+
+	// Unmarshal from YAML
+	var unmarshaledConfig AzureWorkloadConfig
+	err = yaml.Unmarshal(yamlData, &unmarshaledConfig)
+	assert.NoError(t, err)
+
+	// Verify bastion_instance_type matches
+	assert.Equal(t, config.BastionInstanceType, unmarshaledConfig.BastionInstanceType)
+	assert.Equal(t, "Standard_B2s", unmarshaledConfig.BastionInstanceType)
+}
+
+func TestAzureWorkloadConfigBastionInstanceTypeFromYAML(t *testing.T) {
+	// Test parsing bastion_instance_type from YAML
+	yamlContent := `
+subscription_id: "123456789-abcd-efgh-ijkl-1234567890ab"
+tenant_id: "abcdefgh-1234-5678-ijkl-1234567890ab"
+region: "eastus"
+client_id: "12345678-abcd-efgh-ijkl-1234567890ab"
+secrets_provider_client_id: "98765432-abcd-efgh-ijkl-1234567890ab"
+bastion_instance_type: "Standard_D2s_v3"
+instance_type: "Standard_D4s_v3"
+control_plane_node_count: 1
+worker_node_count: 1
+db_storage_size_gb: 20
+`
+
+	var config AzureWorkloadConfig
+	err := yaml.Unmarshal([]byte(yamlContent), &config)
+	assert.NoError(t, err)
+	assert.Equal(t, "Standard_D2s_v3", config.BastionInstanceType)
+}
+
 func TestAzureUserNodePoolConfigSerialization(t *testing.T) {
 	initialCount := 5
 	maxPods := 50
