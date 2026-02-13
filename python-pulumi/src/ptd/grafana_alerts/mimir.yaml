@@ -3,19 +3,19 @@
 # apiVersion: 1
 # deleteRules:
 #   - orgId: 1
-#     uid: loki_wal_disk_full_failures
+#     uid: workload_metrics_silent
 #
 # See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
 apiVersion: 1
 groups:
     - orgId: 1
-      name: Applications
+      name: Mimir
       folder: Posit Alerts
       interval: 1m
       rules:
-        - uid: loki_wal_disk_full_failures
-          title: Loki WAL Disk Full Failures
-          condition: B
+        - uid: workload_metrics_silent
+          title: Workload Metrics Silent
+          condition: C
           data:
             - refId: A
               relativeTimeRange:
@@ -24,7 +24,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: loki_ingester_wal_disk_full_failures_total
+                expr: up{job="prometheus.scrape.kube_state_metrics"}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -39,9 +39,37 @@ groups:
               model:
                 conditions:
                     - evaluator:
-                        params:
-                            - 0
+                        params: []
                         type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - B
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                reducer: last
+                refId: B
+                type: reduce
+            - refId: C
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 1
+                        type: lt
                       operator:
                         type: and
                       query:
@@ -54,17 +82,17 @@ groups:
                 datasource:
                     type: __expr__
                     uid: __expr__
-                expression: A
+                expression: B
                 intervalMs: 1000
                 maxDataPoints: 43200
-                refId: B
+                refId: C
                 type: threshold
-          noDataState: NoData
+          noDataState: Alerting
           execErrState: Error
-          for: 5m
+          for: 10m
           annotations:
-            description: Loki ingester has experienced WAL disk full failures. This indicates storage issues with the Loki WAL directory in cluster {{ $labels.cluster }}.
-            summary: Loki WAL disk full failures detected in {{ $labels.cluster }}
+            description: No metrics have been received from workload cluster {{ $labels.cluster }} for 10 minutes. This could indicate Alloy is not running, network issues between the workload and control room, or the workload cluster is down.
+            summary: "Workload metrics silent!\nCluster: {{ $labels.cluster }}"
           labels:
             opsgenie: "1"
           isPaused: false
