@@ -174,6 +174,15 @@ func pulumiRefreshPreviewUpCancel(ctx context.Context, stack auto.Stack, options
 	return nil
 }
 
+// prepareEnvVarsForPulumi prepares environment variables for Pulumi stack creation.
+func prepareEnvVarsForPulumi(ctx context.Context, target types.Target, creds types.Credentials) (map[string]string, error) {
+	envVars := make(map[string]string)
+	for k, v := range creds.EnvVars() {
+		envVars[k] = v
+	}
+	return envVars, nil
+}
+
 func setLoggerWithContext(t types.Target, controlRoomTarget types.Target, options StepOptions, stepName string) *slog.Logger {
 	l := slog.With(
 		"step_name", stepName,

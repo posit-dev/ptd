@@ -3,6 +3,7 @@ package pulumi
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,10 +60,19 @@ func NewPythonPulumiStack(
 		envVars[k] = v
 	}
 
+	slog.Debug("Creating Pulumi workspace",
+		"project", projectName,
+		"stack", stackName,
+		"backend_url", targetBackendUrl,
+		"cloud", cloud,
+		"env_vars", getEnvVarKeys(envVars))
+
 	lw, err := auto.NewLocalWorkspace(ctx, project, stackSettings, secretsProvider, auto.EnvVars(envVars))
 	if err != nil {
+		slog.Error("Failed to create Pulumi workspace", "error", err)
 		return
 	}
+	slog.Debug("Pulumi workspace created successfully")
 
 	if createAutoloadFile {
 		// inanely hacky attempt at making the class name title case, except for AWS.
@@ -91,10 +101,13 @@ func NewPythonPulumiStack(
 		}
 	}
 
+	slog.Debug("Upserting Pulumi stack", "stack", stackName)
 	stack, err = auto.UpsertStack(ctx, stackName, lw)
 	if err != nil {
+		slog.Error("Failed to upsert Pulumi stack", "error", err)
 		return
 	}
+	slog.Debug("Pulumi stack upserted successfully")
 
 	switch cloud {
 	case "aws":
@@ -115,4 +128,13 @@ func WriteMainPy(dir string, module string, class string) error {
 	contents := fmt.Sprintf("import ptd.pulumi_resources.%s\n\nptd.pulumi_resources.%s.%s.autoload()\n", module, module, class)
 	mainPy := []byte(contents)
 	return os.WriteFile(filepath.Join(dir, "__main__.py"), mainPy, 0644)
+}
+
+// getEnvVarKeys returns a list of environment variable keys (for logging without exposing values)
+func getEnvVarKeys(envVars map[string]string) []string {
+	keys := make([]string, 0, len(envVars))
+	for k := range envVars {
+		keys = append(keys, k)
+	}
+	return keys
 }

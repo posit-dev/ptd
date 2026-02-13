@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/posit-dev/ptd/lib/types"
 
@@ -13,7 +14,7 @@ import (
 type Credentials struct {
 	subscriptionID string
 	tenantID       string
-	credentials    *azidentity.DefaultAzureCredential
+	credentials    azcore.TokenCredential
 }
 
 func (c *Credentials) Expired() bool {
@@ -37,7 +38,37 @@ func (c *Credentials) Refresh(ctx context.Context) error {
 }
 
 func (c *Credentials) EnvVars() map[string]string {
-	return map[string]string{}
+	return map[string]string{
+		// ARM_* variables are used by Pulumi Azure Native provider
+		"ARM_USE_CLI":         "true",
+		"ARM_SUBSCRIPTION_ID": c.subscriptionID,
+		"ARM_TENANT_ID":       c.tenantID,
+		// AZURE_TENANT_ID is used by the Azure SDK's DefaultAzureCredential
+		// (e.g. for azblob backend auth). This is distinct from ARM_TENANT_ID.
+		"AZURE_TENANT_ID": c.tenantID,
+
+		// IMDS workaround: Pulumi's gocloud.dev secrets provider (azurekeyvault)
+		// and blob backend (azblob) both call DefaultAzureCredential(nil)
+		// internally. On AWS workspaces, ManagedIdentityCredential's IMDS probe
+		// reaches AWS's metadata service at 169.254.169.254, which responds but
+		// isn't Azure IMDS. The probe succeeds, the real token request fails with
+		// authenticationFailedError (not CredentialUnavailableError), and the
+		// credential chain stops before reaching AzureCLICredential.
+		//
+		// We previously bypassed this for azblob by fetching storage account keys
+		// and passing AZURE_STORAGE_KEY, but key-based auth fails Azure security
+		// reviews in customer environments. This proxy approach lets both azblob
+		// and azurekeyvault authenticate via DefaultAzureCredential -> AzureCLICredential
+		// without requiring storage account keys.
+		//
+		// Fix: Route the IMDS probe (plain HTTP to 169.254.169.254) through a
+		// non-existent proxy so it fails immediately. ALL IMDS probe failures
+		// return CredentialUnavailableError, allowing the chain to continue to
+		// AzureCLICredential. Azure API calls (HTTPS) bypass the proxy via NO_PROXY.
+		"HTTP_PROXY": "http://127.0.0.1:1",
+		// NOTE: If Azure needs new service domains, they must be added here to bypass the proxy.
+		"NO_PROXY": ".azure.com,.azure.net,.windows.net,.microsoft.com,.microsoftonline.com,localhost,127.0.0.1",
+	}
 }
 
 func (c *Credentials) AccountID() string {
@@ -53,12 +84,16 @@ func (c *Credentials) TenantID() string {
 }
 
 // AzureCredential returns the underlying Azure credential for SDK operations.
-func (c *Credentials) AzureCredential() *azidentity.DefaultAzureCredential {
+func (c *Credentials) AzureCredential() azcore.TokenCredential {
 	return c.credentials
 }
 
 func NewCredentials(subscriptionID string, tenantID string) (c *Credentials) {
-	azCreds, _ := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{
+	// Use AzureCLICredential directly instead of DefaultAzureCredential.
+	// DefaultAzureCredential tries ManagedIdentityCredential before CLI auth,
+	// which hangs in AWS workspaces where IMDS exists
+	// at 169.254.169.254 but isn't Azure IMDS.
+	azCreds, _ := azidentity.NewAzureCLICredential(&azidentity.AzureCLICredentialOptions{
 		TenantID: tenantID,
 	})
 

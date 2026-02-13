@@ -35,7 +35,10 @@ func (s *WorkspacesStep) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	envVars := creds.EnvVars()
+	envVars, err := prepareEnvVarsForPulumi(ctx, s.DstTarget, creds)
+	if err != nil {
+		return err
+	}
 
 	stack, err := pulumi.NewPythonPulumiStack(
 		ctx,

@@ -38,7 +38,10 @@ func (s *PostgresConfigStep) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	envVars := creds.EnvVars()
+	envVars, err := prepareEnvVarsForPulumi(ctx, s.DstTarget, creds)
+	if err != nil {
+		return err
+	}
 
 	// if the target isn't tailscale enabled, add ALL_PROXY to the env vars
 	if !s.DstTarget.TailscaleEnabled() {
