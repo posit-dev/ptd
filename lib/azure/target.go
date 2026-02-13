@@ -157,13 +157,20 @@ func (t Target) PulumiSecretsProviderKey() string {
 	return fmt.Sprintf("azurekeyvault://%s.vault.azure.net/keys/posit-team-dedicated", t.VaultName())
 }
 
-func (t Target) BastionName(ctx context.Context) (string, error) {
-	// get the credentials for the target
+// fullPulumiEnvVars returns credential env vars needed for Pulumi stack operations.
+func (t Target) fullPulumiEnvVars(ctx context.Context) (map[string]string, error) {
 	creds, err := t.Credentials(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return creds.EnvVars(), nil
+}
+
+func (t Target) BastionName(ctx context.Context) (string, error) {
+	envVars, err := t.fullPulumiEnvVars(ctx)
 	if err != nil {
 		return "", err
 	}
-	envVars := creds.EnvVars()
 
 	persistentStack, err := pulumi.NewPythonPulumiStack(
 		ctx,
@@ -196,12 +203,10 @@ func (t Target) BastionName(ctx context.Context) (string, error) {
 }
 
 func (t Target) JumpBoxId(ctx context.Context) (string, error) {
-	// get the credentials for the target
-	creds, err := t.Credentials(ctx)
+	envVars, err := t.fullPulumiEnvVars(ctx)
 	if err != nil {
 		return "", err
 	}
-	envVars := creds.EnvVars()
 
 	persistentStack, err := pulumi.NewPythonPulumiStack(
 		ctx,

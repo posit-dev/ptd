@@ -45,7 +45,12 @@ func (s *AKSStep) Run(ctx context.Context) error {
 		return err
 	}
 
-	stack, err := createStack(ctx, s.Name(), s.DstTarget, s.deploy, creds.EnvVars())
+	envVars, err := prepareEnvVarsForPulumi(ctx, s.DstTarget, creds)
+	if err != nil {
+		return err
+	}
+
+	stack, err := createStack(ctx, s.Name(), s.DstTarget, s.deploy, envVars)
 	if err != nil {
 		return err
 	}
@@ -430,7 +435,10 @@ func getPersistentStackOutputs(ctx context.Context, target types.Target) (auto.O
 		return nil, fmt.Errorf("failed to get target credentials: %w", err)
 	}
 
-	envVars := creds.EnvVars()
+	envVars, err := prepareEnvVarsForPulumi(ctx, target, creds)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare env vars: %w", err)
+	}
 	persistentStack, err := ptdpulumi.NewPythonPulumiStack(
 		ctx,
 		"azure",

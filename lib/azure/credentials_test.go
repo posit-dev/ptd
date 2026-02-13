@@ -56,11 +56,18 @@ func TestCredentialsAccessors(t *testing.T) {
 		assert.NoError(t, creds.Refresh(context.Background()))
 	})
 
-	// Test EnvVars (returns empty map)
+	// Test EnvVars (returns Azure CLI authentication variables)
 	t.Run("EnvVars", func(t *testing.T) {
 		envVars := creds.EnvVars()
-		assert.Empty(t, envVars)
-		assert.Len(t, envVars, 0)
+		assert.NotEmpty(t, envVars)
+		assert.Equal(t, "true", envVars["ARM_USE_CLI"])
+		assert.Equal(t, subscriptionID, envVars["ARM_SUBSCRIPTION_ID"])
+		assert.Equal(t, tenantID, envVars["ARM_TENANT_ID"])
+		assert.Equal(t, tenantID, envVars["AZURE_TENANT_ID"])
+		// HTTP_PROXY breaks IMDS probe so DefaultAzureCredential falls through to AzureCLICredential
+		assert.Equal(t, "http://127.0.0.1:1", envVars["HTTP_PROXY"])
+		assert.Contains(t, envVars["NO_PROXY"], ".azure.com")
+		assert.Len(t, envVars, 6)
 	})
 }
 
