@@ -68,4 +68,3 @@ groups:
           labels:
             opsgenie: "1"
           isPaused: false
-
