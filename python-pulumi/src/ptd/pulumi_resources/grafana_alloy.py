@@ -491,11 +491,24 @@ class AlloyConfig(pulumi.ComponentResource):
 
                 discovery.kubernetes "pod_logs" {{
                     role = "pod"
-                    // CRITICAL: Only discover pods from posit-team and posit-team-system namespaces
+                    // Only discover pods from posit-team and posit-team-system namespaces
                     // This significantly reduces log volume and S3 costs
                     namespaces {{
                         own_namespace = false
                         names = ["posit-team", "posit-team-system"]
+                    }}
+                }}
+
+                // Karpenter logs from kube-system namespace
+                discovery.kubernetes "karpenter_logs" {{
+                    role = "pod"
+                    namespaces {{
+                        own_namespace = false
+                        names = ["kube-system"]
+                    }}
+                    selectors {{
+                        role = "pod"
+                        label = "app.kubernetes.io/name=karpenter"
                     }}
                 }}
 
@@ -556,6 +569,47 @@ class AlloyConfig(pulumi.ComponentResource):
 
                 loki.source.kubernetes "pods" {{
                     targets    = discovery.relabel.pod_logs.output
+                    forward_to = [loki.write.local.receiver]
+                }}
+
+                // Karpenter log labels
+                discovery.relabel "karpenter_logs" {{
+                    targets = discovery.kubernetes.karpenter_logs.targets
+
+                    rule {{
+                        source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+                        target_label = "app"
+                    }}
+
+                    rule {{
+                        source_labels = ["__meta_kubernetes_pod_container_name"]
+                        target_label = "container"
+                    }}
+
+                    rule {{
+                        source_labels = ["__meta_kubernetes_pod_name"]
+                        target_label = "pod_name"
+                    }}
+
+                    rule {{
+                        source_labels = ["__meta_kubernetes_pod_node_name"]
+                        target_label = "host_name"
+                    }}
+
+                    rule {{
+                        source_labels = ["__meta_kubernetes_namespace"]
+                        target_label = "namespace"
+                    }}
+
+                    rule {{
+                        action       = "replace"
+                        target_label = "cluster"
+                        replacement  = "{cluster_name}"
+                    }}
+                }}
+
+                loki.source.kubernetes "karpenter" {{
+                    targets    = discovery.relabel.karpenter_logs.output
                     forward_to = [loki.write.local.receiver]
                 }}
 
