@@ -26,6 +26,7 @@ class AzureBastion(pulumi.ComponentResource):
         resource_group_name: str | pulumi.Output[str],
         location: str | pulumi.Output[str],
         tags: dict[str, str],
+        vm_size: str | pulumi.Output[str],
         *args,
         **kwargs,
     ):
@@ -39,6 +40,8 @@ class AzureBastion(pulumi.ComponentResource):
             *args,
             **kwargs,
         )
+
+        self.vm_size = vm_size
 
         # generate a key pair for the jumpbox
         self.jumpbox_ssh_key = tls.PrivateKey(
@@ -106,7 +109,7 @@ class AzureBastion(pulumi.ComponentResource):
             resource_group_name=resource_group_name,
             location=location,
             hardware_profile=compute.HardwareProfileArgs(
-                vm_size="Standard_B1s",
+                vm_size=self.vm_size,
             ),
             storage_profile=compute.StorageProfileArgs(
                 image_reference=compute.ImageReferenceArgs(
