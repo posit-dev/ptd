@@ -52,7 +52,7 @@ type AWSWorkloadConfig struct {
 	ExternalID                              *uuid.UUID                          `json:"external_id" yaml:"external_id"`
 	ExtraClusterOidcUrls                    []string                            `json:"extra_cluster_oidc_urls" yaml:"extra_cluster_oidc_urls"`
 	ExtraPostgresDbs                        []string                            `json:"extra_postgres_dbs" yaml:"extra_postgres_dbs"`
-	FsxOpenzfsDailyAutomaticBackupStartTime string                              `json:"fsx_openzfs_daily_automatic_backup_start_time" yaml:"fsx_openzfs_daily_automatic_backup_start_time"`
+	FsxOpenzfsDailyAutomaticBackupStartTime *string                             `json:"fsx_openzfs_daily_automatic_backup_start_time" yaml:"fsx_openzfs_daily_automatic_backup_start_time"`
 	FsxOpenzfsMultiAz                       bool                                `json:"fsx_openzfs_multi_az" yaml:"fsx_openzfs_multi_az"`
 	FsxOpenzfsOverrideDeploymentType        *string                             `json:"fsx_openzfs_override_deployment_type" yaml:"fsx_openzfs_override_deployment_type"`
 	FsxOpenzfsStorageCapacity               int                                 `json:"fsx_openzfs_storage_capacity" yaml:"fsx_openzfs_storage_capacity"`
