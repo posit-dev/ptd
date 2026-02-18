@@ -97,6 +97,47 @@ The Go CLI communicates the infrastructure path to Python Pulumi stacks via the 
 
 - `just aws-unset`: Unset all AWS environment variables
 
+## Git Worktrees
+
+**Always use git worktrees instead of plain branches.** This enables concurrent Claude sessions in the same repo.
+
+### Creating a Worktree
+
+```bash
+# From the ptd repo root (or any existing worktree)
+git worktree add ../../.worktrees/ptd-<branch-name> -b <branch-name>
+```
+
+Worktrees live at `ptd-workspace/.worktrees/ptd-<branch-name>` — always prefix with `ptd-` to avoid collisions with other repos.
+
+### After Creating a Worktree
+
+1. **Build the binary** — each worktree needs its own ptd binary:
+   ```bash
+   cd ../../.worktrees/ptd-<branch-name>
+   just build-cmd
+   ```
+2. **direnv** — if direnv is available, `cd` into the worktree and run `direnv allow`. The `.envrc` uses `source_up` to inherit workspace vars and overrides `PTD` to point to the worktree.
+3. **For agents without direnv** — set env vars explicitly before running `ptd` commands:
+   ```bash
+   export PTD="$(pwd)"
+   export PATH="${PTD}/.local/bin:${PATH}"
+   ```
+
+### Cleaning Up
+
+```bash
+# From the main checkout
+git worktree remove ../../.worktrees/ptd-<branch-name>
+```
+
+### Rules
+
+- **NEVER** use `git checkout -b` for new work — always `git worktree add`
+- **NEVER** put worktrees inside the repo directory — always use `../../.worktrees/ptd-<name>`
+- **ALWAYS** rebuild the binary after creating a worktree (`just build-cmd`)
+- Branch names: kebab-case, no slashes, no usernames
+
 ## Contributing
 
 When contributing to the project:
