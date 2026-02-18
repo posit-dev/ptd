@@ -11,7 +11,7 @@ class AWSFsxOpenZfsMultiArgs:
     automatic_backup_retention_days: pulumi.Input[int]
     copy_tags_to_backups: pulumi.Input[bool]
     copy_tags_to_volumes: pulumi.Input[bool]
-    daily_automatic_backup_start_time: pulumi.Input[str]
+    daily_automatic_backup_start_time: pulumi.Input[str] | None
     deployment_type: pulumi.Input[str]
     root_volume_configuration: AWSFsxOpenZfsMultiRootVolumeConfigurationArgs
     route_table_ids: list[str] | list[pulumi.Output[str]]
@@ -85,6 +85,15 @@ class AWSFsxOpenZfsMulti(pulumi.ComponentResource):
             # Use the first subnet as preferred for MULTI_AZ
             preferred_subnet_id = props.subnet_ids[0]
 
+        # Only pass daily_automatic_backup_start_time if it has a valid value.
+        # AWS doesn't return this field properly on refresh, causing state corruption
+        # with empty strings that fail validation. By making it conditional, we avoid
+        # the validation error and let AWS use its default if the state is corrupted.
+        daily_backup_time = props.daily_automatic_backup_start_time
+        if daily_backup_time is not None and len(daily_backup_time) != 5:
+            # Invalid value (likely empty string from corrupted state), don't pass it
+            daily_backup_time = None
+
         self.file_system = aws.fsx.OpenZfsFileSystem(
             f"{name}-filesystem",
             automatic_backup_retention_days=props.automatic_backup_retention_days,
@@ -97,7 +106,7 @@ class AWSFsxOpenZfsMulti(pulumi.ComponentResource):
             throughput_capacity=props.throughput_capacity,
             copy_tags_to_backups=props.copy_tags_to_backups,
             copy_tags_to_volumes=props.copy_tags_to_volumes,
-            daily_automatic_backup_start_time=props.daily_automatic_backup_start_time,
+            daily_automatic_backup_start_time=daily_backup_time,
             route_table_ids=props.route_table_ids,
             root_volume_configuration=root_volume_configuration,
             tags=props.tags,
