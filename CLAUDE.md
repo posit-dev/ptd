@@ -103,12 +103,17 @@ The Go CLI communicates the infrastructure path to Python Pulumi stacks via the 
 
 ### Creating a Worktree
 
+This repo is expected to live at `ptd-workspace/ptd/`. The `../../.worktrees/` relative path resolves to `ptd-workspace/.worktrees/` in that layout.
+
 ```bash
-# From the ptd repo root (or any existing worktree)
+# New branch
 git worktree add ../../.worktrees/ptd-<branch-name> -b <branch-name>
+
+# Existing remote branch
+git worktree add ../../.worktrees/ptd-<branch-name> <branch-name>
 ```
 
-Worktrees live at `ptd-workspace/.worktrees/ptd-<branch-name>` — always prefix with `ptd-` to avoid collisions with other repos.
+Always prefix worktree directories with `ptd-` to avoid collisions with other repos.
 
 ### After Creating a Worktree
 
@@ -136,7 +141,7 @@ git worktree remove ../../.worktrees/ptd-<branch-name>
 - **NEVER** use `git checkout -b` for new work — always `git worktree add`
 - **NEVER** put worktrees inside the repo directory — always use `../../.worktrees/ptd-<name>`
 - **ALWAYS** rebuild the binary after creating a worktree (`just build-cmd`)
-- Branch names: kebab-case, no slashes, no usernames
+- Branch names: kebab-case, no slashes, no usernames (slashes break worktree directory paths)
 
 ## Contributing
 
