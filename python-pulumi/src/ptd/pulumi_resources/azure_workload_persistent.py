@@ -789,6 +789,7 @@ class AzureWorkloadPersistent(pulumi.ComponentResource):
             resource_group_name=self.vnet_rsg_name,
             location=self.workload.cfg.region,
             tags=self.required_tags,
+            vm_size=self.workload.cfg.bastion_instance_type,
             opts=pulumi.ResourceOptions(
                 protect=self.workload.cfg.protect_persistent_resources,
             ),
