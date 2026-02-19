@@ -1967,7 +1967,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 values={
                     "alerting": {
                         "contactpoints.yaml": {
-                            "apiVersion": "v1",
+                            "apiVersion": 1,
                             "contactPoints": [
                                 {
                                     "orgId": 1,
@@ -1984,7 +1984,21 @@ class AWSEKSCluster(pulumi.ComponentResource):
                                     ],
                                 }
                             ],
-                        }
+                        },
+                        "policies.yaml": {
+                            "apiVersion": 1,
+                            "policies": [
+                                {
+                                    "orgId": 1,
+                                    "receiver": "PositOpsGenie",
+                                    "group_by": ["alertname", "cluster"],
+                                    "matchers": ["opsgenie = 1"],
+                                    "group_wait": "30s",
+                                    "group_interval": "5m",
+                                    "repeat_interval": "4h",
+                                }
+                            ],
+                        },
                     },
                     "datasources": {
                         "datasources.yaml": {
