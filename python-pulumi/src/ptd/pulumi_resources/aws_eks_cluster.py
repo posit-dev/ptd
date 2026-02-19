@@ -1967,14 +1967,14 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 values={
                     "alerting": {
                         "contactpoints.yaml": {
-                            "apiVersion": "v1",
+                            "apiVersion": 1,
                             "contactPoints": [
                                 {
                                     "orgId": 1,
-                                    "name": "PositOpsGenie",
+                                    "name": "posit-opsgenie",
                                     "receivers": [
                                         {
-                                            "uid": "positOpsGenie",
+                                            "uid": "posit-opsgenie",
                                             "type": "opsgenie",
                                             "settings": {
                                                 "apiKey": '${{ "{" }}POSIT_OPSGENIE_KEY{{ "}" }}',  # ${POSIT_OPSGENIE_KEY} in the resulting configMap,
@@ -1984,7 +1984,21 @@ class AWSEKSCluster(pulumi.ComponentResource):
                                     ],
                                 }
                             ],
-                        }
+                        },
+                        "policies.yaml": {
+                            "apiVersion": 1,
+                            "policies": [
+                                {
+                                    "orgId": 1,
+                                    "receiver": "posit-opsgenie",
+                                    "group_by": ["alertname", "cluster"],
+                                    "matchers": ["opsgenie = 1"],
+                                    "group_wait": "30s",
+                                    "group_interval": "5m",
+                                    "repeat_interval": "4h",
+                                }
+                            ],
+                        },
                     },
                     "datasources": {
                         "datasources.yaml": {
