@@ -9,7 +9,6 @@ import ptd
 import ptd.azure_workload
 import ptd.pulumi_resources.custom_k8s_resources
 import ptd.pulumi_resources.helm_controller
-import ptd.pulumi_resources.traefik_forward_auth_azure as tfa
 from ptd.azure_roles import (
     ACR_PULL_ROLE_DEFINITION_ID,
     NETWORK_CONTRIBUTOR_ROLE_DEFINITION_ID,
@@ -35,7 +34,6 @@ class AzureWorkloadClusters(pulumi.ComponentResource):
     team_operators: dict[str, team_operator.TeamOperator]
     team_operator_identity: pulumi_az.managedidentity.UserAssignedIdentity
     traefiks: dict[str, azure_traefik.AzureTraefik]
-    traefik_forward_auths: dict[str, tfa.TraefikForwardAuthAzure]
     trident_operators: dict[str, trident_operator.TridentOperator]
     azure_files_csi_classes: dict[str, azure_files_csi.AzureFilesCSI]
 
@@ -84,7 +82,6 @@ class AzureWorkloadClusters(pulumi.ComponentResource):
         self._define_team_operator()
         # self._define_trident_operator()
         self._define_traefik()
-        self._define_traefik_forward_auths()
         self._define_bastion_access()
         self._define_coredns()
         self._define_helm_controllers()
@@ -137,18 +134,6 @@ class AzureWorkloadClusters(pulumi.ComponentResource):
                     providers=[self.kube_providers[release]],
                 ),
             )
-
-    def _define_traefik_forward_auths(self):
-        self.traefik_forward_auths = {}
-        for release in self.managed_clusters_by_release:
-            comps = self.workload.cfg.clusters[release].components
-            if comps is not None and comps.traefik_forward_auth_version is not None:
-                self.traefik_forward_auths[release] = tfa.TraefikForwardAuthAzure(
-                    workload=self.workload,
-                    release=release,
-                    chart_version=comps.traefik_forward_auth_version,
-                    opts=pulumi.ResourceOptions(parent=self, providers=[self.kube_providers[release]]),
-                )
 
     def _define_cert_manager(self):
         self.cert_managers = {}
