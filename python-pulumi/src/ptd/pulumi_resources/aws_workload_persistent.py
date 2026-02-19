@@ -866,10 +866,16 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
             )
 
         else:
+            # Sanitize daily_automatic_backup_start_time - AWS doesn't return this field
+            # properly on refresh, causing state corruption with empty strings.
+            daily_backup_time = self.workload.cfg.fsx_openzfs_daily_automatic_backup_start_time
+            if daily_backup_time is not None and len(daily_backup_time) != 5:
+                daily_backup_time = None
+
             self.fsx_openzfs_fs = aws.fsx.OpenZfsFileSystem(
                 self.workload.compound_name,
                 automatic_backup_retention_days=30,
-                daily_automatic_backup_start_time=self.workload.cfg.fsx_openzfs_daily_automatic_backup_start_time,
+                daily_automatic_backup_start_time=daily_backup_time,
                 preferred_subnet_id=(subnet_ids[0] if deployment_type.startswith("MULTI") else None),
                 subnet_ids=subnet_ids,
                 deployment_type=deployment_type,
