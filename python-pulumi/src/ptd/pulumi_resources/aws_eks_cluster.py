@@ -1971,10 +1971,10 @@ class AWSEKSCluster(pulumi.ComponentResource):
                             "contactPoints": [
                                 {
                                     "orgId": 1,
-                                    "name": "PositOpsGenie",
+                                    "name": "posit-opsgenie",
                                     "receivers": [
                                         {
-                                            "uid": "positOpsGenie",
+                                            "uid": "posit-opsgenie",
                                             "type": "opsgenie",
                                             "settings": {
                                                 "apiKey": '${{ "{" }}POSIT_OPSGENIE_KEY{{ "}" }}',  # ${POSIT_OPSGENIE_KEY} in the resulting configMap,
@@ -1990,7 +1990,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
                             "policies": [
                                 {
                                     "orgId": 1,
-                                    "receiver": "PositOpsGenie",
+                                    "receiver": "posit-opsgenie",
                                     "group_by": ["alertname", "cluster"],
                                     "matchers": ["opsgenie = 1"],
                                     "group_wait": "30s",
