@@ -526,6 +526,70 @@ avg by (pod) (time() - container_start_time_seconds{namespace="posit-team"})
 - OOMKilled restarts indicate insufficient memory limits
 - Short uptime combined with high restart count suggests crash loops
 
+## Configured Alerts
+
+PTD deploys a set of Grafana alerts to the control room for centralized monitoring of all workload clusters. Alert definitions are stored in `python-pulumi/src/ptd/grafana_alerts/`.
+
+All alerts are configured to send notifications to OpsGenie when triggered.
+
+### Application Alerts
+
+| Alert | Threshold | Duration | Description |
+|-------|-----------|----------|-------------|
+| **Loki WAL Disk Full Failures** | > 0 failures | 5m | Loki ingester has experienced WAL disk full failures, indicating storage issues with the Loki WAL directory |
+
+### CloudWatch Alerts (AWS)
+
+| Alert | Threshold | Duration | Description |
+|-------|-----------|----------|-------------|
+| **FSx Capacity** | > 80% used | 5m | FSx storage instance has less than 20% capacity remaining |
+| **EC2 Network Out High** | > 300 MiB/s | 5m | EC2 instance has sustained high network outbound traffic |
+| **EC2 Network Packets Out High** | > 400,000 packets/s | 5m | EC2 instance has unusually high packet transmission rate |
+
+### Health Check Alerts
+
+| Alert | Threshold | Duration | Description |
+|-------|-----------|----------|-------------|
+| **Healthchecks** | HTTP status != 200 | 5m | Health check for a PTD site component returned non-200 response |
+
+### Mimir Alerts
+
+| Alert | Threshold | Duration | Description |
+|-------|-----------|----------|-------------|
+| **Workload Metrics Silent** | No metrics received | 10m | No metrics received from workload cluster; may indicate Alloy not running, network issues, or cluster down |
+
+### Node Alerts
+
+| Alert | Threshold | Duration | Description |
+|-------|-----------|----------|-------------|
+| **Node Not Ready** | Ready condition = false | 15m | Kubernetes node has been in unready state |
+| **Node Memory Pressure** | MemoryPressure = true | 15m | Node is experiencing memory pressure |
+| **Node Disk Pressure** | DiskPressure = true | 15m | Node is experiencing disk pressure |
+
+### Pod Alerts
+
+| Alert | Threshold | Duration | Description |
+|-------|-----------|----------|-------------|
+| **CrashLoopBackOff** | Any container in CrashLoopBackOff | 5m | Container is repeatedly crashing and restarting |
+| **Pod Error** | Container terminated (reason != Completed) | 5m | Pod container terminated with an error (excludes user session pods) |
+| **Pod Not Healthy** | Phase = Pending/Unknown/Failed | 15m | Pod has been in non-running state (excludes user session pods) |
+| **Pod Restarts** | > 5 restarts in 15m | 15m | Pod has restarted excessively |
+| **Deployment Replicas Mismatch** | Desired != Available | 15m | Deployment does not have the expected number of available replicas |
+| **StatefulSet Replicas Mismatch** | Ready != Desired | 15m | StatefulSet does not have the expected number of ready replicas |
+
+### Adding or Modifying Alerts
+
+To add or modify alerts, edit the YAML files in `python-pulumi/src/ptd/grafana_alerts/`. Each file contains alerts grouped by category:
+
+- `applications.yaml` - Application-specific alerts (Loki, etc.)
+- `cloudwatch.yaml` - AWS CloudWatch metric alerts
+- `healthchecks.yaml` - HTTP health check alerts
+- `mimir.yaml` - Metrics pipeline alerts
+- `nodes.yaml` - Kubernetes node alerts
+- `pods.yaml` - Kubernetes pod and workload alerts
+
+To delete an alert, follow the instructions in the file header comments regarding the `deleteRules` syntax.
+
 ## Related Documentation
 
 - [Grafana Alloy Documentation](https://grafana.com/docs/alloy/latest/)
