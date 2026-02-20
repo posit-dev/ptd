@@ -93,9 +93,9 @@ check-session-manager-plugin:
       exit 1
   fi
 
-# install git hooks via pre-commit
+# install git hooks via pre-commit (fails silently in CI)
 install-git-hooks:
-  uvx pre-commit install
+  -uvx pre-commit install
 
 ############################################################################
 # Test targets
