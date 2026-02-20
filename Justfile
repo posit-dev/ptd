@@ -13,7 +13,7 @@ alias fmt := format
 
 # Build all
 [group('build')]
-build: build-cmd
+build: cli
 
 # Test all
 [group('test')]
@@ -60,7 +60,11 @@ aws-unset:
 ############################################################################
 alias link-bins := symlink-binaries
 
-deps: python-deps check-session-manager-plugin symlink-binaries install-thumbprint
+deps: python-deps check-session-manager-plugin symlink-binaries install-thumbprint install-pre-commit install-git-hooks
+
+# install pre-commit via uv
+install-pre-commit:
+  uv tool install pre-commit
 
 # install python dependencies (uv handles this automatically, but here if you need it)
 python-deps:
@@ -93,19 +97,9 @@ check-session-manager-plugin:
       exit 1
   fi
 
-# install git hooks
+# install git hooks via pre-commit
 install-git-hooks:
-  #!/usr/bin/env bash
-  hooks_dir="{{ justfile_directory() }}/.git/hooks"
-  if [ ! -d "$hooks_dir" ]; then
-    echo "Error: .git/hooks directory not found. Are you in a git repository?"
-    exit 1
-  fi
-
-  # Copy the post-checkout hook
-  cp "{{ justfile_directory() }}/scripts/post-checkout" "$hooks_dir/post-checkout"
-  chmod +x "$hooks_dir/post-checkout"
-  echo "Git hooks installed successfully!"
+  pre-commit install
 
 ############################################################################
 # Test targets
@@ -171,10 +165,8 @@ test-e2e URL="":
 # Build targets
 ############################################################################
 
-alias cli := build-cmd
-
 [group('build')]
-build-cmd:
+cli:
   mkdir -p .local/bin
   goreleaser build --single-target --snapshot --clean -o .local/bin/ptd
 

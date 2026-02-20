@@ -9,7 +9,58 @@ Below are some helpful directions on getting your environment set up as well as 
 - [uv](https://github.com/astral-sh/uv) (Python package manager)
 - [Pulumi](https://www.pulumi.com/docs/get-started/install/)
 - [just](https://github.com/casey/just) (command runner)
+- AWS CLI or Azure CLI (depending on your cloud provider)
 - `snyk` CLI (optional, for security scanning)
+
+## Getting Started
+
+```bash
+# Clone the repository
+git clone https://github.com/posit-dev/ptd.git
+cd ptd
+
+# Install dependencies and set up git hooks
+just deps
+
+# Build the CLI
+just cli
+
+# The CLI is now available at .local/bin/ptd
+```
+
+## Development
+
+```bash
+# Run all tests
+just test
+
+# Run specific test suites
+just test-cmd            # CLI tests
+just test-lib            # Library tests
+just test-python-pulumi  # Python tests
+
+# Format code
+just format
+
+# Lint code
+just check
+```
+
+## Git Hooks
+
+Pre-commit hooks run automatically when you commit. They will:
+- Format and lint your code
+- Run tests for the files you changed (e.g., Python tests only if you changed Python files)
+
+If a hook fails, the commit is blocked. Fix the issue, stage the fix, and commit again.
+
+```bash
+# Run hooks manually on all files
+pre-commit run --all-files
+
+# Skip hooks temporarily (use sparingly)
+git commit --no-verify -m "wip: broken but need to save"
+```
 
 ## Commit Message Format
 
