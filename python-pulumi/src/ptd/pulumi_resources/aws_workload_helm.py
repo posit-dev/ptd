@@ -835,7 +835,7 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
             "alb.ingress.kubernetes.io/ssl-policy": "ELBSecurityPolicy-FS-1-2-2019-08",
             "alb.ingress.kubernetes.io/healthcheck-path": "/ping",
             "alb.ingress.kubernetes.io/healthcheck-port": "32090",
-            "alb.ingress.kubernetes.io/load-balancer-attributes": "routing.http.drop_invalid_header_fields.enabled=true",
+            "alb.ingress.kubernetes.io/load-balancer-attributes": "routing.http.drop_invalid_header_fields.enabled=true,idle_timeout.timeout_seconds=300",
         }
 
         if self.workload.cfg.provisioned_vpc:
