@@ -60,11 +60,7 @@ aws-unset:
 ############################################################################
 alias link-bins := symlink-binaries
 
-deps: python-deps check-session-manager-plugin symlink-binaries install-thumbprint install-pre-commit install-git-hooks
-
-# install pre-commit via uv
-install-pre-commit:
-  uv tool install pre-commit
+deps: python-deps check-session-manager-plugin symlink-binaries install-thumbprint install-git-hooks
 
 # install python dependencies (uv handles this automatically, but here if you need it)
 python-deps:
@@ -99,7 +95,7 @@ check-session-manager-plugin:
 
 # install git hooks via pre-commit
 install-git-hooks:
-  pre-commit install
+  uvx pre-commit install
 
 ############################################################################
 # Test targets
