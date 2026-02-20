@@ -74,6 +74,8 @@ func (a Action) RequiresRequestTagKeys() bool {
 		"secretsmanager:TagResource",
 		"secretsmanager:UntagResource",
 		"secretsmanager:CreateSecret",
+		"events:PutRule",
+		"sqs:CreateQueue",
 	}
 
 	return slices.Contains(actions, a.Action)
@@ -1112,8 +1114,10 @@ func IamStatements() []PolicyStatement {
 // SqsActions returns SQS-related actions
 func SqsActions() []Action {
 	return []Action{
-		{"sqs:*Queue*", false, false},
-		{"sqs:*Message*", true, false},
+		{"sqs:ListQueues", false, false},
+		{"sqs:*Queue*", true, true},
+		{"sqs:CreateQueue", true, true},
+		{"sqs:*Message*", true, true},
 	}
 }
 
@@ -1121,10 +1125,11 @@ func SqsActions() []Action {
 func EventsActions() []Action {
 	return []Action{
 		{"events:ListRules", false, false},
-		{"events:ListTagsForResource", true, false},
-		{"events:*Rule", true, false},
-		{"events:*Targets", true, false},
+		{"events:ListTagsForResource", true, true},
+		{"events:*Rule", true, true},
+		{"events:*Targets", true, true},
 		{"events:*tag*", true, true},
+		{"events:PutRule", true, true},
 	}
 }
 

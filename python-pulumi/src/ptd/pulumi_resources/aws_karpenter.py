@@ -253,6 +253,7 @@ class AWSKarpenter(pulumi.ComponentResource):
         scheduled_change_rule = aws.cloudwatch.EventRule(
             f"{cluster_name}-scheduled-change-rule",
             event_pattern=pulumi.Output.json_dumps({"source": ["aws.health"], "detail-type": ["AWS Health Event"]}),
+            tags=self.required_tags,
             opts=pulumi.ResourceOptions(parent=self),
         )
 
@@ -270,6 +271,7 @@ class AWSKarpenter(pulumi.ComponentResource):
             event_pattern=pulumi.Output.json_dumps(
                 {"source": ["aws.ec2"], "detail-type": ["EC2 Spot Instance Interruption Warning"]}
             ),
+            tags=self.required_tags,
             opts=pulumi.ResourceOptions(parent=self),
         )
 
@@ -287,6 +289,7 @@ class AWSKarpenter(pulumi.ComponentResource):
             event_pattern=pulumi.Output.json_dumps(
                 {"source": ["aws.ec2"], "detail-type": ["EC2 Instance Rebalance Recommendation"]}
             ),
+            tags=self.required_tags,
             opts=pulumi.ResourceOptions(parent=self),
         )
 
@@ -304,6 +307,7 @@ class AWSKarpenter(pulumi.ComponentResource):
             event_pattern=pulumi.Output.json_dumps(
                 {"source": ["aws.ec2"], "detail-type": ["EC2 Instance State-change Notification"]}
             ),
+            tags=self.required_tags,
             opts=pulumi.ResourceOptions(parent=self),
         )
 
