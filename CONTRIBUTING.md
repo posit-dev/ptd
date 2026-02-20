@@ -12,40 +12,6 @@ Below are some helpful directions on getting your environment set up as well as 
 - AWS CLI or Azure CLI (depending on your cloud provider)
 - `snyk` CLI (optional, for security scanning)
 
-## Getting Started
-
-```bash
-# Clone the repository
-git clone https://github.com/posit-dev/ptd.git
-cd ptd
-
-# Install dependencies and set up git hooks
-just deps
-
-# Build the CLI
-just cli
-
-# The CLI is now available at .local/bin/ptd
-```
-
-## Development
-
-```bash
-# Run all tests
-just test
-
-# Run specific test suites
-just test-cmd            # CLI tests
-just test-lib            # Library tests
-just test-python-pulumi  # Python tests
-
-# Format code
-just format
-
-# Lint code
-just check
-```
-
 ## Git Hooks
 
 Pre-commit hooks run automatically when you commit. They will:
@@ -58,8 +24,12 @@ If a hook fails, the commit is blocked. Fix the issue, stage the fix, and commit
 # Run hooks manually on all files
 pre-commit run --all-files
 
-# Skip hooks temporarily (use sparingly)
-git commit --no-verify -m "wip: broken but need to save"
+# Skip all hooks
+git commit --no-verify -m "message"
+
+# Skip specific hooks only
+SKIP=test-python-pulumi git commit -m "message"
+SKIP=test-python-pulumi,test-cmd git commit -m "message"
 ```
 
 ## Commit Message Format
