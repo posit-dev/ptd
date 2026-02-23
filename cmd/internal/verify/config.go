@@ -95,7 +95,8 @@ func GenerateConfig(site *SiteCR, targetName string) (string, error) {
 		},
 	}
 
-	// Determine auth provider
+	// Determine auth provider. PackageManager is intentionally excluded: it does not
+	// support authentication types that VIP tests against, so its auth spec is not consulted.
 	authProvider := "oidc" // default
 	if site.Spec.Connect != nil && site.Spec.Connect.Auth != nil && site.Spec.Connect.Auth.Type != "" {
 		authProvider = site.Spec.Connect.Auth.Type

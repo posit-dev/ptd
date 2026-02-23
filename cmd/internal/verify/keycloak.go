@@ -162,6 +162,10 @@ func getKeycloakAdminToken(ctx context.Context, keycloakURL, username, password 
 		return "", err
 	}
 
+	if result.AccessToken == "" {
+		return "", fmt.Errorf("access_token missing from token response")
+	}
+
 	return result.AccessToken, nil
 }
 
