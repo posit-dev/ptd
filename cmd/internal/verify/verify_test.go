@@ -1,9 +1,70 @@
 package verify
 
 import (
+	"context"
+	"encoding/base64"
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestParseSecretData_InvalidFormat(t *testing.T) {
+	cases := []struct {
+		name   string
+		output string
+	}{
+		{"empty", ""},
+		{"whitespace only", "   "},
+		{"single field", "dGVzdA=="},
+		{"three fields", "dGVzdA== dGVzdA== dGVzdA=="},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := parseSecretData(tc.output)
+			if err == nil {
+				t.Fatalf("expected error for input %q, got nil", tc.output)
+			}
+		})
+	}
+}
+
+func TestParseSecretData_InvalidBase64(t *testing.T) {
+	_, _, err := parseSecretData("not-valid-base64!!! dGVzdA==")
+	if err == nil {
+		t.Fatal("expected error for invalid base64 in username field, got nil")
+	}
+
+	_, _, err = parseSecretData("dGVzdA== not-valid-base64!!!")
+	if err == nil {
+		t.Fatal("expected error for invalid base64 in password field, got nil")
+	}
+}
+
+func TestParseSecretData_Valid(t *testing.T) {
+	user := base64.StdEncoding.EncodeToString([]byte("admin"))
+	pass := base64.StdEncoding.EncodeToString([]byte("s3cr3t"))
+
+	gotUser, gotPass, err := parseSecretData(user + " " + pass)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotUser != "admin" {
+		t.Errorf("got username %q, want %q", gotUser, "admin")
+	}
+	if gotPass != "s3cr3t" {
+		t.Errorf("got password %q, want %q", gotPass, "s3cr3t")
+	}
+}
+
+func TestWaitForJob_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately so ctx.Done() fires on first select
+
+	_, err := WaitForJob(ctx, nil, "test-job", "test-namespace", time.Minute)
+	if err == nil {
+		t.Fatal("expected error for cancelled context, got nil")
+	}
+}
 
 func TestGenerateConfig_NilSite(t *testing.T) {
 	_, err := GenerateConfig(nil, "test")

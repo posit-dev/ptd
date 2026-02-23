@@ -13,11 +13,12 @@ import (
 
 // JobOptions contains options for creating a VIP verification Job
 type JobOptions struct {
-	Image      string
-	Categories string
-	JobName    string
-	ConfigName string
-	Namespace  string
+	Image                string
+	Categories           string
+	JobName              string
+	ConfigName           string
+	Namespace            string
+	CredentialsAvailable bool // whether vip-test-credentials Secret exists
 }
 
 // CreateConfigMap creates a Kubernetes ConfigMap with the vip.toml configuration
@@ -74,6 +75,41 @@ func CreateJob(ctx context.Context, env []string, opts JobOptions) error {
 	activeDeadlineSeconds := int64(600)
 	backoffLimit := int32(0)
 
+	container := map[string]interface{}{
+		"name":  "vip",
+		"image": opts.Image,
+		"args":  args,
+		"volumeMounts": []map[string]interface{}{
+			{
+				"name":      "config",
+				"mountPath": "/app/vip.toml",
+				"subPath":   "vip.toml",
+			},
+		},
+	}
+	if opts.CredentialsAvailable {
+		container["env"] = []map[string]interface{}{
+			{
+				"name": "VIP_TEST_USERNAME",
+				"valueFrom": map[string]interface{}{
+					"secretKeyRef": map[string]string{
+						"name": "vip-test-credentials",
+						"key":  "username",
+					},
+				},
+			},
+			{
+				"name": "VIP_TEST_PASSWORD",
+				"valueFrom": map[string]interface{}{
+					"secretKeyRef": map[string]string{
+						"name": "vip-test-credentials",
+						"key":  "password",
+					},
+				},
+			},
+		}
+	}
+
 	job := map[string]interface{}{
 		"apiVersion": "batch/v1",
 		"kind":       "Job",
@@ -91,40 +127,7 @@ func CreateJob(ctx context.Context, env []string, opts JobOptions) error {
 			"template": map[string]interface{}{
 				"spec": map[string]interface{}{
 					"restartPolicy": "Never",
-					"containers": []map[string]interface{}{
-						{
-							"name":  "vip",
-							"image": opts.Image,
-							"args":  args,
-							"volumeMounts": []map[string]interface{}{
-								{
-									"name":      "config",
-									"mountPath": "/app/vip.toml",
-									"subPath":   "vip.toml",
-								},
-							},
-							"env": []map[string]interface{}{
-								{
-									"name": "VIP_TEST_USERNAME",
-									"valueFrom": map[string]interface{}{
-										"secretKeyRef": map[string]string{
-											"name": "vip-test-credentials",
-											"key":  "username",
-										},
-									},
-								},
-								{
-									"name": "VIP_TEST_PASSWORD",
-									"valueFrom": map[string]interface{}{
-										"secretKeyRef": map[string]string{
-											"name": "vip-test-credentials",
-											"key":  "password",
-										},
-									},
-								},
-							},
-						},
-					},
+					"containers":    []map[string]interface{}{container},
 					"volumes": []map[string]interface{}{
 						{
 							"name": "config",
@@ -171,8 +174,14 @@ func StreamLogs(ctx context.Context, env []string, jobName string, namespace str
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
 			// kubectl logs -f exits with code 1 when the pod has already completed,
-			// but also for network errors and other failures. Log a warning so the
-			// operator knows logs may be incomplete, then continue to WaitForJob.
+			// but also for network errors, RBAC failures, and pod eviction.
+			// Check the pod phase to distinguish normal completion from unexpected errors.
+			phase, phaseErr := getPodPhase(env, podName, namespace)
+			if phaseErr == nil && (phase == "Succeeded" || phase == "Failed") {
+				// Pod completed normally; log stream ended because the pod is done.
+				return nil
+			}
+			// Phase unknown or check failed; warn but continue to WaitForJob.
 			slog.Warn("kubectl logs exited with code 1; log output may be incomplete", "pod", podName)
 			return nil
 		}
@@ -180,6 +189,23 @@ func StreamLogs(ctx context.Context, env []string, jobName string, namespace str
 	}
 
 	return nil
+}
+
+// getPodPhase returns the phase of a pod (e.g. "Running", "Succeeded", "Failed").
+func getPodPhase(env []string, podName, namespace string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "kubectl", "get", "pod", podName,
+		"-n", namespace,
+		"-o", "jsonpath={.status.phase}")
+	cmd.Env = env
+
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
 }
 
 // waitForPod waits for a pod associated with the job to be created
