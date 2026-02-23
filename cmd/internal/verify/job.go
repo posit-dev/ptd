@@ -261,6 +261,7 @@ func WaitForJob(ctx context.Context, env []string, jobName string, namespace str
 
 			output, err := cmd.Output()
 			if err != nil {
+				slog.Warn("kubectl get job failed, retrying", "error", err)
 				continue
 			}
 

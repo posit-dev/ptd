@@ -28,7 +28,13 @@ func EnsureTestUser(ctx context.Context, env []string, keycloakURL string, realm
 	checkCmd.Env = env
 
 	output, err := checkCmd.Output()
-	if err == nil && strings.TrimSpace(string(output)) == "vip-test-credentials" {
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return fmt.Errorf("failed to check for existing credentials secret: %s", string(exitErr.Stderr))
+		}
+		return fmt.Errorf("failed to check for existing credentials secret: %w", err)
+	}
+	if strings.TrimSpace(string(output)) == "vip-test-credentials" {
 		slog.Info("Test user credentials secret already exists, skipping creation")
 		return nil
 	}
@@ -199,7 +205,10 @@ func createKeycloakUser(ctx context.Context, keycloakURL, realm, token, username
 		var users []map[string]interface{}
 		if err := json.Unmarshal(body, &users); err == nil && len(users) > 0 {
 			slog.Info("User already exists in Keycloak, resetting password", "username", username)
-			userID, _ := users[0]["id"].(string)
+			userID, ok := users[0]["id"].(string)
+			if !ok || userID == "" {
+				return fmt.Errorf("could not extract user ID from Keycloak search response")
+			}
 			return resetKeycloakUserPassword(ctx, keycloakURL, realm, token, userID, password, client)
 		}
 	}
