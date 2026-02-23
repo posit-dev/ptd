@@ -209,6 +209,7 @@ func createKeycloakUser(ctx context.Context, keycloakURL, realm, token, username
 			return resetKeycloakUserPassword(ctx, keycloakURL, realm, token, userID, password, client)
 		}
 	} else {
+		slog.Warn("user search failed, attempting create", "status", searchResp.StatusCode)
 		io.Copy(io.Discard, searchResp.Body)
 		searchResp.Body.Close()
 	}
@@ -287,14 +288,13 @@ func resetKeycloakUserPassword(ctx context.Context, keycloakURL, realm, token, u
 	return nil
 }
 
-// createCredentialsSecret creates a K8s secret with test user credentials.
-// Uses JSON marshalling to prevent injection, consistent with job.go.
-func createCredentialsSecret(ctx context.Context, env []string, username, password string, namespace string) error {
-	secret := map[string]interface{}{
+// buildSecretSpec constructs a Kubernetes Secret spec as a map ready for JSON marshalling.
+func buildSecretSpec(name, namespace, username, password string) map[string]interface{} {
+	return map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "Secret",
 		"metadata": map[string]string{
-			"name":      "vip-test-credentials",
+			"name":      name,
 			"namespace": namespace,
 		},
 		"type": "Opaque",
@@ -303,6 +303,12 @@ func createCredentialsSecret(ctx context.Context, env []string, username, passwo
 			"password": base64.StdEncoding.EncodeToString([]byte(password)),
 		},
 	}
+}
+
+// createCredentialsSecret creates a K8s secret with test user credentials.
+// Uses JSON marshalling to prevent injection, consistent with job.go.
+func createCredentialsSecret(ctx context.Context, env []string, username, password string, namespace string) error {
+	secret := buildSecretSpec("vip-test-credentials", namespace, username, password)
 
 	secretJSON, err := json.Marshal(secret)
 	if err != nil {

@@ -65,9 +65,8 @@ func CreateConfigMap(ctx context.Context, env []string, configName string, confi
 	return nil
 }
 
-// CreateJob creates a Kubernetes Job for running VIP tests.
-// Uses JSON serialization to prevent YAML injection via user-controlled fields.
-func CreateJob(ctx context.Context, env []string, opts JobOptions) error {
+// buildJobSpec constructs the Kubernetes Job spec as a map ready for JSON marshalling.
+func buildJobSpec(opts JobOptions) map[string]interface{} {
 	args := []string{"--tb=short", "-v"}
 	if opts.Categories != "" {
 		args = append(args, "-m", opts.Categories)
@@ -111,7 +110,7 @@ func CreateJob(ctx context.Context, env []string, opts JobOptions) error {
 		}
 	}
 
-	job := map[string]interface{}{
+	return map[string]interface{}{
 		"apiVersion": "batch/v1",
 		"kind":       "Job",
 		"metadata": map[string]interface{}{
@@ -141,6 +140,12 @@ func CreateJob(ctx context.Context, env []string, opts JobOptions) error {
 			},
 		},
 	}
+}
+
+// CreateJob creates a Kubernetes Job for running VIP tests.
+// Uses JSON serialization to prevent YAML injection via user-controlled fields.
+func CreateJob(ctx context.Context, env []string, opts JobOptions) error {
+	job := buildJobSpec(opts)
 
 	jobJSON, err := json.Marshal(job)
 	if err != nil {
@@ -227,15 +232,21 @@ func waitForPod(ctx context.Context, env []string, jobName string, timeout time.
 		case <-ticker.C:
 			// batch.kubernetes.io/job-name was introduced in Kubernetes 1.27.
 			// Clusters older than 1.27 use the legacy "job-name" label instead.
-			cmd := exec.CommandContext(ctx, "kubectl", "get", "pods",
-				"-n", namespace,
-				"-l", "batch.kubernetes.io/job-name="+jobName,
-				"-o", "jsonpath={.items[0].metadata.name}")
-			cmd.Env = env
+			// Try the modern label first, then fall back to the legacy label.
+			for _, label := range []string{
+				"batch.kubernetes.io/job-name=" + jobName,
+				"job-name=" + jobName,
+			} {
+				cmd := exec.CommandContext(ctx, "kubectl", "get", "pods",
+					"-n", namespace,
+					"-l", label,
+					"-o", "jsonpath={.items[0].metadata.name}")
+				cmd.Env = env
 
-			output, err := cmd.Output()
-			if err == nil && len(output) > 0 {
-				return string(output), nil
+				output, err := cmd.Output()
+				if err == nil && len(output) > 0 {
+					return string(output), nil
+				}
 			}
 		}
 	}
