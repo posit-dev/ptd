@@ -61,61 +61,89 @@ func CreateConfigMap(ctx context.Context, env []string, configName string, confi
 	return nil
 }
 
-// CreateJob creates a Kubernetes Job for running VIP tests
+// CreateJob creates a Kubernetes Job for running VIP tests.
+// Uses JSON serialization to prevent YAML injection via user-controlled fields.
 func CreateJob(ctx context.Context, env []string, opts JobOptions) error {
-	// Build args as a proper slice and marshal to JSON to prevent injection
-	argsSlice := []string{"--tb=short", "-v"}
+	args := []string{"--tb=short", "-v"}
 	if opts.Categories != "" {
-		argsSlice = append(argsSlice, "-m", opts.Categories)
+		args = append(args, "-m", opts.Categories)
 	}
-	argsJSON, err := json.Marshal(argsSlice)
-	if err != nil {
-		return fmt.Errorf("failed to marshal job args: %w", err)
-	}
-	args := string(argsJSON)
 
-	jobYAML := fmt.Sprintf(`apiVersion: batch/v1
-kind: Job
-metadata:
-  name: %s
-  namespace: posit-team
-  labels:
-    app.kubernetes.io/name: vip-verify
-    app.kubernetes.io/managed-by: ptd
-spec:
-  backoffLimit: 0
-  activeDeadlineSeconds: 600
-  template:
-    spec:
-      restartPolicy: Never
-      containers:
-      - name: vip
-        image: %s
-        args: %s
-        volumeMounts:
-        - name: config
-          mountPath: /app/vip.toml
-          subPath: vip.toml
-        env:
-        - name: VIP_TEST_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: vip-test-credentials
-              key: username
-        - name: VIP_TEST_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: vip-test-credentials
-              key: password
-      volumes:
-      - name: config
-        configMap:
-          name: %s
-`, opts.JobName, opts.Image, args, opts.ConfigName)
+	activeDeadlineSeconds := int64(600)
+	backoffLimit := int32(0)
+
+	job := map[string]interface{}{
+		"apiVersion": "batch/v1",
+		"kind":       "Job",
+		"metadata": map[string]interface{}{
+			"name":      opts.JobName,
+			"namespace": "posit-team",
+			"labels": map[string]string{
+				"app.kubernetes.io/name":       "vip-verify",
+				"app.kubernetes.io/managed-by": "ptd",
+			},
+		},
+		"spec": map[string]interface{}{
+			"backoffLimit":          backoffLimit,
+			"activeDeadlineSeconds": activeDeadlineSeconds,
+			"template": map[string]interface{}{
+				"spec": map[string]interface{}{
+					"restartPolicy": "Never",
+					"containers": []map[string]interface{}{
+						{
+							"name":  "vip",
+							"image": opts.Image,
+							"args":  args,
+							"volumeMounts": []map[string]interface{}{
+								{
+									"name":      "config",
+									"mountPath": "/app/vip.toml",
+									"subPath":   "vip.toml",
+								},
+							},
+							"env": []map[string]interface{}{
+								{
+									"name": "VIP_TEST_USERNAME",
+									"valueFrom": map[string]interface{}{
+										"secretKeyRef": map[string]string{
+											"name": "vip-test-credentials",
+											"key":  "username",
+										},
+									},
+								},
+								{
+									"name": "VIP_TEST_PASSWORD",
+									"valueFrom": map[string]interface{}{
+										"secretKeyRef": map[string]string{
+											"name": "vip-test-credentials",
+											"key":  "password",
+										},
+									},
+								},
+							},
+						},
+					},
+					"volumes": []map[string]interface{}{
+						{
+							"name": "config",
+							"configMap": map[string]string{
+								"name": opts.ConfigName,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	jobJSON, err := json.Marshal(job)
+	if err != nil {
+		return fmt.Errorf("failed to marshal job spec: %w", err)
+	}
 
 	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-", "-n", "posit-team")
 	cmd.Env = env
-	cmd.Stdin = strings.NewReader(jobYAML)
+	cmd.Stdin = strings.NewReader(string(jobJSON))
 
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("kubectl apply job failed: %s", string(output))
