@@ -264,7 +264,7 @@ class AlloyConfig(pulumi.ComponentResource):
 
                         metric {{
                             name       = "DatabaseConnections"
-                            statistics = ["Sum"]
+                            statistics = ["Average"]
                             period     = "5m"
                         }}
 
@@ -286,12 +286,14 @@ class AlloyConfig(pulumi.ComponentResource):
                             period     = "5m"
                         }}
 
+                        # Collected for dashboard visibility; no alert rules defined
                         metric {{
                             name       = "WriteLatency"
                             statistics = ["Average"]
                             period     = "5m"
                         }}
 
+                        # Collected for dashboard visibility; no alert rules defined
                         metric {{
                             name       = "Deadlocks"
                             statistics = ["Sum"]
@@ -324,6 +326,8 @@ class AlloyConfig(pulumi.ComponentResource):
                         type    = "AWS/NATGateway"
                         regions = ["{self.region}"]
 
+                        # NAT Gateways inherit VPC tags including posit.team/true-name
+                        # (see python-pulumi/src/ptd/pulumi_resources/aws_vpc.py:607-616)
                         search_tags = {{
                             "posit.team/true-name" = "{self.workload.cfg.true_name}",
                         }}

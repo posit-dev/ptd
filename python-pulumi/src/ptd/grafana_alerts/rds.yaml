@@ -46,7 +46,7 @@ groups:
                         type: and
                       query:
                         params:
-                            - C
+                            - A
                       reducer:
                         params: []
                         type: last
@@ -101,7 +101,7 @@ groups:
                         type: and
                       query:
                         params:
-                            - C
+                            - A
                       reducer:
                         params: []
                         type: last
@@ -156,7 +156,7 @@ groups:
                         type: and
                       query:
                         params:
-                            - C
+                            - A
                       reducer:
                         params: []
                         type: last
@@ -211,7 +211,7 @@ groups:
                         type: and
                       query:
                         params:
-                            - C
+                            - A
                       reducer:
                         params: []
                         type: last
@@ -244,7 +244,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: aws_rds_database_connections_sum{job="integrations/cloudwatch"}
+                expr: aws_rds_database_connections_average{job="integrations/cloudwatch"}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -266,7 +266,7 @@ groups:
                         type: and
                       query:
                         params:
-                            - C
+                            - A
                       reducer:
                         params: []
                         type: last
