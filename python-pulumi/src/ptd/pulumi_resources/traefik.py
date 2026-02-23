@@ -9,6 +9,22 @@ import ptd.pulumi_resources.aws_eks_cluster
 import ptd.pulumi_resources.aws_vpc
 
 
+def _format_nlb_tags(tags: dict[str, str]) -> str:
+    """Format tags as comma-separated key=value pairs for NLB annotations.
+
+    Validates that tag keys and values do not contain commas or equals signs,
+    which would break the annotation format.
+    """
+    for key, value in tags.items():
+        if "," in key or "=" in key:
+            msg = f"NLB tag key contains invalid characters (comma or equals): {key}"
+            raise ValueError(msg)
+        if "," in value or "=" in value:
+            msg = f"NLB tag value contains invalid characters (comma or equals): {key}={value}"
+            raise ValueError(msg)
+    return ",".join(f"{k}={v}" for k, v in tags.items())
+
+
 class Traefik(pulumi.ComponentResource):
     def __init__(
         self,
@@ -121,14 +137,14 @@ class Traefik(pulumi.ComponentResource):
         """
 
         # Build tag string from cluster tags for NLB annotation
-        # Extract posit.team/true-name and posit.team/environment if present
-        tag_parts = []
-        if "posit.team/true-name" in self.cluster.tags:
-            tag_parts.append(f"posit.team/true-name={self.cluster.tags['posit.team/true-name']}")
-        if "posit.team/environment" in self.cluster.tags:
-            tag_parts.append(f"posit.team/environment={self.cluster.tags['posit.team/environment']}")
-        tag_parts.append(f"Name={self.cluster.name}")
-        nlb_tags = ",".join(tag_parts)
+        # Always include posit.team/true-name and posit.team/environment unconditionally
+        # (mirroring ALB path in aws_workload_helm.py which uses workload.cfg.true_name)
+        tags = {
+            "posit.team/true-name": self.cluster.tags["posit.team/true-name"],
+            "posit.team/environment": self.cluster.tags["posit.team/environment"],
+            "Name": self.cluster.name,
+        }
+        nlb_tags = _format_nlb_tags(tags)
 
         self.traefik = k8s.helm.v3.Release(
             f"{self.cluster.name}-traefik",
