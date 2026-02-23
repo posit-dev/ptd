@@ -349,6 +349,9 @@ class AlloyConfig(pulumi.ComponentResource):
                         type    = "AWS/ApplicationELB"
                         regions = ["{self.region}"]
 
+                        # ALBs are tagged at creation time via aws_workload_helm.py.
+                        # LBs provisioned before this tag was added won't be discovered
+                        # until the cluster is redeployed.
                         search_tags = {{
                             "posit.team/true-name" = "{self.workload.cfg.true_name}",
                         }}
@@ -376,6 +379,9 @@ class AlloyConfig(pulumi.ComponentResource):
                         type    = "AWS/NetworkELB"
                         regions = ["{self.region}"]
 
+                        # NLBs are tagged at creation time via traefik.py.
+                        # LBs provisioned before this tag was added won't be discovered
+                        # until the cluster is redeployed.
                         search_tags = {{
                             "posit.team/true-name" = "{self.workload.cfg.true_name}",
                         }}
