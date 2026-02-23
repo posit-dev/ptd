@@ -123,9 +123,9 @@ groups:
                 type: threshold
           noDataState: NoData
           execErrState: Error
-          for: 5m
+          for: 10m
           annotations:
-            description: Application Load Balancer has unhealthy targets for over 5 minutes, indicating backend service health issues.
+            description: Application Load Balancer has unhealthy targets for over 10 minutes, indicating backend service health issues. The extended window reduces false positives during rolling deployments.
             summary: Unhealthy targets on ALB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
@@ -178,9 +178,9 @@ groups:
                 type: threshold
           noDataState: NoData
           execErrState: Error
-          for: 5m
+          for: 10m
           annotations:
-            description: Network Load Balancer has unhealthy targets for over 5 minutes, indicating backend service health issues.
+            description: Network Load Balancer has unhealthy targets for over 10 minutes, indicating backend service health issues. The extended window reduces false positives during rolling deployments and node drains.
             summary: Unhealthy targets on NLB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"

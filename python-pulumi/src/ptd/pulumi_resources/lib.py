@@ -23,7 +23,7 @@ def format_lb_tags(tags: dict[str, str]) -> str:
         if "," in key or "=" in key:
             msg = f"LB tag key contains invalid characters (comma or equals): {key}"
             raise ValueError(msg)
-        if any(c in key for c in (" ", "\t", "\n")):
+        if any(c in key for c in (" ", "\t", "\n", "\r")):
             msg = f"LB tag key contains invalid whitespace character: {key!r}"
             raise ValueError(msg)
         if not value:
@@ -35,7 +35,7 @@ def format_lb_tags(tags: dict[str, str]) -> str:
         if "," in value or "=" in value:
             msg = f"LB tag value contains invalid characters (comma or equals): {key}={value}"
             raise ValueError(msg)
-        if any(c in value for c in (" ", "\t", "\n")):
+        if any(c in value for c in (" ", "\t", "\n", "\r")):
             msg = f"LB tag value contains invalid whitespace character: {key}={value!r}"
             raise ValueError(msg)
     return ",".join(f"{k}={v}" for k, v in tags.items())

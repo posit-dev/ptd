@@ -52,3 +52,23 @@ def test_build_nlb_tag_string_empty_cluster_name() -> None:
             tags={"posit.team/true-name": "myapp", "posit.team/environment": "production"},
             cluster_name="",
         )
+
+
+def test_build_nlb_tag_string_extra_tags_are_dropped() -> None:
+    """Extra tags in the input dict (e.g. aws:created-by, Cost-Center) are intentionally
+    discarded; only true-name, environment, and Name should appear in the output."""
+    result = _build_nlb_tag_string(
+        tags={
+            "posit.team/true-name": "myapp",
+            "posit.team/environment": "production",
+            "aws:created-by": "someone",
+            "Cost-Center": "123",
+        },
+        cluster_name="myapp-cluster",
+    )
+    parsed = dict(pair.split("=", 1) for pair in result.split(","))
+    assert parsed == {
+        "posit.team/true-name": "myapp",
+        "posit.team/environment": "production",
+        "Name": "myapp-cluster",
+    }
