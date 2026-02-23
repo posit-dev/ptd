@@ -224,7 +224,7 @@ func WaitForJob(ctx context.Context, env []string, jobName string) (bool, error)
 		case <-ticker.C:
 			cmd := exec.CommandContext(ctx, "kubectl", "get", "job", jobName,
 				"-n", namespace,
-				"-o", "jsonpath={.status.conditions[?(@.type==\"Complete\")].status} {.status.conditions[?(@.type==\"Failed\")].status}")
+				"-o", "jsonpath={.status.conditions[?(@.type==\"Complete\")].status},{.status.conditions[?(@.type==\"Failed\")].status}")
 			cmd.Env = env
 
 			output, err := cmd.Output()
@@ -240,10 +240,11 @@ func WaitForJob(ctx context.Context, env []string, jobName string) (bool, error)
 }
 
 // parseJobStatus parses kubectl jsonpath output for job Complete/Failed conditions.
-// The output format is "{Complete.status} {Failed.status}" where each is "True", "False", or empty.
+// The output format is "{Complete.status},{Failed.status}" where each is "True", "False", or empty.
+// Using a comma separator prevents ambiguity when one condition is absent (outputs as empty string).
 // Returns (done, success): done=true means the job has finished.
 func parseJobStatus(output string) (done bool, success bool) {
-	parts := strings.Fields(strings.TrimSpace(output))
+	parts := strings.SplitN(strings.TrimSpace(output), ",", 2)
 	if len(parts) >= 1 && parts[0] == "True" {
 		return true, true
 	}

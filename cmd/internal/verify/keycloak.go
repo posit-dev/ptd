@@ -161,7 +161,7 @@ func getKeycloakAdminToken(ctx context.Context, keycloakURL, username, password 
 // always matches the actual Keycloak credentials.
 func createKeycloakUser(ctx context.Context, keycloakURL, realm, token, username, password string) error {
 	client := &http.Client{Timeout: keycloakHTTPTimeout}
-	usersURL := fmt.Sprintf("%s/admin/realms/%s/users", keycloakURL, realm)
+	usersURL := fmt.Sprintf("%s/admin/realms/%s/users", keycloakURL, url.PathEscape(realm))
 
 	// Check if user already exists; use url.Values to safely encode the username.
 	params := url.Values{"username": {username}, "exact": {"true"}}
@@ -230,7 +230,7 @@ func createKeycloakUser(ctx context.Context, keycloakURL, realm, token, username
 
 // resetKeycloakUserPassword sets a user's password via the Keycloak admin API.
 func resetKeycloakUserPassword(ctx context.Context, keycloakURL, realm, token, userID, password string, client *http.Client) error {
-	resetURL := fmt.Sprintf("%s/admin/realms/%s/users/%s/reset-password", keycloakURL, realm, userID)
+	resetURL := fmt.Sprintf("%s/admin/realms/%s/users/%s/reset-password", keycloakURL, url.PathEscape(realm), url.PathEscape(userID))
 	payload := map[string]interface{}{
 		"type":      "password",
 		"value":     password,

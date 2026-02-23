@@ -5,6 +5,13 @@ import (
 	"testing"
 )
 
+func TestGenerateConfig_NilSite(t *testing.T) {
+	_, err := GenerateConfig(nil, "test")
+	if err == nil {
+		t.Fatal("expected error for nil site, got nil")
+	}
+}
+
 func TestGenerateConfig_ConnectOnly(t *testing.T) {
 	site := &SiteCR{
 		Spec: SiteSpec{
@@ -197,19 +204,25 @@ func TestParseJobStatus(t *testing.T) {
 	}{
 		{
 			name:        "job completed successfully",
-			output:      "True ",
+			output:      "True,",
 			wantDone:    true,
 			wantSuccess: true,
 		},
 		{
-			name:        "job failed",
-			output:      "False True",
+			name:        "job failed - only Failed condition present (was false-positive before fix)",
+			output:      ",True",
+			wantDone:    true,
+			wantSuccess: false,
+		},
+		{
+			name:        "job failed - both conditions present",
+			output:      "False,True",
 			wantDone:    true,
 			wantSuccess: false,
 		},
 		{
 			name:        "both conditions set - complete wins",
-			output:      "True True",
+			output:      "True,True",
 			wantDone:    true,
 			wantSuccess: true,
 		},
@@ -221,7 +234,7 @@ func TestParseJobStatus(t *testing.T) {
 		},
 		{
 			name:        "job still running (False conditions)",
-			output:      "False False",
+			output:      "False,False",
 			wantDone:    false,
 			wantSuccess: false,
 		},

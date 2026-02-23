@@ -69,6 +69,10 @@ type KeycloakSpec struct {
 
 // GenerateConfig generates a vip.toml configuration from a parsed Site CR
 func GenerateConfig(site *SiteCR, targetName string) (string, error) {
+	if site == nil {
+		return "", fmt.Errorf("site cannot be nil")
+	}
+
 	config := VIPConfig{
 		General: GeneralConfig{
 			DeploymentName: targetName,
