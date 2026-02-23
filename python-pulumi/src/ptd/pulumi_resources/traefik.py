@@ -7,22 +7,7 @@ import pulumi_kubernetes as k8s
 
 import ptd.pulumi_resources.aws_eks_cluster
 import ptd.pulumi_resources.aws_vpc
-
-
-def _format_nlb_tags(tags: dict[str, str]) -> str:
-    """Format tags as comma-separated key=value pairs for NLB annotations.
-
-    Validates that tag keys and values do not contain commas or equals signs,
-    which would break the annotation format.
-    """
-    for key, value in tags.items():
-        if "," in key or "=" in key:
-            msg = f"NLB tag key contains invalid characters (comma or equals): {key}"
-            raise ValueError(msg)
-        if "," in value or "=" in value:
-            msg = f"NLB tag value contains invalid characters (comma or equals): {key}={value}"
-            raise ValueError(msg)
-    return ",".join(f"{k}={v}" for k, v in tags.items())
+from ptd.pulumi_resources.lib import format_lb_tags
 
 
 class Traefik(pulumi.ComponentResource):
@@ -137,14 +122,19 @@ class Traefik(pulumi.ComponentResource):
         """
 
         # Build tag string from cluster tags for NLB annotation
-        # Always include posit.team/true-name and posit.team/environment unconditionally
-        # (mirroring ALB path in aws_workload_helm.py which uses workload.cfg.true_name)
+        true_name = self.cluster.tags.get("posit.team/true-name")
+        environment = self.cluster.tags.get("posit.team/environment")
+        if true_name is None or environment is None:
+            raise ValueError(
+                "Cluster tags must include 'posit.team/true-name' and 'posit.team/environment' "
+                f"for NLB tagging. Available tags: {list(self.cluster.tags.keys())}"
+            )
         tags = {
-            "posit.team/true-name": self.cluster.tags["posit.team/true-name"],
-            "posit.team/environment": self.cluster.tags["posit.team/environment"],
+            "posit.team/true-name": true_name,
+            "posit.team/environment": environment,
             "Name": self.cluster.name,
         }
-        nlb_tags = _format_nlb_tags(tags)
+        nlb_tags = format_lb_tags(tags)
 
         self.traefik = k8s.helm.v3.Release(
             f"{self.cluster.name}-traefik",
