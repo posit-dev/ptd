@@ -73,8 +73,11 @@ func GenerateConfig(site *SiteCR, targetName string) (string, error) {
 		return "", fmt.Errorf("site cannot be nil")
 	}
 
-	if site.Spec.Domain == "" && (site.Spec.Connect != nil || site.Spec.Workbench != nil || site.Spec.PackageManager != nil) {
-		return "", fmt.Errorf("site domain is required when products are configured")
+	needsDomain := (site.Spec.Connect != nil && site.Spec.Connect.BaseDomain == "") ||
+		(site.Spec.Workbench != nil && site.Spec.Workbench.BaseDomain == "") ||
+		(site.Spec.PackageManager != nil && site.Spec.PackageManager.BaseDomain == "")
+	if site.Spec.Domain == "" && needsDomain {
+		return "", fmt.Errorf("site domain is required when products are configured without a per-product baseDomain")
 	}
 
 	config := VIPConfig{
