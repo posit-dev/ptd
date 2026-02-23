@@ -266,6 +266,7 @@ class AlloyConfig(pulumi.ComponentResource):
                         # target metric (aws_rds_database_connections_average); Sum
                         # (aws_rds_database_connections_sum) is kept temporarily for existing
                         # dashboards. Remove Sum once all dashboards are updated.
+                        # TODO: Open a tracking issue to ensure this cleanup happens.
                         metric {{
                             name       = "DatabaseConnections"
                             statistics = ["Average", "Sum"]

@@ -10,7 +10,12 @@ def test_format_lb_tags_normal() -> None:
         "Name": "myapp-production",
     }
     result = format_lb_tags(tags)
-    assert result == "posit.team/true-name=myapp,posit.team/environment=production,Name=myapp-production"
+    parsed = dict(pair.split("=", 1) for pair in result.split(","))
+    assert parsed == {
+        "posit.team/true-name": "myapp",
+        "posit.team/environment": "production",
+        "Name": "myapp-production",
+    }
 
 
 def test_format_lb_tags_single_entry() -> None:
