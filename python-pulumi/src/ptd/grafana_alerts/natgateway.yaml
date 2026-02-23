@@ -62,7 +62,7 @@ groups:
                 maxDataPoints: 43200
                 refId: B
                 type: threshold
-          noDataState: NoData
+          noDataState: Alerting  # Critical alert: scrape outage should not suppress; missing data itself is suspicious
           execErrState: Error
           for: 5m
           annotations:
