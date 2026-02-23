@@ -14,6 +14,17 @@ from ptd.pulumi_resources.lib import format_lb_tags
 ALLOY_NAMESPACE = "alloy"
 
 
+def _build_alb_tag_string(true_name: str, environment: str, compound_name: str) -> str:
+    """Build the ALB annotation tag string from workload config values."""
+    return format_lb_tags(
+        {
+            "posit.team/true-name": true_name,
+            "posit.team/environment": environment,
+            "Name": compound_name,
+        }
+    )
+
+
 class AWSWorkloadHelm(pulumi.ComponentResource):
     workload: ptd.aws_workload.AWSWorkload
 
@@ -829,12 +840,6 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
     def _define_ingress_alb_annotations(self, cert_arns: list[str]) -> dict[str, str]:
         # cfg.true_name, cfg.environment, and compound_name are plain str values
         # loaded from YAML config at startup (see ptd/workload.py), not Pulumi Outputs.
-        tags = {
-            "posit.team/true-name": self.workload.cfg.true_name,
-            "posit.team/environment": self.workload.cfg.environment,
-            "Name": self.workload.compound_name,
-        }
-
         annotations = {
             "alb.ingress.kubernetes.io/ssl-redirect": "443",
             "alb.ingress.kubernetes.io/listen-ports": json.dumps([{"HTTP": 80}, {"HTTPS": 443}]),
@@ -845,7 +850,11 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
             "alb.ingress.kubernetes.io/healthcheck-path": "/ping",
             "alb.ingress.kubernetes.io/healthcheck-port": "32090",
             "alb.ingress.kubernetes.io/load-balancer-attributes": "routing.http.drop_invalid_header_fields.enabled=true,idle_timeout.timeout_seconds=300",
-            "alb.ingress.kubernetes.io/tags": format_lb_tags(tags),
+            "alb.ingress.kubernetes.io/tags": _build_alb_tag_string(
+                self.workload.cfg.true_name,
+                self.workload.cfg.environment,
+                self.workload.compound_name,
+            ),
         }
 
         if self.workload.cfg.provisioned_vpc:
