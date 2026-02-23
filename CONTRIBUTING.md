@@ -9,7 +9,28 @@ Below are some helpful directions on getting your environment set up as well as 
 - [uv](https://github.com/astral-sh/uv) (Python package manager)
 - [Pulumi](https://www.pulumi.com/docs/get-started/install/)
 - [just](https://github.com/casey/just) (command runner)
+- AWS CLI or Azure CLI (depending on your cloud provider)
 - `snyk` CLI (optional, for security scanning)
+
+## Git Hooks
+
+Pre-commit hooks run automatically when you commit. They will:
+- Format and lint your code
+- Run tests for the files you changed (e.g., Python tests only if you changed Python files)
+
+If a hook fails, the commit is blocked. Fix the issue, stage the fix, and commit again.
+
+```bash
+# Run hooks manually on all files
+pre-commit run --all-files
+
+# Skip all hooks
+git commit --no-verify -m "message"
+
+# Skip specific hooks only
+SKIP=test-python-pulumi git commit -m "message"
+SKIP=test-python-pulumi,test-cmd git commit -m "message"
+```
 
 ## Commit Message Format
 
