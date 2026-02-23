@@ -118,11 +118,11 @@ groups:
                 expr: count by(cluster, pod, reason) (kube_pod_container_status_terminated_reason{reason!="Completed"} * on(cluster,pod) group_left(label_launcher_instance_id) kube_pod_labels{label_launcher_instance_id=""})
                 fullMetaSearch: false
                 includeNullMetadata: true
-                instant: false
+                instant: true
                 intervalMs: 1000
                 legendFormat: __auto
                 maxDataPoints: 43200
-                range: true
+                range: false
                 refId: A
                 useBackend: false
             - refId: B
@@ -209,11 +209,11 @@ groups:
                 expr: sum by (cluster, pod, phase) (kube_pod_status_phase{phase=~"Pending|Unknown|Failed"} * on(cluster,pod) group_left(label_launcher_instance_id) kube_pod_labels{label_launcher_instance_id=""}) > 0
                 fullMetaSearch: false
                 includeNullMetadata: true
-                instant: false
+                instant: true
                 intervalMs: 60000
                 legendFormat: __auto
                 maxDataPoints: 43200
-                range: true
+                range: false
                 refId: A
                 useBackend: false
             - refId: B
@@ -389,11 +389,11 @@ groups:
                 expr: kube_deployment_spec_replicas != kube_deployment_status_replicas_available
                 fullMetaSearch: false
                 includeNullMetadata: true
-                instant: false
+                instant: true
                 intervalMs: 60000
                 legendFormat: __auto
                 maxDataPoints: 43200
-                range: true
+                range: false
                 refId: A
                 useBackend: false
             - refId: B
@@ -474,11 +474,11 @@ groups:
                 expr: kube_statefulset_status_replicas_ready != kube_statefulset_status_replicas
                 fullMetaSearch: false
                 includeNullMetadata: true
-                instant: false
+                instant: true
                 intervalMs: 60000
                 legendFormat: __auto
                 maxDataPoints: 43200
-                range: true
+                range: false
                 refId: A
                 useBackend: false
             - refId: B
