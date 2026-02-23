@@ -16,14 +16,15 @@ const namespace = "posit-team"
 
 // Options contains configuration for the verify command
 type Options struct {
-	Target      string
-	SiteName    string
-	Categories  string
-	LocalMode   bool
-	ConfigOnly  bool
-	Image       string
-	KeycloakURL string // overrides the default https://key.<domain> if set
-	Env         []string
+	Target       string
+	SiteName     string
+	Categories   string
+	LocalMode    bool
+	ConfigOnly   bool
+	Image        string
+	KeycloakURL  string // overrides the default https://key.<domain> if set
+	TestUsername  string // Keycloak test user name (default: vip-test-user)
+	Env          []string
 }
 
 // Run executes the VIP verification process
@@ -63,7 +64,7 @@ func Run(ctx context.Context, opts Options) error {
 
 	// Ensure test user exists
 	slog.Info("Ensuring test user exists in Keycloak")
-	if err := EnsureTestUser(ctx, opts.Env, opts.SiteName, keycloakURL, "posit"); err != nil {
+	if err := EnsureTestUser(ctx, opts.Env, opts.SiteName, keycloakURL, "posit", opts.TestUsername); err != nil {
 		return fmt.Errorf("failed to ensure test user: %w", err)
 	}
 
