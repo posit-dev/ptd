@@ -1,0 +1,235 @@
+# To delete these alerts, simply removing the configMap that uses this method will not work.
+# Replace file contents with the following and apply in order to delete the alerts:
+# apiVersion: 1
+# deleteRules:
+#   - orgId: 1
+#     uid: alb_target_5xx_errors_high
+#
+# See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: LoadBalancer
+      folder: Posit Alerts
+      interval: 5m
+      rules:
+        - uid: alb_target_5xx_errors_high
+          title: ALB Target 5XX Errors High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_applicationelb_httpcode_target_5_xx_count_sum{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 10
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            description: Application Load Balancer has more than 10 target 5XX errors for over 5 minutes, indicating backend service failures.
+            summary: High 5XX errors on ALB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: alb_unhealthy_targets
+          title: ALB Unhealthy Targets
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_applicationelb_un_healthy_host_count_average{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            description: Application Load Balancer has unhealthy targets for over 5 minutes, indicating backend service health issues.
+            summary: Unhealthy targets on ALB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: nlb_unhealthy_targets
+          title: NLB Unhealthy Targets
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_networkelb_un_healthy_host_count_average{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            description: Network Load Balancer has unhealthy targets for over 5 minutes, indicating backend service health issues.
+            summary: Unhealthy targets on NLB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: alb_response_latency_high
+          title: ALB Response Latency High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_applicationelb_target_response_time_average{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 2  # 2 seconds
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 10m
+          annotations:
+            description: Application Load Balancer target response time is above 2 seconds for more than 10 minutes, indicating performance degradation.
+            summary: High response latency on ALB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+          isPaused: false

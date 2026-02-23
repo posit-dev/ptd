@@ -285,6 +285,18 @@ class AlloyConfig(pulumi.ComponentResource):
                             statistics = ["Average"]
                             period     = "5m"
                         }}
+
+                        metric {{
+                            name       = "WriteLatency"
+                            statistics = ["Average"]
+                            period     = "5m"
+                        }}
+
+                        metric {{
+                            name       = "Deadlocks"
+                            statistics = ["Sum"]
+                            period     = "5m"
+                        }}
                     }}
 
                     discovery {{
@@ -305,6 +317,69 @@ class AlloyConfig(pulumi.ComponentResource):
                             name       = "NetworkPacketsOut"
                             statistics = ["Average"]
                             period     = "5m"
+                        }}
+                    }}
+
+                    discovery {{
+                        type    = "AWS/NATGateway"
+                        regions = ["{self.region}"]
+
+                        search_tags = {{
+                            "posit.team/true-name" = "{self.workload.cfg.true_name}",
+                        }}
+
+                        metric {{
+                            name       = "ErrorPortAllocation"
+                            statistics = ["Sum"]
+                            period     = "5m"
+                        }}
+
+                        metric {{
+                            name       = "PacketsDropCount"
+                            statistics = ["Sum"]
+                            period     = "5m"
+                        }}
+                    }}
+
+                    discovery {{
+                        type    = "AWS/ApplicationELB"
+                        regions = ["{self.region}"]
+
+                        search_tags = {{
+                            "posit.team/true-name" = "{self.workload.cfg.true_name}",
+                        }}
+
+                        metric {{
+                            name       = "HTTPCode_Target_5XX_Count"
+                            statistics = ["Sum"]
+                            period     = "5m"
+                        }}
+
+                        metric {{
+                            name       = "UnHealthyHostCount"
+                            statistics = ["Average"]
+                            period     = "1m"
+                        }}
+
+                        metric {{
+                            name       = "TargetResponseTime"
+                            statistics = ["Average"]
+                            period     = "5m"
+                        }}
+                    }}
+
+                    discovery {{
+                        type    = "AWS/NetworkELB"
+                        regions = ["{self.region}"]
+
+                        search_tags = {{
+                            "posit.team/true-name" = "{self.workload.cfg.true_name}",
+                        }}
+
+                        metric {{
+                            name       = "UnHealthyHostCount"
+                            statistics = ["Average"]
+                            period     = "1m"
                         }}
                     }}
                 }}

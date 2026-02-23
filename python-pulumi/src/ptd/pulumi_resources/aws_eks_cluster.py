@@ -1949,6 +1949,9 @@ class AWSEKSCluster(pulumi.ComponentResource):
 
         self._create_alert_configmap("pods", grafana_ns)
         self._create_alert_configmap("cloudwatch", grafana_ns)
+        self._create_alert_configmap("rds", grafana_ns)
+        self._create_alert_configmap("natgateway", grafana_ns)
+        self._create_alert_configmap("loadbalancer", grafana_ns)
         self._create_alert_configmap("healthchecks", grafana_ns)
         self._create_alert_configmap("nodes", grafana_ns)
         self._create_alert_configmap("applications", grafana_ns)
