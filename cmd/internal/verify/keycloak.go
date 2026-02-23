@@ -43,7 +43,7 @@ func EnsureTestUser(ctx context.Context, env []string, siteName string, keycloak
 	}
 
 	// Get admin access token
-	token, err := getKeycloakAdminToken(keycloakURL, adminUser, adminPass)
+	token, err := getKeycloakAdminToken(ctx, keycloakURL, adminUser, adminPass)
 	if err != nil {
 		return fmt.Errorf("failed to get admin token: %w", err)
 	}
@@ -55,7 +55,7 @@ func EnsureTestUser(ctx context.Context, env []string, siteName string, keycloak
 		return fmt.Errorf("failed to generate password: %w", err)
 	}
 
-	if err := createKeycloakUser(keycloakURL, realm, token, username, password); err != nil {
+	if err := createKeycloakUser(ctx, keycloakURL, realm, token, username, password); err != nil {
 		return fmt.Errorf("failed to create test user: %w", err)
 	}
 
@@ -118,7 +118,7 @@ func getKeycloakAdminCreds(ctx context.Context, env []string, secretName string)
 
 // getKeycloakAdminToken gets an admin access token from Keycloak's master realm.
 // Admin tokens are always obtained from the master realm, regardless of the target realm.
-func getKeycloakAdminToken(keycloakURL, username, password string) (string, error) {
+func getKeycloakAdminToken(ctx context.Context, keycloakURL, username, password string) (string, error) {
 	tokenURL := fmt.Sprintf("%s/realms/master/protocol/openid-connect/token", keycloakURL)
 
 	data := url.Values{
@@ -127,7 +127,7 @@ func getKeycloakAdminToken(keycloakURL, username, password string) (string, erro
 		"username":   {username},
 		"password":   {password},
 	}
-	req, err := http.NewRequest("POST", tokenURL, strings.NewReader(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return "", err
 	}
@@ -159,31 +159,32 @@ func getKeycloakAdminToken(keycloakURL, username, password string) (string, erro
 // createKeycloakUser creates a user in Keycloak, or resets their password if they already exist.
 // Resetting the password when the user exists ensures the K8s secret (written after this call)
 // always matches the actual Keycloak credentials.
-func createKeycloakUser(keycloakURL, realm, token, username, password string) error {
+func createKeycloakUser(ctx context.Context, keycloakURL, realm, token, username, password string) error {
 	client := &http.Client{Timeout: keycloakHTTPTimeout}
 	usersURL := fmt.Sprintf("%s/admin/realms/%s/users", keycloakURL, realm)
 
-	// Check if user already exists
-	searchURL := fmt.Sprintf("%s?username=%s&exact=true", usersURL, username)
-	req, err := http.NewRequest("GET", searchURL, nil)
+	// Check if user already exists; use url.Values to safely encode the username.
+	params := url.Values{"username": {username}, "exact": {"true"}}
+	searchURL := usersURL + "?" + params.Encode()
+	req, err := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := client.Do(req)
+	searchResp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer searchResp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+	if searchResp.StatusCode == http.StatusOK {
+		body, _ := io.ReadAll(searchResp.Body)
 		var users []map[string]interface{}
 		if err := json.Unmarshal(body, &users); err == nil && len(users) > 0 {
 			slog.Info("User already exists in Keycloak, resetting password", "username", username)
 			userID, _ := users[0]["id"].(string)
-			return resetKeycloakUserPassword(keycloakURL, realm, token, userID, password, client)
+			return resetKeycloakUserPassword(ctx, keycloakURL, realm, token, userID, password, client)
 		}
 	}
 
@@ -206,14 +207,14 @@ func createKeycloakUser(keycloakURL, realm, token, username, password string) er
 		return err
 	}
 
-	req, err = http.NewRequest("POST", usersURL, bytes.NewReader(payloadBytes))
+	req, err = http.NewRequestWithContext(ctx, "POST", usersURL, bytes.NewReader(payloadBytes))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err = client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -228,7 +229,7 @@ func createKeycloakUser(keycloakURL, realm, token, username, password string) er
 }
 
 // resetKeycloakUserPassword sets a user's password via the Keycloak admin API.
-func resetKeycloakUserPassword(keycloakURL, realm, token, userID, password string, client *http.Client) error {
+func resetKeycloakUserPassword(ctx context.Context, keycloakURL, realm, token, userID, password string, client *http.Client) error {
 	resetURL := fmt.Sprintf("%s/admin/realms/%s/users/%s/reset-password", keycloakURL, realm, userID)
 	payload := map[string]interface{}{
 		"type":      "password",
@@ -240,7 +241,7 @@ func resetKeycloakUserPassword(keycloakURL, realm, token, userID, password strin
 		return err
 	}
 
-	req, err := http.NewRequest("PUT", resetURL, bytes.NewReader(payloadBytes))
+	req, err := http.NewRequestWithContext(ctx, "PUT", resetURL, bytes.NewReader(payloadBytes))
 	if err != nil {
 		return err
 	}
@@ -262,26 +263,30 @@ func resetKeycloakUserPassword(keycloakURL, realm, token, userID, password strin
 }
 
 // createCredentialsSecret creates a K8s secret with test user credentials.
-// Credentials are passed via stdin (not argv) to avoid exposure in process listings.
+// Uses JSON marshalling to prevent injection, consistent with job.go.
 func createCredentialsSecret(ctx context.Context, env []string, username, password string) error {
-	secretYAML := fmt.Sprintf(`apiVersion: v1
-kind: Secret
-metadata:
-  name: vip-test-credentials
-  namespace: %s
-type: Opaque
-data:
-  username: %s
-  password: %s
-`,
-		namespace,
-		base64.StdEncoding.EncodeToString([]byte(username)),
-		base64.StdEncoding.EncodeToString([]byte(password)),
-	)
+	secret := map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Secret",
+		"metadata": map[string]string{
+			"name":      "vip-test-credentials",
+			"namespace": namespace,
+		},
+		"type": "Opaque",
+		"data": map[string]string{
+			"username": base64.StdEncoding.EncodeToString([]byte(username)),
+			"password": base64.StdEncoding.EncodeToString([]byte(password)),
+		},
+	}
+
+	secretJSON, err := json.Marshal(secret)
+	if err != nil {
+		return fmt.Errorf("failed to marshal secret: %w", err)
+	}
 
 	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-", "-n", namespace)
 	cmd.Env = env
-	cmd.Stdin = strings.NewReader(secretYAML)
+	cmd.Stdin = strings.NewReader(string(secretJSON))
 
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("kubectl apply secret failed: %s", string(output))

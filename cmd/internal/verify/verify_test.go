@@ -125,6 +125,69 @@ func TestGenerateConfig_CustomDomainPrefix(t *testing.T) {
 	}
 }
 
+func TestGenerateConfig_EmptyAuthType(t *testing.T) {
+	// Auth.Type == "" should fall through to the default "oidc", not produce provider = ""
+	site := &SiteCR{
+		Spec: SiteSpec{
+			Domain: "example.com",
+			Connect: &ProductSpec{
+				Auth: &AuthSpec{Type: ""},
+			},
+		},
+	}
+
+	config, err := GenerateConfig(site, "test")
+	if err != nil {
+		t.Fatalf("GenerateConfig returned error: %v", err)
+	}
+
+	if !strings.Contains(config, `provider = "oidc"`) {
+		t.Errorf("expected oidc default when Auth.Type is empty, got:\n%s", config)
+	}
+}
+
+func TestGenerateConfig_EmptyDomain(t *testing.T) {
+	// Empty domain should produce a URL with an empty domain segment, not panic
+	site := &SiteCR{
+		Spec: SiteSpec{
+			Domain:  "",
+			Connect: &ProductSpec{},
+		},
+	}
+
+	config, err := GenerateConfig(site, "test")
+	if err != nil {
+		t.Fatalf("GenerateConfig returned error: %v", err)
+	}
+
+	if !strings.Contains(config, `url = "https://connect."`) {
+		t.Errorf("expected connect URL with empty domain, got:\n%s", config)
+	}
+}
+
+func TestBuildProductURL_BaseDomainOverride(t *testing.T) {
+	spec := &ProductSpec{
+		BaseDomain: "custom.org",
+	}
+	got := buildProductURL(spec, "connect", "example.com")
+	want := "https://connect.custom.org"
+	if got != want {
+		t.Errorf("buildProductURL with BaseDomain = %q, want %q", got, want)
+	}
+}
+
+func TestBuildProductURL_DomainPrefixAndBaseDomain(t *testing.T) {
+	spec := &ProductSpec{
+		DomainPrefix: "rsc",
+		BaseDomain:   "custom.org",
+	}
+	got := buildProductURL(spec, "connect", "example.com")
+	want := "https://rsc.custom.org"
+	if got != want {
+		t.Errorf("buildProductURL with DomainPrefix+BaseDomain = %q, want %q", got, want)
+	}
+}
+
 func TestParseJobStatus(t *testing.T) {
 	tests := []struct {
 		name        string
