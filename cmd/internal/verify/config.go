@@ -158,6 +158,9 @@ func GenerateConfig(site *SiteCR, targetName string) (string, error) {
 // ProductSpec.BaseDomain must be a bare parent domain (e.g. "example.com"), not a
 // fully-qualified hostname that already includes the product subdomain.
 func buildProductURL(spec *ProductSpec, defaultPrefix, baseDomain string) string {
+	if spec == nil {
+		return fmt.Sprintf("https://%s.%s", defaultPrefix, baseDomain)
+	}
 	prefix := defaultPrefix
 	if spec.DomainPrefix != "" {
 		prefix = spec.DomainPrefix

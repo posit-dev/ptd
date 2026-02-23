@@ -177,12 +177,44 @@ func CreateJob(ctx context.Context, env []string, opts JobOptions) error {
 	return nil
 }
 
+// waitForPodRunning waits for the pod to leave Pending/Init state before streaming logs.
+// This avoids a spurious "unexpected pod phase Pending" warning when kubectl logs is
+// called immediately after the pod object is created but before the container starts.
+func waitForPodRunning(ctx context.Context, env []string, podName, namespace string) error {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout waiting for pod to start")
+		case <-ticker.C:
+			phase, err := getPodPhase(ctx, env, podName, namespace)
+			if err != nil {
+				continue
+			}
+			if phase == "Running" || phase == "Succeeded" || phase == "Failed" {
+				return nil
+			}
+		}
+	}
+}
+
 // StreamLogs follows the logs of the Job pod
 func StreamLogs(ctx context.Context, env []string, jobName string, namespace string) error {
 	// Wait for pod to be created (timeout after 30 seconds)
 	podName, err := waitForPod(ctx, env, jobName, 30*time.Second, namespace)
 	if err != nil {
 		return err
+	}
+
+	// Wait for the container to start before streaming to avoid spurious warnings
+	// when kubectl logs is called while the pod is still in Pending/Init state.
+	if err := waitForPodRunning(ctx, env, podName, namespace); err != nil {
+		slog.Warn("timed out waiting for pod to start; attempting log stream anyway", "pod", podName)
 	}
 
 	// Stream the pod logs

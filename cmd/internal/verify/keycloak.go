@@ -84,7 +84,7 @@ func EnsureTestUser(ctx context.Context, env []string, keycloakURL string, realm
 
 // generatePassword generates a cryptographically random password of the given length.
 func generatePassword(length int) (string, error) {
-	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%"
 	result := make([]byte, length)
 	for i := range result {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))

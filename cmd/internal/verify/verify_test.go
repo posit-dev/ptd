@@ -505,12 +505,11 @@ func TestBuildSecretSpec(t *testing.T) {
 
 func TestBuildLocalEnv(t *testing.T) {
 	tests := []struct {
-		name      string
-		env       []string
-		testUser  string
-		testPass  string
-		wantErr   bool
-		wantDedup bool // whether we expect existing creds to be replaced (not duplicated)
+		name     string
+		env      []string
+		testUser string
+		testPass string
+		wantErr  bool
 	}{
 		{
 			name:     "newline in username returns error",
@@ -548,11 +547,10 @@ func TestBuildLocalEnv(t *testing.T) {
 			wantErr:  true,
 		},
 		{
-			name:      "existing cred keys are stripped before appending",
-			env:       []string{"PATH=/usr/bin", "VIP_TEST_USERNAME=old", "VIP_TEST_PASSWORD=old"},
-			testUser:  "newuser",
-			testPass:  "newpass",
-			wantDedup: true,
+			name:     "existing cred keys are stripped before appending",
+			env:      []string{"PATH=/usr/bin", "VIP_TEST_USERNAME=old", "VIP_TEST_PASSWORD=old"},
+			testUser: "newuser",
+			testPass: "newpass",
 		},
 		{
 			name:     "clean env appends credentials",
