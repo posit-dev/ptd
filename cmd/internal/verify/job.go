@@ -188,7 +188,7 @@ func StreamLogs(ctx context.Context, env []string, jobName string, namespace str
 				return nil
 			}
 			// Phase unknown or check failed; warn but continue to WaitForJob.
-			slog.Warn("kubectl logs exited with code 1; log output may be incomplete", "pod", podName)
+			slog.Warn("kubectl logs exited with code 1; log output may be incomplete", "pod", podName, "phaseErr", phaseErr)
 			return nil
 		}
 		return fmt.Errorf("failed to stream logs: %w", err)
