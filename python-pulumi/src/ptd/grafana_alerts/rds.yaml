@@ -1,9 +1,18 @@
 # To delete these alerts, simply removing the configMap that uses this method will not work.
-# Replace file contents with the following and apply in order to delete the alerts:
+# Replace file contents with the following and apply in order to delete the alerts
+# (repeat the deleteRules entry for each uid listed below):
 # apiVersion: 1
 # deleteRules:
 #   - orgId: 1
 #     uid: rds_cpu_utilization_high
+#   - orgId: 1
+#     uid: rds_free_storage_low
+#   - orgId: 1
+#     uid: rds_freeable_memory_low
+#   - orgId: 1
+#     uid: rds_read_latency_high
+#   - orgId: 1
+#     uid: rds_database_connections_high
 #
 # See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
 apiVersion: 1
@@ -260,7 +269,7 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            - 80
+                            - 500  # Absolute threshold; tune per instance type (db.r5.large max ~4000)
                         type: gt
                       operator:
                         type: and
@@ -283,7 +292,7 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: RDS instance has more than 80 active database connections for more than 5 minutes.
+            description: RDS instance has more than 500 active database connections for more than 5 minutes.
             summary: High database connections on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"

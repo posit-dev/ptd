@@ -1,9 +1,12 @@
 # To delete these alerts, simply removing the configMap that uses this method will not work.
-# Replace file contents with the following and apply in order to delete the alerts:
+# Replace file contents with the following and apply in order to delete the alerts
+# (repeat the deleteRules entry for each uid listed below):
 # apiVersion: 1
 # deleteRules:
 #   - orgId: 1
 #     uid: nat_gateway_port_allocation_errors
+#   - orgId: 1
+#     uid: nat_gateway_packets_dropped
 #
 # See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
 apiVersion: 1

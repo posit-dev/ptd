@@ -1,9 +1,16 @@
 # To delete these alerts, simply removing the configMap that uses this method will not work.
-# Replace file contents with the following and apply in order to delete the alerts:
+# Replace file contents with the following and apply in order to delete the alerts
+# (repeat the deleteRules entry for each uid listed below):
 # apiVersion: 1
 # deleteRules:
 #   - orgId: 1
 #     uid: alb_target_5xx_errors_high
+#   - orgId: 1
+#     uid: alb_unhealthy_targets
+#   - orgId: 1
+#     uid: nlb_unhealthy_targets
+#   - orgId: 1
+#     uid: alb_response_latency_high
 #
 # See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
 apiVersion: 1

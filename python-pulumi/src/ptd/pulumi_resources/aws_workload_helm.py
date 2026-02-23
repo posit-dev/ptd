@@ -9,24 +9,9 @@ import ptd
 import ptd.aws_workload
 import ptd.pulumi_resources.aws_eks_cluster
 from ptd.pulumi_resources.grafana_alloy import AlloyConfig
+from ptd.pulumi_resources.lib import format_lb_tags
 
 ALLOY_NAMESPACE = "alloy"
-
-
-def _format_lb_tags(tags: dict[str, str]) -> str:
-    """Format tags as comma-separated key=value pairs for AWS LB Controller annotations.
-
-    Validates that tag keys and values do not contain commas or equals signs,
-    which would break the annotation format.
-    """
-    for key, value in tags.items():
-        if "," in key or "=" in key:
-            msg = f"LB tag key contains invalid characters (comma or equals): {key}"
-            raise ValueError(msg)
-        if "," in value or "=" in value:
-            msg = f"LB tag value contains invalid characters (comma or equals): {key}={value}"
-            raise ValueError(msg)
-    return ",".join(f"{k}={v}" for k, v in tags.items())
 
 
 class AWSWorkloadHelm(pulumi.ComponentResource):
@@ -859,7 +844,7 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
             "alb.ingress.kubernetes.io/healthcheck-path": "/ping",
             "alb.ingress.kubernetes.io/healthcheck-port": "32090",
             "alb.ingress.kubernetes.io/load-balancer-attributes": "routing.http.drop_invalid_header_fields.enabled=true,idle_timeout.timeout_seconds=300",
-            "alb.ingress.kubernetes.io/tags": _format_lb_tags(tags),
+            "alb.ingress.kubernetes.io/tags": format_lb_tags(tags),
         }
 
         if self.workload.cfg.provisioned_vpc:
