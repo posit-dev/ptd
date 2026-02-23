@@ -8,7 +8,13 @@ def test_build_nlb_tag_string_happy_path() -> None:
         tags={"posit.team/true-name": "myapp", "posit.team/environment": "production"},
         cluster_name="myapp-cluster",
     )
-    assert result == "posit.team/true-name=myapp,posit.team/environment=production,Name=myapp-cluster"
+    # Parse into key=value pairs to avoid coupling the test to dict insertion order
+    parsed = dict(pair.split("=", 1) for pair in result.split(","))
+    assert parsed == {
+        "posit.team/true-name": "myapp",
+        "posit.team/environment": "production",
+        "Name": "myapp-cluster",
+    }
 
 
 def test_build_nlb_tag_string_tags_none() -> None:
@@ -37,4 +43,12 @@ def test_build_nlb_tag_string_invalid_cluster_name() -> None:
         _build_nlb_tag_string(
             tags={"posit.team/true-name": "myapp", "posit.team/environment": "production"},
             cluster_name="bad,name",
+        )
+
+
+def test_build_nlb_tag_string_empty_cluster_name() -> None:
+    with pytest.raises(ValueError, match="must not be None or empty"):
+        _build_nlb_tag_string(
+            tags={"posit.team/true-name": "myapp", "posit.team/environment": "production"},
+            cluster_name="",
         )
