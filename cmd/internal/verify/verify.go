@@ -60,13 +60,12 @@ func Run(ctx context.Context, opts Options) error {
 		return nil
 	}
 
-	keycloakURL := opts.KeycloakURL
-	if keycloakURL == "" {
-		keycloakURL = fmt.Sprintf("https://key.%s", site.Spec.Domain)
-	}
-
 	// Only ensure test user if Keycloak is configured for this site
 	credentialsAvailable := site.Spec.Keycloak != nil && site.Spec.Keycloak.Enabled
+	keycloakURL, err := deriveKeycloakURL(opts.KeycloakURL, site.Spec.Domain, credentialsAvailable)
+	if err != nil {
+		return err
+	}
 	if credentialsAvailable {
 		adminSecretName := opts.KeycloakAdminSecret
 		if adminSecretName == "" {
@@ -104,6 +103,19 @@ func getSiteCR(ctx context.Context, env []string, siteName, namespace string) ([
 	}
 
 	return output, nil
+}
+
+// deriveKeycloakURL returns the Keycloak URL to use. If override is non-empty it is returned
+// as-is. Otherwise the URL is derived from domain. An error is returned only when Keycloak is
+// enabled (needsURL) and domain is empty, which would produce an invalid URL.
+func deriveKeycloakURL(override, domain string, needsURL bool) (string, error) {
+	if override != "" {
+		return override, nil
+	}
+	if needsURL && domain == "" {
+		return "", fmt.Errorf("site domain is required to derive Keycloak URL; use --keycloak-url to override")
+	}
+	return fmt.Sprintf("https://key.%s", domain), nil
 }
 
 // runLocalTests runs VIP tests locally using uv

@@ -112,7 +112,7 @@ func runVerify(ctx context.Context, cmd *cobra.Command, target string) {
 		os.Exit(1)
 	}
 
-	if cmd.Flags().Changed("image") && strings.HasSuffix(verifyImage, ":latest") {
+	if strings.HasSuffix(verifyImage, ":latest") {
 		slog.Warn("Using ':latest' image tag is non-deterministic; consider pinning a specific version", "image", verifyImage)
 	}
 
