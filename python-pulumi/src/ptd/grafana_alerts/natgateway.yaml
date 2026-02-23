@@ -64,7 +64,7 @@ groups:
                 type: threshold
           noDataState: NoData
           execErrState: Error
-          for: 1m
+          for: 5m
           annotations:
             description: NAT Gateway is experiencing port allocation errors, which means outbound network connectivity is failing. This is a critical issue that requires immediate attention.
             summary: Port allocation errors on NAT Gateway {{$labels.dimension_NatGatewayId}} in cluster {{$labels.cluster}}

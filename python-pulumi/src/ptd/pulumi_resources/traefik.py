@@ -121,7 +121,10 @@ class Traefik(pulumi.ComponentResource):
         :return:
         """
 
-        # Build tag string from cluster tags for NLB annotation
+        # Build tag string from cluster tags for NLB annotation.
+        # cluster.name, true_name, and environment are plain str values (logical resource
+        # names / config loaded at startup), not Pulumi Outputs, so format_lb_tags() checks
+        # work correctly at graph-construction time.
         if self.cluster.tags is None:
             raise ValueError(
                 "Cluster tags must not be None; expected a dict with "

@@ -50,3 +50,13 @@ def test_format_lb_tags_empty_value() -> None:
 def test_format_lb_tags_empty_dict() -> None:
     with pytest.raises(ValueError, match="must not be empty"):
         format_lb_tags({})
+
+
+def test_format_lb_tags_space_in_key() -> None:
+    with pytest.raises(ValueError, match="space"):
+        format_lb_tags({"bad key": "value"})
+
+
+def test_format_lb_tags_space_in_value() -> None:
+    with pytest.raises(ValueError, match="space"):
+        format_lb_tags({"key": "bad value"})
