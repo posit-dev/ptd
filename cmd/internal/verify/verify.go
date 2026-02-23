@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -156,6 +157,9 @@ func runLocalTests(ctx context.Context, env []string, vipConfig string, categori
 	cmd := exec.CommandContext(ctx, "uv", args...)
 	cmd.Env = env
 	if credentialsAvailable {
+		if strings.ContainsAny(testUser, "\n\r") || strings.ContainsAny(testPass, "\n\r") {
+			return fmt.Errorf("test credentials must not contain newline characters")
+		}
 		cmd.Env = append(cmd.Env, "VIP_TEST_USERNAME="+testUser, "VIP_TEST_PASSWORD="+testPass)
 	}
 	cmd.Stdout = os.Stdout

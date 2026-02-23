@@ -232,11 +232,31 @@ func TestGenerateConfig_EmptyDomain(t *testing.T) {
 
 func TestGenerateConfig_EmptyDomainAllBaseDomains(t *testing.T) {
 	// Empty site-level domain is valid when every product has its own baseDomain.
-	// NOTE: BaseDomain must be a bare parent domain (e.g. "custom.org"), NOT a
-	// fully-qualified hostname like "connect.custom.org". buildProductURL always
-	// prepends the product prefix, so BaseDomain="connect.custom.org" produces
-	// "https://connect.connect.custom.org" (double-prefix). Use a bare domain to
-	// get the expected "https://connect.custom.org" result.
+	// BaseDomain must be a bare parent domain (e.g. "custom.org"); buildProductURL
+	// prepends the product prefix to produce "https://connect.custom.org".
+	site := &SiteCR{
+		Spec: SiteSpec{
+			Domain: "",
+			Connect: &ProductSpec{
+				BaseDomain: "custom.org",
+			},
+		},
+	}
+
+	config, err := GenerateConfig(site, "test")
+	if err != nil {
+		t.Fatalf("expected no error when all products have baseDomain, got: %v", err)
+	}
+	if !strings.Contains(config, `url = "https://connect.custom.org"`) {
+		t.Errorf("expected connect URL using baseDomain, got:\n%s", config)
+	}
+}
+
+func TestGenerateConfig_BaseDomainWithSubdomainProducesDoublePrefix(t *testing.T) {
+	// If BaseDomain is mistakenly set to a fully-qualified hostname like
+	// "connect.custom.org" instead of the bare parent "custom.org", buildProductURL
+	// prepends the product prefix again, producing a double-prefix URL.
+	// This test documents that footgun so the behaviour is explicit and visible.
 	site := &SiteCR{
 		Spec: SiteSpec{
 			Domain: "",
@@ -248,10 +268,10 @@ func TestGenerateConfig_EmptyDomainAllBaseDomains(t *testing.T) {
 
 	config, err := GenerateConfig(site, "test")
 	if err != nil {
-		t.Fatalf("expected no error when all products have baseDomain, got: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(config, `url = "https://connect.connect.custom.org"`) {
-		t.Errorf("expected connect URL using baseDomain, got:\n%s", config)
+		t.Errorf("expected double-prefix URL from subdomain BaseDomain, got:\n%s", config)
 	}
 }
 
