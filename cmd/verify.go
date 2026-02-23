@@ -23,15 +23,19 @@ func init() {
 	verifyCmd.Flags().BoolVar(&verifyConfigOnly, "config-only", false, "Generate config only, don't run tests")
 	verifyCmd.Flags().StringVar(&verifyImage, "image", "ghcr.io/posit-dev/vip:latest", "VIP container image to use")
 	verifyCmd.Flags().StringVar(&verifyKeycloakURL, "keycloak-url", "", "Keycloak URL (defaults to https://key.<domain> from Site CR)")
+	verifyCmd.Flags().StringVar(&verifyRealm, "realm", "posit", "Keycloak realm name")
+	verifyCmd.Flags().StringVar(&verifyTestUsername, "test-username", "vip-test-user", "Keycloak test user name")
 }
 
 var (
-	verifySiteName    string
-	verifyCategories  string
-	verifyLocal       bool
-	verifyConfigOnly  bool
-	verifyImage       string
-	verifyKeycloakURL string
+	verifySiteName     string
+	verifyCategories   string
+	verifyLocal        bool
+	verifyConfigOnly   bool
+	verifyImage        string
+	verifyKeycloakURL  string
+	verifyRealm        string
+	verifyTestUsername string
 )
 
 var verifyCmd = &cobra.Command{
@@ -121,7 +125,8 @@ func runVerify(ctx context.Context, cmd *cobra.Command, target string) {
 		ConfigOnly:   verifyConfigOnly,
 		Image:        verifyImage,
 		KeycloakURL:  verifyKeycloakURL,
-		TestUsername: "vip-test-user",
+		Realm:        verifyRealm,
+		TestUsername: verifyTestUsername,
 		Env:          env,
 	}
 

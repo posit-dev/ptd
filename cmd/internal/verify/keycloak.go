@@ -68,6 +68,11 @@ func EnsureTestUser(ctx context.Context, env []string, siteName string, keycloak
 	return nil
 }
 
+// getTestCredentials retrieves VIP test user credentials from the vip-test-credentials Secret.
+func getTestCredentials(ctx context.Context, env []string) (string, string, error) {
+	return getKeycloakAdminCreds(ctx, env, "vip-test-credentials")
+}
+
 // generatePassword generates a cryptographically random password of the given length.
 func generatePassword(length int) (string, error) {
 	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
