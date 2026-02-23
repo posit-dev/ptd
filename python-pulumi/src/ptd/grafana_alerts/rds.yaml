@@ -68,7 +68,7 @@ groups:
                 maxDataPoints: 43200
                 refId: B
                 type: threshold
-          noDataState: NoData
+          noDataState: NoData  # Performance metric; silent suppression on scrape outage is acceptable
           execErrState: Error
           for: 10m
           annotations:
@@ -123,7 +123,7 @@ groups:
                 maxDataPoints: 43200
                 refId: B
                 type: threshold
-          noDataState: Alerting
+          noDataState: Alerting  # Storage exhaustion is latent; alert even when scraping stops so we don't silently miss a full disk
           execErrState: Error
           for: 5m
           annotations:
@@ -178,7 +178,7 @@ groups:
                 maxDataPoints: 43200
                 refId: B
                 type: threshold
-          noDataState: Alerting
+          noDataState: Alerting  # Memory exhaustion is latent; alert even when scraping stops so we don't silently miss an OOM condition
           execErrState: Error
           for: 10m
           annotations:
@@ -234,7 +234,7 @@ groups:
                 maxDataPoints: 43200
                 refId: B
                 type: threshold
-          noDataState: NoData
+          noDataState: NoData  # Performance metric; silent suppression on scrape outage is acceptable
           execErrState: Error
           for: 10m
           annotations:
@@ -289,7 +289,7 @@ groups:
                 maxDataPoints: 43200
                 refId: B
                 type: threshold
-          noDataState: NoData
+          noDataState: NoData  # Performance metric; silent suppression on scrape outage is acceptable
           execErrState: Error
           for: 5m
           annotations:

@@ -33,6 +33,10 @@ class TestValidateAlloyTrueName:
         with pytest.raises(ValueError, match="unsafe for Alloy River config"):
             _validate_alloy_true_name("bad name")
 
+    def test_empty_string_rejected(self) -> None:
+        with pytest.raises(ValueError, match="unsafe for Alloy River config"):
+            _validate_alloy_true_name("")
+
 
 @dataclasses.dataclass
 class MockSiteConfig:

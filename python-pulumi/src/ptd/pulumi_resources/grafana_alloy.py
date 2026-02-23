@@ -283,6 +283,7 @@ class AlloyConfig(pulumi.ComponentResource):
                         # dashboards. Remove ["Sum"] from statistics once all Grafana dashboards
                         # have been updated to query aws_rds_database_connections_average.
                         # Keeping Sum doubles the CloudWatch API cost for this metric.
+                        # TODO: Open a GitHub issue to track removal of Sum once dashboards are updated.
                         metric {{
                             name       = "DatabaseConnections"
                             statistics = ["Average", "Sum"]

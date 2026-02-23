@@ -87,9 +87,19 @@ def test_format_lb_tags_newline_in_value() -> None:
         format_lb_tags({"key": "bad\nvalue"})
 
 
+def test_format_lb_tags_key_at_limit() -> None:
+    # 128 chars — should succeed (boundary check for > comparison)
+    format_lb_tags({"k" * 128: "value"})
+
+
 def test_format_lb_tags_key_too_long() -> None:
     with pytest.raises(ValueError, match="128-character limit"):
         format_lb_tags({"k" * 129: "value"})
+
+
+def test_format_lb_tags_value_at_limit() -> None:
+    # 256 chars — should succeed (boundary check for > comparison)
+    format_lb_tags({"key": "v" * 256})
 
 
 def test_format_lb_tags_value_too_long() -> None:
