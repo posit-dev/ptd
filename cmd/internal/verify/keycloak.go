@@ -14,13 +14,16 @@ import (
 	"net/url"
 	"os/exec"
 	"strings"
+	"time"
 )
+
+const keycloakHTTPTimeout = 30 * time.Second
 
 // EnsureTestUser ensures a test user exists in Keycloak and credentials are in a Secret
 func EnsureTestUser(ctx context.Context, env []string, siteName string, keycloakURL string, realm string) error {
 	// Check if the vip-test-credentials secret already exists
 	checkCmd := exec.CommandContext(ctx, "kubectl", "get", "secret", "vip-test-credentials",
-		"-n", "posit-team", "--ignore-not-found", "-o", "jsonpath={.metadata.name}")
+		"-n", namespace, "--ignore-not-found", "-o", "jsonpath={.metadata.name}")
 	checkCmd.Env = env
 
 	output, err := checkCmd.Output()
@@ -40,7 +43,7 @@ func EnsureTestUser(ctx context.Context, env []string, siteName string, keycloak
 	}
 
 	// Get admin access token
-	token, err := getKeycloakAdminToken(keycloakURL, realm, adminUser, adminPass)
+	token, err := getKeycloakAdminToken(keycloakURL, adminUser, adminPass)
 	if err != nil {
 		return fmt.Errorf("failed to get admin token: %w", err)
 	}
@@ -82,7 +85,7 @@ func generatePassword(length int) (string, error) {
 // getKeycloakAdminCreds retrieves Keycloak admin credentials from the secret
 func getKeycloakAdminCreds(ctx context.Context, env []string, secretName string) (string, string, error) {
 	cmd := exec.CommandContext(ctx, "kubectl", "get", "secret", secretName,
-		"-n", "posit-team",
+		"-n", namespace,
 		"-o", "jsonpath={.data.username} {.data.password}")
 	cmd.Env = env
 
@@ -113,9 +116,9 @@ func getKeycloakAdminCreds(ctx context.Context, env []string, secretName string)
 	return string(usernameBytes), string(passwordBytes), nil
 }
 
-// getKeycloakAdminToken gets an admin access token from Keycloak's master realm
-func getKeycloakAdminToken(keycloakURL, _, username, password string) (string, error) {
-	// Admin tokens are always obtained from the master realm
+// getKeycloakAdminToken gets an admin access token from Keycloak's master realm.
+// Admin tokens are always obtained from the master realm, regardless of the target realm.
+func getKeycloakAdminToken(keycloakURL, username, password string) (string, error) {
 	tokenURL := fmt.Sprintf("%s/realms/master/protocol/openid-connect/token", keycloakURL)
 
 	data := url.Values{
@@ -131,7 +134,7 @@ func getKeycloakAdminToken(keycloakURL, _, username, password string) (string, e
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: keycloakHTTPTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
@@ -153,8 +156,11 @@ func getKeycloakAdminToken(keycloakURL, _, username, password string) (string, e
 	return result.AccessToken, nil
 }
 
-// createKeycloakUser creates a user in Keycloak
+// createKeycloakUser creates a user in Keycloak, or resets their password if they already exist.
+// Resetting the password when the user exists ensures the K8s secret (written after this call)
+// always matches the actual Keycloak credentials.
 func createKeycloakUser(keycloakURL, realm, token, username, password string) error {
+	client := &http.Client{Timeout: keycloakHTTPTimeout}
 	usersURL := fmt.Sprintf("%s/admin/realms/%s/users", keycloakURL, realm)
 
 	// Check if user already exists
@@ -165,7 +171,6 @@ func createKeycloakUser(keycloakURL, realm, token, username, password string) er
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -176,12 +181,13 @@ func createKeycloakUser(keycloakURL, realm, token, username, password string) er
 		body, _ := io.ReadAll(resp.Body)
 		var users []map[string]interface{}
 		if err := json.Unmarshal(body, &users); err == nil && len(users) > 0 {
-			slog.Info("User already exists in Keycloak", "username", username)
-			return nil
+			slog.Info("User already exists in Keycloak, resetting password", "username", username)
+			userID, _ := users[0]["id"].(string)
+			return resetKeycloakUserPassword(keycloakURL, realm, token, userID, password, client)
 		}
 	}
 
-	// Create user
+	// Create user with password
 	userPayload := map[string]interface{}{
 		"username":      username,
 		"enabled":       true,
@@ -221,6 +227,40 @@ func createKeycloakUser(keycloakURL, realm, token, username, password string) er
 	return nil
 }
 
+// resetKeycloakUserPassword sets a user's password via the Keycloak admin API.
+func resetKeycloakUserPassword(keycloakURL, realm, token, userID, password string, client *http.Client) error {
+	resetURL := fmt.Sprintf("%s/admin/realms/%s/users/%s/reset-password", keycloakURL, realm, userID)
+	payload := map[string]interface{}{
+		"type":      "password",
+		"value":     password,
+		"temporary": false,
+	}
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("PUT", resetURL, bytes.NewReader(payloadBytes))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("reset password failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 // createCredentialsSecret creates a K8s secret with test user credentials.
 // Credentials are passed via stdin (not argv) to avoid exposure in process listings.
 func createCredentialsSecret(ctx context.Context, env []string, username, password string) error {
@@ -228,17 +268,18 @@ func createCredentialsSecret(ctx context.Context, env []string, username, passwo
 kind: Secret
 metadata:
   name: vip-test-credentials
-  namespace: posit-team
+  namespace: %s
 type: Opaque
 data:
   username: %s
   password: %s
 `,
+		namespace,
 		base64.StdEncoding.EncodeToString([]byte(username)),
 		base64.StdEncoding.EncodeToString([]byte(password)),
 	)
 
-	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-", "-n", "posit-team")
+	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-", "-n", namespace)
 	cmd.Env = env
 	cmd.Stdin = strings.NewReader(secretYAML)
 

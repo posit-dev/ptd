@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -36,7 +37,7 @@ func CreateConfigMap(ctx context.Context, env []string, configName string, confi
 	// Create ConfigMap from the file
 	cmd := exec.CommandContext(ctx, "kubectl", "create", "configmap", configName,
 		"--from-file=vip.toml="+tmpfile.Name(),
-		"-n", "posit-team",
+		"-n", namespace,
 		"--dry-run=client",
 		"-o", "yaml")
 	cmd.Env = env
@@ -50,7 +51,7 @@ func CreateConfigMap(ctx context.Context, env []string, configName string, confi
 	}
 
 	// Apply the ConfigMap
-	applyCmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-", "-n", "posit-team")
+	applyCmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-", "-n", namespace)
 	applyCmd.Env = env
 	applyCmd.Stdin = strings.NewReader(string(output))
 
@@ -77,7 +78,7 @@ func CreateJob(ctx context.Context, env []string, opts JobOptions) error {
 		"kind":       "Job",
 		"metadata": map[string]interface{}{
 			"name":      opts.JobName,
-			"namespace": "posit-team",
+			"namespace": namespace,
 			"labels": map[string]string{
 				"app.kubernetes.io/name":       "vip-verify",
 				"app.kubernetes.io/managed-by": "ptd",
@@ -141,7 +142,7 @@ func CreateJob(ctx context.Context, env []string, opts JobOptions) error {
 		return fmt.Errorf("failed to marshal job spec: %w", err)
 	}
 
-	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-", "-n", "posit-team")
+	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-", "-n", namespace)
 	cmd.Env = env
 	cmd.Stdin = strings.NewReader(string(jobJSON))
 
@@ -161,18 +162,18 @@ func StreamLogs(ctx context.Context, env []string, jobName string) error {
 	}
 
 	// Stream the pod logs
-	cmd := exec.CommandContext(ctx, "kubectl", "logs", "-f", podName, "-n", "posit-team")
+	cmd := exec.CommandContext(ctx, "kubectl", "logs", "-f", podName, "-n", namespace)
 	cmd.Env = env
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		// Don't return error if the pod has already completed
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			// Exit code 1 from kubectl logs usually means pod is already done
-			if exitErr.ExitCode() == 1 {
-				return nil
-			}
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			// kubectl logs -f exits with code 1 when the pod has already completed,
+			// but also for network errors and other failures. Log a warning so the
+			// operator knows logs may be incomplete, then continue to WaitForJob.
+			slog.Warn("kubectl logs exited with code 1; log output may be incomplete", "pod", podName)
+			return nil
 		}
 		return fmt.Errorf("failed to stream logs: %w", err)
 	}
@@ -194,7 +195,7 @@ func waitForPod(ctx context.Context, env []string, jobName string, timeout time.
 			return "", fmt.Errorf("timeout waiting for pod to be created")
 		case <-ticker.C:
 			cmd := exec.CommandContext(ctx, "kubectl", "get", "pods",
-				"-n", "posit-team",
+				"-n", namespace,
 				"-l", "batch.kubernetes.io/job-name="+jobName,
 				"-o", "jsonpath={.items[0].metadata.name}")
 			cmd.Env = env
@@ -222,7 +223,7 @@ func WaitForJob(ctx context.Context, env []string, jobName string) (bool, error)
 			return false, fmt.Errorf("timeout waiting for job to complete")
 		case <-ticker.C:
 			cmd := exec.CommandContext(ctx, "kubectl", "get", "job", jobName,
-				"-n", "posit-team",
+				"-n", namespace,
 				"-o", "jsonpath={.status.conditions[?(@.type==\"Complete\")].status} {.status.conditions[?(@.type==\"Failed\")].status}")
 			cmd.Env = env
 
@@ -231,33 +232,38 @@ func WaitForJob(ctx context.Context, env []string, jobName string) (bool, error)
 				continue
 			}
 
-			status := strings.TrimSpace(string(output))
-			parts := strings.Fields(status)
-
-			// Check if job completed successfully
-			if len(parts) >= 1 && parts[0] == "True" {
-				return true, nil
-			}
-
-			// Check if job failed
-			if len(parts) >= 2 && parts[1] == "True" {
-				return false, nil
+			if done, success := parseJobStatus(string(output)); done {
+				return success, nil
 			}
 		}
 	}
 }
 
+// parseJobStatus parses kubectl jsonpath output for job Complete/Failed conditions.
+// The output format is "{Complete.status} {Failed.status}" where each is "True", "False", or empty.
+// Returns (done, success): done=true means the job has finished.
+func parseJobStatus(output string) (done bool, success bool) {
+	parts := strings.Fields(strings.TrimSpace(output))
+	if len(parts) >= 1 && parts[0] == "True" {
+		return true, true
+	}
+	if len(parts) >= 2 && parts[1] == "True" {
+		return true, false
+	}
+	return false, false
+}
+
 // Cleanup removes the Job and ConfigMap
 func Cleanup(ctx context.Context, env []string, jobName string, configName string) error {
 	// Delete job
-	jobCmd := exec.CommandContext(ctx, "kubectl", "delete", "job", jobName, "-n", "posit-team", "--ignore-not-found")
+	jobCmd := exec.CommandContext(ctx, "kubectl", "delete", "job", jobName, "-n", namespace, "--ignore-not-found")
 	jobCmd.Env = env
 	if err := jobCmd.Run(); err != nil {
 		return fmt.Errorf("failed to delete job: %w", err)
 	}
 
 	// Delete configmap
-	cmCmd := exec.CommandContext(ctx, "kubectl", "delete", "configmap", configName, "-n", "posit-team", "--ignore-not-found")
+	cmCmd := exec.CommandContext(ctx, "kubectl", "delete", "configmap", configName, "-n", namespace, "--ignore-not-found")
 	cmCmd.Env = env
 	if err := cmCmd.Run(); err != nil {
 		return fmt.Errorf("failed to delete configmap: %w", err)
