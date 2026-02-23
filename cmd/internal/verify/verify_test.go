@@ -3,6 +3,7 @@ package verify
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -230,7 +231,12 @@ func TestGenerateConfig_EmptyDomain(t *testing.T) {
 }
 
 func TestGenerateConfig_EmptyDomainAllBaseDomains(t *testing.T) {
-	// Empty site-level domain is valid when every product has its own baseDomain
+	// Empty site-level domain is valid when every product has its own baseDomain.
+	// NOTE: BaseDomain must be a bare parent domain (e.g. "custom.org"), NOT a
+	// fully-qualified hostname like "connect.custom.org". buildProductURL always
+	// prepends the product prefix, so BaseDomain="connect.custom.org" produces
+	// "https://connect.connect.custom.org" (double-prefix). Use a bare domain to
+	// get the expected "https://connect.custom.org" result.
 	site := &SiteCR{
 		Spec: SiteSpec{
 			Domain: "",
@@ -299,6 +305,174 @@ func TestBuildProductURL_DomainPrefixAndBaseDomain(t *testing.T) {
 	want := "https://rsc.custom.org"
 	if got != want {
 		t.Errorf("buildProductURL with DomainPrefix+BaseDomain = %q, want %q", got, want)
+	}
+}
+
+func TestBuildJobSpec(t *testing.T) {
+	tests := []struct {
+		name             string
+		opts             JobOptions
+		wantAPIVersion   string
+		wantKind         string
+		wantContainerEnv bool
+		wantCategories   bool
+	}{
+		{
+			name: "basic spec without credentials",
+			opts: JobOptions{
+				Image:                "vip:latest",
+				JobName:              "vip-test-123",
+				ConfigName:           "vip-config-123",
+				Namespace:            "default",
+				CredentialsAvailable: false,
+			},
+			wantAPIVersion:   "batch/v1",
+			wantKind:         "Job",
+			wantContainerEnv: false,
+		},
+		{
+			name: "spec with credentials injects env vars",
+			opts: JobOptions{
+				Image:                "vip:latest",
+				JobName:              "vip-test-456",
+				ConfigName:           "vip-config-456",
+				Namespace:            "test-ns",
+				CredentialsAvailable: true,
+			},
+			wantAPIVersion:   "batch/v1",
+			wantKind:         "Job",
+			wantContainerEnv: true,
+		},
+		{
+			name: "spec with categories adds -m flag",
+			opts: JobOptions{
+				Image:      "vip:latest",
+				JobName:    "vip-test-789",
+				ConfigName: "vip-config-789",
+				Namespace:  "default",
+				Categories: "smoke",
+			},
+			wantAPIVersion: "batch/v1",
+			wantKind:       "Job",
+			wantCategories: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := buildJobSpec(tt.opts)
+
+			// Verify by round-tripping through JSON (same path as production code).
+			data, err := json.Marshal(spec)
+			if err != nil {
+				t.Fatalf("json.Marshal failed: %v", err)
+			}
+			var parsed map[string]interface{}
+			if err := json.Unmarshal(data, &parsed); err != nil {
+				t.Fatalf("json.Unmarshal failed: %v", err)
+			}
+
+			if parsed["apiVersion"] != tt.wantAPIVersion {
+				t.Errorf("apiVersion = %v, want %v", parsed["apiVersion"], tt.wantAPIVersion)
+			}
+			if parsed["kind"] != tt.wantKind {
+				t.Errorf("kind = %v, want %v", parsed["kind"], tt.wantKind)
+			}
+
+			// Verify metadata name and labels.
+			meta := parsed["metadata"].(map[string]interface{})
+			if meta["name"] != tt.opts.JobName {
+				t.Errorf("metadata.name = %v, want %v", meta["name"], tt.opts.JobName)
+			}
+			labels := meta["labels"].(map[string]interface{})
+			if labels["app.kubernetes.io/managed-by"] != "ptd" {
+				t.Errorf("managed-by label = %v, want ptd", labels["app.kubernetes.io/managed-by"])
+			}
+
+			// Drill down to the container spec.
+			jobSpec := parsed["spec"].(map[string]interface{})
+			podTemplate := jobSpec["template"].(map[string]interface{})
+			podSpec := podTemplate["spec"].(map[string]interface{})
+			containers := podSpec["containers"].([]interface{})
+			if len(containers) != 1 {
+				t.Fatalf("expected 1 container, got %d", len(containers))
+			}
+			container := containers[0].(map[string]interface{})
+
+			if container["image"] != tt.opts.Image {
+				t.Errorf("container image = %v, want %v", container["image"], tt.opts.Image)
+			}
+
+			// Check volume mount path.
+			mounts := container["volumeMounts"].([]interface{})
+			if len(mounts) != 1 {
+				t.Fatalf("expected 1 volumeMount, got %d", len(mounts))
+			}
+			mount := mounts[0].(map[string]interface{})
+			if mount["mountPath"] != "/app/vip.toml" {
+				t.Errorf("mountPath = %v, want /app/vip.toml", mount["mountPath"])
+			}
+
+			// Check env vars are present/absent based on CredentialsAvailable.
+			_, hasEnv := container["env"]
+			if hasEnv != tt.wantContainerEnv {
+				t.Errorf("container env present = %v, want %v", hasEnv, tt.wantContainerEnv)
+			}
+
+			// Check categories flag.
+			args := container["args"].([]interface{})
+			hasM := false
+			for _, a := range args {
+				if a == "-m" {
+					hasM = true
+					break
+				}
+			}
+			if hasM != tt.wantCategories {
+				t.Errorf("args contains -m = %v, want %v", hasM, tt.wantCategories)
+			}
+		})
+	}
+}
+
+func TestBuildSecretSpec(t *testing.T) {
+	spec := buildSecretSpec("vip-test-credentials", "test-ns", "alice", "s3cr3t")
+
+	data, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatalf("json.Marshal failed: %v", err)
+	}
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("json.Unmarshal failed: %v", err)
+	}
+
+	if parsed["apiVersion"] != "v1" {
+		t.Errorf("apiVersion = %v, want v1", parsed["apiVersion"])
+	}
+	if parsed["kind"] != "Secret" {
+		t.Errorf("kind = %v, want Secret", parsed["kind"])
+	}
+	if parsed["type"] != "Opaque" {
+		t.Errorf("type = %v, want Opaque", parsed["type"])
+	}
+
+	meta := parsed["metadata"].(map[string]interface{})
+	if meta["name"] != "vip-test-credentials" {
+		t.Errorf("metadata.name = %v, want vip-test-credentials", meta["name"])
+	}
+	if meta["namespace"] != "test-ns" {
+		t.Errorf("metadata.namespace = %v, want test-ns", meta["namespace"])
+	}
+
+	secretData := parsed["data"].(map[string]interface{})
+	gotUser, _ := base64.StdEncoding.DecodeString(secretData["username"].(string))
+	gotPass, _ := base64.StdEncoding.DecodeString(secretData["password"].(string))
+	if string(gotUser) != "alice" {
+		t.Errorf("username = %v, want alice", string(gotUser))
+	}
+	if string(gotPass) != "s3cr3t" {
+		t.Errorf("password = %v, want s3cr3t", string(gotPass))
 	}
 }
 

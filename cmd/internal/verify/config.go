@@ -55,6 +55,11 @@ type SiteSpec struct {
 
 type ProductSpec struct {
 	DomainPrefix string   `yaml:"domainPrefix,omitempty"`
+	// BaseDomain is the bare parent domain for this product (e.g. "example.com").
+	// It must NOT include the product subdomain; buildProductURL always prepends the
+	// product prefix (DomainPrefix or the default) to form the final URL.
+	// For example, BaseDomain="example.com" with default prefix "connect" yields
+	// "https://connect.example.com".
 	BaseDomain   string   `yaml:"baseDomain,omitempty"`
 	Auth         *AuthSpec `yaml:"auth,omitempty"`
 }
@@ -148,7 +153,10 @@ func GenerateConfig(site *SiteCR, targetName string) (string, error) {
 	return buf.String(), nil
 }
 
-// buildProductURL constructs the product URL from the product spec
+// buildProductURL constructs the product URL from the product spec.
+// The prefix (DomainPrefix or defaultPrefix) is always prepended to the domain, so
+// ProductSpec.BaseDomain must be a bare parent domain (e.g. "example.com"), not a
+// fully-qualified hostname that already includes the product subdomain.
 func buildProductURL(spec *ProductSpec, defaultPrefix, baseDomain string) string {
 	prefix := defaultPrefix
 	if spec.DomainPrefix != "" {
