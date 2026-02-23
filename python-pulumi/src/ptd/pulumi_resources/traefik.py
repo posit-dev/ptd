@@ -19,10 +19,15 @@ def _build_nlb_tag_string(tags: dict[str, str] | None, cluster_name: str) -> str
         )
     true_name = tags.get("posit.team/true-name")
     environment = tags.get("posit.team/environment")
-    if true_name is None or environment is None:
+    if true_name is None:
         raise ValueError(
-            "Cluster tags must include 'posit.team/true-name' and 'posit.team/environment' "
-            f"for NLB tagging. Available tags: {list(tags.keys())}"
+            f"Missing required tag: 'posit.team/true-name' for NLB tagging. "
+            f"Available tags: {list(tags.keys())}"
+        )
+    if environment is None:
+        raise ValueError(
+            f"Missing required tag: 'posit.team/environment' for NLB tagging. "
+            f"Available tags: {list(tags.keys())}"
         )
     return format_lb_tags(
         {

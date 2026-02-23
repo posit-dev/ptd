@@ -30,3 +30,11 @@ def test_build_nlb_tag_string_missing_environment() -> None:
             tags={"posit.team/true-name": "myapp"},
             cluster_name="myapp-cluster",
         )
+
+
+def test_build_nlb_tag_string_invalid_cluster_name() -> None:
+    with pytest.raises(ValueError):
+        _build_nlb_tag_string(
+            tags={"posit.team/true-name": "myapp", "posit.team/environment": "production"},
+            cluster_name="bad,name",
+        )
