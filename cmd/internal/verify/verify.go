@@ -33,9 +33,15 @@ func Run(ctx context.Context, opts Options) error {
 		return fmt.Errorf("failed to get Site CR: %w", err)
 	}
 
+	// Parse Site CR once
+	var site SiteCR
+	if err := yaml.Unmarshal(siteYAML, &site); err != nil {
+		return fmt.Errorf("failed to parse Site CR: %w", err)
+	}
+
 	// Generate VIP config
 	slog.Info("Generating VIP configuration")
-	vipConfig, err := GenerateConfig(siteYAML, opts.Target)
+	vipConfig, err := GenerateConfig(&site, opts.Target)
 	if err != nil {
 		return fmt.Errorf("failed to generate VIP config: %w", err)
 	}
@@ -44,12 +50,6 @@ func Run(ctx context.Context, opts Options) error {
 	if opts.ConfigOnly {
 		fmt.Println(vipConfig)
 		return nil
-	}
-
-	// Parse Site CR to get Keycloak URL
-	var site SiteCR
-	if err := parseYAML(siteYAML, &site); err != nil {
-		return fmt.Errorf("failed to parse Site CR: %w", err)
 	}
 
 	keycloakURL := fmt.Sprintf("https://key.%s", site.Spec.Domain)
@@ -84,20 +84,6 @@ func getSiteCR(ctx context.Context, env []string, siteName string) ([]byte, erro
 	}
 
 	return output, nil
-}
-
-// parseYAML is a helper to unmarshal YAML
-func parseYAML(data []byte, v interface{}) error {
-	// Use the yaml package imported in config.go
-	// This is a simple wrapper to avoid importing yaml again
-	var site SiteCR
-	if err := yaml.Unmarshal(data, &site); err != nil {
-		return err
-	}
-	if siteCR, ok := v.(*SiteCR); ok {
-		*siteCR = site
-	}
-	return nil
 }
 
 // runLocalTests runs VIP tests locally using uv
@@ -139,17 +125,20 @@ func runLocalTests(ctx context.Context, vipConfig string, categories string) err
 func runKubernetesTests(ctx context.Context, opts Options, vipConfig string) error {
 	timestamp := time.Now().Format("20060102150405")
 	jobName := fmt.Sprintf("vip-verify-%s", timestamp)
-	configName := "vip-verify-config"
+	configName := fmt.Sprintf("vip-verify-config-%s", timestamp)
 
 	slog.Info("Creating ConfigMap", "name", configName)
 	if err := CreateConfigMap(ctx, opts.Env, configName, vipConfig); err != nil {
 		return fmt.Errorf("failed to create ConfigMap: %w", err)
 	}
 
-	// Clean up ConfigMap on exit
+	// Clean up resources on exit using a fresh context so cleanup succeeds
+	// even if the caller context has expired after the job wait.
 	defer func() {
 		slog.Debug("Cleaning up resources")
-		if err := Cleanup(ctx, opts.Env, jobName, configName); err != nil {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := Cleanup(cleanupCtx, opts.Env, jobName, configName); err != nil {
 			slog.Warn("Failed to cleanup resources", "error", err)
 		}
 	}()

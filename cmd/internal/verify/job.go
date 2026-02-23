@@ -2,6 +2,7 @@ package verify
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -62,11 +63,16 @@ func CreateConfigMap(ctx context.Context, env []string, configName string, confi
 
 // CreateJob creates a Kubernetes Job for running VIP tests
 func CreateJob(ctx context.Context, env []string, opts JobOptions) error {
-	// Build args - only add -m filter if categories are specified
-	args := `["--tb=short", "-v"]`
+	// Build args as a proper slice and marshal to JSON to prevent injection
+	argsSlice := []string{"--tb=short", "-v"}
 	if opts.Categories != "" {
-		args = fmt.Sprintf(`["--tb=short", "-v", "-m", "%s"]`, opts.Categories)
+		argsSlice = append(argsSlice, "-m", opts.Categories)
 	}
+	argsJSON, err := json.Marshal(argsSlice)
+	if err != nil {
+		return fmt.Errorf("failed to marshal job args: %w", err)
+	}
+	args := string(argsJSON)
 
 	jobYAML := fmt.Sprintf(`apiVersion: batch/v1
 kind: Job

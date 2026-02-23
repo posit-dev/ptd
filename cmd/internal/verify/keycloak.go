@@ -3,11 +3,15 @@ package verify
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
+	"math/big"
 	"net/http"
+	"net/url"
 	"os/exec"
 	"strings"
 )
@@ -41,9 +45,12 @@ func EnsureTestUser(ctx context.Context, env []string, siteName string, keycloak
 		return fmt.Errorf("failed to get admin token: %w", err)
 	}
 
-	// Create test user
+	// Create test user with a randomly generated password
 	username := "vip-test-user"
-	password := "vip-test-password-12345"
+	password, err := generatePassword(32)
+	if err != nil {
+		return fmt.Errorf("failed to generate password: %w", err)
+	}
 
 	if err := createKeycloakUser(keycloakURL, realm, token, username, password); err != nil {
 		return fmt.Errorf("failed to create test user: %w", err)
@@ -56,6 +63,20 @@ func EnsureTestUser(ctx context.Context, env []string, siteName string, keycloak
 
 	slog.Info("Test user created successfully", "username", username)
 	return nil
+}
+
+// generatePassword generates a cryptographically random password of the given length.
+func generatePassword(length int) (string, error) {
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	result := make([]byte, length)
+	for i := range result {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
+		if err != nil {
+			return "", err
+		}
+		result[i] = chars[n.Int64()]
+	}
+	return string(result), nil
 }
 
 // getKeycloakAdminCreds retrieves Keycloak admin credentials from the secret
@@ -78,22 +99,18 @@ func getKeycloakAdminCreds(ctx context.Context, env []string, secretName string)
 		return "", "", fmt.Errorf("unexpected secret format")
 	}
 
-	// Decode base64 values
-	userCmd := exec.CommandContext(ctx, "base64", "-d")
-	userCmd.Stdin = strings.NewReader(parts[0])
-	username, err := userCmd.Output()
+	// Decode base64 values using stdlib (portable, no subprocess)
+	usernameBytes, err := base64.StdEncoding.DecodeString(parts[0])
 	if err != nil {
 		return "", "", fmt.Errorf("failed to decode username: %w", err)
 	}
 
-	passCmd := exec.CommandContext(ctx, "base64", "-d")
-	passCmd.Stdin = strings.NewReader(parts[1])
-	password, err := passCmd.Output()
+	passwordBytes, err := base64.StdEncoding.DecodeString(parts[1])
 	if err != nil {
 		return "", "", fmt.Errorf("failed to decode password: %w", err)
 	}
 
-	return string(username), string(password), nil
+	return string(usernameBytes), string(passwordBytes), nil
 }
 
 // getKeycloakAdminToken gets an admin access token from Keycloak's master realm
@@ -101,8 +118,13 @@ func getKeycloakAdminToken(keycloakURL, _, username, password string) (string, e
 	// Admin tokens are always obtained from the master realm
 	tokenURL := fmt.Sprintf("%s/realms/master/protocol/openid-connect/token", keycloakURL)
 
-	data := fmt.Sprintf("grant_type=password&client_id=admin-cli&username=%s&password=%s", username, password)
-	req, err := http.NewRequest("POST", tokenURL, strings.NewReader(data))
+	data := url.Values{
+		"grant_type": {"password"},
+		"client_id":  {"admin-cli"},
+		"username":   {username},
+		"password":   {password},
+	}
+	req, err := http.NewRequest("POST", tokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return "", err
 	}
@@ -199,16 +221,29 @@ func createKeycloakUser(keycloakURL, realm, token, username, password string) er
 	return nil
 }
 
-// createCredentialsSecret creates a K8s secret with test user credentials
+// createCredentialsSecret creates a K8s secret with test user credentials.
+// Credentials are passed via stdin (not argv) to avoid exposure in process listings.
 func createCredentialsSecret(ctx context.Context, env []string, username, password string) error {
-	cmd := exec.CommandContext(ctx, "kubectl", "create", "secret", "generic", "vip-test-credentials",
-		"--from-literal=username="+username,
-		"--from-literal=password="+password,
-		"-n", "posit-team")
+	secretYAML := fmt.Sprintf(`apiVersion: v1
+kind: Secret
+metadata:
+  name: vip-test-credentials
+  namespace: posit-team
+type: Opaque
+data:
+  username: %s
+  password: %s
+`,
+		base64.StdEncoding.EncodeToString([]byte(username)),
+		base64.StdEncoding.EncodeToString([]byte(password)),
+	)
+
+	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-", "-n", "posit-team")
 	cmd.Env = env
+	cmd.Stdin = strings.NewReader(secretYAML)
 
 	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("kubectl create secret failed: %s", string(output))
+		return fmt.Errorf("kubectl apply secret failed: %s", string(output))
 	}
 
 	return nil

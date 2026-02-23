@@ -70,14 +70,14 @@ func runVerify(ctx context.Context, cmd *cobra.Command, target string) {
 	t, err := legacy.TargetFromName(target)
 	if err != nil {
 		slog.Error("Could not load target", "error", err)
-		return
+		os.Exit(1)
 	}
 
 	// Get credentials
 	creds, err := t.Credentials(ctx)
 	if err != nil {
 		slog.Error("Failed to get credentials", "error", err)
-		return
+		os.Exit(1)
 	}
 
 	credEnvVars := creds.EnvVars()
@@ -95,7 +95,7 @@ func runVerify(ctx context.Context, cmd *cobra.Command, target string) {
 	kubeconfigPath, err := kube.SetupKubeConfig(ctx, t, creds)
 	if err != nil {
 		slog.Error("Failed to setup kubeconfig", "error", err)
-		return
+		os.Exit(1)
 	}
 
 	// Prepare environment variables for kubectl (inherit from current env)
