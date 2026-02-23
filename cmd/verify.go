@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/posit-dev/ptd/cmd/internal"
 	"github.com/posit-dev/ptd/cmd/internal/legacy"
@@ -96,6 +97,10 @@ func runVerify(ctx context.Context, cmd *cobra.Command, target string) {
 	if err != nil {
 		slog.Error("Failed to setup kubeconfig", "error", err)
 		os.Exit(1)
+	}
+
+	if strings.HasSuffix(verifyImage, ":latest") {
+		slog.Warn("Using ':latest' image tag is non-deterministic; consider pinning a specific version", "image", verifyImage)
 	}
 
 	// Prepare environment variables for kubectl (inherit from current env)

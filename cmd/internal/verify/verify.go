@@ -11,6 +11,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// namespace is the Kubernetes namespace where PTD resources live.
+const namespace = "posit-team"
+
 // Options contains configuration for the verify command
 type Options struct {
 	Target     string
@@ -71,7 +74,7 @@ func Run(ctx context.Context, opts Options) error {
 // getSiteCR retrieves the Site CR YAML from Kubernetes
 func getSiteCR(ctx context.Context, env []string, siteName string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "kubectl", "get", "site", siteName,
-		"-n", "posit-team",
+		"-n", namespace,
 		"-o", "yaml")
 	cmd.Env = env
 
