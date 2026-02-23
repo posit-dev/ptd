@@ -185,7 +185,10 @@ func createKeycloakUser(ctx context.Context, keycloakURL, realm, token, username
 	if err != nil {
 		return err
 	}
-	defer searchResp.Body.Close()
+	defer func() {
+		io.Copy(io.Discard, searchResp.Body)
+		searchResp.Body.Close()
+	}()
 
 	if searchResp.StatusCode == http.StatusOK {
 		body, _ := io.ReadAll(searchResp.Body)

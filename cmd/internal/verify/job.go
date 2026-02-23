@@ -219,7 +219,10 @@ func waitForPod(ctx context.Context, env []string, jobName string, timeout time.
 	for {
 		select {
 		case <-ctx.Done():
-			return "", fmt.Errorf("timeout waiting for pod to be created")
+			if ctx.Err() == context.DeadlineExceeded {
+				return "", fmt.Errorf("timeout waiting for pod to be created")
+			}
+			return "", fmt.Errorf("cancelled while waiting for pod to be created")
 		case <-ticker.C:
 			cmd := exec.CommandContext(ctx, "kubectl", "get", "pods",
 				"-n", namespace,

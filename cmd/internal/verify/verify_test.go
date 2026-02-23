@@ -215,7 +215,7 @@ func TestGenerateConfig_EmptyAuthType(t *testing.T) {
 }
 
 func TestGenerateConfig_EmptyDomain(t *testing.T) {
-	// Empty domain with a configured product should return an error (malformed URL otherwise)
+	// Empty domain with a product that has no per-product baseDomain should return an error
 	site := &SiteCR{
 		Spec: SiteSpec{
 			Domain:  "",
@@ -225,7 +225,27 @@ func TestGenerateConfig_EmptyDomain(t *testing.T) {
 
 	_, err := GenerateConfig(site, "test")
 	if err == nil {
-		t.Fatal("expected error for empty domain with configured product, got nil")
+		t.Fatal("expected error for empty domain with configured product and no baseDomain, got nil")
+	}
+}
+
+func TestGenerateConfig_EmptyDomainAllBaseDomains(t *testing.T) {
+	// Empty site-level domain is valid when every product has its own baseDomain
+	site := &SiteCR{
+		Spec: SiteSpec{
+			Domain: "",
+			Connect: &ProductSpec{
+				BaseDomain: "connect.custom.org",
+			},
+		},
+	}
+
+	config, err := GenerateConfig(site, "test")
+	if err != nil {
+		t.Fatalf("expected no error when all products have baseDomain, got: %v", err)
+	}
+	if !strings.Contains(config, `url = "https://connect.connect.custom.org"`) {
+		t.Errorf("expected connect URL using baseDomain, got:\n%s", config)
 	}
 }
 
