@@ -14,10 +14,16 @@ def format_lb_tags(tags: dict[str, str]) -> str:
         if "," in key or "=" in key:
             msg = f"LB tag key contains invalid characters (comma or equals): {key}"
             raise ValueError(msg)
+        if " " in key:
+            msg = f"LB tag key contains invalid character (space): {key!r}"
+            raise ValueError(msg)
         if not value:
             msg = f"LB tag value must not be empty: key={key}"
             raise ValueError(msg)
         if "," in value or "=" in value:
             msg = f"LB tag value contains invalid characters (comma or equals): {key}={value}"
+            raise ValueError(msg)
+        if " " in value:
+            msg = f"LB tag value contains invalid character (space): {key}={value!r}"
             raise ValueError(msg)
     return ",".join(f"{k}={v}" for k, v in tags.items())

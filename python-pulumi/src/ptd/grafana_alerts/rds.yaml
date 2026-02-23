@@ -292,7 +292,7 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: RDS instance has more than 500 active database connections for more than 5 minutes.
+            description: RDS instance has more than 500 active database connections for more than 5 minutes. Note: this threshold is calibrated for db.r5.large (max ~4000 connections); it will never fire for small instances (e.g. db.t3.small max ~36). Adjust per instance class.
             summary: High database connections on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
