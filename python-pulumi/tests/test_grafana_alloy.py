@@ -603,16 +603,29 @@ class TestDefineCloudwatchConfig:
         alloy = _make_alloy_for_cloudwatch("aws")
         result = alloy._define_cloudwatch_config()  # noqa: SLF001
         assert 'AWS/NATGateway' in result
+        assert '"posit.team/true-name" = "myapp"' in result
 
     def test_aws_contains_applicationelb_discovery_block(self) -> None:
         alloy = _make_alloy_for_cloudwatch("aws")
         result = alloy._define_cloudwatch_config()  # noqa: SLF001
         assert 'AWS/ApplicationELB' in result
+        assert '"posit.team/true-name" = "myapp"' in result
 
     def test_aws_contains_networkelb_discovery_block(self) -> None:
         alloy = _make_alloy_for_cloudwatch("aws")
         result = alloy._define_cloudwatch_config()  # noqa: SLF001
         assert 'AWS/NetworkELB' in result
+        assert '"posit.team/true-name" = "myapp"' in result
+
+    def test_aws_search_tags_use_true_name(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("aws", true_name="customapp")
+        result = alloy._define_cloudwatch_config()  # noqa: SLF001
+        assert '"posit.team/true-name" = "customapp"' in result
+
+    def test_aws_fsx_rds_ec2_use_compound_name(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("aws", compound_name="customapp-staging")
+        result = alloy._define_cloudwatch_config()  # noqa: SLF001
+        assert 'Name = "customapp-staging"' in result
 
     def test_non_aws_returns_empty_string(self) -> None:
         alloy = _make_alloy_for_cloudwatch("azure")

@@ -15,7 +15,14 @@ ALLOY_NAMESPACE = "alloy"
 
 
 def _build_alb_tag_string(true_name: str, environment: str, compound_name: str) -> str:
-    """Build the ALB annotation tag string from workload config values."""
+    """Build the ALB annotation tag string from workload config values.
+
+    Uses format_lb_tags, which validates that values are safe for LB controller
+    annotation strings (no commas, equals, or whitespace). Note: format_lb_tags does
+    NOT validate for Alloy River config safety (e.g. it permits `{`, `}`, `"`).
+    Alloy River injection safety is enforced separately by _validate_alloy_true_name
+    in grafana_alloy.py before values are interpolated into the CloudWatch config.
+    """
     return format_lb_tags(
         {
             "posit.team/true-name": true_name,

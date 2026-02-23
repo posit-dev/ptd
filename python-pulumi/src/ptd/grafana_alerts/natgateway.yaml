@@ -9,6 +9,11 @@
 #     uid: nat_gateway_packets_dropped
 #
 # See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+#
+# Note: alert annotations reference {{$labels.cluster}}. For CloudWatch-sourced metrics,
+# this label is injected by the prometheus.relabel.default block in grafana_alloy.py.
+# If Alloy is not running or relabeling is misconfigured, the label will be absent and
+# the annotation will render as "in cluster " (blank).
 apiVersion: 1
 groups:
     - orgId: 1
