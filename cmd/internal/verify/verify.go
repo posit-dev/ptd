@@ -2,6 +2,8 @@ package verify
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
@@ -64,7 +66,8 @@ func Run(ctx context.Context, opts Options) error {
 	}
 
 	// Only ensure test user if Keycloak is configured for this site
-	if site.Spec.Keycloak != nil && site.Spec.Keycloak.Enabled {
+	credentialsAvailable := site.Spec.Keycloak != nil && site.Spec.Keycloak.Enabled
+	if credentialsAvailable {
 		adminSecretName := opts.KeycloakAdminSecret
 		if adminSecretName == "" {
 			adminSecretName = fmt.Sprintf("%s-keycloak-initial-admin", opts.SiteName)
@@ -79,10 +82,10 @@ func Run(ctx context.Context, opts Options) error {
 
 	// Run tests based on mode
 	if opts.LocalMode {
-		return runLocalTests(ctx, opts.Env, vipConfig, opts.Categories, opts.Namespace)
+		return runLocalTests(ctx, opts.Env, vipConfig, opts.Categories, opts.Namespace, credentialsAvailable)
 	}
 
-	return runKubernetesTests(ctx, opts, vipConfig)
+	return runKubernetesTests(ctx, opts, vipConfig, credentialsAvailable)
 }
 
 // getSiteCR retrieves the Site CR YAML from Kubernetes
@@ -104,7 +107,7 @@ func getSiteCR(ctx context.Context, env []string, siteName, namespace string) ([
 }
 
 // runLocalTests runs VIP tests locally using uv
-func runLocalTests(ctx context.Context, env []string, vipConfig string, categories string, namespace string) error {
+func runLocalTests(ctx context.Context, env []string, vipConfig string, categories string, namespace string, credentialsAvailable bool) error {
 	slog.Info("Running VIP tests locally")
 
 	// Create temporary config file
@@ -121,9 +124,12 @@ func runLocalTests(ctx context.Context, env []string, vipConfig string, categori
 	tmpfile.Close()
 
 	// Fetch credentials from the K8s Secret so local runs authenticate the same way as K8s Jobs.
-	testUser, testPass, err := getTestCredentials(ctx, env, namespace)
-	if err != nil {
-		return fmt.Errorf("failed to get test credentials: %w", err)
+	var testUser, testPass string
+	if credentialsAvailable {
+		testUser, testPass, err = getTestCredentials(ctx, env, namespace)
+		if err != nil {
+			return fmt.Errorf("failed to get test credentials: %w", err)
+		}
 	}
 
 	// Run pytest with uv
@@ -133,7 +139,10 @@ func runLocalTests(ctx context.Context, env []string, vipConfig string, categori
 	}
 
 	cmd := exec.CommandContext(ctx, "uv", args...)
-	cmd.Env = append(env, "VIP_TEST_USERNAME="+testUser, "VIP_TEST_PASSWORD="+testPass)
+	cmd.Env = env
+	if credentialsAvailable {
+		cmd.Env = append(cmd.Env, "VIP_TEST_USERNAME="+testUser, "VIP_TEST_PASSWORD="+testPass)
+	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -145,11 +154,24 @@ func runLocalTests(ctx context.Context, env []string, vipConfig string, categori
 	return nil
 }
 
+// randomHex returns n random hex-encoded bytes (2n hex characters).
+func randomHex(n int) (string, error) {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
 // runKubernetesTests runs VIP tests as a Kubernetes Job
-func runKubernetesTests(ctx context.Context, opts Options, vipConfig string) error {
+func runKubernetesTests(ctx context.Context, opts Options, vipConfig string, credentialsAvailable bool) error {
+	suffix, err := randomHex(3) // 6 hex chars
+	if err != nil {
+		return fmt.Errorf("failed to generate name suffix: %w", err)
+	}
 	timestamp := time.Now().Format("20060102150405")
-	jobName := fmt.Sprintf("vip-verify-%s", timestamp)
-	configName := fmt.Sprintf("vip-verify-config-%s", timestamp)
+	jobName := fmt.Sprintf("vip-verify-%s-%s", timestamp, suffix)
+	configName := fmt.Sprintf("vip-verify-config-%s-%s", timestamp, suffix)
 
 	slog.Info("Creating ConfigMap", "name", configName)
 	if err := CreateConfigMap(ctx, opts.Env, configName, vipConfig, opts.Namespace); err != nil {
@@ -169,11 +191,12 @@ func runKubernetesTests(ctx context.Context, opts Options, vipConfig string) err
 
 	slog.Info("Creating VIP verification Job", "name", jobName)
 	jobOpts := JobOptions{
-		Image:      opts.Image,
-		Categories: opts.Categories,
-		JobName:    jobName,
-		ConfigName: configName,
-		Namespace:  opts.Namespace,
+		Image:                opts.Image,
+		Categories:           opts.Categories,
+		JobName:              jobName,
+		ConfigName:           configName,
+		Namespace:            opts.Namespace,
+		CredentialsAvailable: credentialsAvailable,
 	}
 
 	if err := CreateJob(ctx, opts.Env, jobOpts); err != nil {

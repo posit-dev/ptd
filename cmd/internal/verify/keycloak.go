@@ -100,7 +100,13 @@ func getKeycloakAdminCreds(ctx context.Context, env []string, secretName string,
 		return "", "", fmt.Errorf("kubectl get secret failed: %w", err)
 	}
 
-	parts := strings.Fields(string(output))
+	return parseSecretData(string(output))
+}
+
+// parseSecretData parses kubectl jsonpath output of the form "<base64user> <base64pass>"
+// and returns the decoded username and password.
+func parseSecretData(output string) (string, string, error) {
+	parts := strings.Fields(strings.TrimSpace(output))
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("unexpected secret format")
 	}
