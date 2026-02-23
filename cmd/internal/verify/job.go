@@ -177,11 +177,16 @@ func CreateJob(ctx context.Context, env []string, opts JobOptions) error {
 	return nil
 }
 
+// errImagePull is returned by StreamLogs when the pod cannot start due to a permanent
+// image pull failure (ImagePullBackOff or ErrImagePull). Callers should treat this as
+// a fatal error and abort without waiting for the Job to complete.
+var errImagePull = errors.New("image pull failed")
+
 // waitForPodRunning waits for the pod to leave Pending/Init state before streaming logs.
 // This avoids a spurious "unexpected pod phase Pending" warning when kubectl logs is
 // called immediately after the pod object is created but before the container starts.
-func waitForPodRunning(ctx context.Context, env []string, podName, namespace string) error {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+func waitForPodRunning(ctx context.Context, env []string, podName, namespace string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	ticker := time.NewTicker(2 * time.Second)
@@ -203,17 +208,54 @@ func waitForPodRunning(ctx context.Context, env []string, podName, namespace str
 	}
 }
 
-// StreamLogs follows the logs of the Job pod
-func StreamLogs(ctx context.Context, env []string, jobName string, namespace string) error {
+// getPodWaitingReason returns the waiting reason for the first container in the pod.
+// Returns an empty string if the pod is not in a waiting state or on any error.
+func getPodWaitingReason(ctx context.Context, env []string, podName, namespace string) string {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "kubectl", "get", "pod", podName,
+		"-n", namespace,
+		"-o", "jsonpath={.status.containerStatuses[0].state.waiting.reason}")
+	cmd.Env = env
+
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
+// StreamLogs follows the logs of the Job pod. timeout is the overall job timeout and is
+// used to scale the pod-start wait; pass 0 to use the default 60-second pod-start wait.
+func StreamLogs(ctx context.Context, env []string, jobName string, namespace string, timeout time.Duration) error {
 	// Wait for pod to be created (timeout after 30 seconds)
 	podName, err := waitForPod(ctx, env, jobName, 30*time.Second, namespace)
 	if err != nil {
 		return err
 	}
 
+	// Scale the pod-start timeout from the overall job timeout, capped at 5 minutes.
+	podStartTimeout := 60 * time.Second
+	if timeout > 0 {
+		if t := timeout / 4; t < 5*time.Minute {
+			podStartTimeout = t
+		} else {
+			podStartTimeout = 5 * time.Minute
+		}
+	}
+
 	// Wait for the container to start before streaming to avoid spurious warnings
 	// when kubectl logs is called while the pod is still in Pending/Init state.
-	if err := waitForPodRunning(ctx, env, podName, namespace); err != nil {
+	if err := waitForPodRunning(ctx, env, podName, namespace, podStartTimeout); err != nil {
+		// Detect permanent image pull failures and surface them immediately rather
+		// than silently proceeding to stream logs and waiting for the full job timeout.
+		checkCtx, checkCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		reason := getPodWaitingReason(checkCtx, env, podName, namespace)
+		checkCancel()
+		if reason == "ImagePullBackOff" || reason == "ErrImagePull" {
+			return fmt.Errorf("%w: pod %s reason %s (check image name and pull credentials)", errImagePull, podName, reason)
+		}
 		slog.Warn("timed out waiting for pod to start; attempting log stream anyway", "pod", podName)
 	}
 
@@ -261,6 +303,40 @@ func getPodPhase(ctx context.Context, env []string, podName, namespace string) (
 	return strings.TrimSpace(string(output)), nil
 }
 
+// jobLabelSelector returns the label selector for pods created by a Job.
+// batch.kubernetes.io/job-name was introduced in Kubernetes 1.27; older clusters use
+// the legacy "job-name" label. This probes the server version once to avoid issuing
+// two kubectl calls per poll tick on pre-1.27 clusters. On any error it defaults to
+// the modern label, which is correct for all current clusters.
+func jobLabelSelector(env []string, jobName string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "kubectl", "version", "-o", "json")
+	cmd.Env = env
+
+	output, err := cmd.Output()
+	if err != nil {
+		return "batch.kubernetes.io/job-name=" + jobName
+	}
+
+	var v struct {
+		ServerVersion struct {
+			Minor string `json:"minor"`
+		} `json:"serverVersion"`
+	}
+	if err := json.Unmarshal(output, &v); err != nil {
+		return "batch.kubernetes.io/job-name=" + jobName
+	}
+
+	var minor int
+	fmt.Sscanf(v.ServerVersion.Minor, "%d", &minor)
+	if minor > 0 && minor < 27 {
+		return "job-name=" + jobName
+	}
+	return "batch.kubernetes.io/job-name=" + jobName
+}
+
 // waitForPod waits for a pod associated with the job to be created
 func waitForPod(ctx context.Context, env []string, jobName string, timeout time.Duration, namespace string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -268,6 +344,10 @@ func waitForPod(ctx context.Context, env []string, jobName string, timeout time.
 
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
+
+	// Probe the cluster label style once to avoid issuing two kubectl calls per tick
+	// on pre-1.27 clusters where the modern label is not present.
+	label := jobLabelSelector(env, jobName)
 
 	for {
 		select {
@@ -277,23 +357,15 @@ func waitForPod(ctx context.Context, env []string, jobName string, timeout time.
 			}
 			return "", fmt.Errorf("cancelled while waiting for pod to be created")
 		case <-ticker.C:
-			// batch.kubernetes.io/job-name was introduced in Kubernetes 1.27.
-			// Clusters older than 1.27 use the legacy "job-name" label instead.
-			// Try the modern label first, then fall back to the legacy label.
-			for _, label := range []string{
-				"batch.kubernetes.io/job-name=" + jobName,
-				"job-name=" + jobName,
-			} {
-				cmd := exec.CommandContext(ctx, "kubectl", "get", "pods",
-					"-n", namespace,
-					"-l", label,
-					"-o", "jsonpath={.items[0].metadata.name}")
-				cmd.Env = env
+			cmd := exec.CommandContext(ctx, "kubectl", "get", "pods",
+				"-n", namespace,
+				"-l", label,
+				"-o", "jsonpath={.items[0].metadata.name}")
+			cmd.Env = env
 
-				output, err := cmd.Output()
-				if err == nil && len(output) > 0 {
-					return strings.TrimSpace(string(output)), nil
-				}
+			output, err := cmd.Output()
+			if err == nil && len(output) > 0 {
+				return strings.TrimSpace(string(output)), nil
 			}
 		}
 	}
