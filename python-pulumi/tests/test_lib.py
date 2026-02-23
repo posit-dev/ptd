@@ -80,3 +80,13 @@ def test_format_lb_tags_tab_in_value() -> None:
 def test_format_lb_tags_newline_in_value() -> None:
     with pytest.raises(ValueError, match="whitespace"):
         format_lb_tags({"key": "bad\nvalue"})
+
+
+def test_format_lb_tags_key_too_long() -> None:
+    with pytest.raises(ValueError, match="128-character limit"):
+        format_lb_tags({"k" * 129: "value"})
+
+
+def test_format_lb_tags_value_too_long() -> None:
+    with pytest.raises(ValueError, match="256-character limit"):
+        format_lb_tags({"key": "v" * 257})
