@@ -2,9 +2,36 @@ import dataclasses
 from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
 import yaml
 
-from ptd.pulumi_resources.grafana_alloy import AlloyConfig
+from ptd.pulumi_resources.grafana_alloy import AlloyConfig, _validate_alloy_true_name
+
+
+class TestValidateAlloyTrueName:
+    def test_valid_names(self) -> None:
+        _validate_alloy_true_name("myapp")
+        _validate_alloy_true_name("my-app")
+        _validate_alloy_true_name("my.app.v2")
+        _validate_alloy_true_name("app_name")
+        _validate_alloy_true_name("myapp-production")
+        _validate_alloy_true_name("a1b2c3")
+
+    def test_double_quote_rejected(self) -> None:
+        with pytest.raises(ValueError, match="unsafe for Alloy River config"):
+            _validate_alloy_true_name('bad"name')
+
+    def test_open_brace_rejected(self) -> None:
+        with pytest.raises(ValueError, match="unsafe for Alloy River config"):
+            _validate_alloy_true_name("bad{name}")
+
+    def test_close_brace_rejected(self) -> None:
+        with pytest.raises(ValueError, match="unsafe for Alloy River config"):
+            _validate_alloy_true_name("bad}name")
+
+    def test_space_rejected(self) -> None:
+        with pytest.raises(ValueError, match="unsafe for Alloy River config"):
+            _validate_alloy_true_name("bad name")
 
 
 @dataclasses.dataclass

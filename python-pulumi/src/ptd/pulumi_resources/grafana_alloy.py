@@ -28,6 +28,20 @@ components: list[PTDComponentForAlloy] = [
 T = typing.TypeVar("T")
 
 
+def _validate_alloy_true_name(true_name: str) -> None:
+    """Validate that true_name is safe for interpolation into Alloy River config.
+
+    Alloy River config uses double-quoted strings; characters like `"`, `{`, `}` would
+    break the generated config or allow injection. This validation is enforced at
+    graph-construction time so failures are caught during `pulumi preview`.
+    """
+    if not re.match(r"^[a-zA-Z0-9._-]+$", true_name):
+        raise ValueError(
+            f"workload true_name contains characters unsafe for Alloy River config: "
+            f"{true_name!r}. Must match [a-zA-Z0-9._-]+"
+        )
+
+
 class AlloyConfig(pulumi.ComponentResource):
     namespace: str
     config_map: kubernetes.core.v1.ConfigMap
@@ -223,11 +237,7 @@ class AlloyConfig(pulumi.ComponentResource):
         # Generate CloudWatch exporter configuration for AWS
         cloudwatch_config = ""
         if self.cloud_provider == "aws":
-            if not re.match(r"^[a-zA-Z0-9._-]+$", self.workload.cfg.true_name):
-                raise ValueError(
-                    f"workload true_name contains characters unsafe for Alloy River config: "
-                    f"{self.workload.cfg.true_name!r}. Must match [a-zA-Z0-9._-]+"
-                )
+            _validate_alloy_true_name(self.workload.cfg.true_name)
             cloudwatch_config = textwrap.dedent(f"""
                 prometheus.exporter.cloudwatch "cloudwatch" {{
                     sts_region = "{self.region}"
@@ -270,8 +280,9 @@ class AlloyConfig(pulumi.ComponentResource):
                         # Collecting both Sum and Average during migration. Average is the
                         # target metric (aws_rds_database_connections_average); Sum
                         # (aws_rds_database_connections_sum) is kept temporarily for existing
-                        # dashboards. Remove Sum once all dashboards are updated.
-                        # TODO: Open a tracking issue to ensure this cleanup happens.
+                        # dashboards. Remove ["Sum"] from statistics once all Grafana dashboards
+                        # have been updated to query aws_rds_database_connections_average.
+                        # Keeping Sum doubles the CloudWatch API cost for this metric.
                         metric {{
                             name       = "DatabaseConnections"
                             statistics = ["Average", "Sum"]
