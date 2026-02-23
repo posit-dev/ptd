@@ -66,6 +66,10 @@ func CreateConfigMap(ctx context.Context, env []string, configName string, confi
 }
 
 // buildJobSpec constructs the Kubernetes Job spec as a map ready for JSON marshalling.
+// Note: unlike the local run (which passes --config <tmpfile>), the Job does not pass
+// --config explicitly. VIP defaults to reading /app/vip.toml, which is exactly where
+// the ConfigMap is mounted (see volumeMounts below). If VIP ever changes its default
+// config path, this assumption will silently break; update the mountPath accordingly.
 func buildJobSpec(opts JobOptions) map[string]interface{} {
 	args := []string{"--tb=short", "-v"}
 	if opts.Categories != "" {
@@ -182,7 +186,7 @@ func StreamLogs(ctx context.Context, env []string, jobName string, namespace str
 			// kubectl logs -f exits with code 1 when the pod has already completed,
 			// but also for network errors, RBAC failures, and pod eviction.
 			// Check the pod phase to distinguish normal completion from unexpected errors.
-			phase, phaseErr := getPodPhase(env, podName, namespace)
+			phase, phaseErr := getPodPhase(ctx, env, podName, namespace)
 			if phaseErr == nil && (phase == "Succeeded" || phase == "Failed") {
 				// Pod completed normally; log stream ended because the pod is done.
 				return nil
@@ -199,8 +203,8 @@ func StreamLogs(ctx context.Context, env []string, jobName string, namespace str
 }
 
 // getPodPhase returns the phase of a pod (e.g. "Running", "Succeeded", "Failed").
-func getPodPhase(env []string, podName, namespace string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func getPodPhase(ctx context.Context, env []string, podName, namespace string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "kubectl", "get", "pod", podName,

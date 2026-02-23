@@ -142,7 +142,7 @@ func runLocalTests(ctx context.Context, env []string, vipConfig string, categori
 	// Fetch credentials from the K8s Secret so local runs authenticate the same way as K8s Jobs.
 	var testUser, testPass string
 	if credentialsAvailable {
-		testUser, testPass, err = getTestCredentials(ctx, env, namespace)
+		testUser, testPass, err = getKeycloakAdminCreds(ctx, env, vipTestCredentialsSecret, namespace)
 		if err != nil {
 			return fmt.Errorf("failed to get test credentials: %w", err)
 		}

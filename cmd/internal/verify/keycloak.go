@@ -19,11 +19,21 @@ import (
 
 const keycloakHTTPTimeout = 30 * time.Second
 
+// vipTestCredentialsSecret is the name of the K8s Secret that holds VIP test user credentials.
+const vipTestCredentialsSecret = "vip-test-credentials"
+
 // EnsureTestUser ensures a test user exists in Keycloak and credentials are in a Secret.
 // adminSecretName is the K8s secret holding the Keycloak admin credentials.
+//
+// Note: there is a theoretical TOCTOU race if two ptd verify invocations run concurrently
+// against the same namespace. Both could pass the "secret missing" check, each generate a
+// different password, call createKeycloakUser (which resets the password), and then both
+// kubectl-apply the secret—leaving the secret with one password and Keycloak with the other.
+// This is accepted as benign: ptd verify is designed for single-operator use, and
+// createKeycloakUser resets the password idempotently so a retry will always reconcile.
 func EnsureTestUser(ctx context.Context, env []string, keycloakURL string, realm string, testUsername string, adminSecretName string, namespace string) error {
 	// Check if the vip-test-credentials secret already exists
-	checkCmd := exec.CommandContext(ctx, "kubectl", "get", "secret", "vip-test-credentials",
+	checkCmd := exec.CommandContext(ctx, "kubectl", "get", "secret", vipTestCredentialsSecret,
 		"-n", namespace, "--ignore-not-found", "-o", "jsonpath={.metadata.name}")
 	checkCmd.Env = env
 
@@ -34,7 +44,7 @@ func EnsureTestUser(ctx context.Context, env []string, keycloakURL string, realm
 		}
 		return fmt.Errorf("failed to check for existing credentials secret: %w", err)
 	}
-	if strings.TrimSpace(string(output)) == "vip-test-credentials" {
+	if strings.TrimSpace(string(output)) == vipTestCredentialsSecret {
 		slog.Info("Test user credentials secret already exists, skipping creation")
 		return nil
 	}
@@ -70,11 +80,6 @@ func EnsureTestUser(ctx context.Context, env []string, keycloakURL string, realm
 
 	slog.Info("Test user created successfully", "username", username)
 	return nil
-}
-
-// getTestCredentials retrieves VIP test user credentials from the vip-test-credentials Secret.
-func getTestCredentials(ctx context.Context, env []string, namespace string) (string, string, error) {
-	return getKeycloakAdminCreds(ctx, env, "vip-test-credentials", namespace)
 }
 
 // generatePassword generates a cryptographically random password of the given length.
@@ -312,7 +317,7 @@ func buildSecretSpec(name, namespace, username, password string) map[string]inte
 // createCredentialsSecret creates a K8s secret with test user credentials.
 // Uses JSON marshalling to prevent injection, consistent with job.go.
 func createCredentialsSecret(ctx context.Context, env []string, username, password string, namespace string) error {
-	secret := buildSecretSpec("vip-test-credentials", namespace, username, password)
+	secret := buildSecretSpec(vipTestCredentialsSecret, namespace, username, password)
 
 	secretJSON, err := json.Marshal(secret)
 	if err != nil {
