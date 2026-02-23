@@ -827,7 +827,8 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
         return annotations
 
     def _define_ingress_alb_annotations(self, cert_arns: list[str]) -> dict[str, str]:
-        # Build tags dict and validate using helper
+        # cfg.true_name, cfg.environment, and compound_name are plain str values
+        # loaded from YAML config at startup (see ptd/workload.py), not Pulumi Outputs.
         tags = {
             "posit.team/true-name": self.workload.cfg.true_name,
             "posit.team/environment": self.workload.cfg.environment,
