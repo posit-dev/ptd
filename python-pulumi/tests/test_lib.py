@@ -90,3 +90,8 @@ def test_format_lb_tags_key_too_long() -> None:
 def test_format_lb_tags_value_too_long() -> None:
     with pytest.raises(ValueError, match="256-character limit"):
         format_lb_tags({"key": "v" * 257})
+
+
+def test_format_lb_tags_aws_reserved_prefix() -> None:
+    with pytest.raises(ValueError, match="reserved 'aws:' prefix"):
+        format_lb_tags({"aws:foo": "bar"})
