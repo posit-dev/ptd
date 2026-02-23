@@ -263,11 +263,12 @@ func TestDeriveKeycloakURL(t *testing.T) {
 	}
 
 	// Empty domain with Keycloak disabled is not an error (URL won't be used).
+	// Returns "" rather than a malformed "https://key." URL.
 	got, err = deriveKeycloakURL("", "", false)
 	if err != nil {
 		t.Fatalf("unexpected error when Keycloak disabled: %v", err)
 	}
-	if got != "https://key." {
+	if got != "" {
 		t.Errorf("unexpected URL %q when Keycloak disabled", got)
 	}
 

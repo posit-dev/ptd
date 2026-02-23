@@ -195,13 +195,10 @@ func createKeycloakUser(ctx context.Context, keycloakURL, realm, token, username
 	if err != nil {
 		return err
 	}
-	defer func() {
-		io.Copy(io.Discard, searchResp.Body)
-		searchResp.Body.Close()
-	}()
 
 	if searchResp.StatusCode == http.StatusOK {
 		body, _ := io.ReadAll(searchResp.Body)
+		searchResp.Body.Close()
 		var users []map[string]interface{}
 		if err := json.Unmarshal(body, &users); err == nil && len(users) > 0 {
 			slog.Info("User already exists in Keycloak, resetting password", "username", username)
@@ -211,6 +208,9 @@ func createKeycloakUser(ctx context.Context, keycloakURL, realm, token, username
 			}
 			return resetKeycloakUserPassword(ctx, keycloakURL, realm, token, userID, password, client)
 		}
+	} else {
+		io.Copy(io.Discard, searchResp.Body)
+		searchResp.Body.Close()
 	}
 
 	// Create user with password
