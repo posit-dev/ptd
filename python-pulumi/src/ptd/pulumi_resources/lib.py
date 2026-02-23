@@ -2,7 +2,10 @@ def format_lb_tags(tags: dict[str, str]) -> str:
     """Format tags as comma-separated key=value pairs for AWS LB Controller annotations.
 
     Validates that tag keys and values do not contain commas or equals signs,
-    which would break the annotation format.
+    which would break the annotation format. Whitespace (spaces, tabs, newlines)
+    is also rejected in both keys and values; while AWS tag values permit spaces,
+    this function is used exclusively for LB controller annotation strings where
+    whitespace would be ambiguous. This is a deliberate constraint, not an AWS limit.
     """
     if not tags:
         msg = "tags must not be empty"

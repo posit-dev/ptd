@@ -98,7 +98,7 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            - 100
+                            - 100  # Calibrated as a conservative baseline; high-throughput gateways may see this normally. Adjust per environment.
                         type: gt
                       operator:
                         type: and
