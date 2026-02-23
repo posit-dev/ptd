@@ -51,7 +51,7 @@ func EnsureTestUser(ctx context.Context, env []string, keycloakURL string, realm
 
 	slog.Info("Creating test user in Keycloak")
 
-	adminUser, adminPass, err := getKeycloakAdminCreds(ctx, env, adminSecretName, namespace)
+	adminUser, adminPass, err := getSecretCredentials(ctx, env, adminSecretName, namespace)
 	if err != nil {
 		return fmt.Errorf("failed to get Keycloak admin credentials: %w", err)
 	}
@@ -96,8 +96,8 @@ func generatePassword(length int) (string, error) {
 	return string(result), nil
 }
 
-// getKeycloakAdminCreds retrieves Keycloak admin credentials from the secret
-func getKeycloakAdminCreds(ctx context.Context, env []string, secretName string, namespace string) (string, string, error) {
+// getSecretCredentials retrieves username and password from a Kubernetes Secret.
+func getSecretCredentials(ctx context.Context, env []string, secretName string, namespace string) (string, string, error) {
 	cmd := exec.CommandContext(ctx, "kubectl", "get", "secret", secretName,
 		"-n", namespace,
 		"-o", "jsonpath={.data.username} {.data.password}")

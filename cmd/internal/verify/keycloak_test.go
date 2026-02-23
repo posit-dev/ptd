@@ -34,6 +34,20 @@ func TestGetKeycloakAdminToken_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestGetKeycloakAdminToken_EmptyAccessToken(t *testing.T) {
+	// A 200 response with valid JSON but no access_token field should return an error.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"token_type":"Bearer"}`))
+	}))
+	defer srv.Close()
+
+	_, err := getKeycloakAdminToken(context.Background(), srv.URL, "admin", "pass")
+	if err == nil {
+		t.Fatal("expected error when access_token is absent from response, got nil")
+	}
+}
+
 func TestCreateKeycloakUser_CreateFails(t *testing.T) {
 	// Search returns empty list, create returns 409, re-search also returns empty list → error.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

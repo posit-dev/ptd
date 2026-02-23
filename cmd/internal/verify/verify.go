@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -142,7 +143,7 @@ func runLocalTests(ctx context.Context, env []string, vipConfig string, categori
 	// Fetch credentials from the K8s Secret so local runs authenticate the same way as K8s Jobs.
 	var testUser, testPass string
 	if credentialsAvailable {
-		testUser, testPass, err = getKeycloakAdminCreds(ctx, env, vipTestCredentialsSecret, namespace)
+		testUser, testPass, err = getSecretCredentials(ctx, env, vipTestCredentialsSecret, namespace)
 		if err != nil {
 			return fmt.Errorf("failed to get test credentials: %w", err)
 		}
@@ -244,7 +245,10 @@ func runKubernetesTests(ctx context.Context, opts Options, vipConfig string, cre
 	}
 
 	slog.Info("Streaming Job logs")
-	if err := StreamLogs(ctx, opts.Env, jobName, opts.Namespace); err != nil {
+	if err := StreamLogs(ctx, opts.Env, jobName, opts.Namespace, opts.Timeout); err != nil {
+		if errors.Is(err, errImagePull) {
+			return err
+		}
 		slog.Warn("Failed to stream logs", "error", err)
 	}
 
