@@ -115,6 +115,9 @@ func deriveKeycloakURL(override, domain string, needsURL bool) (string, error) {
 	if needsURL && domain == "" {
 		return "", fmt.Errorf("site domain is required to derive Keycloak URL; use --keycloak-url to override")
 	}
+	if domain == "" {
+		return "", nil
+	}
 	return fmt.Sprintf("https://key.%s", domain), nil
 }
 

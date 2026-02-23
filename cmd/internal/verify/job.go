@@ -225,6 +225,8 @@ func waitForPod(ctx context.Context, env []string, jobName string, timeout time.
 			}
 			return "", fmt.Errorf("cancelled while waiting for pod to be created")
 		case <-ticker.C:
+			// batch.kubernetes.io/job-name was introduced in Kubernetes 1.27.
+			// Clusters older than 1.27 use the legacy "job-name" label instead.
 			cmd := exec.CommandContext(ctx, "kubectl", "get", "pods",
 				"-n", namespace,
 				"-l", "batch.kubernetes.io/job-name="+jobName,
@@ -262,7 +264,11 @@ func WaitForJob(ctx context.Context, env []string, jobName string, namespace str
 
 			output, err := cmd.Output()
 			if err != nil {
-				slog.Warn("kubectl get job failed, retrying", "error", err)
+				if exitErr, ok := err.(*exec.ExitError); ok {
+					slog.Warn("kubectl get job failed, retrying", "error", string(exitErr.Stderr))
+				} else {
+					slog.Warn("kubectl get job failed, retrying", "error", err)
+				}
 				continue
 			}
 

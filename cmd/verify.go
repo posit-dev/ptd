@@ -116,8 +116,26 @@ func runVerify(ctx context.Context, cmd *cobra.Command, target string) {
 		slog.Warn("Using ':latest' image tag is non-deterministic; consider pinning a specific version", "image", verifyImage)
 	}
 
-	// Prepare environment variables for kubectl (inherit from current env)
-	env := os.Environ()
+	// Prepare environment variables for kubectl (inherit from current env).
+	// Deduplicate: strip any existing occurrences of keys we're about to set so
+	// that tools consistently see the intended value regardless of lookup order.
+	keysToSet := make(map[string]bool, len(credEnvVars)+1)
+	for k := range credEnvVars {
+		keysToSet[k] = true
+	}
+	keysToSet["KUBECONFIG"] = true
+
+	base := os.Environ()
+	env := make([]string, 0, len(base)+len(keysToSet))
+	for _, e := range base {
+		if idx := strings.Index(e, "="); idx >= 0 {
+			if !keysToSet[e[:idx]] {
+				env = append(env, e)
+			}
+		} else {
+			env = append(env, e)
+		}
+	}
 	for k, v := range credEnvVars {
 		env = append(env, k+"="+v)
 	}
