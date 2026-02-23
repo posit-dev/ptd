@@ -120,3 +120,10 @@ def test_format_lb_tags_carriage_return_in_key() -> None:
 def test_format_lb_tags_carriage_return_in_value() -> None:
     with pytest.raises(ValueError, match="whitespace"):
         format_lb_tags({"key": "bad\rvalue"})
+
+
+def test_format_lb_tags_slash_in_key() -> None:
+    # Production keys like posit.team/true-name contain /; must be accepted
+    result = format_lb_tags({"posit.team/true-name": "myapp", "posit.team/environment": "production"})
+    assert "posit.team/true-name=myapp" in result
+    assert "posit.team/environment=production" in result
