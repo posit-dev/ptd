@@ -13,22 +13,25 @@ from ptd.pulumi_resources.lib import format_lb_tags
 def _build_nlb_tag_string(tags: dict[str, str] | None, cluster_name: str) -> str:
     """Build the NLB annotation tag string from cluster tags."""
     if tags is None:
-        raise ValueError(
+        msg = (
             "Cluster tags must not be None; expected a dict with "
             "'posit.team/true-name' and 'posit.team/environment' for NLB tagging."
         )
+        raise ValueError(msg)
     true_name = tags.get("posit.team/true-name")
     environment = tags.get("posit.team/environment")
     if true_name is None:
-        raise ValueError(
+        msg = (
             f"Missing required tag: 'posit.team/true-name' for NLB tagging. "
             f"Available tags: {list(tags.keys())}"
         )
+        raise ValueError(msg)
     if environment is None:
-        raise ValueError(
+        msg = (
             f"Missing required tag: 'posit.team/environment' for NLB tagging. "
             f"Available tags: {list(tags.keys())}"
         )
+        raise ValueError(msg)
     return format_lb_tags(
         {
             "posit.team/true-name": true_name,
