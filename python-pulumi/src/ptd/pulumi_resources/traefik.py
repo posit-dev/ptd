@@ -120,6 +120,16 @@ class Traefik(pulumi.ComponentResource):
         :return:
         """
 
+        # Build tag string from cluster tags for NLB annotation
+        # Extract posit.team/true-name and posit.team/environment if present
+        tag_parts = []
+        if "posit.team/true-name" in self.cluster.tags:
+            tag_parts.append(f"posit.team/true-name={self.cluster.tags['posit.team/true-name']}")
+        if "posit.team/environment" in self.cluster.tags:
+            tag_parts.append(f"posit.team/environment={self.cluster.tags['posit.team/environment']}")
+        tag_parts.append(f"Name={self.cluster.name}")
+        nlb_tags = ",".join(tag_parts)
+
         self.traefik = k8s.helm.v3.Release(
             f"{self.cluster.name}-traefik",
             k8s.helm.v3.ReleaseArgs(
@@ -147,6 +157,7 @@ class Traefik(pulumi.ComponentResource):
                             "service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold": "3",
                             "service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout": "10",
                             "service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval": "10",
+                            "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags": nlb_tags,
                         },
                     },
                     "ports": {
