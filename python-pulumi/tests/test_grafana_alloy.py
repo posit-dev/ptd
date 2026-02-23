@@ -575,3 +575,42 @@ class TestReplicasHandling:
         assert 'name = "site-two-workbench-fqdn"' in result
         assert 'name = "site-two-connect"' not in result
         assert 'name = "site-two-connect-fqdn"' not in result
+
+
+def _make_alloy_for_cloudwatch(cloud_provider_name: str, true_name: str = "myapp", compound_name: str = "myapp-production") -> AlloyConfig:
+    """Helper to create an AlloyConfig instance with mocked attributes for cloudwatch tests."""
+    alloy = AlloyConfig.__new__(AlloyConfig)
+    mock_workload = Mock()
+    mock_workload.cfg.true_name = true_name
+    mock_workload.compound_name = compound_name
+    mock_cloud_provider = Mock()
+    mock_cloud_provider.name = cloud_provider_name
+    mock_workload.cloud_provider = mock_cloud_provider
+    alloy.workload = mock_workload
+    alloy.cloud_provider = cloud_provider_name.lower()
+    alloy.region = "us-east-1"
+    return alloy
+
+
+class TestDefineCloudwatchConfig:
+    """Tests for _define_cloudwatch_config method."""
+
+    def test_aws_contains_natgateway_discovery_block(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("aws")
+        result = alloy._define_cloudwatch_config()  # noqa: SLF001
+        assert 'AWS/NATGateway' in result
+
+    def test_aws_contains_applicationelb_discovery_block(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("aws")
+        result = alloy._define_cloudwatch_config()  # noqa: SLF001
+        assert 'AWS/ApplicationELB' in result
+
+    def test_aws_contains_networkelb_discovery_block(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("aws")
+        result = alloy._define_cloudwatch_config()  # noqa: SLF001
+        assert 'AWS/NetworkELB' in result
+
+    def test_non_aws_returns_empty_string(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("azure")
+        result = alloy._define_cloudwatch_config()  # noqa: SLF001
+        assert result == ""

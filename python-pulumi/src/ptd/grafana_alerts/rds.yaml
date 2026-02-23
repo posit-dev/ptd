@@ -187,7 +187,7 @@ groups:
           labels:
             opsgenie: "1"
             instance_size_dependent: "true"  # Silence this label for known-small instance classes
-          isPaused: false
+          isPaused: true  # Paused until a Grafana silence or Alertmanager inhibit rule is configured for the instance_size_dependent label
         - uid: rds_read_latency_high
           title: RDS Read Latency High
           condition: B
@@ -298,4 +298,4 @@ groups:
           labels:
             opsgenie: "1"
             instance_size_dependent: "true"  # Silence this label for known-small instance classes
-          isPaused: false
+          isPaused: true  # Paused until a Grafana silence or Alertmanager inhibit rule is configured for the instance_size_dependent label
