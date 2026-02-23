@@ -22,6 +22,7 @@ func init() {
 	verifyCmd.Flags().BoolVar(&verifyLocal, "local", false, "Run tests locally instead of in Kubernetes")
 	verifyCmd.Flags().BoolVar(&verifyConfigOnly, "config-only", false, "Generate config only, don't run tests")
 	verifyCmd.Flags().StringVar(&verifyImage, "image", "ghcr.io/posit-dev/vip:latest", "VIP container image to use")
+	verifyCmd.Flags().StringVar(&verifyKeycloakURL, "keycloak-url", "", "Keycloak URL (defaults to https://key.<domain> from Site CR)")
 }
 
 var (
@@ -30,6 +31,7 @@ var (
 	verifyLocal       bool
 	verifyConfigOnly  bool
 	verifyImage       string
+	verifyKeycloakURL string
 )
 
 var verifyCmd = &cobra.Command{
@@ -112,13 +114,14 @@ func runVerify(ctx context.Context, cmd *cobra.Command, target string) {
 
 	// Run verification
 	opts := verify.Options{
-		Target:     target,
-		SiteName:   verifySiteName,
-		Categories: verifyCategories,
-		LocalMode:  verifyLocal,
-		ConfigOnly: verifyConfigOnly,
-		Image:      verifyImage,
-		Env:        env,
+		Target:      target,
+		SiteName:    verifySiteName,
+		Categories:  verifyCategories,
+		LocalMode:   verifyLocal,
+		ConfigOnly:  verifyConfigOnly,
+		Image:       verifyImage,
+		KeycloakURL: verifyKeycloakURL,
+		Env:         env,
 	}
 
 	if err := verify.Run(ctx, opts); err != nil {

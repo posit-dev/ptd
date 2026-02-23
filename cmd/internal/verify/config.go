@@ -86,9 +86,9 @@ func GenerateConfig(site *SiteCR, targetName string) (string, error) {
 
 	// Determine auth provider
 	authProvider := "oidc" // default
-	if site.Spec.Connect != nil && site.Spec.Connect.Auth != nil {
+	if site.Spec.Connect != nil && site.Spec.Connect.Auth != nil && site.Spec.Connect.Auth.Type != "" {
 		authProvider = site.Spec.Connect.Auth.Type
-	} else if site.Spec.Workbench != nil && site.Spec.Workbench.Auth != nil {
+	} else if site.Spec.Workbench != nil && site.Spec.Workbench.Auth != nil && site.Spec.Workbench.Auth.Type != "" {
 		authProvider = site.Spec.Workbench.Auth.Type
 	}
 	config.Auth = AuthConfig{Provider: authProvider}
