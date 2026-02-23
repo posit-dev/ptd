@@ -10,6 +10,29 @@ import ptd.pulumi_resources.aws_vpc
 from ptd.pulumi_resources.lib import format_lb_tags
 
 
+def _build_nlb_tag_string(tags: dict[str, str] | None, cluster_name: str) -> str:
+    """Build the NLB annotation tag string from cluster tags."""
+    if tags is None:
+        raise ValueError(
+            "Cluster tags must not be None; expected a dict with "
+            "'posit.team/true-name' and 'posit.team/environment' for NLB tagging."
+        )
+    true_name = tags.get("posit.team/true-name")
+    environment = tags.get("posit.team/environment")
+    if true_name is None or environment is None:
+        raise ValueError(
+            "Cluster tags must include 'posit.team/true-name' and 'posit.team/environment' "
+            f"for NLB tagging. Available tags: {list(tags.keys())}"
+        )
+    return format_lb_tags(
+        {
+            "posit.team/true-name": true_name,
+            "posit.team/environment": environment,
+            "Name": cluster_name,
+        }
+    )
+
+
 class Traefik(pulumi.ComponentResource):
     def __init__(
         self,
@@ -125,24 +148,7 @@ class Traefik(pulumi.ComponentResource):
         # cluster.name, true_name, and environment are plain str values (logical resource
         # names / config loaded at startup), not Pulumi Outputs, so format_lb_tags() checks
         # work correctly at graph-construction time.
-        if self.cluster.tags is None:
-            raise ValueError(
-                "Cluster tags must not be None; expected a dict with "
-                "'posit.team/true-name' and 'posit.team/environment' for NLB tagging."
-            )
-        true_name = self.cluster.tags.get("posit.team/true-name")
-        environment = self.cluster.tags.get("posit.team/environment")
-        if true_name is None or environment is None:
-            raise ValueError(
-                "Cluster tags must include 'posit.team/true-name' and 'posit.team/environment' "
-                f"for NLB tagging. Available tags: {list(self.cluster.tags.keys())}"
-            )
-        tags = {
-            "posit.team/true-name": true_name,
-            "posit.team/environment": environment,
-            "Name": self.cluster.name,
-        }
-        nlb_tags = format_lb_tags(tags)
+        nlb_tags = _build_nlb_tag_string(self.cluster.tags, self.cluster.name)
 
         self.traefik = k8s.helm.v3.Release(
             f"{self.cluster.name}-traefik",
