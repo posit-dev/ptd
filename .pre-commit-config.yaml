@@ -1,0 +1,35 @@
+repos:
+  - repo: local
+    hooks:
+      - id: format
+        name: Format code
+        entry: just format
+        language: system
+        pass_filenames: false
+
+      - id: check
+        name: Lint code
+        entry: just check
+        language: system
+        pass_filenames: false
+
+      - id: test-python-pulumi
+        name: Test Python Pulumi
+        entry: just test-python-pulumi
+        language: system
+        pass_filenames: false
+        files: ^python-pulumi/.*\.py$
+
+      - id: test-cmd
+        name: Test CLI
+        entry: just test-cmd
+        language: system
+        pass_filenames: false
+        files: ^cmd/.*\.go$
+
+      - id: test-lib
+        name: Test lib
+        entry: just test-lib
+        language: system
+        pass_filenames: false
+        files: ^lib/.*\.go$
