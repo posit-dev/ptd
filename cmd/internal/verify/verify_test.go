@@ -484,6 +484,13 @@ func TestBuildSecretSpec(t *testing.T) {
 	if meta["namespace"] != "test-ns" {
 		t.Errorf("metadata.namespace = %v, want test-ns", meta["namespace"])
 	}
+	labels := meta["labels"].(map[string]interface{})
+	if labels["app.kubernetes.io/managed-by"] != "ptd" {
+		t.Errorf("managed-by label = %v, want ptd", labels["app.kubernetes.io/managed-by"])
+	}
+	if labels["app.kubernetes.io/name"] != "vip-verify" {
+		t.Errorf("name label = %v, want vip-verify", labels["app.kubernetes.io/name"])
+	}
 
 	secretData := parsed["data"].(map[string]interface{})
 	gotUser, _ := base64.StdEncoding.DecodeString(secretData["username"].(string))
@@ -493,6 +500,94 @@ func TestBuildSecretSpec(t *testing.T) {
 	}
 	if string(gotPass) != "s3cr3t" {
 		t.Errorf("password = %v, want s3cr3t", string(gotPass))
+	}
+}
+
+func TestBuildLocalEnv(t *testing.T) {
+	tests := []struct {
+		name      string
+		env       []string
+		testUser  string
+		testPass  string
+		wantErr   bool
+		wantDedup bool // whether we expect existing creds to be replaced (not duplicated)
+	}{
+		{
+			name:     "newline in username returns error",
+			env:      []string{"PATH=/usr/bin"},
+			testUser: "user\ninjected",
+			testPass: "pass",
+			wantErr:  true,
+		},
+		{
+			name:     "carriage return in username returns error",
+			env:      []string{"PATH=/usr/bin"},
+			testUser: "user\rinjected",
+			testPass: "pass",
+			wantErr:  true,
+		},
+		{
+			name:     "newline in password returns error",
+			env:      []string{"PATH=/usr/bin"},
+			testUser: "user",
+			testPass: "pass\ninjected",
+			wantErr:  true,
+		},
+		{
+			name:      "existing cred keys are stripped before appending",
+			env:       []string{"PATH=/usr/bin", "VIP_TEST_USERNAME=old", "VIP_TEST_PASSWORD=old"},
+			testUser:  "newuser",
+			testPass:  "newpass",
+			wantDedup: true,
+		},
+		{
+			name:     "clean env appends credentials",
+			env:      []string{"PATH=/usr/bin"},
+			testUser: "alice",
+			testPass: "s3cr3t",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := buildLocalEnv(tt.env, tt.testUser, tt.testPass)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Credentials must appear exactly once each.
+			usernameCount, passwordCount := 0, 0
+			for _, e := range got {
+				if strings.HasPrefix(e, "VIP_TEST_USERNAME=") {
+					usernameCount++
+				}
+				if strings.HasPrefix(e, "VIP_TEST_PASSWORD=") {
+					passwordCount++
+				}
+			}
+			if usernameCount != 1 {
+				t.Errorf("VIP_TEST_USERNAME appears %d times, want 1", usernameCount)
+			}
+			if passwordCount != 1 {
+				t.Errorf("VIP_TEST_PASSWORD appears %d times, want 1", passwordCount)
+			}
+
+			// Verify the appended values are correct.
+			wantUser := "VIP_TEST_USERNAME=" + tt.testUser
+			wantPass := "VIP_TEST_PASSWORD=" + tt.testPass
+			if !strings.Contains(strings.Join(got, "\n"), wantUser) {
+				t.Errorf("expected %q in env", wantUser)
+			}
+			if !strings.Contains(strings.Join(got, "\n"), wantPass) {
+				t.Errorf("expected %q in env", wantPass)
+			}
+		})
 	}
 }
 

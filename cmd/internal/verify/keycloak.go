@@ -293,9 +293,13 @@ func buildSecretSpec(name, namespace, username, password string) map[string]inte
 	return map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "Secret",
-		"metadata": map[string]string{
+		"metadata": map[string]interface{}{
 			"name":      name,
 			"namespace": namespace,
+			"labels": map[string]string{
+				"app.kubernetes.io/name":       "vip-verify",
+				"app.kubernetes.io/managed-by": "ptd",
+			},
 		},
 		"type": "Opaque",
 		"data": map[string]string{
