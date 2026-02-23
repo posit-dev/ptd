@@ -104,7 +104,7 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            - 5368709120  # 5 GiB in bytes
+                            - 5368709120  # 5 GiB in bytes; calibrated for mid-size instances (100–500 GiB). Adjust for larger (e.g. 1 TiB) or smaller instances.
                         type: lt
                       operator:
                         type: and
@@ -159,7 +159,7 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            - 536870912  # 512 MiB in bytes
+                            - 536870912  # 512 MiB in bytes; calibrated for db.r5.large (~16 GiB RAM). Adjust for other instance classes.
                         type: lt
                       operator:
                         type: and

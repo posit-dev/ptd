@@ -122,6 +122,11 @@ class Traefik(pulumi.ComponentResource):
         """
 
         # Build tag string from cluster tags for NLB annotation
+        if self.cluster.tags is None:
+            raise ValueError(
+                "Cluster tags must not be None; expected a dict with "
+                "'posit.team/true-name' and 'posit.team/environment' for NLB tagging."
+            )
         true_name = self.cluster.tags.get("posit.team/true-name")
         environment = self.cluster.tags.get("posit.team/environment")
         if true_name is None or environment is None:

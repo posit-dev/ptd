@@ -4,6 +4,9 @@ def format_lb_tags(tags: dict[str, str]) -> str:
     Validates that tag keys and values do not contain commas or equals signs,
     which would break the annotation format.
     """
+    if not tags:
+        msg = "tags must not be empty"
+        raise ValueError(msg)
     for key, value in tags.items():
         if not key:
             msg = "LB tag key must not be empty"
