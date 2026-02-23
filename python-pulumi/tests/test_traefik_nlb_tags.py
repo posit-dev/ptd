@@ -33,7 +33,7 @@ def test_build_nlb_tag_string_missing_environment() -> None:
 
 
 def test_build_nlb_tag_string_invalid_cluster_name() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="comma or equals"):
         _build_nlb_tag_string(
             tags={"posit.team/true-name": "myapp", "posit.team/environment": "production"},
             cluster_name="bad,name",

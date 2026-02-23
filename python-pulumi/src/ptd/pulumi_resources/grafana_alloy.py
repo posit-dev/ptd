@@ -352,6 +352,9 @@ class AlloyConfig(pulumi.ComponentResource):
                         # ALBs are tagged at creation time via aws_workload_helm.py.
                         # LBs provisioned before this tag was added won't be discovered
                         # until the cluster is redeployed.
+                        # FIXME: To tag existing ALBs without redeploying, use the AWS CLI:
+                        #   aws elbv2 add-tags --resource-arns <ALB_ARN> \
+                        #     --tags Key=posit.team/true-name,Value=<true_name>
                         search_tags = {{
                             "posit.team/true-name" = "{self.workload.cfg.true_name}",
                         }}
@@ -382,6 +385,9 @@ class AlloyConfig(pulumi.ComponentResource):
                         # NLBs are tagged at creation time via traefik.py.
                         # LBs provisioned before this tag was added won't be discovered
                         # until the cluster is redeployed.
+                        # FIXME: To tag existing NLBs without redeploying, use the AWS CLI:
+                        #   aws elbv2 add-tags --resource-arns <NLB_ARN> \
+                        #     --tags Key=posit.team/true-name,Value=<true_name>
                         search_tags = {{
                             "posit.team/true-name" = "{self.workload.cfg.true_name}",
                         }}
