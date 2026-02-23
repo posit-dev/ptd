@@ -17,10 +17,11 @@ type JobOptions struct {
 	Categories string
 	JobName    string
 	ConfigName string
+	Namespace  string
 }
 
 // CreateConfigMap creates a Kubernetes ConfigMap with the vip.toml configuration
-func CreateConfigMap(ctx context.Context, env []string, configName string, config string) error {
+func CreateConfigMap(ctx context.Context, env []string, configName string, config string, namespace string) error {
 	// Create a temporary file with the config
 	tmpfile, err := os.CreateTemp("", "vip-config-*.toml")
 	if err != nil {
@@ -78,7 +79,7 @@ func CreateJob(ctx context.Context, env []string, opts JobOptions) error {
 		"kind":       "Job",
 		"metadata": map[string]interface{}{
 			"name":      opts.JobName,
-			"namespace": namespace,
+			"namespace": opts.Namespace,
 			"labels": map[string]string{
 				"app.kubernetes.io/name":       "vip-verify",
 				"app.kubernetes.io/managed-by": "ptd",
@@ -142,7 +143,7 @@ func CreateJob(ctx context.Context, env []string, opts JobOptions) error {
 		return fmt.Errorf("failed to marshal job spec: %w", err)
 	}
 
-	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-", "-n", namespace)
+	cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-", "-n", opts.Namespace)
 	cmd.Env = env
 	cmd.Stdin = strings.NewReader(string(jobJSON))
 
@@ -154,9 +155,9 @@ func CreateJob(ctx context.Context, env []string, opts JobOptions) error {
 }
 
 // StreamLogs follows the logs of the Job pod
-func StreamLogs(ctx context.Context, env []string, jobName string) error {
+func StreamLogs(ctx context.Context, env []string, jobName string, namespace string) error {
 	// Wait for pod to be created (timeout after 30 seconds)
-	podName, err := waitForPod(ctx, env, jobName, 30*time.Second)
+	podName, err := waitForPod(ctx, env, jobName, 30*time.Second, namespace)
 	if err != nil {
 		return err
 	}
@@ -182,7 +183,7 @@ func StreamLogs(ctx context.Context, env []string, jobName string) error {
 }
 
 // waitForPod waits for a pod associated with the job to be created
-func waitForPod(ctx context.Context, env []string, jobName string, timeout time.Duration) (string, error) {
+func waitForPod(ctx context.Context, env []string, jobName string, timeout time.Duration, namespace string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -209,9 +210,8 @@ func waitForPod(ctx context.Context, env []string, jobName string, timeout time.
 }
 
 // WaitForJob waits for the Job to complete and returns success status
-func WaitForJob(ctx context.Context, env []string, jobName string) (bool, error) {
-	// Wait for job to complete (timeout after 15 minutes)
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+func WaitForJob(ctx context.Context, env []string, jobName string, namespace string, timeout time.Duration) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	ticker := time.NewTicker(5 * time.Second)
@@ -255,7 +255,7 @@ func parseJobStatus(output string) (done bool, success bool) {
 }
 
 // Cleanup removes the Job and ConfigMap
-func Cleanup(ctx context.Context, env []string, jobName string, configName string) error {
+func Cleanup(ctx context.Context, env []string, jobName string, configName string, namespace string) error {
 	// Delete job
 	jobCmd := exec.CommandContext(ctx, "kubectl", "delete", "job", jobName, "-n", namespace, "--ignore-not-found")
 	jobCmd.Env = env

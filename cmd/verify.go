@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/posit-dev/ptd/cmd/internal"
 	"github.com/posit-dev/ptd/cmd/internal/legacy"
@@ -25,17 +26,23 @@ func init() {
 	verifyCmd.Flags().StringVar(&verifyKeycloakURL, "keycloak-url", "", "Keycloak URL (defaults to https://key.<domain> from Site CR)")
 	verifyCmd.Flags().StringVar(&verifyRealm, "realm", "posit", "Keycloak realm name")
 	verifyCmd.Flags().StringVar(&verifyTestUsername, "test-username", "vip-test-user", "Keycloak test user name")
+	verifyCmd.Flags().StringVar(&verifyNamespace, "namespace", "posit-team", "Kubernetes namespace where PTD resources live")
+	verifyCmd.Flags().StringVar(&verifyKeycloakAdminSecret, "keycloak-admin-secret", "", "Name of the K8s secret holding Keycloak admin credentials (defaults to {site}-keycloak-initial-admin)")
+	verifyCmd.Flags().DurationVar(&verifyTimeout, "timeout", 15*time.Minute, "Timeout for waiting for the VIP verification Job to complete")
 }
 
 var (
-	verifySiteName     string
-	verifyCategories   string
-	verifyLocal        bool
-	verifyConfigOnly   bool
-	verifyImage        string
-	verifyKeycloakURL  string
-	verifyRealm        string
-	verifyTestUsername string
+	verifySiteName           string
+	verifyCategories         string
+	verifyLocal              bool
+	verifyConfigOnly         bool
+	verifyImage              string
+	verifyKeycloakURL        string
+	verifyRealm              string
+	verifyTestUsername       string
+	verifyNamespace          string
+	verifyKeycloakAdminSecret string
+	verifyTimeout            time.Duration
 )
 
 var verifyCmd = &cobra.Command{
@@ -118,16 +125,19 @@ func runVerify(ctx context.Context, cmd *cobra.Command, target string) {
 
 	// Run verification
 	opts := verify.Options{
-		Target:       target,
-		SiteName:     verifySiteName,
-		Categories:   verifyCategories,
-		LocalMode:    verifyLocal,
-		ConfigOnly:   verifyConfigOnly,
-		Image:        verifyImage,
-		KeycloakURL:  verifyKeycloakURL,
-		Realm:        verifyRealm,
-		TestUsername: verifyTestUsername,
-		Env:          env,
+		Target:              target,
+		SiteName:            verifySiteName,
+		Namespace:           verifyNamespace,
+		Categories:          verifyCategories,
+		LocalMode:           verifyLocal,
+		ConfigOnly:          verifyConfigOnly,
+		Image:               verifyImage,
+		KeycloakURL:         verifyKeycloakURL,
+		Realm:               verifyRealm,
+		TestUsername:        verifyTestUsername,
+		KeycloakAdminSecret: verifyKeycloakAdminSecret,
+		Timeout:             verifyTimeout,
+		Env:                 env,
 	}
 
 	if err := verify.Run(ctx, opts); err != nil {

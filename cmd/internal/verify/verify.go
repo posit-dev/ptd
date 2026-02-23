@@ -11,21 +11,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// namespace is the Kubernetes namespace where PTD resources live.
-const namespace = "posit-team"
-
 // Options contains configuration for the verify command
 type Options struct {
-	Target       string
-	SiteName     string
-	Categories   string
-	LocalMode    bool
-	ConfigOnly   bool
-	Image        string
-	KeycloakURL  string // overrides the default https://key.<domain> if set
-	Realm        string // Keycloak realm (default: posit)
-	TestUsername string // Keycloak test user name (default: vip-test-user)
-	Env          []string
+	Target              string
+	SiteName            string
+	Namespace           string        // Kubernetes namespace (default: posit-team)
+	Categories          string
+	LocalMode           bool
+	ConfigOnly          bool
+	Image               string
+	KeycloakURL         string        // overrides the default https://key.<domain> if set
+	Realm               string        // Keycloak realm (default: posit)
+	TestUsername        string        // Keycloak test user name (default: vip-test-user)
+	KeycloakAdminSecret string        // overrides the default {siteName}-keycloak-initial-admin
+	Timeout             time.Duration // WaitForJob timeout (default: 15 minutes)
+	Env                 []string
 }
 
 // Run executes the VIP verification process
@@ -34,7 +34,7 @@ func Run(ctx context.Context, opts Options) error {
 
 	// Get Site CR from Kubernetes
 	slog.Info("Fetching Site CR from Kubernetes")
-	siteYAML, err := getSiteCR(ctx, opts.Env, opts.SiteName)
+	siteYAML, err := getSiteCR(ctx, opts.Env, opts.SiteName, opts.Namespace)
 	if err != nil {
 		return fmt.Errorf("failed to get Site CR: %w", err)
 	}
@@ -63,22 +63,30 @@ func Run(ctx context.Context, opts Options) error {
 		keycloakURL = fmt.Sprintf("https://key.%s", site.Spec.Domain)
 	}
 
-	// Ensure test user exists
-	slog.Info("Ensuring test user exists in Keycloak")
-	if err := EnsureTestUser(ctx, opts.Env, opts.SiteName, keycloakURL, opts.Realm, opts.TestUsername); err != nil {
-		return fmt.Errorf("failed to ensure test user: %w", err)
+	// Only ensure test user if Keycloak is configured for this site
+	if site.Spec.Keycloak != nil && site.Spec.Keycloak.Enabled {
+		adminSecretName := opts.KeycloakAdminSecret
+		if adminSecretName == "" {
+			adminSecretName = fmt.Sprintf("%s-keycloak-initial-admin", opts.SiteName)
+		}
+		slog.Info("Ensuring test user exists in Keycloak")
+		if err := EnsureTestUser(ctx, opts.Env, keycloakURL, opts.Realm, opts.TestUsername, adminSecretName, opts.Namespace); err != nil {
+			return fmt.Errorf("failed to ensure test user: %w", err)
+		}
+	} else {
+		slog.Info("Keycloak not configured for this site, skipping test user creation")
 	}
 
 	// Run tests based on mode
 	if opts.LocalMode {
-		return runLocalTests(ctx, opts.Env, vipConfig, opts.Categories)
+		return runLocalTests(ctx, opts.Env, vipConfig, opts.Categories, opts.Namespace)
 	}
 
 	return runKubernetesTests(ctx, opts, vipConfig)
 }
 
 // getSiteCR retrieves the Site CR YAML from Kubernetes
-func getSiteCR(ctx context.Context, env []string, siteName string) ([]byte, error) {
+func getSiteCR(ctx context.Context, env []string, siteName, namespace string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "kubectl", "get", "site", siteName,
 		"-n", namespace,
 		"-o", "yaml")
@@ -96,7 +104,7 @@ func getSiteCR(ctx context.Context, env []string, siteName string) ([]byte, erro
 }
 
 // runLocalTests runs VIP tests locally using uv
-func runLocalTests(ctx context.Context, env []string, vipConfig string, categories string) error {
+func runLocalTests(ctx context.Context, env []string, vipConfig string, categories string, namespace string) error {
 	slog.Info("Running VIP tests locally")
 
 	// Create temporary config file
@@ -113,7 +121,7 @@ func runLocalTests(ctx context.Context, env []string, vipConfig string, categori
 	tmpfile.Close()
 
 	// Fetch credentials from the K8s Secret so local runs authenticate the same way as K8s Jobs.
-	testUser, testPass, err := getTestCredentials(ctx, env)
+	testUser, testPass, err := getTestCredentials(ctx, env, namespace)
 	if err != nil {
 		return fmt.Errorf("failed to get test credentials: %w", err)
 	}
@@ -144,7 +152,7 @@ func runKubernetesTests(ctx context.Context, opts Options, vipConfig string) err
 	configName := fmt.Sprintf("vip-verify-config-%s", timestamp)
 
 	slog.Info("Creating ConfigMap", "name", configName)
-	if err := CreateConfigMap(ctx, opts.Env, configName, vipConfig); err != nil {
+	if err := CreateConfigMap(ctx, opts.Env, configName, vipConfig, opts.Namespace); err != nil {
 		return fmt.Errorf("failed to create ConfigMap: %w", err)
 	}
 
@@ -154,7 +162,7 @@ func runKubernetesTests(ctx context.Context, opts Options, vipConfig string) err
 		slog.Debug("Cleaning up resources")
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		if err := Cleanup(cleanupCtx, opts.Env, jobName, configName); err != nil {
+		if err := Cleanup(cleanupCtx, opts.Env, jobName, configName, opts.Namespace); err != nil {
 			slog.Warn("Failed to cleanup resources", "error", err)
 		}
 	}()
@@ -165,6 +173,7 @@ func runKubernetesTests(ctx context.Context, opts Options, vipConfig string) err
 		Categories: opts.Categories,
 		JobName:    jobName,
 		ConfigName: configName,
+		Namespace:  opts.Namespace,
 	}
 
 	if err := CreateJob(ctx, opts.Env, jobOpts); err != nil {
@@ -172,12 +181,16 @@ func runKubernetesTests(ctx context.Context, opts Options, vipConfig string) err
 	}
 
 	slog.Info("Streaming Job logs")
-	if err := StreamLogs(ctx, opts.Env, jobName); err != nil {
+	if err := StreamLogs(ctx, opts.Env, jobName, opts.Namespace); err != nil {
 		slog.Warn("Failed to stream logs", "error", err)
 	}
 
 	slog.Info("Waiting for Job to complete")
-	success, err := WaitForJob(ctx, opts.Env, jobName)
+	timeout := opts.Timeout
+	if timeout == 0 {
+		timeout = 15 * time.Minute
+	}
+	success, err := WaitForJob(ctx, opts.Env, jobName, opts.Namespace, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to wait for Job: %w", err)
 	}
