@@ -53,10 +53,30 @@ def test_format_lb_tags_empty_dict() -> None:
 
 
 def test_format_lb_tags_space_in_key() -> None:
-    with pytest.raises(ValueError, match="space"):
+    with pytest.raises(ValueError, match="whitespace"):
         format_lb_tags({"bad key": "value"})
 
 
 def test_format_lb_tags_space_in_value() -> None:
-    with pytest.raises(ValueError, match="space"):
+    with pytest.raises(ValueError, match="whitespace"):
         format_lb_tags({"key": "bad value"})
+
+
+def test_format_lb_tags_tab_in_key() -> None:
+    with pytest.raises(ValueError, match="whitespace"):
+        format_lb_tags({"bad\tkey": "value"})
+
+
+def test_format_lb_tags_newline_in_key() -> None:
+    with pytest.raises(ValueError, match="whitespace"):
+        format_lb_tags({"bad\nkey": "value"})
+
+
+def test_format_lb_tags_tab_in_value() -> None:
+    with pytest.raises(ValueError, match="whitespace"):
+        format_lb_tags({"key": "bad\tvalue"})
+
+
+def test_format_lb_tags_newline_in_value() -> None:
+    with pytest.raises(ValueError, match="whitespace"):
+        format_lb_tags({"key": "bad\nvalue"})
