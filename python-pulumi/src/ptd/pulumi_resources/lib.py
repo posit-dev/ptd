@@ -27,7 +27,7 @@ def format_lb_tags(tags: dict[str, str]) -> str:
             msg = f"LB tag key contains invalid whitespace character: {key!r}"
             raise ValueError(msg)
         if not value:
-            msg = f"LB tag value must not be empty: key={key}"
+            msg = f"LB tag value must not be None or empty: key={key}"
             raise ValueError(msg)
         if len(value) > 256:
             msg = f"LB tag value exceeds AWS 256-character limit ({len(value)} chars): key={key}"

@@ -43,7 +43,7 @@ def test_format_lb_tags_empty_key() -> None:
 
 
 def test_format_lb_tags_empty_value() -> None:
-    with pytest.raises(ValueError, match="must not be empty"):
+    with pytest.raises(ValueError, match="must not be None or empty"):
         format_lb_tags({"key": ""})
 
 
