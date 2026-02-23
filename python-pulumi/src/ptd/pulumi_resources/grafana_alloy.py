@@ -262,12 +262,13 @@ class AlloyConfig(pulumi.ComponentResource):
                             period     = "5m"
                         }}
 
-                        # Changed from Sum to Average; Prometheus metric name is now
-                        # aws_rds_database_connections_average (was aws_rds_database_connections_sum).
-                        # Update any Grafana dashboards querying the old _sum metric name.
+                        # Collecting both Sum and Average during migration. Average is the
+                        # target metric (aws_rds_database_connections_average); Sum
+                        # (aws_rds_database_connections_sum) is kept temporarily for existing
+                        # dashboards. Remove Sum once all dashboards are updated.
                         metric {{
                             name       = "DatabaseConnections"
-                            statistics = ["Average"]
+                            statistics = ["Average", "Sum"]
                             period     = "5m"
                         }}
 

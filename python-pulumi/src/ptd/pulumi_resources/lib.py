@@ -14,6 +14,9 @@ def format_lb_tags(tags: dict[str, str]) -> str:
         if not key:
             msg = "LB tag key must not be empty"
             raise ValueError(msg)
+        if key.startswith("aws:"):
+            msg = f"LB tag key uses reserved 'aws:' prefix: {key!r}"
+            raise ValueError(msg)
         if len(key) > 128:
             msg = f"LB tag key exceeds AWS 128-character limit ({len(key)} chars): {key!r}"
             raise ValueError(msg)
