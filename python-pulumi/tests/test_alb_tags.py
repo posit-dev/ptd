@@ -44,3 +44,21 @@ def test_build_alb_tag_string_empty_compound_name() -> None:
             environment="production",
             compound_name="",
         )
+
+
+def test_build_alb_tag_string_invalid_true_name_value() -> None:
+    with pytest.raises(ValueError, match="comma or equals"):
+        _build_alb_tag_string(
+            true_name="bad,name",
+            environment="production",
+            compound_name="myapp-production",
+        )
+
+
+def test_build_alb_tag_string_invalid_environment_value() -> None:
+    with pytest.raises(ValueError, match="comma or equals"):
+        _build_alb_tag_string(
+            true_name="myapp",
+            environment="bad=env",
+            compound_name="myapp-production",
+        )

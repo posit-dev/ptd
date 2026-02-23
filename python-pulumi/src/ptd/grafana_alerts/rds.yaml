@@ -297,4 +297,5 @@ groups:
             summary: High database connections on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
+            instance_size_dependent: "true"  # Silence this label for known-small instance classes
           isPaused: false
