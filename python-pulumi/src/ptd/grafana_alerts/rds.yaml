@@ -127,7 +127,7 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: RDS instance has less than 5 GiB of free storage space remaining.
+            description: RDS instance has less than 5 GiB of free storage space remaining. Note: on new cluster deployments where CloudWatch scraping has not yet initialized, noDataState=Alerting may produce a false positive after the for:5m window; this is expected during provisioning.
             summary: Low free storage on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
