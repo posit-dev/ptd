@@ -223,6 +223,11 @@ class AlloyConfig(pulumi.ComponentResource):
         # Generate CloudWatch exporter configuration for AWS
         cloudwatch_config = ""
         if self.cloud_provider == "aws":
+            if not re.match(r"^[a-zA-Z0-9._-]+$", self.workload.cfg.true_name):
+                raise ValueError(
+                    f"workload true_name contains characters unsafe for Alloy River config: "
+                    f"{self.workload.cfg.true_name!r}. Must match [a-zA-Z0-9._-]+"
+                )
             cloudwatch_config = textwrap.dedent(f"""
                 prometheus.exporter.cloudwatch "cloudwatch" {{
                     sts_region = "{self.region}"

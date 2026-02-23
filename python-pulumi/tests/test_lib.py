@@ -100,3 +100,13 @@ def test_format_lb_tags_value_too_long() -> None:
 def test_format_lb_tags_aws_reserved_prefix() -> None:
     with pytest.raises(ValueError, match="reserved 'aws:' prefix"):
         format_lb_tags({"aws:foo": "bar"})
+
+
+def test_format_lb_tags_carriage_return_in_key() -> None:
+    with pytest.raises(ValueError, match="whitespace"):
+        format_lb_tags({"bad\rkey": "value"})
+
+
+def test_format_lb_tags_carriage_return_in_value() -> None:
+    with pytest.raises(ValueError, match="whitespace"):
+        format_lb_tags({"key": "bad\rvalue"})
