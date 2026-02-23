@@ -3,6 +3,7 @@ package verify
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -289,19 +290,21 @@ func parseJobStatus(output string) (done bool, success bool) {
 
 // Cleanup removes the Job and ConfigMap
 func Cleanup(ctx context.Context, env []string, jobName string, configName string, namespace string) error {
+	var errs []error
+
 	// Delete job
 	jobCmd := exec.CommandContext(ctx, "kubectl", "delete", "job", jobName, "-n", namespace, "--ignore-not-found")
 	jobCmd.Env = env
 	if err := jobCmd.Run(); err != nil {
-		return fmt.Errorf("failed to delete job: %w", err)
+		errs = append(errs, fmt.Errorf("failed to delete job: %w", err))
 	}
 
-	// Delete configmap
+	// Delete configmap (always attempt even if job deletion failed)
 	cmCmd := exec.CommandContext(ctx, "kubectl", "delete", "configmap", configName, "-n", namespace, "--ignore-not-found")
 	cmCmd.Env = env
 	if err := cmCmd.Run(); err != nil {
-		return fmt.Errorf("failed to delete configmap: %w", err)
+		errs = append(errs, fmt.Errorf("failed to delete configmap: %w", err))
 	}
 
-	return nil
+	return errors.Join(errs...)
 }

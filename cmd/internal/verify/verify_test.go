@@ -249,6 +249,35 @@ func TestGenerateConfig_EmptyDomainAllBaseDomains(t *testing.T) {
 	}
 }
 
+func TestDeriveKeycloakURL(t *testing.T) {
+	// Override takes precedence over domain.
+	got, err := deriveKeycloakURL("https://custom.example.com", "", true)
+	if err != nil || got != "https://custom.example.com" {
+		t.Fatalf("expected override URL, got %q, err %v", got, err)
+	}
+
+	// Empty domain with Keycloak enabled and no override returns an error.
+	_, err = deriveKeycloakURL("", "", true)
+	if err == nil {
+		t.Fatal("expected error for empty domain when Keycloak is enabled, got nil")
+	}
+
+	// Empty domain with Keycloak disabled is not an error (URL won't be used).
+	got, err = deriveKeycloakURL("", "", false)
+	if err != nil {
+		t.Fatalf("unexpected error when Keycloak disabled: %v", err)
+	}
+	if got != "https://key." {
+		t.Errorf("unexpected URL %q when Keycloak disabled", got)
+	}
+
+	// Domain is used when no override is set and Keycloak is enabled.
+	got, err = deriveKeycloakURL("", "example.com", true)
+	if err != nil || got != "https://key.example.com" {
+		t.Fatalf("expected derived URL, got %q, err %v", got, err)
+	}
+}
+
 func TestBuildProductURL_BaseDomainOverride(t *testing.T) {
 	spec := &ProductSpec{
 		BaseDomain: "custom.org",
