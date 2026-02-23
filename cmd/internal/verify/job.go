@@ -249,7 +249,10 @@ func WaitForJob(ctx context.Context, env []string, jobName string, namespace str
 	for {
 		select {
 		case <-ctx.Done():
-			return false, fmt.Errorf("timeout waiting for job to complete")
+			if ctx.Err() == context.DeadlineExceeded {
+				return false, fmt.Errorf("timeout waiting for job to complete")
+			}
+			return false, fmt.Errorf("cancelled while waiting for job to complete")
 		case <-ticker.C:
 			cmd := exec.CommandContext(ctx, "kubectl", "get", "job", jobName,
 				"-n", namespace,
