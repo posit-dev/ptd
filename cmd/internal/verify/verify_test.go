@@ -534,6 +534,20 @@ func TestBuildLocalEnv(t *testing.T) {
 			wantErr:  true,
 		},
 		{
+			name:     "null byte in username returns error",
+			env:      []string{"PATH=/usr/bin"},
+			testUser: "user\x00injected",
+			testPass: "pass",
+			wantErr:  true,
+		},
+		{
+			name:     "null byte in password returns error",
+			env:      []string{"PATH=/usr/bin"},
+			testUser: "user",
+			testPass: "pass\x00injected",
+			wantErr:  true,
+		},
+		{
 			name:      "existing cred keys are stripped before appending",
 			env:       []string{"PATH=/usr/bin", "VIP_TEST_USERNAME=old", "VIP_TEST_PASSWORD=old"},
 			testUser:  "newuser",

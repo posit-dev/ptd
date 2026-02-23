@@ -20,6 +20,7 @@ type JobOptions struct {
 	ConfigName           string
 	Namespace            string
 	CredentialsAvailable bool // whether vip-test-credentials Secret exists
+	Timeout              time.Duration
 }
 
 // CreateConfigMap creates a Kubernetes ConfigMap with the vip.toml configuration
@@ -76,7 +77,16 @@ func buildJobSpec(opts JobOptions) map[string]interface{} {
 		args = append(args, "-m", opts.Categories)
 	}
 
+	// Derive activeDeadlineSeconds from the CLI timeout with a 60-second buffer so the
+	// pod is killed before the outer poll times out. Fall back to 600s if not set.
 	activeDeadlineSeconds := int64(600)
+	if opts.Timeout > 0 {
+		derived := int64(opts.Timeout.Seconds()) - 60
+		if derived < 60 {
+			derived = 60
+		}
+		activeDeadlineSeconds = derived
+	}
 	backoffLimit := int32(0)
 
 	container := map[string]interface{}{

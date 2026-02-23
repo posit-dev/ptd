@@ -35,7 +35,7 @@ func TestGetKeycloakAdminToken_InvalidJSON(t *testing.T) {
 }
 
 func TestCreateKeycloakUser_CreateFails(t *testing.T) {
-	// Search returns empty list (user does not exist), create returns 409 Conflict
+	// Search returns empty list, create returns 409, re-search also returns empty list → error.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -50,7 +50,46 @@ func TestCreateKeycloakUser_CreateFails(t *testing.T) {
 
 	err := createKeycloakUser(context.Background(), srv.URL, "myrealm", "token", "user", "pass")
 	if err == nil {
-		t.Fatal("expected error for 409 create response, got nil")
+		t.Fatal("expected error when re-search after 409 finds no user, got nil")
+	}
+}
+
+func TestCreateKeycloakUser_409ResearchResetsPassword(t *testing.T) {
+	// Search fails with 403, create returns 409, re-search finds the user → reset password.
+	userID := "found-user-id"
+	getCount := 0
+	resetCalled := false
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			getCount++
+			if getCount == 1 {
+				// First search: permission denied
+				w.WriteHeader(http.StatusForbidden)
+				w.Write([]byte(`{"error":"access_denied"}`))
+			} else {
+				// Re-search after 409: user found
+				users := []map[string]interface{}{{"id": userID, "username": "user"}}
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(users)
+			}
+		case http.MethodPost:
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte(`{"errorMessage":"User exists with same username"}`))
+		case http.MethodPut:
+			resetCalled = true
+			w.WriteHeader(http.StatusNoContent)
+		}
+	}))
+	defer srv.Close()
+
+	err := createKeycloakUser(context.Background(), srv.URL, "myrealm", "token", "user", "pass")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resetCalled {
+		t.Error("expected password reset to be called after 409 re-search")
 	}
 }
 

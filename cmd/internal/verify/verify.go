@@ -181,8 +181,8 @@ func runLocalTests(ctx context.Context, env []string, vipConfig string, categori
 // then appends the provided credentials. Returns an error if credentials contain
 // newline characters.
 func buildLocalEnv(env []string, testUser, testPass string) ([]string, error) {
-	if strings.ContainsAny(testUser, "\n\r") || strings.ContainsAny(testPass, "\n\r") {
-		return nil, fmt.Errorf("test credentials must not contain newline characters")
+	if strings.ContainsAny(testUser, "\n\r\x00") || strings.ContainsAny(testPass, "\n\r\x00") {
+		return nil, fmt.Errorf("test credentials must not contain newline or null characters")
 	}
 	result := make([]string, 0, len(env)+2)
 	for _, e := range env {
@@ -236,6 +236,7 @@ func runKubernetesTests(ctx context.Context, opts Options, vipConfig string, cre
 		ConfigName:           configName,
 		Namespace:            opts.Namespace,
 		CredentialsAvailable: credentialsAvailable,
+		Timeout:              opts.Timeout,
 	}
 
 	if err := CreateJob(ctx, opts.Env, jobOpts); err != nil {
