@@ -11,6 +11,9 @@ def format_lb_tags(tags: dict[str, str]) -> str:
         if not key:
             msg = "LB tag key must not be empty"
             raise ValueError(msg)
+        if len(key) > 128:
+            msg = f"LB tag key exceeds AWS 128-character limit ({len(key)} chars): {key!r}"
+            raise ValueError(msg)
         if "," in key or "=" in key:
             msg = f"LB tag key contains invalid characters (comma or equals): {key}"
             raise ValueError(msg)
@@ -19,6 +22,9 @@ def format_lb_tags(tags: dict[str, str]) -> str:
             raise ValueError(msg)
         if not value:
             msg = f"LB tag value must not be empty: key={key}"
+            raise ValueError(msg)
+        if len(value) > 256:
+            msg = f"LB tag value exceeds AWS 256-character limit ({len(value)} chars): key={key}"
             raise ValueError(msg)
         if "," in value or "=" in value:
             msg = f"LB tag value contains invalid characters (comma or equals): {key}={value}"
