@@ -155,12 +155,14 @@ func runLocalTests(ctx context.Context, env []string, vipConfig string, categori
 	}
 
 	cmd := exec.CommandContext(ctx, "uv", args...)
-	cmd.Env = env
 	if credentialsAvailable {
-		if strings.ContainsAny(testUser, "\n\r") || strings.ContainsAny(testPass, "\n\r") {
-			return fmt.Errorf("test credentials must not contain newline characters")
+		localEnv, err := buildLocalEnv(env, testUser, testPass)
+		if err != nil {
+			return err
 		}
-		cmd.Env = append(cmd.Env, "VIP_TEST_USERNAME="+testUser, "VIP_TEST_PASSWORD="+testPass)
+		cmd.Env = localEnv
+	} else {
+		cmd.Env = env
 	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -171,6 +173,24 @@ func runLocalTests(ctx context.Context, env []string, vipConfig string, categori
 
 	fmt.Println("\nVIP tests completed successfully")
 	return nil
+}
+
+// buildLocalEnv constructs the environment for a local uv invocation.
+// It strips any pre-existing VIP_TEST_USERNAME/VIP_TEST_PASSWORD entries from env
+// (preventing duplicates when the caller's environment already exports them),
+// then appends the provided credentials. Returns an error if credentials contain
+// newline characters.
+func buildLocalEnv(env []string, testUser, testPass string) ([]string, error) {
+	if strings.ContainsAny(testUser, "\n\r") || strings.ContainsAny(testPass, "\n\r") {
+		return nil, fmt.Errorf("test credentials must not contain newline characters")
+	}
+	result := make([]string, 0, len(env)+2)
+	for _, e := range env {
+		if !strings.HasPrefix(e, "VIP_TEST_USERNAME=") && !strings.HasPrefix(e, "VIP_TEST_PASSWORD=") {
+			result = append(result, e)
+		}
+	}
+	return append(result, "VIP_TEST_USERNAME="+testUser, "VIP_TEST_PASSWORD="+testPass), nil
 }
 
 // randomHex returns n random hex-encoded bytes (2n hex characters).
