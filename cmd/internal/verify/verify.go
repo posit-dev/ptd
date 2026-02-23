@@ -23,7 +23,8 @@ type Options struct {
 	ConfigOnly   bool
 	Image        string
 	KeycloakURL  string // overrides the default https://key.<domain> if set
-	TestUsername  string // Keycloak test user name (default: vip-test-user)
+	Realm        string // Keycloak realm (default: posit)
+	TestUsername string // Keycloak test user name (default: vip-test-user)
 	Env          []string
 }
 
@@ -64,13 +65,13 @@ func Run(ctx context.Context, opts Options) error {
 
 	// Ensure test user exists
 	slog.Info("Ensuring test user exists in Keycloak")
-	if err := EnsureTestUser(ctx, opts.Env, opts.SiteName, keycloakURL, "posit", opts.TestUsername); err != nil {
+	if err := EnsureTestUser(ctx, opts.Env, opts.SiteName, keycloakURL, opts.Realm, opts.TestUsername); err != nil {
 		return fmt.Errorf("failed to ensure test user: %w", err)
 	}
 
 	// Run tests based on mode
 	if opts.LocalMode {
-		return runLocalTests(ctx, vipConfig, opts.Categories)
+		return runLocalTests(ctx, opts.Env, vipConfig, opts.Categories)
 	}
 
 	return runKubernetesTests(ctx, opts, vipConfig)
@@ -95,7 +96,7 @@ func getSiteCR(ctx context.Context, env []string, siteName string) ([]byte, erro
 }
 
 // runLocalTests runs VIP tests locally using uv
-func runLocalTests(ctx context.Context, vipConfig string, categories string) error {
+func runLocalTests(ctx context.Context, env []string, vipConfig string, categories string) error {
 	slog.Info("Running VIP tests locally")
 
 	// Create temporary config file
@@ -111,6 +112,12 @@ func runLocalTests(ctx context.Context, vipConfig string, categories string) err
 	}
 	tmpfile.Close()
 
+	// Fetch credentials from the K8s Secret so local runs authenticate the same way as K8s Jobs.
+	testUser, testPass, err := getTestCredentials(ctx, env)
+	if err != nil {
+		return fmt.Errorf("failed to get test credentials: %w", err)
+	}
+
 	// Run pytest with uv
 	args := []string{"run", "pytest", "--config", tmpfile.Name(), "--tb=short", "-v"}
 	if categories != "" {
@@ -118,6 +125,7 @@ func runLocalTests(ctx context.Context, vipConfig string, categories string) err
 	}
 
 	cmd := exec.CommandContext(ctx, "uv", args...)
+	cmd.Env = append(env, "VIP_TEST_USERNAME="+testUser, "VIP_TEST_PASSWORD="+testPass)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
