@@ -54,6 +54,22 @@ def test_build_nlb_tag_string_empty_cluster_name() -> None:
         )
 
 
+def test_build_nlb_tag_string_invalid_true_name_value() -> None:
+    with pytest.raises(ValueError, match="comma or equals"):
+        _build_nlb_tag_string(
+            tags={"posit.team/true-name": "bad,name", "posit.team/environment": "prod"},
+            cluster_name="cluster",
+        )
+
+
+def test_build_nlb_tag_string_invalid_environment_value() -> None:
+    with pytest.raises(ValueError, match="comma or equals"):
+        _build_nlb_tag_string(
+            tags={"posit.team/true-name": "myapp", "posit.team/environment": "bad=env"},
+            cluster_name="cluster",
+        )
+
+
 def test_build_nlb_tag_string_extra_tags_are_dropped() -> None:
     """Extra tags in the input dict (e.g. aws:created-by, Cost-Center) are intentionally
     discarded; only true-name, environment, and Name should appear in the output."""

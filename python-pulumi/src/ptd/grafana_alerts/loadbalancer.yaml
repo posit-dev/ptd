@@ -47,7 +47,7 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            - 10
+                            - 10  # Absolute count, not an error rate. High-traffic ALBs may never breach this; low-traffic ALBs may page on transient spikes. Consider a rate-based alert if traffic volume varies significantly across environments.
                         type: gt
                       operator:
                         type: and
