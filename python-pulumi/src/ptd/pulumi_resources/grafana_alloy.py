@@ -372,7 +372,7 @@ class AlloyConfig(pulumi.ComponentResource):
                         metric {{
                             name       = "UnHealthyHostCount"
                             statistics = ["Average"]
-                            period     = "1m"
+                            period     = "5m"
                         }}
 
                         metric {{
@@ -399,7 +399,7 @@ class AlloyConfig(pulumi.ComponentResource):
                         metric {{
                             name       = "UnHealthyHostCount"
                             statistics = ["Average"]
-                            period     = "1m"
+                            period     = "5m"
                         }}
                     }}
                 }}

@@ -182,7 +182,7 @@ groups:
           execErrState: Error
           for: 10m
           annotations:
-            description: RDS instance has less than 512 MiB of freeable memory remaining for more than 10 minutes.
+            description: RDS instance has less than 512 MiB of freeable memory remaining for more than 10 minutes. Note: this threshold is calibrated for db.r5.large (~16 GiB RAM); it will fire continuously for small instances (e.g. db.t3.micro, db.t3.small). Adjust per instance class.
             summary: Low freeable memory on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
