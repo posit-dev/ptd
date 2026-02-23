@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/BurntSushi/toml"
-	"gopkg.in/yaml.v3"
 )
 
 // VIPConfig represents the vip.toml configuration structure
@@ -68,13 +67,8 @@ type KeycloakSpec struct {
 	Enabled bool `yaml:"enabled"`
 }
 
-// GenerateConfig generates a vip.toml configuration from a Site CR YAML
-func GenerateConfig(siteYAML []byte, targetName string) (string, error) {
-	var site SiteCR
-	if err := yaml.Unmarshal(siteYAML, &site); err != nil {
-		return "", fmt.Errorf("failed to parse Site CR YAML: %w", err)
-	}
-
+// GenerateConfig generates a vip.toml configuration from a parsed Site CR
+func GenerateConfig(site *SiteCR, targetName string) (string, error) {
 	config := VIPConfig{
 		General: GeneralConfig{
 			DeploymentName: targetName,
@@ -101,10 +95,10 @@ func GenerateConfig(siteYAML []byte, targetName string) (string, error) {
 
 	// Configure Connect
 	if site.Spec.Connect != nil {
-		url := buildProductURL(site.Spec.Connect, "connect", site.Spec.Domain)
+		productURL := buildProductURL(site.Spec.Connect, "connect", site.Spec.Domain)
 		config.Connect = ProductConfig{
 			Enabled: true,
-			URL:     url,
+			URL:     productURL,
 		}
 	} else {
 		config.Connect = ProductConfig{Enabled: false}
@@ -112,10 +106,10 @@ func GenerateConfig(siteYAML []byte, targetName string) (string, error) {
 
 	// Configure Workbench
 	if site.Spec.Workbench != nil {
-		url := buildProductURL(site.Spec.Workbench, "workbench", site.Spec.Domain)
+		productURL := buildProductURL(site.Spec.Workbench, "workbench", site.Spec.Domain)
 		config.Workbench = ProductConfig{
 			Enabled: true,
-			URL:     url,
+			URL:     productURL,
 		}
 	} else {
 		config.Workbench = ProductConfig{Enabled: false}
@@ -123,10 +117,10 @@ func GenerateConfig(siteYAML []byte, targetName string) (string, error) {
 
 	// Configure Package Manager
 	if site.Spec.PackageManager != nil {
-		url := buildProductURL(site.Spec.PackageManager, "packagemanager", site.Spec.Domain)
+		productURL := buildProductURL(site.Spec.PackageManager, "packagemanager", site.Spec.Domain)
 		config.PackageManager = ProductConfig{
 			Enabled: true,
-			URL:     url,
+			URL:     productURL,
 		}
 	} else {
 		config.PackageManager = ProductConfig{Enabled: false}
