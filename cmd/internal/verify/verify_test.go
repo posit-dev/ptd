@@ -154,7 +154,7 @@ func TestGenerateConfig_EmptyAuthType(t *testing.T) {
 }
 
 func TestGenerateConfig_EmptyDomain(t *testing.T) {
-	// Empty domain should produce a URL with an empty domain segment, not panic
+	// Empty domain with a configured product should return an error (malformed URL otherwise)
 	site := &SiteCR{
 		Spec: SiteSpec{
 			Domain:  "",
@@ -162,13 +162,9 @@ func TestGenerateConfig_EmptyDomain(t *testing.T) {
 		},
 	}
 
-	config, err := GenerateConfig(site, "test")
-	if err != nil {
-		t.Fatalf("GenerateConfig returned error: %v", err)
-	}
-
-	if !strings.Contains(config, `url = "https://connect."`) {
-		t.Errorf("expected connect URL with empty domain, got:\n%s", config)
+	_, err := GenerateConfig(site, "test")
+	if err == nil {
+		t.Fatal("expected error for empty domain with configured product, got nil")
 	}
 }
 

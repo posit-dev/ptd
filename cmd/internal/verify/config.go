@@ -73,6 +73,10 @@ func GenerateConfig(site *SiteCR, targetName string) (string, error) {
 		return "", fmt.Errorf("site cannot be nil")
 	}
 
+	if site.Spec.Domain == "" && (site.Spec.Connect != nil || site.Spec.Workbench != nil || site.Spec.PackageManager != nil) {
+		return "", fmt.Errorf("site domain is required when products are configured")
+	}
+
 	config := VIPConfig{
 		General: GeneralConfig{
 			DeploymentName: targetName,

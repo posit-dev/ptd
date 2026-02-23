@@ -19,8 +19,9 @@ import (
 
 const keycloakHTTPTimeout = 30 * time.Second
 
-// EnsureTestUser ensures a test user exists in Keycloak and credentials are in a Secret
-func EnsureTestUser(ctx context.Context, env []string, siteName string, keycloakURL string, realm string, testUsername string) error {
+// EnsureTestUser ensures a test user exists in Keycloak and credentials are in a Secret.
+// adminSecretName is the K8s secret holding the Keycloak admin credentials.
+func EnsureTestUser(ctx context.Context, env []string, keycloakURL string, realm string, testUsername string, adminSecretName string, namespace string) error {
 	// Check if the vip-test-credentials secret already exists
 	checkCmd := exec.CommandContext(ctx, "kubectl", "get", "secret", "vip-test-credentials",
 		"-n", namespace, "--ignore-not-found", "-o", "jsonpath={.metadata.name}")
@@ -34,10 +35,7 @@ func EnsureTestUser(ctx context.Context, env []string, siteName string, keycloak
 
 	slog.Info("Creating test user in Keycloak")
 
-	// Get Keycloak admin credentials from the Keycloak Operator's initial-admin secret
-	// The Keycloak Operator creates this as {keycloak-cr-name}-initial-admin
-	adminSecretName := fmt.Sprintf("%s-keycloak-initial-admin", siteName)
-	adminUser, adminPass, err := getKeycloakAdminCreds(ctx, env, adminSecretName)
+	adminUser, adminPass, err := getKeycloakAdminCreds(ctx, env, adminSecretName, namespace)
 	if err != nil {
 		return fmt.Errorf("failed to get Keycloak admin credentials: %w", err)
 	}
@@ -60,7 +58,7 @@ func EnsureTestUser(ctx context.Context, env []string, siteName string, keycloak
 	}
 
 	// Create the vip-test-credentials secret
-	if err := createCredentialsSecret(ctx, env, username, password); err != nil {
+	if err := createCredentialsSecret(ctx, env, username, password, namespace); err != nil {
 		return fmt.Errorf("failed to create credentials secret: %w", err)
 	}
 
@@ -69,8 +67,8 @@ func EnsureTestUser(ctx context.Context, env []string, siteName string, keycloak
 }
 
 // getTestCredentials retrieves VIP test user credentials from the vip-test-credentials Secret.
-func getTestCredentials(ctx context.Context, env []string) (string, string, error) {
-	return getKeycloakAdminCreds(ctx, env, "vip-test-credentials")
+func getTestCredentials(ctx context.Context, env []string, namespace string) (string, string, error) {
+	return getKeycloakAdminCreds(ctx, env, "vip-test-credentials", namespace)
 }
 
 // generatePassword generates a cryptographically random password of the given length.
@@ -88,7 +86,7 @@ func generatePassword(length int) (string, error) {
 }
 
 // getKeycloakAdminCreds retrieves Keycloak admin credentials from the secret
-func getKeycloakAdminCreds(ctx context.Context, env []string, secretName string) (string, string, error) {
+func getKeycloakAdminCreds(ctx context.Context, env []string, secretName string, namespace string) (string, string, error) {
 	cmd := exec.CommandContext(ctx, "kubectl", "get", "secret", secretName,
 		"-n", namespace,
 		"-o", "jsonpath={.data.username} {.data.password}")
@@ -269,7 +267,7 @@ func resetKeycloakUserPassword(ctx context.Context, keycloakURL, realm, token, u
 
 // createCredentialsSecret creates a K8s secret with test user credentials.
 // Uses JSON marshalling to prevent injection, consistent with job.go.
-func createCredentialsSecret(ctx context.Context, env []string, username, password string) error {
+func createCredentialsSecret(ctx context.Context, env []string, username, password string, namespace string) error {
 	secret := map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "Secret",
