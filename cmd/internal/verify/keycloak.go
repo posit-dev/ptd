@@ -84,7 +84,7 @@ func EnsureTestUser(ctx context.Context, env []string, keycloakURL string, realm
 
 // generatePassword generates a cryptographically random password of the given length.
 func generatePassword(length int) (string, error) {
-	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%"
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	result := make([]byte, length)
 	for i := range result {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
@@ -253,6 +253,34 @@ func createKeycloakUser(ctx context.Context, keycloakURL, realm, token, username
 
 	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode == http.StatusConflict {
+			// User exists (possibly created concurrently, or the initial search lacked permissions).
+			// Re-search to obtain the user ID and reset the password.
+			slog.Info("User already exists (409 on create), re-searching to reset password", "username", username)
+			req2, err := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
+			if err != nil {
+				return err
+			}
+			req2.Header.Set("Authorization", "Bearer "+token)
+			searchResp2, err := client.Do(req2)
+			if err != nil {
+				return err
+			}
+			body2, _ := io.ReadAll(searchResp2.Body)
+			searchResp2.Body.Close()
+			if searchResp2.StatusCode != http.StatusOK {
+				return fmt.Errorf("re-search after 409 failed with status %d: %s", searchResp2.StatusCode, string(body2))
+			}
+			var users2 []map[string]interface{}
+			if err := json.Unmarshal(body2, &users2); err != nil || len(users2) == 0 {
+				return fmt.Errorf("could not find user after 409 conflict: %s", string(body))
+			}
+			userID, ok := users2[0]["id"].(string)
+			if !ok || userID == "" {
+				return fmt.Errorf("could not extract user ID after 409 conflict")
+			}
+			return resetKeycloakUserPassword(ctx, keycloakURL, realm, token, userID, password, client)
+		}
 		return fmt.Errorf("create user failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
