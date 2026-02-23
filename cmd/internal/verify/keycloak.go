@@ -20,7 +20,7 @@ import (
 const keycloakHTTPTimeout = 30 * time.Second
 
 // EnsureTestUser ensures a test user exists in Keycloak and credentials are in a Secret
-func EnsureTestUser(ctx context.Context, env []string, siteName string, keycloakURL string, realm string) error {
+func EnsureTestUser(ctx context.Context, env []string, siteName string, keycloakURL string, realm string, testUsername string) error {
 	// Check if the vip-test-credentials secret already exists
 	checkCmd := exec.CommandContext(ctx, "kubectl", "get", "secret", "vip-test-credentials",
 		"-n", namespace, "--ignore-not-found", "-o", "jsonpath={.metadata.name}")
@@ -49,7 +49,7 @@ func EnsureTestUser(ctx context.Context, env []string, siteName string, keycloak
 	}
 
 	// Create test user with a randomly generated password
-	username := "vip-test-user"
+	username := testUsername
 	password, err := generatePassword(32)
 	if err != nil {
 		return fmt.Errorf("failed to generate password: %w", err)

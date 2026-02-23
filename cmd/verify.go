@@ -114,14 +114,15 @@ func runVerify(ctx context.Context, cmd *cobra.Command, target string) {
 
 	// Run verification
 	opts := verify.Options{
-		Target:      target,
-		SiteName:    verifySiteName,
-		Categories:  verifyCategories,
-		LocalMode:   verifyLocal,
-		ConfigOnly:  verifyConfigOnly,
-		Image:       verifyImage,
-		KeycloakURL: verifyKeycloakURL,
-		Env:         env,
+		Target:       target,
+		SiteName:     verifySiteName,
+		Categories:   verifyCategories,
+		LocalMode:    verifyLocal,
+		ConfigOnly:   verifyConfigOnly,
+		Image:        verifyImage,
+		KeycloakURL:  verifyKeycloakURL,
+		TestUsername: "vip-test-user",
+		Env:          env,
 	}
 
 	if err := verify.Run(ctx, opts); err != nil {
