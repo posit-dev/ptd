@@ -223,6 +223,7 @@ class AlloyConfig(pulumi.ComponentResource):
         if self.cloud_provider != "aws":
             return ""
         _validate_alloy_true_name(self.workload.cfg.true_name)
+        _validate_alloy_true_name(self.workload.compound_name)
         return textwrap.dedent(f"""
             prometheus.exporter.cloudwatch "cloudwatch" {{
                 sts_region = "{self.region}"
@@ -262,13 +263,12 @@ class AlloyConfig(pulumi.ComponentResource):
                         period     = "5m"
                     }}
 
+                    # TODO: Remove ["Sum"] from statistics once all Grafana dashboards have
+                    # been updated to query aws_rds_database_connections_average.
                     # Collecting both Sum and Average during migration. Average is the
                     # target metric (aws_rds_database_connections_average); Sum
                     # (aws_rds_database_connections_sum) is kept temporarily for existing
-                    # dashboards. Remove ["Sum"] from statistics once all Grafana dashboards
-                    # have been updated to query aws_rds_database_connections_average.
-                    # NOTE: Keeping Sum doubles the CloudWatch API cost for this metric.
-                    # Create a GitHub issue to track this removal before it is forgotten.
+                    # dashboards. NOTE: Keeping Sum doubles the CloudWatch API cost for this metric.
                     metric {{
                         name       = "DatabaseConnections"
                         statistics = ["Average", "Sum"]

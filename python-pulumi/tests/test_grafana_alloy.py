@@ -577,7 +577,11 @@ class TestReplicasHandling:
         assert 'name = "site-two-connect-fqdn"' not in result
 
 
-def _make_alloy_for_cloudwatch(cloud_provider_name: str, true_name: str = "myapp", compound_name: str = "myapp-production") -> AlloyConfig:
+def _make_alloy_for_cloudwatch(
+    cloud_provider_name: str,
+    true_name: str = "myapp",
+    compound_name: str = "myapp-production",
+) -> AlloyConfig:
     """Helper to create an AlloyConfig instance with mocked attributes for cloudwatch tests."""
     alloy = AlloyConfig.__new__(AlloyConfig)
     mock_workload = Mock()
@@ -614,3 +618,13 @@ class TestDefineCloudwatchConfig:
         alloy = _make_alloy_for_cloudwatch("azure")
         result = alloy._define_cloudwatch_config()  # noqa: SLF001
         assert result == ""
+
+    def test_invalid_true_name_raises_value_error(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("aws", true_name='bad"name')
+        with pytest.raises(ValueError, match="unsafe for Alloy River config"):
+            alloy._define_cloudwatch_config()  # noqa: SLF001
+
+    def test_invalid_compound_name_raises_value_error(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("aws", compound_name="bad{name}")
+        with pytest.raises(ValueError, match="unsafe for Alloy River config"):
+            alloy._define_cloudwatch_config()  # noqa: SLF001
