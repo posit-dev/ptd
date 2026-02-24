@@ -122,7 +122,7 @@ Always prefix worktree directories with `ptd-` to avoid collisions with other re
    cd ../../.worktrees/ptd-<branch-name>
    just build-cmd
    ```
-2. **direnv** — if direnv is available, `cd` into the worktree and run `direnv allow`. The `.envrc` uses `source_up` to inherit workspace vars and overrides `PTD` to point to the worktree.
+2. **direnv** — if direnv is available, copy `envrc.recommended` to `.envrc` in the worktree, then run `direnv allow`. The file uses `source_up` to inherit workspace vars and overrides `PTD` to point to the worktree.
 3. **For agents without direnv** — set env vars explicitly before running `ptd` commands:
    ```bash
    export PTD="$(pwd)"
