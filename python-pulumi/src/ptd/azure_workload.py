@@ -66,7 +66,6 @@ class AzureWorkloadConfig(ptd.WorkloadConfig):
     resource_tags: dict[str, str] | None = None
     protect_persistent_resources: bool = True
     admin_group_id: str | None = None
-    bastion_instance_type: str = "Standard_B1s"
     ppm_file_share_size_gib: int = 100  # Minimum size for PPM Azure File Share in GiB
 
 
