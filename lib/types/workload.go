@@ -95,7 +95,6 @@ type AzureWorkloadConfig struct {
 	ClientID                   string                                `yaml:"client_id"`
 	SecretsProviderClientID    string                                `yaml:"secrets_provider_client_id"`
 	AdminGroupID               string                                `yaml:"admin_group_id"`
-	BastionInstanceType        string                                `yaml:"bastion_instance_type"`
 	InstanceType               string                                `yaml:"instance_type"`
 	ControlPlaneNodeCount      int                                   `yaml:"control_plane_node_count"`
 	WorkerNodeCount            int                                   `yaml:"worker_node_count"`
