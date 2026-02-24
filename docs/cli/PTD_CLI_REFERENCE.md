@@ -344,6 +344,47 @@ ptd ensure testing01-staging --dry-run
 
 ---
 
+### `ptd verify`
+
+Run VIP (Verified Installation of Posit) tests against a deployment to validate that products are functioning correctly. See [verify.md](verify.md) for full documentation including authentication modes.
+
+**Usage:**
+```bash
+ptd verify <target> [flags]
+```
+
+**Flags:**
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--site` | string | `main` | Name of the Site CR to verify |
+| `--categories` | string | (all) | Test categories to run (pytest `-m` marker) |
+| `--local` | bool | false | Run tests locally instead of as a K8s Job |
+| `--config-only` | bool | false | Generate and print `vip.toml` without running tests |
+| `--image` | string | `ghcr.io/posit-dev/vip:latest` | VIP container image for K8s Job mode |
+| `--keycloak-url` | string | (derived) | Override Keycloak URL |
+| `--realm` | string | `posit` | Keycloak realm name |
+| `--test-username` | string | `vip-test-user` | Keycloak test user name |
+
+**Examples:**
+```bash
+# Run all tests as a K8s Job
+ptd verify ganso01-staging
+
+# Generate config only
+ptd verify ganso01-staging --config-only
+
+# Run locally with interactive browser auth (for Okta deployments)
+ptd verify ganso01-staging --local --interactive-auth
+
+# Run specific test categories
+ptd verify ganso01-staging --categories prerequisites
+```
+
+**Implementation:** `/cmd/verify.go`, `/cmd/internal/verify/`
+
+---
+
 ### `ptd workon`
 
 Start an interactive shell or run a one-shot command with credentials, kubeconfig, and environment configured for a target. Optionally, work within a specific Pulumi stack directory.
