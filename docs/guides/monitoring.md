@@ -532,6 +532,42 @@ PTD deploys a set of Grafana alerts to the control room for centralized monitori
 
 All alerts are configured to send notifications to OpsGenie when triggered.
 
+### Alert Format
+
+Alerts use a standardized format for consistency across all alert types:
+
+```
+[🔴 CRITICAL | 🟡 WARNING]: [Title]
+
+[Description]
+
+─── WHERE ───────────────────────────
+Tenant:      [tenant name] (Note: The organization or group that a workload cluster is provisioned for)
+Cluster:     [cluster name]
+Component:   [affected component]
+
+─── DETAILS ─────────────────────────
+[Key]:       [Value]
+[Key]:       [Value]
+...
+
+📖 [runbook link]
+📊 [dashboard link]
+```
+
+**Severity levels:**
+- 🔴 **CRITICAL** — Immediate action required
+- 🟡 **WARNING** — Investigate soon
+
+**Alert types and their WHERE/DETAILS fields:**
+
+| Type | WHERE | DETAILS |
+|------|-------|---------|
+| Health Check | Tenant, Cluster, Product | Endpoint, Status, Response Time, Down Since |
+| Kubernetes | Tenant, Cluster, Namespace, Pod/Node | Varies by alert (restarts, replicas, conditions) |
+| Cloud (AWS) | Tenant, Cluster, Resource, Region | Metric, Current, Threshold, Duration |
+| Cloud (Azure) | Tenant, Cluster, Resource, Location | Metric, Current, Threshold, Duration |
+
 ### Application Alerts
 
 | Alert | Threshold | Duration | Description |
