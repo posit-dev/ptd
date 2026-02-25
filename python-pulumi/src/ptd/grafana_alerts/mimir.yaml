@@ -91,8 +91,21 @@ groups:
           execErrState: Error
           for: 10m
           annotations:
-            description: No metrics have been received from workload cluster {{ $labels.cluster }} for 10 minutes. This could indicate Alloy is not running, network issues between the workload and control room, or the workload cluster is down.
-            summary: "Workload metrics silent!\nCluster: {{ $labels.cluster }}"
+            summary: "🔴 CRITICAL: Workload Metrics Silent"
+            description: |
+              No metrics received from workload cluster
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+
+              ─── DETAILS ─────────────────────────
+              Component:   Metrics Pipeline
+              Issue:       No metrics received
+              Duration:    10 minutes
+
+              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/workload-metrics-silent.md
+              📊 https://grafana.example.com/d/mimir?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false

@@ -63,8 +63,24 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: Evaluates FSx instance usage to determine if it is greater than 80% allocated.
-            summary: FSx instance {{$labels.dimension_FileSystemId}} has less than 20% of capacity remaining.
+            summary: "🟡 WARNING: FSx Storage Capacity Low"
+            description: |
+              FSx file system is running low on storage capacity
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_FileSystemId }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Storage Capacity
+              Current:     > 80% used
+              Threshold:   80%
+              Duration:    5 minutes
+
+              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/fsx-capacity-low.md
+              📊 https://grafana.example.com/d/cloudwatch?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false
@@ -124,8 +140,24 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: EC2 instance has high network outbound traffic (over 300 MiB/s) for more than 5 minutes.
-            summary: High network outbound traffic on EC2 instance {{$labels.dimension_InstanceId}} in cluster {{$labels.cluster}}
+            summary: "🟡 WARNING: EC2 Network Out High"
+            description: |
+              EC2 instance has unusually high outbound network traffic
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_InstanceId }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Network Out
+              Current:     > 300 MiB/s
+              Threshold:   300 MiB/s
+              Duration:    5 minutes
+
+              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/ec2-network-high.md
+              📊 https://grafana.example.com/d/cloudwatch?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false
@@ -181,8 +213,24 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: EC2 instance has an unusually high packet transmission rate (over 400,000 packets/s) for more than 5 minutes, which could indicate abnormal network activity.
-            summary: High network packet rate on EC2 instance {{$labels.dimension_InstanceId}} in cluster {{$labels.cluster}}
+            summary: "🟡 WARNING: EC2 Network Packets Out High"
+            description: |
+              EC2 instance has unusually high packet transmission rate
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_InstanceId }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Network Packets Out
+              Current:     > 400,000 packets/s
+              Threshold:   400,000 packets/s
+              Duration:    5 minutes
+
+              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/ec2-network-high.md
+              📊 https://grafana.example.com/d/cloudwatch?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false

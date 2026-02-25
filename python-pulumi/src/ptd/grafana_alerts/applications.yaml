@@ -63,8 +63,23 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: Loki ingester has experienced WAL disk full failures. This indicates storage issues with the Loki WAL directory in cluster {{ $labels.cluster }}.
-            summary: Loki WAL disk full failures detected in {{ $labels.cluster }}
+            summary: "🔴 CRITICAL: Loki WAL Disk Full"
+            description: |
+              Loki ingester experiencing WAL disk full failures
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Namespace:   {{ $labels.namespace }}
+              Pod:         {{ $labels.pod }}
+
+              ─── DETAILS ─────────────────────────
+              Component:   Loki Ingester
+              Issue:       WAL disk full
+              Duration:    5 minutes
+
+              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/loki-wal-disk-full.md
+              📊 https://grafana.example.com/d/loki?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false
