@@ -220,6 +220,9 @@ class AlloyConfig(pulumi.ComponentResource):
             account_id = self.workload.cfg.account_id
             cluster_name = self.workload.eks_cluster_name(self.release)
 
+        # Use tenant_name if set, otherwise fall back to compound_name
+        tenant_name = self.workload.cfg.tenant_name or self.workload.compound_name
+
         # Generate CloudWatch exporter configuration for AWS
         cloudwatch_config = ""
         if self.cloud_provider == "aws":
@@ -635,6 +638,7 @@ class AlloyConfig(pulumi.ComponentResource):
 
                   external_labels = {{
                     data = "true",
+                    tenant_name = "{tenant_name}",
                   }}
                 }}
             """

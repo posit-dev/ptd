@@ -315,6 +315,7 @@ class WorkloadConfig:
     network_trust: NetworkTrust
     sites: typing.Mapping[str, SiteConfig]
     true_name: str
+    tenant_name: str | None = dataclasses.field(default=None, kw_only=True)  # Human-readable name for the tenant
 
     @property
     def domain(self) -> str:
