@@ -54,7 +54,9 @@ aws.s3.Bucket(
 
 PTD uses consistent naming patterns. Here are common patterns found in the codebase:
 
-#### IAM Roles
+#### AWS Naming Patterns
+
+##### IAM Roles
 **Pattern:** `f"{purpose}.{compound_name}.posit.team"`
 
 ```python
@@ -71,7 +73,7 @@ def team_operator_role_name(self) -> str:
 
 ---
 
-#### S3 Buckets
+##### S3 Buckets
 **Pattern:** `f"{compound_name}-{purpose}"`
 
 ```python
@@ -91,7 +93,7 @@ loki_bucket = aws.s3.Bucket(
 
 ---
 
-#### EKS Clusters
+##### EKS Clusters
 **Pattern:** `f"default_{compound_name}-control-plane"`
 
 ```python
@@ -106,7 +108,7 @@ cluster_name = f"default_{self.workload.compound_name}-control-plane"
 
 ---
 
-#### Helm Releases
+##### Helm Releases
 **Pattern:** `f"{compound_name}-{release}-{component}"`
 
 ```python
@@ -126,6 +128,99 @@ k8s.apiextensions.CustomResource(
 
 **Usage locations:**
 - `python-pulumi/src/ptd/pulumi_resources/aws_workload_helm.py`
+
+---
+
+#### Azure Naming Patterns
+
+Azure has strict naming constraints. All naming methods are on the `AzureWorkload` class in `python-pulumi/src/ptd/azure_workload.py`.
+
+##### Resource Groups
+**Pattern:** `f"rsg-ptd-{sanitized_name}"`
+
+```python
+# Example from azure_workload.py
+@property
+def resource_group_name(self) -> str:
+    name = self.compound_name.lower()
+    name = re.sub(r"[^a-z0-9-]", "-", name)
+    return f"rsg-ptd-{name}"
+
+# Creates: "rsg-ptd-myworkload-staging"
+```
+
+---
+
+##### Key Vault
+**Pattern:** `f"kv-ptd-{compound_name[:17]}"` (max 24 chars total)
+
+```python
+# Example from azure_workload.py
+@functools.cached_property
+def key_vault_name(self) -> str:
+    name = self.compound_name.lower()
+    name = re.sub(r"[^a-z0-9-]", "-", name)
+    name = name[:17]  # Truncate to fit max length
+    return f"kv-ptd-{name}"
+
+# Creates: "kv-ptd-myworkload-st" (truncated if necessary)
+```
+
+**Critical:** Key Vault names have a 24-character limit. The compound name is truncated to 17 chars to leave room for the `kv-ptd-` prefix.
+
+---
+
+##### Storage Accounts
+**Pattern:** `f"stptd{compound_name_no_hyphens[:19]}"` (max 24 chars, NO hyphens)
+
+```python
+# Example from azure_workload.py
+@property
+def storage_account_name(self) -> str:
+    name = self.compound_name.lower()
+    name = re.sub(r"[^a-z0-9-]", "-", name)
+    name = name.replace("-", "")  # Remove ALL hyphens
+    name = name[:19]
+    return f"stptd{name}"
+
+# Creates: "stptdmyworkloadstaging" (no hyphens!)
+```
+
+**Critical:** Storage account names:
+- Cannot contain hyphens (Azure requirement)
+- Max 24 characters
+- Must be lowercase alphanumeric only
+
+---
+
+##### VNets
+**Pattern:** `f"vnet-ptd-{compound_name}"`
+
+```python
+# Example from azure_workload.py
+@property
+def vnet_name(self) -> str:
+    return f"vnet-ptd-{self.compound_name}"
+
+# Creates: "vnet-ptd-myworkload-staging"
+```
+
+---
+
+##### AKS Clusters
+**Pattern:** `f"{compound_name}-{release}"`
+
+```python
+# Example from azure_workload.py
+def cluster_name(self, release: str) -> str:
+    return f"{self.compound_name}-{release}"
+
+# Creates: "myworkload-staging-r1"
+```
+
+**Usage locations:**
+- `python-pulumi/src/ptd/azure_workload.py`
+- All Azure resource naming methods
 
 ---
 
@@ -219,6 +314,8 @@ class CertManager(pulumi.ComponentResource):
 - Simple components with no conditional logic
 - All resources created unconditionally
 
+**Azure note:** Azure workload components consistently use this pattern with `_define_*()` helper methods (no builder pattern).
+
 ---
 
 ### Pattern 2: Builder/Chaining
@@ -256,10 +353,14 @@ cluster = AWSEKSCluster(...).with_node_role().with_node_group("default")
 - Complex resources with many optional components
 - Want to expose a fluent API for configuration
 
+**Important:** Builder methods in `AWSEKSCluster` have ordering dependencies. For example, `with_node_role()` must be called before `with_node_group()` because it sets `self.default_node_role`.
+
+**Azure note:** Azure does NOT use the builder pattern. AKS cluster creation is handled in Go (`lib/steps/aks.go`), not Python. Azure Python components use the all-in-constructor pattern with `_define_*()` methods that have no ordering dependencies.
+
 ---
 
 ### Pattern 3: Autoload + Constructor
-**Example:** `AWSWorkloadHelm`
+**Example:** `AWSWorkloadHelm`, `AzureWorkloadHelm`
 
 `autoload()` classmethod loads config, then `__init__` creates resources.
 
@@ -400,8 +501,43 @@ class AWSWorkload(AbstractWorkload):
 
 ---
 
-### WorkloadConfig / AWSWorkloadConfig
-**Location:** `python-pulumi/src/ptd/__init__.py`, `python-pulumi/src/ptd/aws_workload.py`
+### AzureWorkload
+**Location:** `python-pulumi/src/ptd/azure_workload.py`
+
+**Role:** Azure-specific workload config loading, naming with strict character limits.
+
+**Key methods:**
+- `load_unique_config()`: Parses Azure-specific YAML into `AzureWorkloadConfig`
+- `resource_group_name`: Returns sanitized resource group name (`f"rsg-ptd-{name}"`)
+- `key_vault_name`: Returns Key Vault name with 24-char limit (`f"kv-ptd-{name[:17]}"`)
+- `storage_account_name`: Returns storage account name with NO hyphens (`f"stptd{name_no_hyphens[:19]}"`)
+- `cluster_name(release)`: Returns AKS cluster name (`f"{compound_name}-{release}"`)
+- `vnet_name`: Returns VNet name (`f"vnet-ptd-{compound_name}"`)
+
+**Example:**
+```python
+class AzureWorkload(AbstractWorkload):
+    cfg: AzureWorkloadConfig
+
+    def load_unique_config(self) -> None:
+        # Parse Azure-specific config from YAML
+        self.cfg = AzureWorkloadConfig(**self.spec)
+
+    @property
+    def storage_account_name(self) -> str:
+        name = self.compound_name.lower()
+        name = re.sub(r"[^a-z0-9-]", "-", name)
+        name = name.replace("-", "")  # Remove ALL hyphens
+        name = name[:19]
+        return f"stptd{name}"
+```
+
+**Critical:** AKS cluster creation is in Go (`lib/steps/aks.go`), not Python, unlike EKS.
+
+---
+
+### WorkloadConfig / AWSWorkloadConfig / AzureWorkloadConfig
+**Location:** `python-pulumi/src/ptd/__init__.py`, `python-pulumi/src/ptd/aws_workload.py`, `python-pulumi/src/ptd/azure_workload.py`
 
 **Role:** Frozen dataclasses holding parsed configuration.
 
@@ -422,13 +558,28 @@ class AWSWorkloadConfig(WorkloadConfig):
     tailscale_enabled: bool
     clusters: dict[str, AWSWorkloadClusterConfig]
     # ... many more AWS-specific fields
+
+@dataclasses.dataclass(frozen=True)
+class AzureWorkloadConfig(WorkloadConfig):
+    subscription_id: str
+    tenant_id: str
+    client_id: str
+    network: NetworkConfig  # Nested dataclass for Azure
+    clusters: dict[str, AzureWorkloadClusterConfig]
+    # ... Azure-specific fields
 ```
 
 **Usage:**
 ```python
+# AWS
 workload = AWSWorkload("myworkload-staging")
 print(workload.cfg.account_id)  # "123456789012"
 print(workload.cfg.region)       # "us-east-1"
+
+# Azure
+workload = AzureWorkload("myworkload-staging")
+print(workload.cfg.subscription_id)  # "abc-123-def"
+print(workload.cfg.network.vnet_cidr)  # "10.0.0.0/16"
 ```
 
 ---
@@ -522,6 +673,69 @@ class MyComponent(pulumi.ComponentResource):
 **Impact:** Component works but doesn't export any outputs for `pulumi stack output`.
 
 **Fix:** Call `self.register_outputs({...})` at the end of `__init__`.
+
+---
+
+### 5. Azure Storage Account Names with Hyphens (Azure-specific)
+**Mistake:**
+```python
+# ❌ WRONG - Azure storage accounts cannot have hyphens
+storage_account_name = f"stptd-{compound_name}"
+```
+
+**Impact:** Azure API rejects the resource creation with a validation error.
+
+**Fix:**
+```python
+# ✅ Correct - remove ALL hyphens
+name = compound_name.replace("-", "")
+storage_account_name = f"stptd{name[:19]}"
+```
+
+**Why this happens:** AI models trained on AWS patterns often add hyphens, but Azure storage accounts only allow lowercase alphanumeric characters (no hyphens, no underscores).
+
+---
+
+### 6. Azure Resource Names Exceeding Character Limits (Azure-specific)
+**Mistake:**
+```python
+# ❌ WRONG - Key Vault names can't exceed 24 chars
+key_vault_name = f"kv-ptd-{very_long_compound_name}"  # Could be 30+ chars
+```
+
+**Impact:** Azure API rejects the resource with a length validation error.
+
+**Fix:**
+```python
+# ✅ Correct - truncate to fit within limits
+name = compound_name[:17]  # Leave room for "kv-ptd-" prefix
+key_vault_name = f"kv-ptd-{name}"
+```
+
+**Azure character limits:**
+- Key Vault: 24 chars max
+- Storage Account: 24 chars max
+- Most other resources: 64-80 chars (more lenient)
+
+---
+
+### 7. Incorrect Azure Tag Key Format (Azure-specific)
+**Mistake:**
+```python
+# ❌ WRONG - Azure doesn't allow dots in tag keys
+tags = {"posit.team/environment": "staging"}
+```
+
+**Impact:** Azure silently converts or rejects the tags, leading to inconsistent tagging.
+
+**Fix:**
+```python
+# ✅ Correct - use azure_tag_key_format() helper
+tags = {
+    ptd.azure_tag_key_format("posit.team/environment"): "staging"
+}
+# Converts dots to forward slashes: "posit/team/environment"
+```
 
 ---
 

@@ -129,9 +129,30 @@ def load_workload_cluster_site_dict(
 
 
 class AzureWorkload(ptd.workload.AbstractWorkload):
+    """Azure-specific workload configuration and naming conventions.
+
+    Loads Azure workload configuration from ptd.yaml and provides naming methods
+    that follow Azure Cloud Adoption Framework (CAF) naming conventions with strict
+    character limits. Azure resource names have more restrictive requirements than AWS:
+    - Key Vault: max 24 chars, alphanumeric and hyphens only
+    - Storage Account: max 24 chars, lowercase alphanumeric only (NO hyphens)
+    - Resource names must be sanitized and truncated to fit within these limits
+
+    All naming methods apply Azure CAF prefixes (e.g., 'rsg-', 'kv-', 'st-') and handle
+    character restrictions automatically.
+    """
+
     cfg: AzureWorkloadConfig
 
     def load_unique_config(self) -> None:
+        """Parse ptd.yaml and load Azure-specific configuration.
+
+        Loads clusters, sites, and network configuration from the workload's ptd.yaml file.
+        Validates that apiVersion is 'posit.team/v1' and kind is 'AzureWorkloadConfig'.
+
+        Raises:
+            ValueError: If config kind/apiVersion mismatch or if duplicate site domains are found.
+        """
         cfg_dict = yaml.safe_load(self.ptd_yaml.read_text())
         if cfg_dict["kind"] != AzureWorkloadConfig.__name__ or cfg_dict["apiVersion"] != "posit.team/v1":
             msg = (
@@ -292,6 +313,21 @@ class AzureWorkload(ptd.workload.AbstractWorkload):
             ptd.azure_tag_key_format(str(ptd.TagKeys.POSIT_TEAM_TRUE_NAME)): self.cfg.true_name,
             ptd.azure_tag_key_format(str(ptd.TagKeys.POSIT_TEAM_ENVIRONMENT)): self.cfg.environment,
         }
+
+    # ============================================================================
+    # Naming Methods - Azure Cloud Adoption Framework (CAF) Conventions
+    # ============================================================================
+    # Azure resource names have strict character limits and character restrictions:
+    #
+    # - Key Vault: max 24 chars, alphanumeric and hyphens only
+    # - Storage Account: max 24 chars, lowercase alphanumeric only (NO hyphens)
+    # - ACR: alphanumeric only (hyphens not allowed)
+    # - Resource Group: can include hyphens
+    # - VNet/Subnets: can include hyphens
+    #
+    # All methods apply CAF prefixes (e.g., 'kv-', 'st-', 'rsg-') and sanitize
+    # the compound_name as needed (removing invalid chars, truncating to limits).
+    # ============================================================================
 
     @property
     def acr_registry(self) -> str:

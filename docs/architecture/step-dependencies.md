@@ -34,20 +34,18 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 ---
 
 ### Step 2: persistent (Python)
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_workload_persistent.py`
+**Implementation:**
+- AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_persistent.py`
+- Azure: `python-pulumi/src/ptd/pulumi_resources/azure_workload_persistent.py`
+
 **Language:** Python/Pulumi
 **Proxy Required:** No
 
 **Creates:**
-- VPC, subnets, NAT gateways, route tables
-- RDS PostgreSQL database
-- S3 buckets (Loki logs, Mimir metrics, general storage)
-- IAM roles and policies for cluster components
-- ACM certificates for TLS
-- FSx for OpenZFS or EFS file systems
-- Bastion host (optional)
+- **AWS:** VPC, subnets, NAT gateways, route tables, RDS PostgreSQL, S3 buckets (Loki logs, Mimir metrics, general storage), IAM roles and policies, ACM certificates, FSx for OpenZFS or EFS, bastion host (optional)
+- **Azure:** VNet, subnets, Azure Database for PostgreSQL, Storage Accounts, Azure Container Registry (ACR), managed identities, Azure Key Vault certificates, Azure NetApp Files, bastion host (optional)
 
-**Post-stack action:** Updates AWS Secrets Manager with stack outputs (database endpoint, VPC ID, etc.) for use by later steps.
+**Post-stack action:** Updates AWS Secrets Manager (AWS) or Azure Key Vault (Azure) with stack outputs (database endpoint, VPC/VNet ID, etc.) for use by later steps.
 
 **Depends on:**
 - `bootstrap`: Needs state bucket and KMS key
@@ -81,10 +79,10 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 
 ### Step 4: eks (AWS) or aks (Azure) (Cloud-specific)
 **Implementation:**
-- AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_eks.py`
-- Azure: `lib/steps/aks.go`
+- AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_eks.py` (Python)
+- Azure: `lib/steps/aks.go` (Go)
 
-**Language:** Python (AWS), Go (Azure)
+**Language:** Python (AWS), **Go (Azure)** - This is a key difference from most other steps
 **Proxy Required:** No
 
 **Creates:**
@@ -92,11 +90,11 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 - Node groups or node pools
 - OIDC provider for workload identity
 - Security groups (AWS) or network security groups (Azure)
-- Cluster addons (EBS CSI driver, secrets store, etc.)
-- Karpenter resources (if autoscaling enabled)
+- Cluster addons (EBS CSI driver for AWS, secrets store CSI for both)
+- Karpenter resources (if autoscaling enabled, AWS only)
 
 **Depends on:**
-- `persistent`: Needs VPC/subnets, IAM roles
+- `persistent`: Needs VPC/VNet, subnets, IAM roles (AWS) or managed identities (Azure)
 
 **Why fourth:** The Kubernetes cluster is the foundation for all application workloads.
 
@@ -108,12 +106,17 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 }),
 ```
 
+**Implementation note:** AKS is implemented in **Go** (`lib/steps/aks.go`) unlike EKS which uses Python. This is because AKS cluster creation logic is better handled in Go for this implementation.
+
 **Safe to re-run:** Yes, but cluster upgrades may cause downtime.
 
 ---
 
 ### Step 5: clusters (Python)
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_workload_clusters.py`
+**Implementation:**
+- AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_clusters.py`
+- Azure: `python-pulumi/src/ptd/pulumi_resources/azure_workload_clusters.py`
+
 **Language:** Python/Pulumi
 **Proxy Required:** Yes (creates Kubernetes resources)
 
@@ -127,14 +130,17 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 
 **Why fifth:** Namespaces must exist before Helm charts can deploy into them.
 
-**Proxy rationale:** EKS/AKS API endpoints are private. The proxy (via bastion/Tailscale) provides access to the Kubernetes API.
+**Proxy rationale:** EKS/AKS API endpoints are private. The proxy (via bastion/Tailscale for AWS, bastion for Azure) provides access to the Kubernetes API.
 
 **Safe to re-run:** Yes, idempotent.
 
 ---
 
 ### Step 6: helm (Python)
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_workload_helm.py`
+**Implementation:**
+- AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_helm.py`
+- Azure: `python-pulumi/src/ptd/pulumi_resources/azure_workload_helm.py`
+
 **Language:** Python/Pulumi
 **Proxy Required:** Yes (deploys Helm charts via Kubernetes API)
 
@@ -147,14 +153,15 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 - **Mimir:** Metrics storage
 - **kube-state-metrics:** Cluster metrics exporter
 - **Grafana Alloy:** Telemetry collector
-- **AWS Load Balancer Controller:** Integrates ELB with Kubernetes services
-- **Secrets Store CSI Driver:** Mounts AWS Secrets Manager into pods
-- **Karpenter:** Autoscaling (if enabled)
+- **AWS Load Balancer Controller** (AWS only): Integrates ELB with Kubernetes services
+- **Secrets Store CSI Driver:** Mounts AWS Secrets Manager (AWS) or Azure Key Vault (Azure) into pods
+- **Karpenter** (AWS only): Autoscaling (if enabled)
 - **NVIDIA Device Plugin:** GPU support (if enabled)
+- **Azure Files CSI Driver** (Azure only): Persistent volume support
 
 **Depends on:**
 - `clusters`: Needs namespaces
-- `persistent`: Needs certificates, IAM roles, S3 buckets for Loki/Mimir
+- `persistent`: Needs certificates, IAM roles/managed identities, S3 buckets (AWS) or Storage Accounts (Azure) for Loki/Mimir
 
 **Why sixth:** Helm charts deploy the platform components that support Posit Team applications.
 
@@ -165,19 +172,22 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 ---
 
 ### Step 7: sites (Python)
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_workload_sites.py`
+**Implementation:**
+- AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_sites.py`
+- Azure: `python-pulumi/src/ptd/pulumi_resources/azure_workload_sites.py`
+
 **Language:** Python/Pulumi
 **Proxy Required:** Yes (creates Kubernetes CRDs)
 
 **Creates:**
 - `TeamSite` custom resources (CRDs consumed by Team Operator)
 - Ingress resources for each site
-- DNS records (Route53 or Azure DNS)
+- DNS records (Route53 for AWS, Azure DNS for Azure)
 - Site-specific secrets
 
 **Depends on:**
 - `helm`: Needs Team Operator running to reconcile `TeamSite` CRDs
-- `persistent`: Needs ACM certificates, IAM roles
+- `persistent`: Needs ACM certificates (AWS) or Key Vault certificates (Azure), IAM roles (AWS) or managed identities (Azure)
 
 **Why seventh:** Sites are the user-facing entry points to Posit Team products. They must be created after the operator is running.
 
@@ -192,9 +202,11 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 **Language:** Go
 **Proxy Required:** No
 
-**Purpose:** Re-runs the `persistent` step to update AWS Secrets Manager with outputs from later steps (e.g., cluster endpoints, load balancer DNS names).
+**Purpose:** Re-runs the `persistent` step to update AWS Secrets Manager (AWS) or Azure Key Vault (Azure) with outputs from later steps (e.g., cluster endpoints, load balancer DNS names).
 
-**Why last:** Secrets Manager acts as a cross-step data store. This step ensures all outputs from all steps are available for future operations or debugging.
+**Why last:** Secrets Manager/Key Vault acts as a cross-step data store. This step ensures all outputs from all steps are available for future operations or debugging.
+
+**Azure note:** Azure does NOT have control room support (workload-only deployments). This step only applies to Azure workloads, not control rooms.
 
 **Safe to re-run:** Yes, idempotent.
 
