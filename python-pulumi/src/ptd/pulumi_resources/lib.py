@@ -1,3 +1,7 @@
+_AWS_TAG_KEY_MAX_LENGTH = 128
+_AWS_TAG_VALUE_MAX_LENGTH = 256
+
+
 def format_lb_tags(tags: dict[str, str]) -> str:
     """Format tags as comma-separated key=value pairs for AWS LB Controller annotations.
 
@@ -17,7 +21,7 @@ def format_lb_tags(tags: dict[str, str]) -> str:
         if key.startswith("aws:"):
             msg = f"LB tag key uses reserved 'aws:' prefix: {key!r}"
             raise ValueError(msg)
-        if len(key) > 128:
+        if len(key) > _AWS_TAG_KEY_MAX_LENGTH:
             msg = f"LB tag key exceeds AWS 128-character limit ({len(key)} chars): {key!r}"
             raise ValueError(msg)
         if "," in key or "=" in key:
@@ -29,7 +33,7 @@ def format_lb_tags(tags: dict[str, str]) -> str:
         if not value:
             msg = f"LB tag value must not be None or empty: key={key}"
             raise ValueError(msg)
-        if len(value) > 256:
+        if len(value) > _AWS_TAG_VALUE_MAX_LENGTH:
             msg = f"LB tag value exceeds AWS 256-character limit ({len(value)} chars): key={key}"
             raise ValueError(msg)
         if "," in value or "=" in value:
