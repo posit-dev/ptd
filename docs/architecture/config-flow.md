@@ -121,7 +121,7 @@ class AbstractWorkload(ABC):
 
 ### Step 4: Python Converts to Dataclasses
 
-**Location:** `python-pulumi/src/ptd/__init__.py`, `python-pulumi/src/ptd/aws_workload.py`
+**Location:** `python-pulumi/src/ptd/__init__.py`, `python-pulumi/src/ptd/aws_workload.py`, `python-pulumi/src/ptd/azure_workload.py`
 
 YAML configuration is parsed into frozen dataclasses:
 
@@ -139,7 +139,18 @@ class AWSWorkloadConfig(WorkloadConfig):
     tailscale_enabled: bool
     clusters: dict[str, AWSWorkloadClusterConfig]
     # ... AWS-specific fields
+
+@dataclasses.dataclass(frozen=True)
+class AzureWorkloadConfig(WorkloadConfig):
+    subscription_id: str
+    tenant_id: str
+    client_id: str
+    network: NetworkConfig  # Azure has nested config for network
+    clusters: dict[str, AzureWorkloadClusterConfig]
+    # ... Azure-specific fields
 ```
+
+**Azure-specific note:** Azure config includes a `NetworkConfig` nested dataclass with stricter naming constraints (see `python-pulumi/src/ptd/azure_workload.py:24-50`) for subnet CIDRs and VNet configuration.
 
 **Critical pattern:** YAML keys with hyphens are converted to underscores (line 408-409 of `aws_workload.py`):
 
@@ -196,6 +207,8 @@ class AWSWorkloadConfig(WorkloadConfig):
     # ... existing fields
     my_new_setting: bool = False  # Provide a default if optional
 ```
+
+**For Azure workloads:** Azure has its own config files in `python-pulumi/src/ptd/azure_workload.py` with cloud-specific dataclasses (`AzureWorkloadConfig`, `NetworkConfig`). Azure config changes follow the same pattern but are in separate files from AWS.
 
 ### 4. Handle Hyphen-to-Underscore Conversion
 The conversion happens automatically in the config loader (e.g., `aws_workload.py`):
