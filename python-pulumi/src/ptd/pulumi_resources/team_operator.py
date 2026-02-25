@@ -243,12 +243,8 @@ echo "Migration complete - Helm will now create fresh resources"
 
     def _define_helm_release(self):
         # Parse self.image (from _define_image) into repository and tag
-        # Format is either "repo@sha256:digest" or "repo:tag"
-        if "@" in self.image:
-            # Image with digest: "hostname/repo@sha256:abc123"
-            image_repository, image_tag = self.image.rsplit("@", 1)
-            image_tag = f"@{image_tag}"  # Helm needs the @ prefix for digests
-        elif ":" in self.image.split("/")[-1]:
+        # Format: "repo:tag" (digest-based images are not supported)
+        if ":" in self.image.split("/")[-1]:
             # Image with tag: "hostname/repo:tag"
             image_repository, image_tag = self.image.rsplit(":", 1)
         else:
@@ -256,28 +252,24 @@ echo "Migration complete - Helm will now create fresh resources"
             image_repository = self.image
             image_tag = "latest"
 
-        # Build environment variables
-        env_vars = {
-            "WATCH_NAMESPACES": ptd.POSIT_TEAM_NAMESPACE,
-        }
+        # Build environment variables (list format for helm/v2-alpha chart)
+        env_vars = [
+            {"name": "WATCH_NAMESPACES", "value": ptd.POSIT_TEAM_NAMESPACE},
+        ]
 
         # Add AWS_REGION if we have a region configured
         if self.workload.cfg.region:
-            env_vars["AWS_REGION"] = self.workload.cfg.region
+            env_vars.append({"name": "AWS_REGION", "value": self.workload.cfg.region})
 
-        # Helm values for the team-operator chart
+        # Helm values for the team-operator chart (helm/v2-alpha structure)
         helm_values = {
-            "controllerManager": {
+            "manager": {
                 "replicas": 1,
-                "container": {
-                    "image": {
-                        "repository": image_repository,
-                        "tag": image_tag,
-                    },
-                    "env": env_vars,
+                "image": {
+                    "repository": image_repository,
+                    "tag": image_tag,
                 },
-                # Use default serviceAccountName from chart (team-operator-controller-manager)
-                # to match existing kustomize resources for seamless migration
+                "env": env_vars,
                 "serviceAccount": {
                     "annotations": self.service_account_annotations,
                 },
