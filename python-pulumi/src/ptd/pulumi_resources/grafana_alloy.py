@@ -36,10 +36,11 @@ def _validate_alloy_true_name(true_name: str) -> None:
     graph-construction time so failures are caught during `pulumi preview`.
     """
     if not re.match(r"^[a-zA-Z0-9._-]+$", true_name):
-        raise ValueError(
+        msg = (
             f"workload true_name contains characters unsafe for Alloy River config: "
             f"{true_name!r}. Must match [a-zA-Z0-9._-]+"
         )
+        raise ValueError(msg)
 
 
 class AlloyConfig(pulumi.ComponentResource):

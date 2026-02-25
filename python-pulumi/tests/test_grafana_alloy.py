@@ -602,19 +602,19 @@ class TestDefineCloudwatchConfig:
     def test_aws_contains_natgateway_discovery_block(self) -> None:
         alloy = _make_alloy_for_cloudwatch("aws")
         result = alloy._define_cloudwatch_config()  # noqa: SLF001
-        assert 'AWS/NATGateway' in result
+        assert "AWS/NATGateway" in result
         assert '"posit.team/true-name" = "myapp"' in result
 
     def test_aws_contains_applicationelb_discovery_block(self) -> None:
         alloy = _make_alloy_for_cloudwatch("aws")
         result = alloy._define_cloudwatch_config()  # noqa: SLF001
-        assert 'AWS/ApplicationELB' in result
+        assert "AWS/ApplicationELB" in result
         assert '"posit.team/true-name" = "myapp"' in result
 
     def test_aws_contains_networkelb_discovery_block(self) -> None:
         alloy = _make_alloy_for_cloudwatch("aws")
         result = alloy._define_cloudwatch_config()  # noqa: SLF001
-        assert 'AWS/NetworkELB' in result
+        assert "AWS/NetworkELB" in result
         assert '"posit.team/true-name" = "myapp"' in result
 
     def test_aws_search_tags_use_true_name(self) -> None:
