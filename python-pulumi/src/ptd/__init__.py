@@ -1,3 +1,23 @@
+"""
+PTD Python Pulumi base module.
+
+This module defines shared types, constants, and utilities used across all Pulumi resources.
+
+Key types:
+- WorkloadConfig: Configuration for a PTD workload (must stay in sync with Go struct in lib/types/)
+- SiteConfig: Configuration for a site within a workload
+- WorkloadClusterConfig: Configuration for a cluster within a workload
+- CloudProvider: Enum for cloud providers (AWS, Azure, AKS)
+
+Constants used across all Pulumi resources:
+- Namespaces (POSIT_TEAM_NAMESPACE, KUBE_SYSTEM_NAMESPACE, etc.)
+- IAM role names (Roles enum)
+- Tag keys (TagKeys enum)
+
+These types are the Python counterpart to Go types in lib/types/.
+Changes to config structure require updates in BOTH Go and Python.
+"""
+
 from __future__ import annotations
 
 import base64
@@ -297,6 +317,11 @@ class CloudProvider(enum.StrEnum):
 
 @dataclasses.dataclass(frozen=True)
 class SiteConfig:
+    """
+    Configuration for a site within a workload.
+    Must stay in sync with Go struct: lib/types/workload.go (SiteConfig).
+    """
+
     domain: str
     domain_type: str = ""
     use_traefik_forward_auth: bool = False
@@ -304,6 +329,14 @@ class SiteConfig:
 
 @dataclasses.dataclass(frozen=True)
 class WorkloadConfig:
+    """
+    Top-level configuration for a PTD workload.
+    Must stay in sync with Go struct: lib/types/workload.go (WorkloadConfig).
+
+    Contains clusters, sites, network trust, control room references, etc.
+    Field names MUST match Go YAML tags (snake_case).
+    """
+
     clusters: dict[str, WorkloadClusterConfig]
     region: str
     control_room_account_id: str
@@ -409,6 +442,14 @@ class Toleration:
 
 @dataclasses.dataclass(frozen=True)
 class WorkloadClusterConfig:
+    """
+    Configuration for a single cluster within a workload.
+    Must stay in sync with Go struct: lib/types/workload.go (WorkloadClusterConfig).
+
+    Contains cluster-specific settings: Team Operator image, EKS access entries,
+    custom K8s resources, tolerations, component versions, node groups, routing weight.
+    """
+
     team_operator_image: str = "latest"
     # Overrides team_operator_image when set. Can be a tag (e.g., "test", "dev")
     # or a full image reference. For adhoc images from posit-dev/team-operator PRs:
