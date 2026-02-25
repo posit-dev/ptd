@@ -155,3 +155,84 @@ When contributing to the project:
 # Additional Instructions
 - LLM coding instructions shared with copilot: [.github/copilot/copilot-instructions.md](.github/copilot/copilot-instructions.md)
 - Follow the template in [.github/pull_request_template.md](.github/pull_request_template.md) to format PR descriptions correctly
+
+## Architecture Overview
+
+Brief pointer section:
+- **Config Flow**: How YAML config flows through Go to Python → See `docs/architecture/config-flow.md`
+- **Step Dependencies**: Deployment pipeline ordering and why → See `docs/architecture/step-dependencies.md`
+- **Pulumi Conventions**: Resource naming, Output handling, autoload pattern → See `docs/architecture/pulumi-conventions.md`
+
+## Danger Zones
+
+### Pulumi Resource Names
+- **NEVER** change the first argument (logical name) to a Pulumi resource constructor without understanding state implications
+- Changing `aws.s3.Bucket("my-bucket-name", ...)` to `aws.s3.Bucket("different-name", ...)` causes Pulumi to DELETE the old bucket and CREATE a new one
+- This applies to ALL resources: VPCs, RDS instances, S3 buckets, IAM roles, EKS clusters, etc.
+- If you need to rename a resource, discuss the state migration strategy first
+
+### Config Changes Require Both Languages
+- Adding/modifying a config option requires changes in BOTH:
+  - **Go**: Struct in `lib/types/workload.go` (with YAML struct tags)
+  - **Python**: Dataclass in `python-pulumi/src/ptd/aws_workload.py` or `python-pulumi/src/ptd/__init__.py`
+- Field names must match: Go YAML tags (snake_case) = Python dataclass field names
+- There is no automated validation between the two — mismatches fail at runtime
+
+### Builder Method Ordering
+- `AWSEKSCluster` uses a builder pattern where `with_*()` methods have ordering dependencies
+- Example: `with_node_role()` MUST be called before `with_node_group()` (sets `self.default_node_role`)
+- Check method dependencies before reordering calls
+
+### Resource Naming Conventions
+- IAM roles: `f"{purpose}.{compound_name}.posit.team"`
+- S3 buckets: `f"{compound_name}-{purpose}"`
+- EKS clusters: `f"default_{compound_name}-control-plane"`
+- All naming methods are on `AWSWorkload` class in `python-pulumi/src/ptd/aws_workload.py`
+- Do NOT introduce new naming patterns — follow existing conventions
+
+## Key Patterns
+
+### The autoload Pattern
+Go generates `__main__.py` dynamically (see `lib/pulumi/python.go:WriteMainPy`):
+```python
+import ptd.pulumi_resources.<module>
+ptd.pulumi_resources.<module>.<Class>.autoload()
+```
+- Module: `{cloud}_{target_type}_{step_name}` (e.g., `aws_workload_persistent`)
+- Class: `{Cloud}{TargetType}{StepName}` (e.g., `AWSWorkloadPersistent`)
+- `__main__.py` is NOT in source control — it's generated at runtime
+
+### Pulumi Output[T]
+- Resource properties return `Output[T]`, not plain values
+- Use `.apply(lambda x: ...)` to transform; cannot use in f-strings directly
+- Combine with `pulumi.Output.all(a, b).apply(lambda args: ...)`
+
+### Step Execution
+Steps run sequentially via `ptd ensure`:
+1. `bootstrap` (Go) → 2. `persistent` (Python) → 3. `postgres_config` (Python) → 4. `eks`/`aks` → 5. `clusters` → 6. `helm` → 7. `sites` → 8. `persistent_reprise` (Go)
+
+Each step produces outputs consumed by later steps. See `docs/architecture/step-dependencies.md`.
+
+## Python Pulumi Development
+
+### Testing
+- Use `pulumi.runtime.set_mocks()` for Pulumi resource tests
+- For Go→Python integration details, see the "Go→Python Integration" section above
+- Tests must set `PTD_ROOT` via `monkeypatch.setenv("PTD_ROOT", ...)`
+- See `python-pulumi/tests/` for examples
+- Run: `just test-python-pulumi`
+
+### Adding a New Pulumi Resource Module
+1. Create `python-pulumi/src/ptd/pulumi_resources/<cloud>_<target_type>_<step_name>.py`
+2. Define a class inheriting from `pulumi.ComponentResource`
+3. Implement `@classmethod autoload(cls)` that reads stack name and constructs workload
+4. Add corresponding step in `lib/steps/`
+5. Register step in `WorkloadSteps` or `ControlRoomSteps` in `lib/steps/steps.go`
+
+### Large Files (>1000 lines)
+These files are large and require careful context management:
+- `pulumi_resources/aws_eks_cluster.py` (~2580 lines) — EKS cluster provisioning with builder pattern
+- `pulumi_resources/aws_workload_persistent.py` (~1454 lines) — VPC, RDS, S3, IAM
+- `pulumi_resources/aws_workload_helm.py` (~1390 lines) — Helm chart deployments
+- `__init__.py` (~1275 lines) — Base types, constants, utility functions
+- `aws_workload.py` (~815 lines) — AWS workload config and naming conventions
