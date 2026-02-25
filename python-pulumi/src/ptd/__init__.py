@@ -102,6 +102,7 @@ class Environments(enum.StrEnum):
     development = "development"
     staging = "staging"
     production = "production"
+    validation = "validation"
 
 
 class TagsRSEnvironment(enum.StrEnum):
