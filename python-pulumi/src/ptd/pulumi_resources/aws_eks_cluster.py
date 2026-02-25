@@ -43,6 +43,12 @@ class ServiceAccount:
 
 class AWSEKSCluster(pulumi.ComponentResource):
     """
+    BUILDER PATTERN: __init__() sets up initial state, then call with_*() methods in sequence.
+    Each with_*() method returns self for chaining.
+
+    CRITICAL: Method ordering matters. See ordering dependencies below.
+    CRITICAL: register_outputs({}) is NOT called in this class — caller must handle it.
+
     Create an EKS cluster. Other useful methods:
       - with_node_role()
       - with_node_group()
@@ -120,6 +126,18 @@ class AWSEKSCluster(pulumi.ComponentResource):
         self.iam_permissions_boundary = iam_permissions_boundary
         self.tailscale_enabled = tailscale_enabled
         self.customer_managed_bastion_id = customer_managed_bastion_id
+
+        # ──────────────────────────────────────────────────────────────────────
+        # Method Ordering Dependencies (for with_*() methods):
+        # 1. __init__() creates self.eks (the cluster resource)
+        # 2. with_oidc_provider() requires self.eks
+        # 3. with_node_role() sets self.default_node_role
+        # 4. with_node_group() requires self.default_node_role (from with_node_role())
+        # 5. with_ebs_csi_driver() sets self.ebs_csi_addon
+        # 6. with_encrypted_ebs_storage_class() requires self.ebs_csi_addon
+        # 7. with_aws_lbc() requires self.oidc_provider (from with_oidc_provider())
+        # 8. with_grafana() and with_mimir() require namespace and OIDC provider
+        # ──────────────────────────────────────────────────────────────────────
 
         # optional variables added later
         self.default_node_role = None
@@ -246,6 +264,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
             pulumi.log.info(f"Creating new cluster {name} with API_AND_CONFIG_MAP authentication mode")
 
         # Create or update the cluster
+        # PULUMI STATE NAME — changing 'name' here will destroy and recreate the EKS cluster
         self.eks = aws.eks.Cluster(
             name,
             **cluster_args,
@@ -436,6 +455,8 @@ class AWSEKSCluster(pulumi.ComponentResource):
         Create the default node role for the EKS cluster.
         This is a minimal node role for EKS cluster nodes to function.
 
+        Sets self.default_node_role, which is required by with_node_group().
+
         :param role: Optional. The role that should be used by default for node groups. No policies are created if a
         role is provided. Default is a role with minimal policies for proper EKS function.
         :param opts: Optional. Resource options.
@@ -533,7 +554,9 @@ class AWSEKSCluster(pulumi.ComponentResource):
         # TODO: what typing should we have for subnets? Consistency?
         """
         Add a node group to the EKS cluster
-        Node groups are tracked in the `node_groups` dict on the
+        Node groups are tracked in the `node_groups` dict on the cluster.
+
+        Requires self.default_node_role to be set (via with_node_role()) if node_role is not provided.
 
         :param name: The name of the nodegroup. Should be consistent to avoid unexpected node group deletion.
         :param launch_template: A Pulumi LaunchTemplate object or RStudio ec2.LaunchTemplate
@@ -581,6 +604,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
             msg = "node role is None (somehow)"
             raise ValueError(msg)
 
+        # PULUMI STATE NAME — changing 'name' here will destroy and recreate the node group
         node_group = aws.eks.NodeGroup(
             name,
             cluster_name=self.eks.name,
@@ -1115,7 +1139,10 @@ class AWSEKSCluster(pulumi.ComponentResource):
 
     def with_oidc_provider(self):
         """
-        Create an oidc provider
+        Create an OIDC provider for the EKS cluster.
+
+        Requires self.eks to be created (happens in __init__).
+        Sets self.oidc_provider, which is required by with_aws_lbc() and other service account methods.
 
         :param opts: Optional. Resource options
         :return: self
@@ -1153,7 +1180,9 @@ class AWSEKSCluster(pulumi.ComponentResource):
         depends_on: list[pulumi.Resource] | None = None,
     ) -> typing.Self:
         """
-        Add the aws-ebs-csi-driver eks addon
+        Add the aws-ebs-csi-driver eks addon.
+
+        Sets self.ebs_csi_addon, which is required by with_encrypted_ebs_storage_class().
 
         :param version: Optional, String, version of the aws-ebs-csi-driver addon to install, default: None
             By setting this to None, the latest version will be installed on first run, to upgrade versions later, you
