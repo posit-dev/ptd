@@ -78,8 +78,9 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
             if not self.workload.cfg.secrets_store_addon_enabled:
                 self._define_secret_store_csi(release, components.secret_store_csi_driver_version)
                 self._define_secret_store_csi_aws(release, components.secret_store_csi_driver_aws_provider_version)
-            # Deploy external-secrets-operator
-            self._define_external_secrets_operator(release, components.external_secrets_operator_version)
+            # Deploy external-secrets-operator (opt-in via enable_external_secrets_operator)
+            if self.workload.cfg.clusters[release].enable_external_secrets_operator:
+                self._define_external_secrets_operator(release, components.external_secrets_operator_version)
             self._define_traefik(release, components.traefik_version, weight, cert_arns_output)
             self._define_metrics_server(release, components.metrics_server_version)
             self._define_loki(release, components.loki_version, components)

@@ -588,17 +588,22 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         annotations on the ServiceAccount resource.
         """
         for release in self.managed_clusters_by_release:
+            cluster_cfg = self.workload.cfg.clusters[release]
+            if not cluster_cfg.enable_pod_identity_agent:
+                continue
+
             cluster_name = f"{self.workload.compound_name}-{release}"
 
-            # External Secrets Operator (per-release, not per-site)
-            aws.eks.PodIdentityAssociation(
-                f"{cluster_name}-external-secrets-pod-identity",
-                cluster_name=cluster_name,
-                namespace="external-secrets",
-                service_account="external-secrets",
-                role_arn=self.external_secrets_roles[release].arn,
-                opts=pulumi.ResourceOptions(parent=self),
-            )
+            # External Secrets Operator (per-release, only if ESO is also enabled)
+            if cluster_cfg.enable_external_secrets_operator:
+                aws.eks.PodIdentityAssociation(
+                    f"{cluster_name}-external-secrets-pod-identity",
+                    cluster_name=cluster_name,
+                    namespace="external-secrets",
+                    service_account="external-secrets",
+                    role_arn=self.external_secrets_roles[release].arn,
+                    opts=pulumi.ResourceOptions(parent=self),
+                )
 
             # Per-site product associations
             for site_name in sorted(self.workload.cfg.sites.keys()):
@@ -652,25 +657,27 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     opts=pulumi.ResourceOptions(parent=self),
                 )
 
-                # Chronicle
-                aws.eks.PodIdentityAssociation(
-                    f"{cluster_name}-{site_name}-chronicle-pod-identity",
-                    cluster_name=cluster_name,
-                    namespace=ptd.POSIT_TEAM_NAMESPACE,
-                    service_account=f"{site_name}-chronicle",
-                    role_arn=self.chronicle_roles[f"{release}-{site_name}"].arn,
-                    opts=pulumi.ResourceOptions(parent=self),
-                )
+                # Chronicle (optional product — skip if not configured for this release/site)
+                if f"{release}-{site_name}" in self.chronicle_roles:
+                    aws.eks.PodIdentityAssociation(
+                        f"{cluster_name}-{site_name}-chronicle-pod-identity",
+                        cluster_name=cluster_name,
+                        namespace=ptd.POSIT_TEAM_NAMESPACE,
+                        service_account=f"{site_name}-chronicle",
+                        role_arn=self.chronicle_roles[f"{release}-{site_name}"].arn,
+                        opts=pulumi.ResourceOptions(parent=self),
+                    )
 
-                # Home (Flightdeck)
-                aws.eks.PodIdentityAssociation(
-                    f"{cluster_name}-{site_name}-home-pod-identity",
-                    cluster_name=cluster_name,
-                    namespace=ptd.POSIT_TEAM_NAMESPACE,
-                    service_account=f"{site_name}-home",
-                    role_arn=self.home_roles[release].arn,
-                    opts=pulumi.ResourceOptions(parent=self),
-                )
+                # Home/Flightdeck (optional product — skip if not configured for this release)
+                if release in self.home_roles:
+                    aws.eks.PodIdentityAssociation(
+                        f"{cluster_name}-{site_name}-home-pod-identity",
+                        cluster_name=cluster_name,
+                        namespace=ptd.POSIT_TEAM_NAMESPACE,
+                        service_account=f"{site_name}-home",
+                        role_arn=self.home_roles[release].arn,
+                        opts=pulumi.ResourceOptions(parent=self),
+                    )
 
     def _apply_custom_k8s_resources(self):
         """Apply custom Kubernetes resources from the custom_k8s_resources/ directory."""

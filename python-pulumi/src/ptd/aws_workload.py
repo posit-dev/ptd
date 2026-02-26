@@ -257,6 +257,7 @@ class AWSWorkloadClusterConfig(ptd.WorkloadClusterConfig):
     ebs_csi_addon_version: str = "v1.41.0-eksbuild.1"
     pod_identity_agent_version: str | None = None
     enable_pod_identity_agent: bool = False
+    enable_external_secrets_operator: bool = False
     enable_efs_csi_driver: bool = False
     efs_config: ptd.EFSConfig | None = None
     karpenter_config: KarpenterConfig | None = None
