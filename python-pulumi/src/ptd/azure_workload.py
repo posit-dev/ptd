@@ -32,6 +32,7 @@ class NetworkConfig:
     public_subnet_cidr: str | None = None
     vnet_rsg_name: str | None = None
     dns_forward_domains: list[dict[str, str]] = dataclasses.field(default_factory=list)
+    private_subnet_route_table_id: str | None = None
 
     def __post_init__(self):
         """Validate DNS forward domain entries if configured."""
@@ -93,19 +94,8 @@ class AzureWorkloadClusterConfig(ptd.WorkloadClusterConfig):
     public_endpoint_access: bool = True
     system_node_pool_instance_type: str | None = "Standard_D2s_v6"
 
-    # Legacy field - maintained for backward compatibility
-    # Used to configure the hardcoded "userpool" in AgentPoolProfiles for legacy clusters
-    user_node_pool_instance_type: str | None = "Standard_D2s_v6"
-
-    # defines additional user node pools as separate AgentPool resources
-    # Works for both new clusters (all user pools) and legacy clusters (additional pools)
+    # Required: defines user node pools as separate AgentPool resources
     user_node_pools: list[AzureUserNodePoolConfig] | None = None
-
-    # Optional: explicit flag to control whether to include legacy user pool in agentPoolProfiles
-    # Set to True for existing clusters to maintain the hardcoded "userpool" in AgentPoolProfiles
-    # Set to False (or omit) for new clusters to have all user pools as separate AgentPool resources
-    # Legacy clusters can have BOTH the hardcoded userpool AND additional user_node_pools
-    use_legacy_user_pool: bool | None = None
 
     # Optional: Root disk size for system node pool in GB (defaults to 128)
     system_node_pool_root_disk_size: int | None = None
