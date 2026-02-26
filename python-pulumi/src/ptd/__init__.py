@@ -429,6 +429,9 @@ class WorkloadClusterConfig:
     team_operator_skip_crds: bool = False
 
     def __post_init__(self) -> None:
+        # No-op implementation makes super().__post_init__() safe to call from subclasses
+        # (e.g. AWSWorkloadClusterConfig) without requiring every intermediate class to guard
+        # against AttributeError when the MRO reaches this base.
         pass
 
 

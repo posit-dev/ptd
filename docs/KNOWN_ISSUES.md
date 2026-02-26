@@ -117,4 +117,23 @@ exit
 - Changes made directly via Pulumi CLI may be overwritten by subsequent `ptd ensure` runs if they conflict with your configuration
 - This is an advanced troubleshooting tool - use it when the standard PTD commands aren't sufficient
 
+
+### External Secrets Operator: ClusterSecretStore Fails on First Run
+
+**The Problem:**
+When enabling `enable_external_secrets_operator` on a fresh cluster, the `ClusterSecretStore` resource
+may fail to apply with `no matches for kind "ClusterSecretStore"`. This happens because Pulumi registers
+the ESO HelmChart CR but the CRDs installed by the chart have not yet converged before Pulumi attempts
+to create the `ClusterSecretStore`.
+
+**Why It Happens:**
+`depends_on` the HelmChart CR only ensures the CR is accepted by the API server, not that the ESO
+controller has finished installing its CRDs. On a fresh cluster, CRD propagation can take several
+minutes. Pulumi will retry for up to 10 minutes via `CustomTimeouts(create="10m")`, but may still
+time out on very slow clusters or under resource pressure.
+
+**The Solution:**
+Re-run `ptd ensure` after the initial failure. By that point the CRDs will be available and the
+`ClusterSecretStore` will apply successfully.
+
 ---

@@ -346,9 +346,6 @@ def test_session_roles_key_format():
     lookup_key = f"{release}-{site_name}"
     assert population_key == lookup_key
     assert population_key == "20250328-mysite"
-    # Hyphens in release or site_name would silently corrupt the separator.
-    assert "-" not in release
-    assert "-" not in site_name
 
 
 def test_eso_requires_pod_identity():

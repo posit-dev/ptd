@@ -144,12 +144,8 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
 
     @staticmethod
     def _define_read_secrets_inline() -> str:
-        # resources=["*"] is intentional: workload roles (connect, workbench, packagemanager, ESO, etc.)
-        # all use this same broad policy. Scoping to specific ARN prefixes (e.g., per-workload prefix)
-        # is deferred work tracked separately.
-        # TODO: ESO uses a cluster-wide ClusterSecretStore, so its blast radius is larger than
-        # per-product IRSA roles — it can read every secret in the account. Scope ESO's policy to
-        # arn:aws:secretsmanager:<region>:<account>:secret:<workload-prefix>/* in a follow-up.
+        # resources=["*"] is intentional: workload roles (connect, workbench, packagemanager, etc.)
+        # all use this same broad policy. Scoping to specific ARN prefixes is deferred work.
         return aws.iam.get_policy_document(
             statements=[
                 aws.iam.GetPolicyDocumentStatementArgs(
@@ -160,6 +156,27 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                         "secretsmanager:ListSecrets",
                     ],
                     resources=["*"],
+                )
+            ]
+        ).json
+
+    def _define_eso_read_secrets_inline(self) -> str:
+        # ESO uses a cluster-wide ClusterSecretStore, so its blast radius is larger than
+        # per-product IRSA roles. Scope to this workload's secret prefix to prevent
+        # cross-workload reads when multiple workloads share the same AWS account.
+        account_id = aws.get_caller_identity().account_id
+        region = self.workload.cfg.region
+        prefix = self.workload.compound_name
+        return aws.iam.get_policy_document(
+            statements=[
+                aws.iam.GetPolicyDocumentStatementArgs(
+                    effect="Allow",
+                    actions=[
+                        "secretsmanager:Get*",
+                        "secretsmanager:Describe*",
+                        "secretsmanager:ListSecrets",
+                    ],
+                    resources=[f"arn:aws:secretsmanager:{region}:{account_id}:secret:{prefix}/*"],
                 )
             ]
         ).json
@@ -617,7 +634,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 release=release,
                 namespace="external-secrets",
                 service_accounts=["external-secrets"],
-                role_policies=[self._define_read_secrets_inline()],
+                role_policies=[self._define_eso_read_secrets_inline()],
                 pod_identity=True,
             )
 
@@ -655,6 +672,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     namespace="external-secrets",
                     service_account="external-secrets",
                     role_arn=self.external_secrets_roles[release].arn,
+                    tags=self.required_tags,
                     opts=pulumi.ResourceOptions(parent=self),
                 )
 
@@ -667,6 +685,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     namespace=ptd.POSIT_TEAM_NAMESPACE,
                     service_account=f"{site_name}-connect",
                     role_arn=self.connect_roles[release].arn,
+                    tags=self.required_tags,
                     opts=pulumi.ResourceOptions(parent=self),
                 )
 
@@ -678,6 +697,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     namespace=ptd.POSIT_TEAM_NAMESPACE,
                     service_account=f"{site_name}-connect-session",
                     role_arn=self.connect_session_roles[f"{release}-{site_name}"].arn,
+                    tags=self.required_tags,
                     opts=pulumi.ResourceOptions(parent=self),
                 )
 
@@ -688,6 +708,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     namespace=ptd.POSIT_TEAM_NAMESPACE,
                     service_account=f"{site_name}-workbench",
                     role_arn=self.workbench_roles[release].arn,
+                    tags=self.required_tags,
                     opts=pulumi.ResourceOptions(parent=self),
                 )
 
@@ -699,6 +720,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     namespace=ptd.POSIT_TEAM_NAMESPACE,
                     service_account=f"{site_name}-workbench-session",
                     role_arn=self.workbench_session_roles[f"{release}-{site_name}"].arn,
+                    tags=self.required_tags,
                     opts=pulumi.ResourceOptions(parent=self),
                 )
 
@@ -711,6 +733,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                         namespace=ptd.POSIT_TEAM_NAMESPACE,
                         service_account=f"{site_name}-packagemanager",
                         role_arn=self.packagemanager_roles[release + "//" + site_name].arn,
+                        tags=self.required_tags,
                         opts=pulumi.ResourceOptions(parent=self),
                     )
 
@@ -722,6 +745,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                         namespace=ptd.POSIT_TEAM_NAMESPACE,
                         service_account=f"{site_name}-chronicle",
                         role_arn=self.chronicle_roles[f"{release}-{site_name}"].arn,
+                        tags=self.required_tags,
                         opts=pulumi.ResourceOptions(parent=self),
                     )
 
@@ -736,6 +760,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                         namespace=ptd.POSIT_TEAM_NAMESPACE,
                         service_account=f"{site_name}-home",
                         role_arn=self.home_roles[release].arn,
+                        tags=self.required_tags,
                         opts=pulumi.ResourceOptions(parent=self),
                     )
 
