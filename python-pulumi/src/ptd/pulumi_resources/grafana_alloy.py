@@ -127,6 +127,7 @@ class AlloyConfig(pulumi.ComponentResource):
 
     def _define_blackbox_targets(self) -> str:
         output = ""
+        tenant_name = self.workload.cfg.tenant_name or self.workload.compound_name
 
         for site_name, site_config in self.workload.cfg.sites.items():
             # Parse site YAML once for this site
@@ -150,6 +151,7 @@ class AlloyConfig(pulumi.ComponentResource):
                   address = {internal_address}
                   module = "{component.module_name}"
                   labels = {{
+                    "tenant_name" = "{tenant_name}",
                     "ptd_site" = "{site_name}",
                     "ptd_component" = "{lower_name}",
                     "check_type" = "internal",
@@ -168,6 +170,7 @@ class AlloyConfig(pulumi.ComponentResource):
                       address = {fqdn_address}
                       module = "{component.module_name}"
                       labels = {{
+                        "tenant_name" = "{tenant_name}",
                         "ptd_site" = "{site_name}",
                         "ptd_component" = "{lower_name}",
                         "check_type" = "fqdn",
