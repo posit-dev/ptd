@@ -29,6 +29,11 @@ def _make_clusters_mock(
         cluster_cfgs[release] = cfg
     m.workload.cfg.clusters.__getitem__ = lambda _self, k: cluster_cfgs[k]
 
+    # connect_session_roles and workbench_session_roles are keyed by "{release}-{site}" and use
+    # explicit invariant guards, so they must be real dicts populated for every release/site combo.
+    m.connect_session_roles = {f"{r}-{s}": MagicMock() for r in releases for s in sites}
+    m.workbench_session_roles = {f"{r}-{s}": MagicMock() for r in releases for s in sites}
+
     # chronicle_roles, home_roles, and packagemanager_roles use `in` checks so they must be real dicts
     m.chronicle_roles = {k: MagicMock() for k in (chronicle_keys or [])}
     m.home_roles = {r: MagicMock() for r in (home_releases or [])}
@@ -77,6 +82,9 @@ def test_associations_count_with_eso():
     with patch("ptd.pulumi_resources.aws_workload_clusters.aws.eks.PodIdentityAssociation") as mock_pia:
         AWSWorkloadClusters._define_pod_identity_associations(mock)
         assert mock_pia.call_count == 11  # 2×5 + 1 ESO
+        eso_call = next(c for c in mock_pia.call_args_list if "external-secrets" in c[0][0])
+        assert eso_call.kwargs["namespace"] == "external-secrets"
+        assert eso_call.kwargs["service_account"] == "external-secrets"
 
 
 def test_chronicle_association_created_only_when_role_present():

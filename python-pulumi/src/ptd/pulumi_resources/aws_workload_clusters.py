@@ -16,6 +16,7 @@ import ptd.pulumi_resources.aws_iam
 import ptd.pulumi_resources.aws_karpenter
 import ptd.pulumi_resources.custom_k8s_resources
 import ptd.pulumi_resources.external_dns
+import ptd.pulumi_resources.aws_workload_helm
 import ptd.pulumi_resources.helm_controller
 import ptd.pulumi_resources.keycloak_operator
 import ptd.pulumi_resources.kubernetes_role
@@ -469,9 +470,10 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 oidc_url_tails=self._oidc_url_tails,
                 auth_issuers=auth_issuers,
             )
-            assert isinstance(irsa_policy.get("Statement"), list), (
-                "Expected Statement list from build_hybrid_irsa_role_assume_role_policy"
-            )
+            if not isinstance(irsa_policy.get("Statement"), list):
+                raise ValueError(
+                    "Expected Statement list from build_hybrid_irsa_role_assume_role_policy"
+                )
             base_policy = {**irsa_policy, "Statement": list(irsa_policy["Statement"]) + extra_statements}
         else:
             base_policy = {
@@ -659,8 +661,8 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
             self.external_secrets_roles[release] = self._define_k8s_iam_role(
                 name=self.workload.external_secrets_role_name(release),
                 release=release,
-                namespace="external-secrets",
-                service_accounts=["external-secrets"],
+                namespace=ptd.pulumi_resources.aws_workload_helm.ESO_SERVICE_ACCOUNT,
+                service_accounts=[ptd.pulumi_resources.aws_workload_helm.ESO_SERVICE_ACCOUNT],
                 role_policies=[self._define_eso_read_secrets_inline()],
                 pod_identity=True,
             )
@@ -693,9 +695,10 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
 
             # External Secrets Operator (per-release, only if ESO is also enabled)
             if cluster_cfg.enable_external_secrets_operator:
+                _eso_sa = ptd.pulumi_resources.aws_workload_helm.ESO_SERVICE_ACCOUNT
                 _pod_identity_assoc(
-                    self, "external-secrets", cluster_name,
-                    "external-secrets", "external-secrets",
+                    self, _eso_sa, cluster_name,
+                    _eso_sa, _eso_sa,
                     self.external_secrets_roles[release].arn,
                 )
 
@@ -710,10 +713,16 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
 
                 # Connect Session — always present: _define_connect_iam populates connect_session_roles
                 # for every release/site combo unconditionally.
+                _session_key = f"{release}-{site_name}"
+                if _session_key not in self.connect_session_roles:
+                    raise RuntimeError(
+                        f"connect_session_roles missing key {_session_key!r}; "
+                        "_define_connect_iam must be called before _define_pod_identity_associations"
+                    )
                 _pod_identity_assoc(
                     self, f"{site_name}-connect-session", cluster_name,
                     ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-connect-session",
-                    self.connect_session_roles[f"{release}-{site_name}"].arn,
+                    self.connect_session_roles[_session_key].arn,
                 )
 
                 # Workbench
@@ -725,10 +734,15 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
 
                 # Workbench Session — always present: _define_workbench_iam populates workbench_session_roles
                 # for every release/site combo unconditionally.
+                if _session_key not in self.workbench_session_roles:
+                    raise RuntimeError(
+                        f"workbench_session_roles missing key {_session_key!r}; "
+                        "_define_workbench_iam must be called before _define_pod_identity_associations"
+                    )
                 _pod_identity_assoc(
                     self, f"{site_name}-workbench-session", cluster_name,
                     ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-workbench-session",
-                    self.workbench_session_roles[f"{release}-{site_name}"].arn,
+                    self.workbench_session_roles[_session_key].arn,
                 )
 
                 # Package Manager

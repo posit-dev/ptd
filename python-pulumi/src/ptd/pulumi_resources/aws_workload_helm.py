@@ -14,6 +14,7 @@ from ptd.pulumi_resources.lib import format_lb_tags
 ALLOY_NAMESPACE = "alloy"
 NFS_STORAGE_CLASS_NAME = "posit-shared-storage"
 CLUSTER_SECRET_STORE_NAME = "aws-secrets-manager"
+ESO_SERVICE_ACCOUNT = "external-secrets"
 
 
 def _nfs_subdir_provisioner_values(fsx_dns_name: str, fsx_nfs_path: str = "/fsx") -> dict:
@@ -45,7 +46,7 @@ def _eso_helm_values() -> dict:
         "installCRDs": True,
         "serviceAccount": {
             "create": True,
-            "name": "external-secrets",
+            "name": ESO_SERVICE_ACCOUNT,
         },
     }
 
@@ -283,7 +284,7 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
         eso_spec: dict = {
             "repo": "https://charts.external-secrets.io",
             "chart": "external-secrets",
-            "targetNamespace": "external-secrets",
+            "targetNamespace": ESO_SERVICE_ACCOUNT,
             "valuesContent": yaml.dump(_eso_helm_values()),
         }
         if version is not None:
