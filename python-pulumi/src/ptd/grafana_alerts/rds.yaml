@@ -1,0 +1,306 @@
+# To delete these alerts, simply removing the configMap that uses this method will not work.
+# Replace file contents with the following and apply in order to delete the alerts
+# (repeat the deleteRules entry for each uid listed below):
+# apiVersion: 1
+# deleteRules:
+#   - orgId: 1
+#     uid: rds_cpu_utilization_high
+#   - orgId: 1
+#     uid: rds_free_storage_low
+#   - orgId: 1
+#     uid: rds_freeable_memory_low
+#   - orgId: 1
+#     uid: rds_read_latency_high
+#   - orgId: 1
+#     uid: rds_database_connections_high
+#
+# See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+#
+# Note: alert annotations reference {{$labels.cluster}}. For CloudWatch-sourced metrics,
+# this label is injected by the prometheus.relabel.default block in grafana_alloy.py.
+# If Alloy is not running or relabeling is misconfigured, the label will be absent and
+# the annotation will render as "in cluster " (blank).
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: RDS
+      folder: Posit Alerts
+      interval: 5m
+      rules:
+        - uid: rds_cpu_utilization_high
+          title: RDS CPU Utilization High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_rds_cpuutilization_average{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 80
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData  # Performance metric; silent suppression on scrape outage is acceptable
+          execErrState: Error
+          for: 10m
+          annotations:
+            description: RDS instance CPU utilization is above 80% for more than 10 minutes.
+            summary: High CPU utilization on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: rds_free_storage_low
+          title: RDS Free Storage Low
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_rds_free_storage_space_average{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 5368709120  # 5 GiB in bytes; calibrated for mid-size instances (100–500 GiB). Adjust for larger (e.g. 1 TiB) or smaller instances.
+                        type: lt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: Alerting  # Storage exhaustion is latent; alert even when scraping stops so we don't silently miss a full disk
+          execErrState: Error
+          for: 5m
+          annotations:
+            description: RDS instance has less than 5 GiB of free storage space remaining. Note: on new cluster deployments where CloudWatch scraping has not yet initialized, noDataState=Alerting may produce a false positive after the for:5m window; this is expected during provisioning.
+            summary: Low free storage on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: rds_freeable_memory_low
+          title: RDS Freeable Memory Low
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_rds_freeable_memory_average{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 536870912  # 512 MiB in bytes; calibrated for db.r5.large (~16 GiB RAM). Adjust for other instance classes.
+                        type: lt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: Alerting  # Memory exhaustion is latent; alert even when scraping stops so we don't silently miss an OOM condition
+          execErrState: Error
+          for: 10m
+          annotations:
+            description: RDS instance has less than 512 MiB of freeable memory remaining for more than 10 minutes. Note: this threshold is calibrated for db.r5.large (~16 GiB RAM); it will fire continuously for small instances (e.g. db.t3.micro, db.t3.small). Adjust per instance class.
+            summary: Low freeable memory on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+            instance_size_dependent: "true"  # Silence this label for known-small instance classes
+          isPaused: true  # Paused until a Grafana silence or Alertmanager inhibit rule is configured for the instance_size_dependent label
+        - uid: rds_read_latency_high
+          title: RDS Read Latency High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_rds_read_latency_average{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0.1  # 100ms in seconds
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData  # Performance metric; silent suppression on scrape outage is acceptable
+          execErrState: Error
+          for: 10m
+          annotations:
+            description: RDS instance read latency is above 100ms for more than 10 minutes.
+            summary: High read latency on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: rds_database_connections_high
+          title: RDS Database Connections High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_rds_database_connections_average{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 500  # Calibrated for db.r5.large (max ~4000). For small instances (db.t3.small max ~36) this alert will never fire; adjust per instance class.
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData  # Performance metric; silent suppression on scrape outage is acceptable
+          execErrState: Error
+          for: 5m
+          annotations:
+            description: RDS instance has more than 500 active database connections for more than 5 minutes. Note: this threshold is calibrated for db.r5.large (max ~4000 connections); it will never fire for small instances (e.g. db.t3.small max ~36). Adjust per instance class.
+            summary: High database connections on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+            instance_size_dependent: "true"  # Silence this label for known-small instance classes
+          isPaused: true  # Paused until a Grafana silence or Alertmanager inhibit rule is configured for the instance_size_dependent label
