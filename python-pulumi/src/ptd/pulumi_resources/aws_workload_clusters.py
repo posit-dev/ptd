@@ -14,9 +14,9 @@ import ptd.pulumi_resources.aws_bucket
 import ptd.pulumi_resources.aws_eks_cluster
 import ptd.pulumi_resources.aws_iam
 import ptd.pulumi_resources.aws_karpenter
+import ptd.pulumi_resources.aws_workload_helm
 import ptd.pulumi_resources.custom_k8s_resources
 import ptd.pulumi_resources.external_dns
-import ptd.pulumi_resources.aws_workload_helm
 import ptd.pulumi_resources.helm_controller
 import ptd.pulumi_resources.keycloak_operator
 import ptd.pulumi_resources.kubernetes_role
@@ -705,6 +705,11 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
             # Per-site product associations
             for site_name in sorted(self.workload.cfg.sites.keys()):
                 # Connect
+                if release not in self.connect_roles:
+                    raise RuntimeError(
+                        f"connect_roles missing key {release!r}; "
+                        "_define_connect_iam must be called before _define_pod_identity_associations"
+                    )
                 _pod_identity_assoc(
                     self, f"{site_name}-connect", cluster_name,
                     ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-connect",
@@ -726,6 +731,11 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 )
 
                 # Workbench
+                if release not in self.workbench_roles:
+                    raise RuntimeError(
+                        f"workbench_roles missing key {release!r}; "
+                        "_define_workbench_iam must be called before _define_pod_identity_associations"
+                    )
                 _pod_identity_assoc(
                     self, f"{site_name}-workbench", cluster_name,
                     ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-workbench",

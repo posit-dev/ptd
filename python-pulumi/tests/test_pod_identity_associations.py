@@ -29,6 +29,11 @@ def _make_clusters_mock(
         cluster_cfgs[release] = cfg
     m.workload.cfg.clusters.__getitem__ = lambda _self, k: cluster_cfgs[k]
 
+    # connect_roles and workbench_roles are keyed by release and use invariant guards, so they must
+    # be real dicts populated for every release.
+    m.connect_roles = {r: MagicMock() for r in releases}
+    m.workbench_roles = {r: MagicMock() for r in releases}
+
     # connect_session_roles and workbench_session_roles are keyed by "{release}-{site}" and use
     # explicit invariant guards, so they must be real dicts populated for every release/site combo.
     m.connect_session_roles = {f"{r}-{s}": MagicMock() for r in releases for s in sites}
@@ -147,7 +152,7 @@ def test_define_k8s_iam_role_trust_policy_includes_pod_identity_statement():
         patch("ptd.pulumi_resources.aws_workload_clusters.aws.iam.Role"),
         patch("ptd.pulumi_resources.aws_workload_clusters.aws.iam.RoleArgs") as mock_role_args,
     ):
-        AWSWorkloadClusters._define_k8s_iam_role(m, name="test-role", pod_identity=True)
+        AWSWorkloadClusters._define_k8s_iam_role(m, name="test-role", release="test-release", namespace="test-ns", pod_identity=True)
         policy = json.loads(mock_role_args.call_args.kwargs["assume_role_policy"])
 
     services = [
@@ -169,7 +174,7 @@ def test_define_k8s_iam_role_trust_policy_excludes_pod_identity_statement_when_d
         patch("ptd.pulumi_resources.aws_workload_clusters.aws.iam.Role"),
         patch("ptd.pulumi_resources.aws_workload_clusters.aws.iam.RoleArgs") as mock_role_args,
     ):
-        AWSWorkloadClusters._define_k8s_iam_role(m, name="test-role", pod_identity=False)
+        AWSWorkloadClusters._define_k8s_iam_role(m, name="test-role", release="test-release", namespace="test-ns", pod_identity=False)
         policy = json.loads(mock_role_args.call_args.kwargs["assume_role_policy"])
 
     services = [
