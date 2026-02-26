@@ -1,75 +1,32 @@
 # To delete these alerts, simply removing the configMap that uses this method will not work.
-# Replace file contents with the following and apply in order to delete the alerts:
+# Replace file contents with the following and apply in order to delete the alerts
+# (repeat the deleteRules entry for each uid listed below):
 # apiVersion: 1
 # deleteRules:
 #   - orgId: 1
-#     uid: fsx_capacity
+#     uid: alb_target_5xx_errors_high
+#   - orgId: 1
+#     uid: alb_unhealthy_targets
+#   - orgId: 1
+#     uid: nlb_unhealthy_targets
+#   - orgId: 1
+#     uid: alb_response_latency_high
 #
 # See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+#
+# Note: alert annotations reference {{$labels.cluster}}. For CloudWatch-sourced metrics,
+# this label is injected by the prometheus.relabel.default block in grafana_alloy.py.
+# If Alloy is not running or relabeling is misconfigured, the label will be absent and
+# the annotation will render as "in cluster " (blank).
 apiVersion: 1
 groups:
     - orgId: 1
-      name: Cloudwatch
+      name: LoadBalancer
       folder: Posit Alerts
       interval: 5m
       rules:
-        - uid: fsx_capacity
-          title: FSx Capacity
-          condition: C
-          data:
-            - refId: A
-              relativeTimeRange:
-                from: 600
-                to: 0
-              datasourceUid: mimir
-              model:
-                editorMode: code
-                expr: aws_fsx_used_storage_capacity_average{job="integrations/cloudwatch", dimension_DataType!="Snapshot", dimension_VolumeId!=""} / aws_fsx_storage_capacity_average{job="integrations/cloudwatch", dimension_VolumeId!=""}
-                instant: true
-                intervalMs: 1000
-                legendFormat: __auto
-                maxDataPoints: 43200
-                range: false
-                refId: A
-            - refId: C
-              relativeTimeRange:
-                from: 600
-                to: 0
-              datasourceUid: __expr__
-              model:
-                conditions:
-                    - evaluator:
-                        params:
-                            - 0.8
-                        type: gt
-                      operator:
-                        type: and
-                      query:
-                        params:
-                            - A
-                      reducer:
-                        params: []
-                        type: last
-                      type: query
-                datasource:
-                    type: __expr__
-                    uid: __expr__
-                expression: A
-                intervalMs: 1000
-                maxDataPoints: 43200
-                refId: C
-                type: threshold
-          noDataState: NoData
-          execErrState: Error
-          for: 5m
-          annotations:
-            description: Evaluates FSx instance usage to determine if it is greater than 80% allocated.
-            summary: FSx instance {{$labels.dimension_FileSystemId}} has less than 20% of capacity remaining.
-          labels:
-            opsgenie: "1"
-          isPaused: false
-        - uid: ec2_network_out_high
-          title: EC2 Network Out High
+        - uid: alb_target_5xx_errors_high
+          title: ALB Target 5XX Errors High
           condition: B
           data:
             - refId: A
@@ -79,13 +36,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                # Network out threshold: 314572800 bytes/s (~300 MiB/s)
-                # Based on analysis of Loki->S3 traffic patterns from issue #2347
-                # Instance-aware thresholds: Using the same threshold for all instances
-                # To set different thresholds by instance type, use:
-                # avg_over_time(aws_ec2_network_out_average{job="integrations/cloudwatch", dimension_InstanceType="t3.xlarge"}[5m]) > 157286400 or
-                # avg_over_time(aws_ec2_network_out_average{job="integrations/cloudwatch", dimension_InstanceType="m5.2xlarge"}[5m]) > 314572800
-                expr: avg_over_time(aws_ec2_network_out_average{job="integrations/cloudwatch"}[5m])
+                expr: aws_applicationelb_httpcode_target_5_xx_count_sum{job="integrations/cloudwatch"}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -101,7 +52,7 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            - 3.145728e+08 # ~ 300 MiB/s
+                            - 10  # Absolute count, not an error rate. High-traffic ALBs may never breach this; low-traffic ALBs may page on transient spikes. Consider a rate-based alert if traffic volume varies significantly across environments.
                         type: gt
                       operator:
                         type: and
@@ -124,13 +75,13 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: EC2 instance has high network outbound traffic (over 300 MiB/s) for more than 5 minutes.
-            summary: High network outbound traffic on EC2 instance {{$labels.dimension_InstanceId}} in cluster {{$labels.cluster}}
+            description: Application Load Balancer has more than 10 target 5XX errors for over 5 minutes, indicating backend service failures.
+            summary: High 5XX errors on ALB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
           isPaused: false
-        - uid: ec2_network_packets_out_high
-          title: EC2 Network Packets Out High
+        - uid: alb_unhealthy_targets
+          title: ALB Unhealthy Targets
           condition: B
           data:
             - refId: A
@@ -140,9 +91,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                # Network packets out threshold: 400000 packets/s
-                # High packet rate can indicate network bottlenecks or unusual traffic patterns
-                expr: avg_over_time(aws_ec2_network_packets_out_average{job="integrations/cloudwatch"}[5m])
+                expr: aws_applicationelb_un_healthy_host_count_average{job="integrations/cloudwatch"}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -158,7 +107,7 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            - 400000
+                            - 0
                         type: gt
                       operator:
                         type: and
@@ -179,10 +128,120 @@ groups:
                 type: threshold
           noDataState: NoData
           execErrState: Error
-          for: 5m
+          for: 10m
           annotations:
-            description: EC2 instance has an unusually high packet transmission rate (over 400,000 packets/s) for more than 5 minutes, which could indicate abnormal network activity.
-            summary: High network packet rate on EC2 instance {{$labels.dimension_InstanceId}} in cluster {{$labels.cluster}}
+            description: Application Load Balancer has unhealthy targets for over 10 minutes, indicating backend service health issues. The extended window reduces false positives during rolling deployments.
+            summary: Unhealthy targets on ALB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: nlb_unhealthy_targets
+          title: NLB Unhealthy Targets
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_networkelb_un_healthy_host_count_average{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 10m
+          annotations:
+            description: Network Load Balancer has unhealthy targets for over 10 minutes, indicating backend service health issues. The extended window reduces false positives during rolling deployments and node drains.
+            summary: Unhealthy targets on NLB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: alb_response_latency_high
+          title: ALB Response Latency High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_applicationelb_target_response_time_average{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 2  # 2 seconds
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 10m
+          annotations:
+            description: Application Load Balancer target response time is above 2 seconds for more than 10 minutes, indicating performance degradation.
+            summary: High response latency on ALB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
           isPaused: false
