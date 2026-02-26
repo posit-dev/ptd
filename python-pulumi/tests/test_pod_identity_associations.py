@@ -12,6 +12,7 @@ def _make_clusters_mock(
     enable_eso: bool = False,
     chronicle_keys: list[str] | None = None,
     home_releases: list[str] | None = None,
+    packagemanager_keys: list[str] | None = None,
 ) -> MagicMock:
     """Build a minimal AWSWorkloadClusters mock for testing _define_pod_identity_associations."""
     m = MagicMock()
@@ -27,9 +28,13 @@ def _make_clusters_mock(
         cluster_cfgs[release] = cfg
     m.workload.cfg.clusters.__getitem__ = lambda _self, k: cluster_cfgs[k]
 
-    # chronicle_roles and home_roles use `in` checks so they must be real dicts
+    # chronicle_roles, home_roles, and packagemanager_roles use `in` checks so they must be real dicts
     m.chronicle_roles = {k: MagicMock() for k in (chronicle_keys or [])}
     m.home_roles = {r: MagicMock() for r in (home_releases or [])}
+    # Default: populate packagemanager for all release/site combos (the common case)
+    if packagemanager_keys is None:
+        packagemanager_keys = [f"{r}//{s}" for r in releases for s in sites]
+    m.packagemanager_roles = {k: MagicMock() for k in packagemanager_keys}
 
     return m
 

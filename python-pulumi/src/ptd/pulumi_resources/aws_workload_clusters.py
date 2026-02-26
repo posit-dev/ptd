@@ -697,14 +697,15 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
 
                 # Package Manager
                 # Key format uses "//" separator — must match _define_packagemanager_iam (release + "//" + site_name).
-                aws.eks.PodIdentityAssociation(
-                    f"{cluster_name}-{site_name}-packagemanager-pod-identity",
-                    cluster_name=cluster_name,
-                    namespace=ptd.POSIT_TEAM_NAMESPACE,
-                    service_account=f"{site_name}-packagemanager",
-                    role_arn=self.packagemanager_roles[release + "//" + site_name].arn,
-                    opts=pulumi.ResourceOptions(parent=self),
-                )
+                if release + "//" + site_name in self.packagemanager_roles:
+                    aws.eks.PodIdentityAssociation(
+                        f"{cluster_name}-{site_name}-packagemanager-pod-identity",
+                        cluster_name=cluster_name,
+                        namespace=ptd.POSIT_TEAM_NAMESPACE,
+                        service_account=f"{site_name}-packagemanager",
+                        role_arn=self.packagemanager_roles[release + "//" + site_name].arn,
+                        opts=pulumi.ResourceOptions(parent=self),
+                    )
 
                 # Chronicle (optional product — skip if not configured for this release/site)
                 if f"{release}-{site_name}" in self.chronicle_roles:

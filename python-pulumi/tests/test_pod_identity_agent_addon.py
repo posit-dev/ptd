@@ -44,8 +44,6 @@ def test_explicit_version_is_passed_through():
 
 def test_parent_is_set_to_eks():
     """The addon's parent is set to self.eks."""
-    import pulumi
-
     mock = _make_cluster_mock()
     with patch("ptd.pulumi_resources.aws_eks_cluster.aws.eks.Addon") as mock_addon:
         with patch("ptd.pulumi_resources.aws_eks_cluster.pulumi.ResourceOptions") as mock_opts:

@@ -81,3 +81,13 @@ def test_nfs_provisioner_raises_on_live_run_when_key_missing():
         with patch("pulumi.runtime.is_dry_run", return_value=False):
             with pytest.raises(ValueError, match="fs-dns-name"):
                 AWSWorkloadHelm._define_nfs_subdir_provisioner(_make_helm_mock(), "20250328", "4.0.18")
+
+
+def test_nfs_provisioner_warns_on_dry_run_when_key_missing():
+    """When secret fetch succeeds but fs-dns-name key is absent during a dry run, warn and return."""
+    with patch("ptd.secrecy.aws_get_secret_value_json", return_value=({"other-key": "value"}, True)):
+        with patch("pulumi.runtime.is_dry_run", return_value=True):
+            with patch("pulumi.warn") as mock_warn:
+                AWSWorkloadHelm._define_nfs_subdir_provisioner(_make_helm_mock(), "20250328", "4.0.18")
+                assert mock_warn.called
+                assert "fs-dns-name" in mock_warn.call_args[0][0]
