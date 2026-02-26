@@ -1,6 +1,7 @@
 """Tests for _define_pod_identity_associations, _define_external_secrets_iam, and _define_eso_read_secrets_inline in AWSWorkloadClusters."""
 
 import json
+import pytest
 from unittest.mock import MagicMock, patch
 
 from ptd.pulumi_resources.aws_workload_clusters import AWSWorkloadClusters
@@ -136,6 +137,73 @@ def test_home_association_created_per_site_when_role_present():
         assert mock_pia.call_count == 12
         names_called = [c[0][0] for c in mock_pia.call_args_list]
         assert sum(1 for n in names_called if "home" in n) == 2  # one per site
+
+
+def test_runtime_error_when_external_secrets_roles_missing_key():
+    """RuntimeError is raised when ESO is enabled but external_secrets_roles is missing the release key."""
+    mock = _make_clusters_mock(
+        releases=["20250328"],
+        sites=["siteA"],
+        enable_pod_identity=True,
+        enable_eso=True,
+    )
+    # Deliberately empty external_secrets_roles to simulate _define_external_secrets_iam not being called
+    mock.external_secrets_roles = {}
+    with patch("ptd.pulumi_resources.aws_workload_clusters.aws.eks.PodIdentityAssociation"):
+        with pytest.raises(RuntimeError, match="external_secrets_roles missing key"):
+            AWSWorkloadClusters._define_pod_identity_associations(mock)
+
+
+def test_runtime_error_when_connect_roles_missing_key():
+    """RuntimeError is raised when connect_roles is missing the release key."""
+    mock = _make_clusters_mock(
+        releases=["20250328"],
+        sites=["siteA"],
+        enable_pod_identity=True,
+    )
+    mock.connect_roles = {}
+    with patch("ptd.pulumi_resources.aws_workload_clusters.aws.eks.PodIdentityAssociation"):
+        with pytest.raises(RuntimeError, match="connect_roles missing key"):
+            AWSWorkloadClusters._define_pod_identity_associations(mock)
+
+
+def test_runtime_error_when_connect_session_roles_missing_key():
+    """RuntimeError is raised when connect_session_roles is missing the release-site key."""
+    mock = _make_clusters_mock(
+        releases=["20250328"],
+        sites=["siteA"],
+        enable_pod_identity=True,
+    )
+    mock.connect_session_roles = {}
+    with patch("ptd.pulumi_resources.aws_workload_clusters.aws.eks.PodIdentityAssociation"):
+        with pytest.raises(RuntimeError, match="connect_session_roles missing key"):
+            AWSWorkloadClusters._define_pod_identity_associations(mock)
+
+
+def test_runtime_error_when_workbench_roles_missing_key():
+    """RuntimeError is raised when workbench_roles is missing the release key."""
+    mock = _make_clusters_mock(
+        releases=["20250328"],
+        sites=["siteA"],
+        enable_pod_identity=True,
+    )
+    mock.workbench_roles = {}
+    with patch("ptd.pulumi_resources.aws_workload_clusters.aws.eks.PodIdentityAssociation"):
+        with pytest.raises(RuntimeError, match="workbench_roles missing key"):
+            AWSWorkloadClusters._define_pod_identity_associations(mock)
+
+
+def test_runtime_error_when_workbench_session_roles_missing_key():
+    """RuntimeError is raised when workbench_session_roles is missing the release-site key."""
+    mock = _make_clusters_mock(
+        releases=["20250328"],
+        sites=["siteA"],
+        enable_pod_identity=True,
+    )
+    mock.workbench_session_roles = {}
+    with patch("ptd.pulumi_resources.aws_workload_clusters.aws.eks.PodIdentityAssociation"):
+        with pytest.raises(RuntimeError, match="workbench_session_roles missing key"):
+            AWSWorkloadClusters._define_pod_identity_associations(mock)
 
 
 def _make_role_mock(oidc_url_tails: list[str]) -> MagicMock:

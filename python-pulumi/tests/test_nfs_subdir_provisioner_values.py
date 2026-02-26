@@ -107,6 +107,18 @@ def test_nfs_provisioner_warns_on_dry_run_when_key_missing():
                 assert "fs-dns-name" in mock_warn.call_args[0][0]
 
 
+def test_nfs_provisioner_custom_nfs_path_from_secret():
+    """When secret contains 'fs-nfs-path', that value is used as the NFS mount path."""
+    dns = "fs-123.fsx.us-east-1.amazonaws.com"
+    custom_path = "/custom-mount"
+    with patch("ptd.secrecy.aws_get_secret_value_json", return_value=({"fs-dns-name": dns, "fs-nfs-path": custom_path}, True)):
+        with patch("ptd.pulumi_resources.aws_workload_helm.k8s") as mock_k8s:
+            AWSWorkloadHelm._define_nfs_subdir_provisioner(_make_helm_mock(), "20250328", "4.0.18")
+            spec = mock_k8s.apiextensions.CustomResource.call_args.kwargs["spec"]
+            parsed_values = yaml.safe_load(spec["valuesContent"])
+            assert parsed_values["nfs"]["path"] == custom_path
+
+
 def test_nfs_provisioner_version_none_omits_version_key():
     """When version=None, no 'version' key is added to the spec (uses latest chart)."""
     dns = "fs-123.fsx.us-east-1.amazonaws.com"

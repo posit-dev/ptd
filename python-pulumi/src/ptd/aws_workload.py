@@ -258,6 +258,12 @@ class AWSWorkloadClusterConfig(ptd.WorkloadClusterConfig):
     pod_identity_agent_version: str | None = None
     enable_pod_identity_agent: bool = False
     enable_external_secrets_operator: bool = False
+    # Requires the workload secret (secret_name) to contain 'fs-dns-name' (FSx NFS endpoint) before
+    # `pulumi up` is run; a missing key causes a deploy-time error (dry runs warn instead).
+    # Security note: the storageClass pathPattern derives subdirectory paths from the
+    # nfs.io/storage-path PVC annotation, which is user-controlled. Any entity with PVC create
+    # permissions can supply arbitrary paths; restrict via OPA/Gatekeeper or a
+    # ValidatingWebhookConfiguration if cross-path access is a concern.
     enable_nfs_subdir_provisioner: bool = False  # PVCs must carry the nfs.io/storage-path annotation; the storageClass pathPattern uses it to derive subdirectory paths
     enable_efs_csi_driver: bool = False
     efs_config: ptd.EFSConfig | None = None

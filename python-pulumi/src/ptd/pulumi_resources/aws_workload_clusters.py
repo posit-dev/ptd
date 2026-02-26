@@ -661,7 +661,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
             self.external_secrets_roles[release] = self._define_k8s_iam_role(
                 name=self.workload.external_secrets_role_name(release),
                 release=release,
-                namespace=ptd.pulumi_resources.aws_workload_helm.ESO_SERVICE_ACCOUNT,
+                namespace=ptd.pulumi_resources.aws_workload_helm.ESO_NAMESPACE,
                 service_accounts=[ptd.pulumi_resources.aws_workload_helm.ESO_SERVICE_ACCOUNT],
                 role_policies=[self._define_eso_read_secrets_inline()],
                 pod_identity=True,
