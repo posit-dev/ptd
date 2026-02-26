@@ -568,6 +568,8 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         self.external_secrets_roles = {}
 
         for release in self.managed_clusters_by_release:
+            if not self.workload.cfg.clusters[release].enable_external_secrets_operator:
+                continue
             self.external_secrets_roles[release] = self._define_k8s_iam_role(
                 name=self.workload.external_secrets_role_name(release),
                 release=release,
@@ -586,6 +588,10 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
 
         Pod Identity associations connect service accounts directly to IAM roles without requiring
         annotations on the ServiceAccount resource.
+
+        Note: team_operator_roles is intentionally excluded here. The team-operator's service
+        account retains IRSA-based access; Pod Identity will be added in a future phase once
+        the operator itself is updated to remove IRSA annotation computation.
         """
         for release in self.managed_clusters_by_release:
             cluster_cfg = self.workload.cfg.clusters[release]

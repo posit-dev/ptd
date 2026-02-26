@@ -178,6 +178,8 @@ class AWSWorkloadSites(pulumi.ComponentResource):
         deploy, ESO will log errors until the ClusterSecretStore converges (~1-2 reconcile loops).
         """
         for release in self.managed_clusters_by_release:
+            if not self.workload.cfg.clusters[release].enable_external_secrets_operator:
+                continue
             for site_name in sorted(self.workload.cfg.sites.keys()):
                 # Create ExternalSecret for site secrets
                 kubernetes.apiextensions.CustomResource(
