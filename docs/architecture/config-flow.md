@@ -1,16 +1,16 @@
-# Configuration Flow: YAML → Go → Python
+# Configuration flow: YAML → Go → Python
 
 This document explains how configuration flows from YAML files through the Go CLI orchestrator into Python Pulumi infrastructure code.
 
 ## Overview
 
-PTD configuration is **parsed twice** during execution:
-1. **Go CLI** parses YAML to make orchestration decisions (which steps to run, credentials, etc.)
-2. **Python Pulumi** re-reads the same YAML to build infrastructure resources
+PTD configuration is parsed twice during execution:
+1. Go CLI parses YAML to make orchestration decisions (which steps to run, credentials, etc.)
+2. Python Pulumi re-reads the same YAML to build infrastructure resources
 
 This dual-parsing architecture means configuration changes must be synchronized across both Go structs and Python dataclasses.
 
-## Configuration Flow Diagram
+## Configuration flow diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -48,9 +48,9 @@ This dual-parsing architecture means configuration changes must be synchronized 
                     └─────────────────┘
 ```
 
-## Detailed Flow
+## Detailed flow
 
-### Step 1: Go CLI Parses Configuration
+### Step 1: Go CLI parses configuration {#go-cli-parses-configuration}
 
 **Location:** `cmd/ensure.go`, `lib/types/workload.go`, `lib/types/types.go`
 
@@ -73,18 +73,18 @@ The Go code uses these structs to:
 - Configure the Pulumi backend URL
 - **Set the `PTD_ROOT` environment variable** (critical bridge to Python)
 
-### Step 2: Go Invokes Python via Pulumi
+### Step 2: Go invokes Python via Pulumi {#go-invokes-python}
 
 **Location:** `lib/pulumi/python.go`
 
 When executing Python-based steps (persistent, postgres_config, helm, etc.), Go:
 
-1. **Sets PTD_ROOT** (line 55 of `lib/pulumi/python.go`):
+1. Sets PTD_ROOT (line 55 of `lib/pulumi/python.go`):
    ```go
    envVars["PTD_ROOT"] = helpers.GetTargetsConfigPath()
    ```
 
-2. **Generates `__main__.py`** dynamically (lines 77-101):
+2. Generates `__main__.py` dynamically (lines 77-101):
    ```python
    # Generated __main__.py example
    import ptd.pulumi_resources.aws_workload_persistent
@@ -92,11 +92,11 @@ When executing Python-based steps (persistent, postgres_config, helm, etc.), Go:
    ptd.pulumi_resources.aws_workload_persistent.AWSWorkloadPersistent.autoload()
    ```
 
-3. **Module naming convention:**
+3. Module naming convention:
    - Module: `{cloud}_{target_type}_{step_name}` (e.g., `aws_workload_persistent`)
    - Class: `{Cloud}{TargetType}{StepName}` (e.g., `AWSWorkloadPersistent`)
 
-### Step 3: Python Re-reads YAML Configuration
+### Step 3: Python re-reads YAML configuration {#python-rereads-yaml}
 
 **Location:** `python-pulumi/src/ptd/workload.py`, `python-pulumi/src/ptd/aws_workload.py`
 
@@ -119,7 +119,7 @@ class AbstractWorkload(ABC):
         cfg_dict = yaml.safe_load(self.ptd_yaml.read_text())
 ```
 
-### Step 4: Python Converts to Dataclasses
+### Step 4: Python converts to dataclasses {#python-converts-to-dataclasses}
 
 **Location:** `python-pulumi/src/ptd/__init__.py`, `python-pulumi/src/ptd/aws_workload.py`, `python-pulumi/src/ptd/azure_workload.py`
 
@@ -150,7 +150,7 @@ class AzureWorkloadConfig(WorkloadConfig):
     # ... Azure-specific fields
 ```
 
-**Azure-specific note:** Azure config includes a `NetworkConfig` nested dataclass with stricter naming constraints (see `python-pulumi/src/ptd/azure_workload.py:24-50`) for subnet CIDRs and VNet configuration.
+**Azure-specific note:** Azure config includes a `NetworkConfig` nested dataclass with stricter naming constraints (see `python-pulumi/src/ptd/azure_workload.py:24-50`) for subnet CIDRs and Virtual Network (VNet) configuration.
 
 **Critical pattern:** YAML keys with hyphens are converted to underscores (line 408-409 of `aws_workload.py`):
 
@@ -164,30 +164,30 @@ This means:
 - Go struct tag: `yaml:"tailscale_enabled"`
 - Python dataclass field: `tailscale_enabled`
 
-## The Bridge: PTD_ROOT
+## The bridge: PTD_ROOT
 
 `PTD_ROOT` is the critical environment variable that connects Go and Python:
 
 | Component | Role | Location |
 |-----------|------|----------|
-| **Go sets it** | Points to the targets directory | `lib/pulumi/python.go:55` |
-| **Python reads it** | Locates `__work__/` and `__ctrl__/` directories | `python-pulumi/src/ptd/paths.py` |
-| **Tests must set it** | Required for Python tests to load config | Via `monkeypatch.setenv()` |
+| Go sets it | Points to the targets directory | `lib/pulumi/python.go:55` |
+| Python reads it | Locates `__work__/` and `__ctrl__/` directories | `python-pulumi/src/ptd/paths.py` |
+| Tests must set it | Required for Python tests to load config | Via `monkeypatch.setenv()` |
 
 Without `PTD_ROOT`, Python cannot find the YAML configuration files.
 
-## How to Add a New Configuration Option
+## How to add a new configuration option
 
 Follow this checklist to add a new configuration field:
 
-### 1. Update YAML Schema
+### 1. Update YAML schema {#update-yaml-schema}
 Add the field to your YAML file:
 ```yaml
 spec:
   my_new_setting: true
 ```
 
-### 2. Add Go Struct Field
+### 2. Add Go struct field {#add-go-struct-field}
 Update the appropriate struct in `lib/types/`:
 ```go
 // lib/types/workload.go
@@ -199,7 +199,7 @@ type WorkloadSpec struct {
 
 **Important:** The YAML struct tag must match the Python field name (with underscores).
 
-### 3. Add Python Dataclass Field
+### 3. Add Python dataclass field {#add-python-dataclass-field}
 Update the corresponding dataclass in `python-pulumi/src/ptd/`:
 ```python
 @dataclasses.dataclass(frozen=True)
@@ -210,7 +210,7 @@ class AWSWorkloadConfig(WorkloadConfig):
 
 **For Azure workloads:** Azure has its own config files in `python-pulumi/src/ptd/azure_workload.py` with cloud-specific dataclasses (`AzureWorkloadConfig`, `NetworkConfig`). Azure config changes follow the same pattern but are in separate files from AWS.
 
-### 4. Handle Hyphen-to-Underscore Conversion
+### 4. Handle hyphen-to-underscore conversion {#handle-hyphen-conversion}
 The conversion happens automatically in the config loader (e.g., `aws_workload.py`):
 ```python
 for key in list(cluster_spec.keys()):
@@ -219,19 +219,19 @@ for key in list(cluster_spec.keys()):
 
 No additional changes needed unless you have nested configuration.
 
-### 5. Update Tests
+### 5. Update tests {#update-tests}
 If the config is required, update test fixtures:
 - Go tests: Update test YAML files or mock structs
 - Python tests: Set `PTD_ROOT` via `monkeypatch.setenv()` and update test config files
 
-### 6. Validation (Optional)
+### 6. Validation (optional) {#validation}
 Add validation logic if needed:
 - Go: In `lib/types/workload.go` or during step setup
 - Python: In dataclass `__post_init__` or during resource creation
 
-## Common Pitfalls
+## Common pitfalls
 
-### 1. Mismatched Field Names
+### 1. Mismatched field names
 **Problem:** Go struct tag doesn't match Python dataclass field name.
 
 ```go
@@ -248,7 +248,7 @@ tailscale_enabled: bool  # Must match Go struct field name, not YAML tag
 
 **Solution:** Use consistent field names. The YAML tag can differ, but the struct field name should match the Python field.
 
-### 2. Missing PTD_ROOT in Tests
+### 2. Missing PTD_ROOT in tests
 **Problem:** Python tests fail with "File not found" errors.
 
 **Solution:** Always set `PTD_ROOT` in test fixtures:
@@ -258,7 +258,7 @@ def test_something(monkeypatch):
     # ... rest of test
 ```
 
-### 3. Forgetting Hyphen-to-Underscore Conversion
+### 3. Forgetting hyphen-to-underscore conversion
 **Problem:** Python tries to use hyphenated keys that don't exist.
 
 **Solution:** The conversion is automatic in config loaders, but make sure custom parsers include it:
@@ -267,7 +267,7 @@ for key in list(config.keys()):
     config[key.replace("-", "_")] = config.pop(key)
 ```
 
-### 4. No Validation Between Go and Python
+### 4. No validation between Go and Python
 **Problem:** Go and Python structs drift apart over time.
 
 **Solution:** There is no automated validation. Code review must catch mismatches. Consider:
@@ -275,16 +275,16 @@ for key in list(config.keys()):
 - Creating integration tests that validate config parsing in both languages
 - Using linters or custom tooling to check struct/dataclass alignment
 
-## Testing Configuration Changes
+## Testing configuration changes
 
-### Go Side
+### Go side
 ```bash
 just test-lib
 ```
 
 Tests are in `lib/types/*_test.go`.
 
-### Python Side
+### Python side
 ```bash
 just test-python-pulumi
 ```
@@ -311,6 +311,6 @@ def test_config_loading(monkeypatch, tmp_path):
     assert workload.cfg.account_id == "123456789"
 ```
 
-## Related Documentation
+## Related documentation
 - [Step Dependencies](./step-dependencies.md) - How steps depend on each other
 - [Pulumi Conventions](./pulumi-conventions.md) - Pulumi-specific patterns

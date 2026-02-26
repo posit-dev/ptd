@@ -1,17 +1,17 @@
-# Testing Guide for PTD Python Pulumi
+# Testing guide for PTD Python Pulumi
 
 This guide covers testing patterns and best practices for the PTD Python Pulumi infrastructure code.
 
-## Table of Contents
-- [Quick Start](#quick-start)
-- [Test Paradigms](#test-paradigms)
-- [Shared Fixtures](#shared-fixtures)
-- [Required Setup](#required-setup)
-- [Running Tests](#running-tests)
-- [Writing a New Test](#writing-a-new-test)
-- [Common Pitfalls](#common-pitfalls)
+## Table of contents
+- [Quick start](#quick-start)
+- [Test paradigms](#test-paradigms)
+- [Shared fixtures](#shared-fixtures)
+- [Required setup](#required-setup)
+- [Running tests](#running-tests)
+- [Writing a new test](#writing-a-new-test)
+- [Common pitfalls](#common-pitfalls)
 
-## Quick Start
+## Quick start
 
 ```bash
 # Run all tests
@@ -27,11 +27,11 @@ just test -k "test_paths_root_with_ptd_root_set"
 just coverage
 ```
 
-## Test Paradigms
+## Test paradigms
 
 PTD Python Pulumi tests use two main testing approaches depending on what you're testing.
 
-### 1. Pulumi Mocks (For Infrastructure Resources)
+### 1. Pulumi mocks (for infrastructure resources)
 
 **When to use:** Testing components that create Pulumi resources (AWS, Azure, Kubernetes, etc.)
 
@@ -85,7 +85,7 @@ def test_define_bucket_policy(aws_workload):
 - Use `.apply()` to extract values from `Output[T]` for assertions
 - Mock class must return appropriate values for your resources
 
-### 2. Direct Mocking (For Logic & Configuration)
+### 2. Direct mocking (for logic & configuration)
 
 **When to use:** Testing pure Python logic that doesn't create Pulumi resources (config parsing, utility functions, data transformations, etc.)
 
@@ -123,11 +123,11 @@ def test_aws_whoami_success(mock_session):
 - Direct assertions on return values
 - Can use `monkeypatch` fixture for environment variables
 
-## Shared Fixtures
+## Shared fixtures
 
 The `conftest.py` file provides shared fixtures that eliminate duplication across tests.
 
-### `ptd_root` - Environment Setup
+### `ptd_root` - environment setup
 
 Sets `PTD_ROOT` environment variable to a temporary directory.
 
@@ -140,7 +140,7 @@ def test_paths_root_with_ptd_root_set(ptd_root):
 
 **When to use:** Any test that loads workload configs or uses the `Paths` class.
 
-### `pulumi_mocks` - Standard Pulumi Mocks
+### `pulumi_mocks` - standard Pulumi mocks
 
 Provides a standard Pulumi mock class that echoes inputs as outputs.
 
@@ -155,7 +155,7 @@ def test_my_resource(pulumi_mocks):
 
 **Note:** For tests requiring specific mock behavior (returning particular resource properties, simulating API calls), create a custom mock class in your test file.
 
-### `aws_workload` - Mock AWS Workload
+### `aws_workload` - mock AWS workload
 
 Pre-configured `AWSWorkload` object with test data.
 
@@ -173,7 +173,7 @@ def test_something(aws_workload):
 - Single cluster: `19551105`
 - Single site: `main` with domain `puppy.party`
 
-### `azure_workload` - Mock Azure Workload
+### `azure_workload` - mock Azure workload
 
 Pre-configured `AzureWorkload` object with test data.
 
@@ -191,38 +191,38 @@ def test_something(azure_workload):
 - Single site: `main` with domain `puppy.party`
 - Standard network configuration
 
-## Required Setup
+## Required setup
 
-### PTD_ROOT Environment Variable
+### PTD_ROOT environment variable
 
-**CRITICAL:** Most PTD code requires `PTD_ROOT` to be set. This points to the targets configuration directory.
+Most PTD code requires `PTD_ROOT` to be set. This points to the targets configuration directory.
 
 **Three ways to set it:**
 
-1. **Use `ptd_root` fixture** (recommended for most tests):
+1. Use `ptd_root` fixture (recommended for most tests):
    ```python
    def test_something(ptd_root):
        # PTD_ROOT is automatically set
        paths = Paths()
    ```
 
-2. **Use `monkeypatch` directly**:
+2. Use `monkeypatch` directly:
    ```python
    def test_something(monkeypatch):
        monkeypatch.setenv("PTD_ROOT", "/path/to/targets")
        paths = Paths()
    ```
 
-3. **Use `aws_workload` or `azure_workload` fixtures** (sets `PTD_ROOT` automatically):
+3. Use `aws_workload` or `azure_workload` fixtures (sets `PTD_ROOT` automatically):
    ```python
    def test_something(aws_workload):
        # PTD_ROOT is automatically set via the fixture
        assert aws_workload.cfg.environment == "test"
    ```
 
-## Running Tests
+## Running tests
 
-### Basic Commands
+### Basic commands
 
 ```bash
 # Run all tests
@@ -248,7 +248,7 @@ just coverage
 cat coverage.json | jq '.totals.percent_covered'
 ```
 
-### Test Output
+### Test output
 
 ```bash
 # Show print statements
@@ -264,7 +264,7 @@ just test -x
 just test --lf
 ```
 
-### Pytest Options
+### Pytest options
 
 All pytest options work with `just test`:
 
@@ -279,16 +279,16 @@ just test -n auto
 just test --durations=10
 ```
 
-## Writing a New Test
+## Writing a new test
 
-### Step 1: Choose the Right Paradigm
+### Step 1: Choose the right paradigm {#choose-paradigm}
 
 Ask yourself: **Does my code create Pulumi resources?**
 
-- **YES** → Use Pulumi Mocks (see [Template A](#template-a-pulumi-resource-test))
-- **NO** → Use Direct Mocking (see [Template B](#template-b-logic-test))
+- **YES** → Use Pulumi mocks (see [Template A](#template-a-pulumi-resource-test))
+- **NO** → Use direct mocking (see [Template B](#template-b-logic-test))
 
-### Template A: Pulumi Resource Test
+### Template A: Pulumi resource test
 
 ```python
 """Tests for [component name]."""
@@ -331,7 +331,7 @@ def test_my_component_creates_resource(aws_workload):
     pulumi.Output.all(result).apply(check)
 ```
 
-### Template B: Logic Test
+### Template B: Logic test
 
 ```python
 """Tests for [module name]."""
@@ -363,7 +363,7 @@ def test_my_function_with_mock(mock_dependency):
     mock_dependency.assert_called_once()
 ```
 
-### Step 2: Organize Your Tests
+### Step 2: Organize your tests {#organize-tests}
 
 ```python
 class TestMyFeature:
@@ -382,7 +382,7 @@ class TestMyFeature:
         pass
 ```
 
-### Step 3: Write Descriptive Tests
+### Step 3: Write descriptive tests {#write-descriptive-tests}
 
 **Good test names:**
 - `test_vpc_endpoints_config_default_initialization`
@@ -394,9 +394,9 @@ class TestMyFeature:
 - `test_1`
 - `test_it_works`
 
-## Common Pitfalls
+## Common pitfalls
 
-### 1. Forgetting to Set PTD_ROOT
+### 1. Forgetting to set PTD_ROOT
 
 **Problem:**
 ```python
@@ -410,7 +410,7 @@ def test_load_workload(ptd_root):
     wl = AWSWorkload(name="test01-staging")  # PTD_ROOT is set via fixture
 ```
 
-### 2. Using the Wrong Mock Paradigm
+### 2. Using the wrong mock paradigm
 
 **Problem:** Using Pulumi mocks for non-Pulumi code:
 ```python
@@ -430,7 +430,7 @@ def test_parse_config(ptd_root):
     assert result["environment"] == "test"
 ```
 
-### 3. Not Handling Pulumi Output[T]
+### 3. Not handling Pulumi Output[T]
 
 **Problem:**
 ```python
@@ -452,7 +452,7 @@ def test_bucket_name():
     bucket.id.apply(check)
 ```
 
-### 4. Testing Private Methods Directly
+### 4. Testing private methods directly
 
 **Problem:**
 ```python
@@ -471,7 +471,7 @@ def test_public_method():
 
 **Exception:** It's acceptable to test private methods when they contain complex logic that needs thorough testing independently of the public API. See `test_grafana_alloy.py` for examples.
 
-### 5. Not Cleaning Up Test Data
+### 5. Not cleaning up test data
 
 **Problem:**
 ```python
@@ -487,7 +487,7 @@ def test_create_file(tmp_path):
     # tmp_path is automatically cleaned up
 ```
 
-### 6. Module-Level Mocks in Wrong Place
+### 6. Module-level mocks in wrong place
 
 **Problem:**
 ```python
@@ -508,7 +508,7 @@ def test_resource():
     # Mocks are already set
 ```
 
-### 7. Sharing Mutable Test Data
+### 7. Sharing mutable test data
 
 **Problem:**
 ```python
@@ -534,33 +534,33 @@ def test_two(config):
     assert config["setting"] == "value"  # Gets fresh copy
 ```
 
-## Examples from Codebase
+## Examples from codebase
 
-### Testing Configuration Parsing
+### Testing configuration parsing
 See: `tests/test_ptd_init.py`
 - Uses direct mocking
 - Tests dataclasses and configuration logic
 - No Pulumi resources involved
 
-### Testing Infrastructure Resources
+### Testing infrastructure resources
 See: `tests/test_ptd_pulumi_resources_aws_bucket.py`
 - Uses Pulumi mocks
 - Tests resource creation
 - Uses `.apply()` for assertions
 
-### Testing with Workload Fixtures
+### Testing with workload fixtures
 See: `tests/test_azure_bastion_config.py`
 - Uses `aws_workload` and `azure_workload` fixtures
 - Tests configuration defaults
 - Compares AWS and Azure patterns
 
-### Testing Complex Logic
+### Testing complex logic
 See: `tests/test_aws_iam.py`
 - Tests policy generation logic
 - Uses type casting for complex data structures
 - No Pulumi mocks needed
 
-## Tips and Best Practices
+## Tips and best practices
 
 1. **Keep tests focused**: One test should verify one behavior
 2. **Use descriptive names**: Test names should describe what they verify
@@ -570,7 +570,7 @@ See: `tests/test_aws_iam.py`
 6. **Verify behavior, not implementation**: Test what the code does, not how it does it
 7. **Run tests frequently**: Use `just test -k <test_name>` during development
 
-## Further Reading
+## Further reading
 
 - [Pytest Documentation](https://docs.pytest.org/)
 - [Pulumi Testing Guide](https://www.pulumi.com/docs/using-pulumi/testing/)

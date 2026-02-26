@@ -1,14 +1,14 @@
-# Step Dependencies and Execution Pipeline
+# Step dependencies and execution pipeline
 
 This document explains the step execution pipeline for PTD deployments, including what each step does, why steps depend on previous steps, and how to safely use `--only-steps` and `--start-at-step`.
 
 ## Overview
 
-PTD infrastructure deployment is organized into sequential steps. Each step depends on resources created by previous steps. The Go CLI orchestrates step execution, while most steps use Python Pulumi to create cloud resources.
+PTD organizes infrastructure deployment into sequential steps. Each step depends on resources that previous steps create. The Go CLI orchestrates step execution, while most steps use Python Pulumi to create cloud resources.
 
 **Location:** `lib/steps/steps.go`
 
-## Workload Steps (Full Pipeline)
+## Workload steps (full pipeline)
 
 Workloads use this 8-step pipeline:
 
@@ -16,15 +16,15 @@ Workloads use this 8-step pipeline:
 bootstrap → persistent → postgres_config → eks/aks → clusters → helm → sites → persistent_reprise
 ```
 
-### Step 1: bootstrap (Go)
+### Step 1: bootstrap (Go) {#bootstrap}
 **Implementation:** `lib/steps/bootstrap.go`
 **Language:** Go
 **Proxy Required:** No
 
 **Creates:**
 - S3 state bucket for Pulumi backend
-- KMS key for state encryption
-- Admin IAM policy for Pulumi operations
+- Key Management Service (KMS) key for state encryption
+- Admin Identity and Access Management (IAM) policy for Pulumi operations
 - AWS Secrets Manager secret (empty, populated by later steps)
 
 **Why first:** Everything else needs a place to store Pulumi state and credentials to operate. This step creates the foundational infrastructure for the workload account.
@@ -33,7 +33,7 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 
 ---
 
-### Step 2: persistent (Python)
+### Step 2: persistent (Python) {#persistent-workload}
 **Implementation:**
 - AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_persistent.py`
 - Azure: `python-pulumi/src/ptd/pulumi_resources/azure_workload_persistent.py`
@@ -42,10 +42,10 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 **Proxy Required:** No
 
 **Creates:**
-- **AWS:** VPC, subnets, NAT gateways, route tables, RDS PostgreSQL, S3 buckets (Loki logs, Mimir metrics, general storage), IAM roles and policies, ACM certificates, FSx for OpenZFS or EFS, bastion host (optional)
+- **AWS:** Virtual Private Cloud (VPC), subnets, NAT gateways, route tables, Relational Database Service (RDS) PostgreSQL, S3 buckets (Loki logs, Mimir metrics, general storage), IAM roles and policies, AWS Certificate Manager (ACM) certificates, FSx for OpenZFS or Elastic File System (EFS), bastion host (optional)
 - **Azure:** VNet, subnets, Azure Database for PostgreSQL, Storage Accounts, Azure Container Registry (ACR), managed identities, Azure Key Vault certificates, Azure NetApp Files, bastion host (optional)
 
-**Post-stack action:** Updates AWS Secrets Manager (AWS) or Azure Key Vault (Azure) with stack outputs (database endpoint, VPC/VNet ID, etc.) for use by later steps.
+**Post-stack action:** Updates AWS Secrets Manager (AWS) or Azure Key Vault (Azure) with stack outputs (database endpoint, VPC/VNet ID, etc.) for later steps to use.
 
 **Depends on:**
 - `bootstrap`: Needs state bucket and KMS key
@@ -56,7 +56,7 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 
 ---
 
-### Step 3: postgres_config (Python)
+### Step 3: postgres_config (Python) {#postgres-config}
 **Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_workload_postgres_config.py`
 **Language:** Python/Pulumi
 **Proxy Required:** Yes (connects to private RDS)
@@ -71,13 +71,13 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 
 **Why third:** Database configuration must happen before deploying applications that need database access.
 
-**Proxy rationale:** RDS is in a private subnet. The step uses the SSM proxy (via bastion host) to connect through the private network.
+**Proxy rationale:** RDS is in a private subnet. The step uses the Systems Manager (SSM) proxy (via bastion host) to connect through the private network.
 
-**Safe to re-run:** Yes, idempotent. Terraform-style state ensures users/permissions are created only once.
+**Safe to re-run:** Yes, idempotent. Terraform-style state creates users and permissions only once.
 
 ---
 
-### Step 4: eks (AWS) or aks (Azure) (Cloud-specific)
+### Step 4: eks (AWS) or aks (Azure) (cloud-specific) {#eks-aks}
 **Implementation:**
 - AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_eks.py` (Python)
 - Azure: `lib/steps/aks.go` (Go)
@@ -86,11 +86,11 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 **Proxy Required:** No
 
 **Creates:**
-- Kubernetes cluster (EKS or AKS)
+- Kubernetes cluster (Elastic Kubernetes Service (EKS) or Azure Kubernetes Service (AKS))
 - Node groups or node pools
-- OIDC provider for workload identity
+- OpenID Connect (OIDC) provider for workload identity
 - Security groups (AWS) or network security groups (Azure)
-- Cluster addons (EBS CSI driver for AWS, secrets store CSI for both)
+- Cluster addons (EBS Container Storage Interface (CSI) driver for AWS, secrets store CSI for both)
 - Karpenter resources (if autoscaling enabled, AWS only)
 
 **Depends on:**
@@ -112,7 +112,7 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 
 ---
 
-### Step 5: clusters (Python)
+### Step 5: clusters (Python) {#clusters}
 **Implementation:**
 - AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_clusters.py`
 - Azure: `python-pulumi/src/ptd/pulumi_resources/azure_workload_clusters.py`
@@ -136,7 +136,7 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 
 ---
 
-### Step 6: helm (Python)
+### Step 6: helm (Python) {#helm}
 **Implementation:**
 - AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_helm.py`
 - Azure: `python-pulumi/src/ptd/pulumi_resources/azure_workload_helm.py`
@@ -145,7 +145,7 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 **Proxy Required:** Yes (deploys Helm charts via Kubernetes API)
 
 **Creates:**
-- **Team Operator:** Manages Posit Team products (Workbench, Connect, Package Manager)
+- **Team Operator:** Manages Posit Team products (Posit Workbench, Posit Connect, Posit Package Manager)
 - **Traefik:** Ingress controller and load balancer
 - **cert-manager:** Automatic TLS certificate management
 - **Loki:** Log aggregation
@@ -153,7 +153,7 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 - **Mimir:** Metrics storage
 - **kube-state-metrics:** Cluster metrics exporter
 - **Grafana Alloy:** Telemetry collector
-- **AWS Load Balancer Controller** (AWS only): Integrates ELB with Kubernetes services
+- **AWS Load Balancer Controller** (AWS only): Integrates Elastic Load Balancing (ELB) with Kubernetes services
 - **Secrets Store CSI Driver:** Mounts AWS Secrets Manager (AWS) or Azure Key Vault (Azure) into pods
 - **Karpenter** (AWS only): Autoscaling (if enabled)
 - **NVIDIA Device Plugin:** GPU support (if enabled)
@@ -171,7 +171,7 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 
 ---
 
-### Step 7: sites (Python)
+### Step 7: sites (Python) {#sites}
 **Implementation:**
 - AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_sites.py`
 - Azure: `python-pulumi/src/ptd/pulumi_resources/azure_workload_sites.py`
@@ -180,7 +180,7 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 **Proxy Required:** Yes (creates Kubernetes CRDs)
 
 **Creates:**
-- `TeamSite` custom resources (CRDs consumed by Team Operator)
+- `TeamSite` custom resources (Custom Resource Definitions (CRDs) consumed by Team Operator)
 - Ingress resources for each site
 - DNS records (Route53 for AWS, Azure DNS for Azure)
 - Site-specific secrets
@@ -189,7 +189,7 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 - `helm`: Needs Team Operator running to reconcile `TeamSite` CRDs
 - `persistent`: Needs ACM certificates (AWS) or Key Vault certificates (Azure), IAM roles (AWS) or managed identities (Azure)
 
-**Why seventh:** Sites are the user-facing entry points to Posit Team products. They must be created after the operator is running.
+**Why seventh:** Sites are the user-facing entry points to Posit Team products. The operator must be running before you create them.
 
 **Proxy rationale:** Creates Kubernetes resources via API.
 
@@ -197,14 +197,14 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 
 ---
 
-### Step 8: persistent_reprise (Go)
+### Step 8: persistent_reprise (Go) {#persistent-reprise}
 **Implementation:** `lib/steps/persistent_reprise.go`
 **Language:** Go
 **Proxy Required:** No
 
 **Purpose:** Re-runs the `persistent` step to update AWS Secrets Manager (AWS) or Azure Key Vault (Azure) with outputs from later steps (e.g., cluster endpoints, load balancer DNS names).
 
-**Why last:** Secrets Manager/Key Vault acts as a cross-step data store. This step ensures all outputs from all steps are available for future operations or debugging.
+**Why last:** Secrets Manager/Key Vault acts as a cross-step data store. This step makes all outputs from all steps available for future operations or debugging.
 
 **Azure note:** Azure does NOT have control room support (workload-only deployments). This step only applies to Azure workloads, not control rooms.
 
@@ -212,7 +212,7 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 
 ---
 
-## Control Room Steps
+## Control room steps
 
 Control rooms use a simpler 4-step pipeline:
 
@@ -220,7 +220,7 @@ Control rooms use a simpler 4-step pipeline:
 workspaces → persistent → postgres_config → cluster
 ```
 
-### Step 1: workspaces (Python)
+### Step 1: workspaces (Python) {#workspaces}
 **Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_control_room_workspaces.py`
 **Proxy Required:** No
 
@@ -233,7 +233,7 @@ workspaces → persistent → postgres_config → cluster
 
 ---
 
-### Step 2: persistent (Python)
+### Step 2: persistent (Python) {#persistent-control-room}
 **Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_control_room_persistent.py`
 **Proxy Required:** No
 
@@ -241,7 +241,7 @@ Same as workload persistent: VPC, RDS, S3, IAM roles, etc.
 
 ---
 
-### Step 3: postgres_config (Python)
+### Step 3: postgres_config (Python) {#postgres-config-control-room}
 **Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_control_room_postgres_config.py`
 **Proxy Required:** Yes
 
@@ -249,7 +249,7 @@ Same as workload postgres_config: database users, permissions, extensions.
 
 ---
 
-### Step 4: cluster (Python)
+### Step 4: cluster (Python) {#cluster}
 **Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_control_room_cluster.py`
 **Proxy Required:** Yes
 
@@ -263,7 +263,7 @@ Same as workload postgres_config: database users, permissions, extensions.
 
 ---
 
-## Pulumi Stack Naming Convention
+## Pulumi stack naming convention
 
 Each step creates a Pulumi stack with a consistent naming pattern:
 
@@ -288,7 +288,7 @@ organization/ptd-aws-workload-persistent/myworkload-staging
 
 ---
 
-## Selective Step Execution
+## Selective step execution
 
 ### --only-steps
 
@@ -304,7 +304,7 @@ ptd ensure myworkload-staging --only-steps postgres_config,helm
 
 **Safety:**
 - Safe if the step doesn't depend on changes in skipped steps
-- **Dangerous** if upstream resources changed (e.g., running `helm` without running `persistent` first after changing VPC config)
+- Dangerous if upstream resources changed (e.g., running `helm` without running `persistent` first after changing VPC config)
 
 **Validation:** Go validates that step names are valid before execution.
 
@@ -352,7 +352,7 @@ persistent_reprise
 
 ---
 
-## When Steps Are Safe to Re-run
+## When steps are safe to re-run
 
 | Step | Safe to Re-run? | Notes |
 |------|-----------------|-------|
@@ -367,7 +367,7 @@ persistent_reprise
 
 ---
 
-## Understanding Proxy Requirements
+## Understanding proxy requirements
 
 Some steps require a proxy to access private resources:
 
@@ -390,7 +390,7 @@ Some steps require a proxy to access private resources:
 
 ---
 
-## Debugging Step Execution
+## Debugging step execution
 
 ### View step status
 ```bash
@@ -415,6 +415,6 @@ See [CLAUDE.md](../../CLAUDE.md) for more debugging commands.
 
 ---
 
-## Related Documentation
+## Related documentation
 - [Config Flow](./config-flow.md) - How configuration flows from YAML to Go to Python
 - [Pulumi Conventions](./pulumi-conventions.md) - Pulumi-specific patterns
