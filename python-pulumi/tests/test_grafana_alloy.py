@@ -641,3 +641,168 @@ class TestDefineCloudwatchConfig:
         alloy = _make_alloy_for_cloudwatch("aws", compound_name="bad{name}")
         with pytest.raises(ValueError, match="unsafe for Alloy River config"):
             alloy._define_cloudwatch_config()  # noqa: SLF001
+
+
+def _make_alloy_for_azure_monitor(
+    subscription_id: str = "test-subscription-id",
+    resource_group_name: str = "test-rg",
+    public_subnet_cidr: str | None = None,
+) -> AlloyConfig:
+    """Helper to create an AlloyConfig instance with mocked Azure workload attributes."""
+    import ptd.azure_workload
+
+    alloy = AlloyConfig.__new__(AlloyConfig)
+
+    # Create mock Azure workload - use spec to ensure isinstance checks work
+    mock_workload = Mock(spec=ptd.azure_workload.AzureWorkload)
+    mock_cfg = Mock()
+    mock_cfg.subscription_id = subscription_id
+    mock_network = Mock()
+    mock_network.public_subnet_cidr = public_subnet_cidr
+    mock_cfg.network = mock_network
+    mock_workload.cfg = mock_cfg
+    mock_workload.resource_group_name = resource_group_name
+
+    # Mock cloud_provider
+    mock_cloud_provider = Mock()
+    mock_cloud_provider.name = "Azure"
+    mock_workload.cloud_provider = mock_cloud_provider
+
+    alloy.workload = mock_workload
+    alloy.cloud_provider = "azure"
+    alloy.region = "eastus"
+
+    return alloy
+
+
+class TestDefineAzureMonitorConfig:
+    """Tests for _define_azure_monitor_config method."""
+
+    def test_azure_contains_postgres_exporter(self) -> None:
+        alloy = _make_alloy_for_azure_monitor()
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        assert 'prometheus.exporter.azure "postgres"' in result
+        assert "Microsoft.DBforPostgreSQL/flexibleServers" in result
+
+    def test_azure_contains_netapp_exporter(self) -> None:
+        alloy = _make_alloy_for_azure_monitor()
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        assert 'prometheus.exporter.azure "netapp"' in result
+        assert "Microsoft.NetApp/netAppAccounts/capacityPools/volumes" in result
+
+    def test_azure_contains_loadbalancer_exporter(self) -> None:
+        alloy = _make_alloy_for_azure_monitor()
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        assert 'prometheus.exporter.azure "loadbalancer"' in result
+        assert "Microsoft.Network/loadBalancers" in result
+
+    def test_azure_contains_storage_exporter(self) -> None:
+        alloy = _make_alloy_for_azure_monitor()
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        assert 'prometheus.exporter.azure "storage"' in result
+        assert "Microsoft.Storage/storageAccounts" in result
+
+    def test_azure_subscription_id_interpolated(self) -> None:
+        alloy = _make_alloy_for_azure_monitor(subscription_id="custom-subscription-id")
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        assert 'subscriptions    = ["custom-subscription-id"]' in result
+
+    def test_azure_resource_group_name_interpolated(self) -> None:
+        alloy = _make_alloy_for_azure_monitor(resource_group_name="custom-rg-name")
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        assert "resourceGroup eq 'custom-rg-name'" in result
+
+    def test_azure_contains_all_postgres_metrics(self) -> None:
+        alloy = _make_alloy_for_azure_monitor()
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        postgres_metrics = [
+            "cpu_percent",
+            "memory_percent",
+            "storage_percent",
+            "active_connections",
+            "connections_failed",
+            "deadlocks",
+        ]
+        for metric in postgres_metrics:
+            assert metric in result
+
+    def test_azure_contains_all_netapp_metrics(self) -> None:
+        alloy = _make_alloy_for_azure_monitor()
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        netapp_metrics = [
+            "VolumeConsumedSizePercentage",
+            "VolumeLogicalSize",
+            "AverageReadLatency",
+            "AverageWriteLatency",
+            "ReadIops",
+            "WriteIops",
+        ]
+        for metric in netapp_metrics:
+            assert metric in result
+
+    def test_azure_contains_all_loadbalancer_metrics(self) -> None:
+        alloy = _make_alloy_for_azure_monitor()
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        lb_metrics = [
+            "DipAvailability",
+            "VipAvailability",
+            "UsedSnatPorts",
+            "AllocatedSnatPorts",
+            "SnatConnectionCount",
+        ]
+        for metric in lb_metrics:
+            assert metric in result
+
+    def test_azure_contains_all_storage_metrics(self) -> None:
+        alloy = _make_alloy_for_azure_monitor()
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        storage_metrics = ["Availability", "SuccessE2ELatency", "UsedCapacity", "Transactions"]
+        for metric in storage_metrics:
+            assert metric in result
+
+    def test_azure_includes_scrape_blocks(self) -> None:
+        alloy = _make_alloy_for_azure_monitor()
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        # Each exporter should have a corresponding scrape block
+        assert 'prometheus.scrape "azure_postgres"' in result
+        assert 'prometheus.scrape "azure_netapp"' in result
+        assert 'prometheus.scrape "azure_loadbalancer"' in result
+        assert 'prometheus.scrape "azure_storage"' in result
+
+    def test_azure_scrape_blocks_forward_to_relabel(self) -> None:
+        alloy = _make_alloy_for_azure_monitor()
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        # All scrape blocks should forward to the default relabel receiver
+        assert result.count("forward_to = [prometheus.relabel.default.receiver]") >= 4
+
+    def test_azure_scrape_blocks_enable_clustering(self) -> None:
+        alloy = _make_alloy_for_azure_monitor()
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        # All scrape blocks should enable clustering
+        assert result.count("enabled = true") >= 4
+
+    def test_azure_natgateway_included_when_public_subnet_configured(self) -> None:
+        alloy = _make_alloy_for_azure_monitor(public_subnet_cidr="10.0.100.0/24")
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        assert 'prometheus.exporter.azure "natgateway"' in result
+        assert "Microsoft.Network/natGateways" in result
+        assert 'prometheus.scrape "azure_natgateway"' in result
+
+    def test_azure_natgateway_excluded_when_no_public_subnet(self) -> None:
+        alloy = _make_alloy_for_azure_monitor(public_subnet_cidr=None)
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        assert 'prometheus.exporter.azure "natgateway"' not in result
+        assert "Microsoft.Network/natGateways" not in result
+        assert 'prometheus.scrape "azure_natgateway"' not in result
+
+    def test_aws_workload_returns_empty_string(self) -> None:
+        # Create an AWS workload instead of Azure
+        alloy = _make_alloy_for_cloudwatch("aws")
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        assert result == ""
+
+    def test_azure_config_not_empty_for_azure_workload(self) -> None:
+        alloy = _make_alloy_for_azure_monitor()
+        result = alloy._define_azure_monitor_config()  # noqa: SLF001
+        assert result != ""
+        assert len(result) > 100  # Should be a substantial config block
