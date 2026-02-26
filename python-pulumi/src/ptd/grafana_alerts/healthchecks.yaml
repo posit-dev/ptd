@@ -84,8 +84,6 @@ groups:
               Status:      Non-200 response
               Duration:    5 minutes
 
-              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/health-check-failed.md
-              📊 https://grafana.example.com/d/healthchecks?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false

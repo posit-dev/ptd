@@ -29,7 +29,7 @@ groups:
                     type: prometheus
                     uid: mimir
                 editorMode: code
-                expr: count by (cluster, container)(kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"})
+                expr: count by (cluster, namespace, pod, container)(kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"})
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -103,14 +103,14 @@ groups:
               ─── WHERE ───────────────────────────
               Tenant:      {{ $labels.tenant_name }}
               Cluster:     {{ $labels.cluster }}
+              Namespace:   {{ $labels.namespace }}
+              Pod:         {{ $labels.pod }}
               Container:   {{ $labels.container }}
 
               ─── DETAILS ─────────────────────────
               Status:      CrashLoopBackOff
               Duration:    5 minutes
 
-              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/crash-loop-backoff.md
-              📊 https://grafana.example.com/d/pods?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false
@@ -129,7 +129,7 @@ groups:
                     uid: mimir
                 disableTextWrap: false
                 editorMode: code
-                expr: count by(cluster, pod, reason) (kube_pod_container_status_terminated_reason{reason!="Completed"} * on(cluster,pod) group_left(label_launcher_instance_id) kube_pod_labels{label_launcher_instance_id=""})
+                expr: count by(cluster, namespace, pod, reason) (kube_pod_container_status_terminated_reason{reason!="Completed"} * on(cluster,pod) group_left(label_launcher_instance_id) kube_pod_labels{label_launcher_instance_id=""})
                 fullMetaSearch: false
                 includeNullMetadata: true
                 instant: true
@@ -208,14 +208,13 @@ groups:
               ─── WHERE ───────────────────────────
               Tenant:      {{ $labels.tenant_name }}
               Cluster:     {{ $labels.cluster }}
+              Namespace:   {{ $labels.namespace }}
               Pod:         {{ $labels.pod }}
 
               ─── DETAILS ─────────────────────────
               Reason:      {{ $labels.reason }}
               Duration:    5 minutes
 
-              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/pod-error.md
-              📊 https://grafana.example.com/d/pods?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false
@@ -234,7 +233,7 @@ groups:
                     uid: mimir
                 disableTextWrap: false
                 editorMode: code
-                expr: sum by (cluster, pod, phase) (kube_pod_status_phase{phase=~"Pending|Unknown|Failed"} * on(cluster,pod) group_left(label_launcher_instance_id) kube_pod_labels{label_launcher_instance_id=""}) > 0
+                expr: sum by (cluster, namespace, pod, phase) (kube_pod_status_phase{phase=~"Pending|Unknown|Failed"} * on(cluster,pod) group_left(label_launcher_instance_id) kube_pod_labels{label_launcher_instance_id=""}) > 0
                 fullMetaSearch: false
                 includeNullMetadata: true
                 instant: true
@@ -309,14 +308,13 @@ groups:
               ─── WHERE ───────────────────────────
               Tenant:      {{ $labels.tenant_name }}
               Cluster:     {{ $labels.cluster }}
+              Namespace:   {{ $labels.namespace }}
               Pod:         {{ $labels.pod }}
 
               ─── DETAILS ─────────────────────────
               Phase:       {{ $labels.phase }}
               Duration:    15 minutes
 
-              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/pod-not-healthy.md
-              📊 https://grafana.example.com/d/pods?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false
@@ -418,11 +416,8 @@ groups:
               Pod:         {{ $labels.pod }}
 
               ─── DETAILS ─────────────────────────
-              Restarts:    {{ $value }} in 15 minutes
-              Threshold:   > 5 restarts
+              Issue:       > 5 restarts in 15 minutes
 
-              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/pod-restarts.md
-              📊 https://grafana.example.com/d/pods?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false
@@ -520,8 +515,6 @@ groups:
               Status:      Replicas mismatch
               Duration:    15 minutes
 
-              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/deployment-replica-mismatch.md
-              📊 https://grafana.example.com/d/deployments?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false
@@ -619,8 +612,6 @@ groups:
               Status:      Replicas mismatch
               Duration:    15 minutes
 
-              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/statefulset-replica-mismatch.md
-              📊 https://grafana.example.com/d/statefulsets?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false
