@@ -48,6 +48,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
     autoscaling_queues: dict[str, aws.sqs.Queue]
     packagemanager_roles: dict[str, aws.iam.Role | pulumi.Output[aws.iam.Role]]
     team_operator_roles: dict[str, aws.iam.Role]
+    external_secrets_roles: dict[str, aws.iam.Role]
     workbench_roles: dict[str, aws.iam.Role]
     workbench_session_roles: dict[str, aws.iam.Role]
 
@@ -108,6 +109,9 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         self._define_workbench_iam()
         self._define_packagemanager_iam(persistent_stack)
         self._define_team_operator_iam()
+        self._define_external_secrets_iam()
+        # Create Pod Identity associations for all products (ADDITIVE - keeps IRSA for backward compatibility)
+        self._define_pod_identity_associations()
         self._apply_custom_k8s_resources()
         self._define_team_operator()
         # after team operator so we can reuse the namespaces
@@ -558,6 +562,105 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 service_accounts=[helm_service_account_name],
                 policy_name=self.workload.team_operator_policy_name,
             )
+
+    def _define_external_secrets_iam(self):
+        """Define IAM roles for external-secrets-operator to access AWS Secrets Manager."""
+        self.external_secrets_roles = {}
+
+        for release in self.managed_clusters_by_release:
+            self.external_secrets_roles[release] = self._define_k8s_iam_role(
+                name=self.workload.external_secrets_role_name(release),
+                release=release,
+                namespace="external-secrets",
+                service_accounts=["external-secrets"],
+                role_policies=[self._define_read_secrets_inline()],
+            )
+
+    def _define_pod_identity_associations(self):
+        """
+        Create EKS Pod Identity associations for all product service accounts.
+
+        This is ADDITIVE - existing IRSA roles and annotations are kept for backward compatibility.
+        Both Pod Identity and IRSA can coexist. The operator will be updated to stop computing
+        IRSA annotations in a future phase.
+
+        Pod Identity associations connect service accounts directly to IAM roles without requiring
+        annotations on the ServiceAccount resource.
+        """
+        for release in self.managed_clusters_by_release:
+            cluster_name = f"{self.workload.compound_name}-{release}"
+
+            # Per-site product associations
+            for site_name in sorted(self.workload.cfg.sites.keys()):
+                # Connect
+                aws.eks.PodIdentityAssociation(
+                    f"{cluster_name}-{site_name}-connect-pod-identity",
+                    cluster_name=cluster_name,
+                    namespace=ptd.POSIT_TEAM_NAMESPACE,
+                    service_account=f"{site_name}-connect",
+                    role_arn=self.connect_roles[release].arn,
+                    opts=pulumi.ResourceOptions(parent=self),
+                )
+
+                # Connect Session
+                aws.eks.PodIdentityAssociation(
+                    f"{cluster_name}-{site_name}-connect-session-pod-identity",
+                    cluster_name=cluster_name,
+                    namespace=ptd.POSIT_TEAM_NAMESPACE,
+                    service_account=f"{site_name}-connect-session",
+                    role_arn=self.connect_session_roles[f"{release}-{site_name}"].arn,
+                    opts=pulumi.ResourceOptions(parent=self),
+                )
+
+                # Workbench
+                aws.eks.PodIdentityAssociation(
+                    f"{cluster_name}-{site_name}-workbench-pod-identity",
+                    cluster_name=cluster_name,
+                    namespace=ptd.POSIT_TEAM_NAMESPACE,
+                    service_account=f"{site_name}-workbench",
+                    role_arn=self.workbench_roles[release].arn,
+                    opts=pulumi.ResourceOptions(parent=self),
+                )
+
+                # Workbench Session
+                aws.eks.PodIdentityAssociation(
+                    f"{cluster_name}-{site_name}-workbench-session-pod-identity",
+                    cluster_name=cluster_name,
+                    namespace=ptd.POSIT_TEAM_NAMESPACE,
+                    service_account=f"{site_name}-workbench-session",
+                    role_arn=self.workbench_session_roles[f"{release}-{site_name}"].arn,
+                    opts=pulumi.ResourceOptions(parent=self),
+                )
+
+                # Package Manager
+                aws.eks.PodIdentityAssociation(
+                    f"{cluster_name}-{site_name}-packagemanager-pod-identity",
+                    cluster_name=cluster_name,
+                    namespace=ptd.POSIT_TEAM_NAMESPACE,
+                    service_account=f"{site_name}-packagemanager",
+                    role_arn=self.packagemanager_roles[release + "//" + site_name].arn,
+                    opts=pulumi.ResourceOptions(parent=self),
+                )
+
+                # Chronicle
+                aws.eks.PodIdentityAssociation(
+                    f"{cluster_name}-{site_name}-chronicle-pod-identity",
+                    cluster_name=cluster_name,
+                    namespace=ptd.POSIT_TEAM_NAMESPACE,
+                    service_account=f"{site_name}-chronicle",
+                    role_arn=self.chronicle_roles[f"{release}-{site_name}"].arn,
+                    opts=pulumi.ResourceOptions(parent=self),
+                )
+
+                # Home (Flightdeck)
+                aws.eks.PodIdentityAssociation(
+                    f"{cluster_name}-{site_name}-home-pod-identity",
+                    cluster_name=cluster_name,
+                    namespace=ptd.POSIT_TEAM_NAMESPACE,
+                    service_account=f"{site_name}-home",
+                    role_arn=self.home_roles[release].arn,
+                    opts=pulumi.ResourceOptions(parent=self),
+                )
 
     def _apply_custom_k8s_resources(self):
         """Apply custom Kubernetes resources from the custom_k8s_resources/ directory."""

@@ -157,6 +157,9 @@ class AWSWorkloadEKS(pulumi.ComponentResource):
         if self.workload.cfg.secrets_store_addon_enabled:
             eks_cluster.with_aws_secrets_store_csi_driver_provider()
 
+        # Enable EKS Pod Identity Agent for cloud-agnostic IAM
+        eks_cluster.with_pod_identity_agent()
+
         eks_cluster.with_gp3()
         eks_cluster.with_encrypted_ebs_storage_class()
         eks_cluster.with_oidc_provider()

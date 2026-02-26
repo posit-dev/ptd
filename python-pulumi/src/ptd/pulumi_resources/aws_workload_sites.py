@@ -70,6 +70,7 @@ class AWSWorkloadSites(pulumi.ComponentResource):
             raise ValueError(msg)
 
         self._define_team_sites()
+        self._define_external_secrets()
 
     def _define_team_sites(self):
         self.team_sites = {}
@@ -163,5 +164,47 @@ class AWSWorkloadSites(pulumi.ComponentResource):
                     opts=pulumi.ResourceOptions(
                         parent=self,
                         providers=[self.kube_providers[release]],
+                    ),
+                )
+
+    def _define_external_secrets(self):
+        """
+        Create ExternalSecret CRs for each site to sync secrets from AWS Secrets Manager to K8s Secrets.
+
+        This creates K8s Secrets that the operator can reference by name instead of calling AWS SDK directly.
+        """
+        for release in self.managed_clusters_by_release:
+            for site_name in sorted(self.workload.cfg.sites.keys()):
+                # Create ExternalSecret for site secrets
+                kubernetes.apiextensions.CustomResource(
+                    f"{self.workload.compound_name}-{release}-{site_name}-external-secret",
+                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                        name=f"{site_name}-secrets",
+                        namespace=ptd.POSIT_TEAM_NAMESPACE,
+                        labels=self.required_tags,
+                    ),
+                    api_version="external-secrets.io/v1beta1",
+                    kind="ExternalSecret",
+                    spec={
+                        "refreshInterval": "1h",
+                        "secretStoreRef": {
+                            "name": "aws-secrets-manager",
+                            "kind": "ClusterSecretStore",
+                        },
+                        "target": {
+                            "name": f"{site_name}-secrets",
+                            "creationPolicy": "Owner",
+                        },
+                        "dataFrom": [
+                            {
+                                "extract": {
+                                    "key": self.workload.site_secret_name(site_name),
+                                }
+                            }
+                        ],
+                    },
+                    opts=pulumi.ResourceOptions(
+                        parent=self,
+                        provider=self.kube_providers[release],
                     ),
                 )

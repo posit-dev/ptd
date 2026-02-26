@@ -68,15 +68,28 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
         )
         cert_arns_output = persistent_stack.require_output("cert_arns")
 
+        self.workload_secrets_dict, ok = ptd.secrecy.aws_get_secret_value_json(
+            self.workload.secret_name, region=self.workload.cfg.region
+        )
+        if not ok:
+            msg = f"Failed to look up secret {self.workload.secret_name!r}"
+            pulumi.error(msg, self)
+            raise ValueError(msg)
+
         for release in self.managed_clusters_by_release:
             components = self.workload.cfg.clusters[release].components
             weight = self.workload.cfg.clusters[release].routing_weight
 
             self._define_aws_lbc(release, components.aws_load_balancer_controller_version)
             self._define_aws_fsx_openzfs_csi(release, components.aws_fsx_openzfs_csi_driver_version)
+            # Deploy nfs-subdir-external-provisioner if FSx is configured
+            if "fs-dns-name" in self.workload_secrets_dict:
+                self._define_nfs_subdir_provisioner(release)
             if not self.workload.cfg.secrets_store_addon_enabled:
                 self._define_secret_store_csi(release, components.secret_store_csi_driver_version)
                 self._define_secret_store_csi_aws(release, components.secret_store_csi_driver_aws_provider_version)
+            # Deploy external-secrets-operator
+            self._define_external_secrets_operator(release)
             self._define_traefik(release, components.traefik_version, weight, cert_arns_output)
             self._define_metrics_server(release, components.metrics_server_version)
             self._define_loki(release, components.loki_version, components)
@@ -166,6 +179,115 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                         },
                     }
                 ),
+            },
+            opts=pulumi.ResourceOptions(provider=self.kube_providers[release]),
+        )
+
+    def _define_nfs_subdir_provisioner(self, release: str):
+        """Deploy nfs-subdir-external-provisioner for FSx storage."""
+        workload_secrets = self.workload_secrets_dict
+        fsx_dns_name = workload_secrets.get("fs-dns-name", "")
+
+        if not fsx_dns_name:
+            return
+
+        k8s.apiextensions.CustomResource(
+            f"{self.workload.compound_name}-{release}-nfs-subdir-provisioner-helm-release",
+            metadata=k8s.meta.v1.ObjectMetaArgs(
+                name="nfs-subdir-external-provisioner",
+                namespace=ptd.HELM_CONTROLLER_NAMESPACE,
+                labels=self.required_tags,
+            ),
+            api_version="helm.cattle.io/v1",
+            kind="HelmChart",
+            spec={
+                "repo": "https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/",
+                "chart": "nfs-subdir-external-provisioner",
+                "targetNamespace": ptd.KUBE_SYSTEM_NAMESPACE,
+                "version": "4.0.18",
+                "valuesContent": yaml.dump(
+                    {
+                        "nfs": {
+                            "server": fsx_dns_name,
+                            "path": "/fsx",
+                        },
+                        "storageClass": {
+                            "name": "posit-shared-storage",
+                            "reclaimPolicy": "Retain",
+                            "accessModes": "ReadWriteMany",
+                            "onDelete": "retain",
+                            "pathPattern": "${.PVC.annotations.nfs.io/storage-path}",
+                        },
+                        "nfs.mountOptions": [
+                            "nfsvers=4.2",
+                            "rsize=1048576",
+                            "wsize=1048576",
+                            "timeo=600",
+                        ],
+                    }
+                ),
+            },
+            opts=pulumi.ResourceOptions(provider=self.kube_providers[release]),
+        )
+
+    def _define_external_secrets_operator(self, release: str):
+        """Deploy external-secrets-operator and create ClusterSecretStore for AWS Secrets Manager."""
+        # Deploy external-secrets-operator Helm chart
+        k8s.apiextensions.CustomResource(
+            f"{self.workload.compound_name}-{release}-external-secrets-helm-release",
+            metadata=k8s.meta.v1.ObjectMetaArgs(
+                name="external-secrets",
+                namespace=ptd.HELM_CONTROLLER_NAMESPACE,
+                labels=self.required_tags,
+            ),
+            api_version="helm.cattle.io/v1",
+            kind="HelmChart",
+            spec={
+                "repo": "https://charts.external-secrets.io",
+                "chart": "external-secrets",
+                "targetNamespace": "external-secrets",
+                "version": "0.10.7",
+                "valuesContent": yaml.dump(
+                    {
+                        "installCRDs": True,
+                        "serviceAccount": {
+                            "create": True,
+                            "name": "external-secrets",
+                            "annotations": {
+                                "eks.amazonaws.com/role-arn": f"arn:aws:iam::{self.workload.cfg.account_id}:role/"
+                                + self.workload.external_secrets_role_name(release),
+                            },
+                        },
+                    }
+                ),
+            },
+            opts=pulumi.ResourceOptions(provider=self.kube_providers[release]),
+        )
+
+        # Create ClusterSecretStore for AWS Secrets Manager
+        k8s.apiextensions.CustomResource(
+            f"{self.workload.compound_name}-{release}-cluster-secret-store",
+            metadata=k8s.meta.v1.ObjectMetaArgs(
+                name="aws-secrets-manager",
+                labels=self.required_tags,
+            ),
+            api_version="external-secrets.io/v1beta1",
+            kind="ClusterSecretStore",
+            spec={
+                "provider": {
+                    "aws": {
+                        "service": "SecretsManager",
+                        "region": self.workload.cfg.region,
+                        "auth": {
+                            "jwt": {
+                                "serviceAccountRef": {
+                                    "name": "external-secrets",
+                                    "namespace": "external-secrets",
+                                },
+                            },
+                        },
+                    },
+                },
             },
             opts=pulumi.ResourceOptions(provider=self.kube_providers[release]),
         )

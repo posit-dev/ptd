@@ -585,6 +585,9 @@ class AWSWorkload(ptd.workload.AbstractWorkload):
     def fsx_openzfs_role_name(self) -> str:
         return f"aws-fsx-openzfs-csi-driver.{self.compound_name}.posit.team"
 
+    def external_secrets_role_name(self, release: str) -> str:
+        return f"external-secrets.{release}.{self.compound_name}.posit.team"
+
     def cluster_home_role_name(self, release: str) -> str:
         return f"home.{release}.{self.compound_name}.posit.team"
 

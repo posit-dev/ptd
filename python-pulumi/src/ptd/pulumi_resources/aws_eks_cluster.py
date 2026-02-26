@@ -1306,6 +1306,34 @@ class AWSEKSCluster(pulumi.ComponentResource):
 
         return self
 
+    def with_pod_identity_agent(
+        self,
+        version: str | None = None,
+    ) -> typing.Self:
+        """
+        Add the EKS Pod Identity Agent addon.
+
+        This addon enables EKS Pod Identity for associating IAM roles with
+        Kubernetes service accounts without IRSA annotations. Pod Identity
+        associations are created separately via aws.eks.PodIdentityAssociation.
+
+        :param version: Optional, String, version of the addon to install.
+            By setting this to None, the latest version will be installed.
+        :return: self
+        """
+        aws.eks.Addon(
+            f"{self.name}-eks-pod-identity-agent",
+            args=aws.eks.AddonArgs(
+                addon_name="eks-pod-identity-agent",
+                addon_version=version,
+                cluster_name=self.name,
+                tags=self.eks.tags,
+            ),
+            opts=pulumi.ResourceOptions(parent=self.eks),
+        )
+
+        return self
+
     def attach_efs_security_group(
         self,
         efs_file_system_id: str,
