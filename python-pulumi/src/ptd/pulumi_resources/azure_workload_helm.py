@@ -20,6 +20,23 @@ MIMIR_NAMESPACE = "mimir"
 
 
 class AzureWorkloadHelm(pulumi.ComponentResource):
+    """Azure Helm chart deployments for observability stack.
+
+    Uses autoload + all-in-constructor pattern to deploy Helm charts to AKS clusters:
+    - External DNS: Manages DNS records in Azure DNS zones using workload identity
+    - Loki: Log aggregation using Azure Blob Storage for persistence
+    - Mimir: Metrics storage using Azure Blob Storage for blocks
+    - Grafana: Observability UI with Azure PostgreSQL backend
+    - Grafana Alloy: Unified observability agent for logs and metrics collection
+    - Kube State Metrics: Kubernetes cluster state metrics exporter
+
+    Depends on:
+    - AKS cluster (created by Go-based aks step)
+    - Persistent outputs (VNet, subnets, storage accounts, ACR, PostgreSQL)
+
+    All components use Azure Workload Identity for authentication to Azure services.
+    """
+
     workload: ptd.azure_workload.AzureWorkload
 
     required_tags: dict[str, str]
