@@ -366,6 +366,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         role_policies: pulumi.Input[typing.Sequence[pulumi.Input[str]],] | None = None,
         auth_issuers: list[ptd.aws_iam.AuthIssuer] | None = None,
         opts: pulumi.ResourceOptions | None = None,
+        pod_identity: bool = False,
     ) -> aws.iam.Role:
         """
         Define a Kubernetes IAM role with appropriate trust relationships.
@@ -378,6 +379,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         :param role_policies: Role policies to attach to the role (Previously known as inline_policies)
         :param auth_issuers: A list of auth issuers that the role should trust. DO NOT list the same auth issuer more
             than once! Use a list of client_ids instead
+        :param pod_identity: When True, adds pods.eks.amazonaws.com as a trusted principal (required for Pod Identity)
         :return: aws.iam.Role
         """
         if auth_issuers is None:
@@ -386,34 +388,43 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
             service_accounts = []
         if opts is None:
             opts = pulumi.ResourceOptions()
+
+        base_policy = (
+            ptd.aws_iam.build_hybrid_irsa_role_assume_role_policy(
+                service_accounts=service_accounts,
+                namespace=namespace,
+                managed_account_id=self.workload.cfg.account_id,
+                oidc_url_tails=self._oidc_url_tails,
+                auth_issuers=auth_issuers,
+            )
+            if len(self._oidc_url_tails) > 0 or len(auth_issuers) > 0
+            else {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Action": "sts:AssumeRole",
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": aws.get_caller_identity().arn,
+                        },
+                    },
+                ],
+            }
+        )
+        if pod_identity:
+            base_policy["Statement"].append(
+                {
+                    "Action": ["sts:AssumeRole", "sts:TagSession"],
+                    "Effect": "Allow",
+                    "Principal": {"Service": "pods.eks.amazonaws.com"},
+                }
+            )
+
         role = aws.iam.Role(
             name,
             aws.iam.RoleArgs(
                 name=name,
-                assume_role_policy=json.dumps(
-                    (
-                        ptd.aws_iam.build_hybrid_irsa_role_assume_role_policy(
-                            service_accounts=service_accounts,
-                            namespace=namespace,
-                            managed_account_id=self.workload.cfg.account_id,
-                            oidc_url_tails=self._oidc_url_tails,
-                            auth_issuers=auth_issuers,
-                        )
-                        if len(self._oidc_url_tails) > 0 or len(auth_issuers) > 0
-                        else {
-                            "Version": "2012-10-17",
-                            "Statement": [
-                                {
-                                    "Action": "sts:AssumeRole",
-                                    "Effect": "Allow",
-                                    "Principal": {
-                                        "AWS": aws.get_caller_identity().arn,
-                                    },
-                                },
-                            ],
-                        }
-                    ),
-                ),
+                assume_role_policy=json.dumps(base_policy),
                 permissions_boundary=self.workload.iam_permissions_boundary,
                 tags=self.required_tags,
             ),
@@ -576,12 +587,15 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 continue
             # Invariant: enable_pod_identity_agent=True when enable_external_secrets_operator=True
             # is enforced by AWSWorkloadClusterConfig.__post_init__; no need to re-check here.
+            # pod_identity=True: ESO uses no auth block in ClusterSecretStore and relies exclusively
+            # on Pod Identity, so the role trust policy must trust pods.eks.amazonaws.com.
             self.external_secrets_roles[release] = self._define_k8s_iam_role(
                 name=self.workload.external_secrets_role_name(release),
                 release=release,
                 namespace="external-secrets",
                 service_accounts=["external-secrets"],
                 role_policies=[self._define_read_secrets_inline()],
+                pod_identity=True,
             )
 
     def _define_pod_identity_associations(self):
