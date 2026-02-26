@@ -1,7 +1,7 @@
 default: test lint format-check
 
 test *args:
-    uv run python -m pytest {{args}}
+    uv run pytest {{args}}
 
 coverage:
     uv run coverage run -m pytest
