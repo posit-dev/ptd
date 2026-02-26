@@ -258,7 +258,7 @@ class AWSWorkloadClusterConfig(ptd.WorkloadClusterConfig):
     pod_identity_agent_version: str | None = None
     enable_pod_identity_agent: bool = False
     enable_external_secrets_operator: bool = False
-    enable_nfs_subdir_provisioner: bool = False
+    enable_nfs_subdir_provisioner: bool = False  # PVCs must carry the nfs.io/storage-path annotation; the storageClass pathPattern uses it to derive subdirectory paths
     enable_efs_csi_driver: bool = False
     efs_config: ptd.EFSConfig | None = None
     karpenter_config: KarpenterConfig | None = None

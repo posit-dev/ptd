@@ -103,6 +103,11 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
             f"organization/ptd-aws-workload-persistent/{self.workload.compound_name}"
         )
 
+        # Initialize optional product role dicts defensively so _define_pod_identity_associations
+        # can safely check membership even if the defining methods are skipped or reordered.
+        self.chronicle_roles = {}
+        self.home_roles = {}
+
         self._define_home_iam()
         self._define_chronicle_iam(persistent_stack)
         self._define_connect_iam()
