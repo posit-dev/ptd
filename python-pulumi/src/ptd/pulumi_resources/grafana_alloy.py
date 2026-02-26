@@ -28,6 +28,21 @@ components: list[PTDComponentForAlloy] = [
 T = typing.TypeVar("T")
 
 
+def _validate_alloy_true_name(true_name: str) -> None:
+    """Validate that true_name is safe for interpolation into Alloy River config.
+
+    Alloy River config uses double-quoted strings; characters like `"`, `{`, `}` would
+    break the generated config or allow injection. This validation is enforced at
+    graph-construction time so failures are caught during `pulumi preview`.
+    """
+    if not re.match(r"^[a-zA-Z0-9._-]+$", true_name):
+        msg = (
+            f"workload true_name contains characters unsafe for Alloy River config: "
+            f"{true_name!r}. Must match [a-zA-Z0-9._-]+"
+        )
+        raise ValueError(msg)
+
+
 class AlloyConfig(pulumi.ComponentResource):
     namespace: str
     config_map: kubernetes.core.v1.ConfigMap
@@ -204,6 +219,204 @@ class AlloyConfig(pulumi.ComponentResource):
         many_spaces = re.compile(r"\s+")
         return many_spaces.sub(" ", cfg).strip()
 
+    def _define_cloudwatch_config(self) -> str:
+        """Generate CloudWatch exporter configuration for AWS. Returns empty string for non-AWS."""
+        if self.cloud_provider != "aws":
+            return ""
+        _validate_alloy_true_name(self.workload.cfg.true_name)
+        _validate_alloy_true_name(self.workload.compound_name)
+        return textwrap.dedent(f"""
+            prometheus.exporter.cloudwatch "cloudwatch" {{
+                sts_region = "{self.region}"
+
+                discovery {{
+                    type    = "AWS/FSx"
+                    regions = ["{self.region}"]
+
+                    search_tags = {{
+                        Name = "{self.workload.compound_name}",
+                    }}
+
+                    metric {{
+                        name       = "StorageCapacity"
+                        statistics = ["Average"]
+                        period     = "5m"
+                    }}
+
+                    metric {{
+                        name       = "UsedStorageCapacity"
+                        statistics = ["Average"]
+                        period     = "5m"
+                    }}
+                }}
+
+                discovery {{
+                    type    = "AWS/RDS"
+                    regions = ["{self.region}"]
+
+                    search_tags = {{
+                        Name = "{self.workload.compound_name}",
+                    }}
+
+                    metric {{
+                        name       = "FreeStorageSpace"
+                        statistics = ["Average"]
+                        period     = "5m"
+                    }}
+
+                    # TODO: Remove ["Sum"] from statistics once all Grafana dashboards have
+                    # been updated to query aws_rds_database_connections_average.
+                    # Collecting both Sum and Average during migration. Average is the
+                    # target metric (aws_rds_database_connections_average); Sum
+                    # (aws_rds_database_connections_sum) is kept temporarily for existing
+                    # dashboards. NOTE: Keeping Sum doubles the CloudWatch API cost for this metric.
+                    metric {{
+                        name       = "DatabaseConnections"
+                        statistics = ["Average", "Sum"]
+                        period     = "5m"
+                    }}
+
+                    metric {{
+                        name       = "ReadLatency"
+                        statistics = ["Average"]
+                        period     = "5m"
+                    }}
+
+                    metric {{
+                        name       = "CPUUtilization"
+                        statistics = ["Average"]
+                        period     = "5m"
+                    }}
+
+                    metric {{
+                        name       = "FreeableMemory"
+                        statistics = ["Average"]
+                        period     = "5m"
+                    }}
+
+                    # Collected for dashboard visibility; no alert rules defined
+                    metric {{
+                        name       = "WriteLatency"
+                        statistics = ["Average"]
+                        period     = "5m"
+                    }}
+
+                    # Collected for dashboard visibility; no alert rules defined
+                    metric {{
+                        name       = "Deadlocks"
+                        statistics = ["Sum"]
+                        period     = "5m"
+                    }}
+                }}
+
+                discovery {{
+                    type    = "AWS/EC2"
+                    regions = ["{self.region}"]
+
+                    search_tags = {{
+                        Name = "{self.workload.compound_name}",
+                    }}
+
+                    metric {{
+                        name       = "NetworkOut"
+                        statistics = ["Average"]
+                        period     = "5m"
+                    }}
+
+                    metric {{
+                        name       = "NetworkPacketsOut"
+                        statistics = ["Average"]
+                        period     = "5m"
+                    }}
+                }}
+
+                discovery {{
+                    type    = "AWS/NATGateway"
+                    regions = ["{self.region}"]
+
+                    # NAT Gateways inherit VPC tags including posit.team/true-name
+                    # (see python-pulumi/src/ptd/pulumi_resources/aws_vpc.py:607-616)
+                    search_tags = {{
+                        "posit.team/true-name" = "{self.workload.cfg.true_name}",
+                    }}
+
+                    metric {{
+                        name       = "ErrorPortAllocation"
+                        statistics = ["Sum"]
+                        period     = "5m"
+                    }}
+
+                    metric {{
+                        name       = "PacketsDropCount"
+                        statistics = ["Sum"]
+                        period     = "5m"
+                    }}
+                }}
+
+                discovery {{
+                    type    = "AWS/ApplicationELB"
+                    regions = ["{self.region}"]
+
+                    # ALBs are tagged at creation time via aws_workload_helm.py.
+                    # LBs provisioned before this tag was added won't be discovered
+                    # until the cluster is redeployed.
+                    # FIXME: To tag existing ALBs without redeploying, use the AWS CLI:
+                    #   aws elbv2 add-tags --resource-arns <ALB_ARN> \
+                    #     --tags Key=posit.team/true-name,Value=<true_name>
+                    search_tags = {{
+                        "posit.team/true-name" = "{self.workload.cfg.true_name}",
+                    }}
+
+                    metric {{
+                        name       = "HTTPCode_Target_5XX_Count"
+                        statistics = ["Sum"]
+                        period     = "5m"
+                    }}
+
+                    metric {{
+                        name       = "UnHealthyHostCount"
+                        statistics = ["Average"]
+                        period     = "5m"
+                    }}
+
+                    metric {{
+                        name       = "TargetResponseTime"
+                        statistics = ["Average"]
+                        period     = "5m"
+                    }}
+                }}
+
+                discovery {{
+                    type    = "AWS/NetworkELB"
+                    regions = ["{self.region}"]
+
+                    # NLBs are tagged at creation time via traefik.py.
+                    # LBs provisioned before this tag was added won't be discovered
+                    # until the cluster is redeployed.
+                    # FIXME: To tag existing NLBs without redeploying, use the AWS CLI:
+                    #   aws elbv2 add-tags --resource-arns <NLB_ARN> \
+                    #     --tags Key=posit.team/true-name,Value=<true_name>
+                    search_tags = {{
+                        "posit.team/true-name" = "{self.workload.cfg.true_name}",
+                    }}
+
+                    metric {{
+                        name       = "UnHealthyHostCount"
+                        statistics = ["Average"]
+                        period     = "5m"
+                    }}
+                }}
+            }}
+
+            prometheus.scrape "cloudwatch" {{
+                targets    = prometheus.exporter.cloudwatch.cloudwatch.targets
+                forward_to = [prometheus.relabel.default.receiver]
+                clustering {{
+                    enabled = true
+                }}
+            }}
+        """)
+
     def _define_config_map(
         self,
         name: str,
@@ -221,102 +434,7 @@ class AlloyConfig(pulumi.ComponentResource):
             cluster_name = self.workload.eks_cluster_name(self.release)
 
         # Generate CloudWatch exporter configuration for AWS
-        cloudwatch_config = ""
-        if self.cloud_provider == "aws":
-            cloudwatch_config = textwrap.dedent(f"""
-                prometheus.exporter.cloudwatch "cloudwatch" {{
-                    sts_region = "{self.region}"
-
-                    discovery {{
-                        type    = "AWS/FSx"
-                        regions = ["{self.region}"]
-
-                        search_tags = {{
-                            Name = "{self.workload.compound_name}",
-                        }}
-
-                        metric {{
-                            name       = "StorageCapacity"
-                            statistics = ["Average"]
-                            period     = "5m"
-                        }}
-
-                        metric {{
-                            name       = "UsedStorageCapacity"
-                            statistics = ["Average"]
-                            period     = "5m"
-                        }}
-                    }}
-
-                    discovery {{
-                        type    = "AWS/RDS"
-                        regions = ["{self.region}"]
-
-                        search_tags = {{
-                            Name = "{self.workload.compound_name}",
-                        }}
-
-                        metric {{
-                            name       = "FreeStorageSpace"
-                            statistics = ["Average"]
-                            period     = "5m"
-                        }}
-
-                        metric {{
-                            name       = "DatabaseConnections"
-                            statistics = ["Sum"]
-                            period     = "5m"
-                        }}
-
-                        metric {{
-                            name       = "ReadLatency"
-                            statistics = ["Average"]
-                            period     = "5m"
-                        }}
-
-                        metric {{
-                            name       = "CPUUtilization"
-                            statistics = ["Average"]
-                            period     = "5m"
-                        }}
-
-                        metric {{
-                            name       = "FreeableMemory"
-                            statistics = ["Average"]
-                            period     = "5m"
-                        }}
-                    }}
-
-                    discovery {{
-                        type    = "AWS/EC2"
-                        regions = ["{self.region}"]
-
-                        search_tags = {{
-                            Name = "{self.workload.compound_name}",
-                        }}
-
-                        metric {{
-                            name       = "NetworkOut"
-                            statistics = ["Average"]
-                            period     = "5m"
-                        }}
-
-                        metric {{
-                            name       = "NetworkPacketsOut"
-                            statistics = ["Average"]
-                            period     = "5m"
-                        }}
-                    }}
-                }}
-
-                prometheus.scrape "cloudwatch" {{
-                    targets    = prometheus.exporter.cloudwatch.cloudwatch.targets
-                    forward_to = [prometheus.relabel.default.receiver]
-                    clustering {{
-                        enabled = true
-                    }}
-                }}
-            """)
+        cloudwatch_config = self._define_cloudwatch_config()
 
         # Generate system log scraping configuration
         system_logs_config = ""
