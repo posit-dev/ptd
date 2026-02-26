@@ -156,11 +156,11 @@ class Traefik(pulumi.ComponentResource):
             f"{self.cluster.name}-traefik",
             k8s.helm.v3.ReleaseArgs(
                 chart="traefik",
-                version="24.0.0",
+                version="33.2.1",
                 namespace=self.namespace,
                 name="traefik",
                 repository_opts=k8s.helm.v3.RepositoryOptsArgs(
-                    repo="https://helm.traefik.io/traefik/",
+                    repo="https://traefik.github.io/charts",
                 ),
                 values={
                     "service": {
@@ -184,7 +184,13 @@ class Traefik(pulumi.ComponentResource):
                     },
                     "ports": {
                         "web": {
-                            "redirectTo": "websecure",
+                            "redirections": {
+                                "entryPoint": {
+                                    "to": "websecure",
+                                    "scheme": "https",
+                                    "permanent": True,
+                                }
+                            },
                         },
                         "websecure": {
                             "tls": {
@@ -226,7 +232,7 @@ class Traefik(pulumi.ComponentResource):
                     },
                     "ingressClass": {
                         "enabled": True,
-                        "default": True,
+                        "isDefaultClass": True,
                     },
                     "ingressRoute": {
                         "dashboard": {

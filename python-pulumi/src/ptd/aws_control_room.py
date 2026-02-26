@@ -71,7 +71,7 @@ class AWSControlRoomConfig:
     tailscale_enabled: bool = True
     tigera_operator_version: str = "3.27.2"
     traefik_forward_auth_version: str = "0.0.14"
-    traefik_version: str = "24.0.0"
+    traefik_version: str = "33.2.1"
     ebs_csi_addon_version: str = "v1.41.0-eksbuild.1"
 
 
