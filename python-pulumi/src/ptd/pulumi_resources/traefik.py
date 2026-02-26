@@ -35,6 +35,91 @@ def _build_nlb_tag_string(tags: dict[str, str] | None, cluster_name: str) -> str
     )
 
 
+def _build_traefik_helm_values(
+    node_selector: str,
+    deployment_replicas: int,
+    cert_arn,
+    nlb_tags: str,
+) -> dict:
+    """Build the Helm values dict for the Traefik chart (v3 syntax)."""
+    return {
+        "service": {
+            "type": "LoadBalancer",
+            "annotations": {
+                "service.beta.kubernetes.io/aws-load-balancer-type": "external",
+                "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
+                "service.beta.kubernetes.io/aws-load-balancer-ip-address-type": "ipv4",
+                "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
+                "service.beta.kubernetes.io/aws-load-balancer-ssl-cert": cert_arn,
+                "service.beta.kubernetes.io/aws-load-balancer-ssl-ports": "443",
+                "service.beta.kubernetes.io/aws-load-balancer-access-log-enabled": "false",
+                "service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy": "ELBSecurityPolicy-FS-1-2-2019-08",
+                "service.beta.kubernetes.io/aws-load-balancer-healthcheck-healthy-threshold": "3",
+                "service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold": "3",
+                "service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout": "10",
+                "service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval": "10",
+                "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags": nlb_tags,
+            },
+        },
+        "ports": {
+            "web": {
+                "redirections": {
+                    "entryPoint": {
+                        "to": "websecure",
+                        "scheme": "https",
+                        "permanent": True,
+                    }
+                },
+            },
+            "websecure": {
+                "tls": {
+                    "enabled": False,
+                }
+            },
+        },
+        "nodeSelector": (
+            {
+                "node.kubernetes.io/instance-type": node_selector,
+            }
+            if node_selector
+            else None
+        ),
+        "providers": {
+            "kubernetesCRD": {
+                "enabled": True,
+            },
+            "kubernetesIngress": {
+                "enabled": True,
+            },
+            "publishedService": {
+                "enabled": True,
+            },
+        },
+        "additionalArguments": [
+            "--metrics.prometheus=true",
+        ],
+        "deployment": {
+            "replicas": deployment_replicas,
+        },
+        "logs": {
+            "general": {"level": "DEBUG"},
+            "access": {"enabled": True},
+        },
+        "image": {
+            "registry": "ghcr.io/traefik",
+        },
+        "ingressClass": {
+            "enabled": True,
+            "isDefaultClass": True,
+        },
+        "ingressRoute": {
+            "dashboard": {
+                "enabled": True,
+            }
+        },
+    }
+
+
 class Traefik(pulumi.ComponentResource):
     def __init__(
         self,
@@ -43,8 +128,8 @@ class Traefik(pulumi.ComponentResource):
         node_selector: str = "",
         cert: aws.acm.Certificate | None = None,
         deployment_replicas: int = 3,
-        version: str = "33.2.1",
         *args,
+        version: str,
         **kwargs,
     ):
         """
@@ -164,84 +249,12 @@ class Traefik(pulumi.ComponentResource):
                 repository_opts=k8s.helm.v3.RepositoryOptsArgs(
                     repo="https://traefik.github.io/charts",
                 ),
-                values={
-                    "service": {
-                        # TODO: we could make this into an ingress if we want...?
-                        "type": "LoadBalancer",
-                        "annotations": {
-                            "service.beta.kubernetes.io/aws-load-balancer-type": "external",
-                            "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
-                            "service.beta.kubernetes.io/aws-load-balancer-ip-address-type": "ipv4",
-                            "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
-                            "service.beta.kubernetes.io/aws-load-balancer-ssl-cert": (cert.arn if cert else None),
-                            "service.beta.kubernetes.io/aws-load-balancer-ssl-ports": "443",
-                            "service.beta.kubernetes.io/aws-load-balancer-access-log-enabled": "false",
-                            "service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy": "ELBSecurityPolicy-FS-1-2-2019-08",
-                            "service.beta.kubernetes.io/aws-load-balancer-healthcheck-healthy-threshold": "3",
-                            "service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold": "3",
-                            "service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout": "10",
-                            "service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval": "10",
-                            "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags": nlb_tags,
-                        },
-                    },
-                    "ports": {
-                        "web": {
-                            "redirections": {
-                                "entryPoint": {
-                                    "to": "websecure",
-                                    "scheme": "https",
-                                    "permanent": True,
-                                }
-                            },
-                        },
-                        "websecure": {
-                            "tls": {
-                                "enabled": False,
-                            }
-                        },
-                    },
-                    "nodeSelector": (
-                        {
-                            # "meta" nodes
-                            "node.kubernetes.io/instance-type": self.node_selector,
-                        }
-                        if self.node_selector
-                        else None
-                    ),
-                    "providers": {
-                        "kubernetesCRD": {
-                            "enabled": True,
-                        },
-                        "kubernetesIngress": {
-                            "enabled": True,
-                        },
-                        "publishedService": {
-                            "enabled": True,
-                        },
-                    },
-                    "additionalArguments": [
-                        "--metrics.prometheus=true",
-                    ],
-                    "deployment": {
-                        "replicas": self.deployment_replicas,
-                    },
-                    "logs": {
-                        "general": {"level": "DEBUG"},
-                        "access": {"enabled": True},
-                    },
-                    "image": {
-                        "registry": "ghcr.io/traefik",
-                    },
-                    "ingressClass": {
-                        "enabled": True,
-                        "isDefaultClass": True,
-                    },
-                    "ingressRoute": {
-                        "dashboard": {
-                            "enabled": True,
-                        }
-                    },
-                },
+                values=_build_traefik_helm_values(
+                    node_selector=self.node_selector,
+                    deployment_replicas=self.deployment_replicas,
+                    cert_arn=(cert.arn if cert else None),
+                    nlb_tags=nlb_tags,
+                ),
             ),
             opts=pulumi.ResourceOptions(
                 provider=self.cluster.provider,

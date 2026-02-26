@@ -70,6 +70,20 @@ With this setting disabled, the infrastructure will deploy successfully without 
 
 
 
+### Traefik v3 CRD Migration
+
+**Background:**
+PTD upgraded the Traefik ingress controller from v2 (Helm chart `24.x`) to v3 (Helm chart `33.x`). Traefik v3 ships updated CRD schemas for `IngressRoute`, `Middleware`, `TLSOption`, and related resources.
+
+**Risk:**
+If any workloads use Traefik v2-style CRD fields that were removed or renamed in v3 (e.g., `ServersTransport` → `ServersTransports`, changed TLS store/options schemas, modified middleware CRD fields), those resources may fail to reconcile after the Helm upgrade without producing obvious errors.
+
+**Before rolling out to production clusters:**
+1. Audit existing `IngressRoute`, `Middleware`, `TLSOption`, and `ServersTransport` resources against the [Traefik v3 migration guide](https://doc.traefik.io/traefik/migration/v2-to-v3/).
+2. Pay particular attention to `ServersTransport` → `ServersTransports` rename and any middleware fields your workloads rely on.
+3. Test the upgrade in a staging cluster before applying to production.
+
+
 ## Workarounds and Best Practices
 
 ### Direct Pulumi Stack Access with `ptd workon`

@@ -1,6 +1,6 @@
 import pytest
 
-from ptd.pulumi_resources.traefik import _build_nlb_tag_string
+from ptd.pulumi_resources.traefik import _build_nlb_tag_string, _build_traefik_helm_values
 
 
 def test_build_nlb_tag_string_happy_path() -> None:
@@ -68,6 +68,64 @@ def test_build_nlb_tag_string_invalid_environment_value() -> None:
             tags={"posit.team/true-name": "myapp", "posit.team/environment": "bad=env"},
             cluster_name="cluster",
         )
+
+
+def _make_traefik_values(**overrides):
+    """Helper to create traefik helm values with sensible defaults."""
+    defaults = dict(
+        node_selector="",
+        deployment_replicas=3,
+        cert_arn=None,
+        nlb_tags="posit.team/true-name=myapp,posit.team/environment=prod,Name=cluster",
+    )
+    defaults.update(overrides)
+    return _build_traefik_helm_values(**defaults)
+
+
+def test_traefik_v3_redirect_uses_redirections_syntax() -> None:
+    values = _make_traefik_values()
+    web = values["ports"]["web"]
+    assert "redirectTo" not in web, "v2 redirect syntax must not be present"
+    assert "redirections" in web
+    assert web["redirections"]["entryPoint"]["to"] == "websecure"
+    assert web["redirections"]["entryPoint"]["scheme"] == "https"
+    assert web["redirections"]["entryPoint"]["permanent"] is True
+
+
+def test_traefik_v3_ingress_class_uses_is_default_class() -> None:
+    values = _make_traefik_values()
+    ingress_class = values["ingressClass"]
+    assert "default" not in ingress_class, "v2 'default' key must not be present"
+    assert ingress_class["isDefaultClass"] is True
+    assert ingress_class["enabled"] is True
+
+
+def test_traefik_node_selector_empty_string_yields_none() -> None:
+    values = _make_traefik_values(node_selector="")
+    assert values["nodeSelector"] is None
+
+
+def test_traefik_node_selector_set_yields_dict() -> None:
+    values = _make_traefik_values(node_selector="m5.xlarge")
+    assert values["nodeSelector"] == {"node.kubernetes.io/instance-type": "m5.xlarge"}
+
+
+def test_traefik_deployment_replicas_propagated() -> None:
+    values = _make_traefik_values(deployment_replicas=5)
+    assert values["deployment"]["replicas"] == 5
+
+
+def test_traefik_cert_arn_none_sets_annotation_to_none() -> None:
+    values = _make_traefik_values(cert_arn=None)
+    assert values["service"]["annotations"]["service.beta.kubernetes.io/aws-load-balancer-ssl-cert"] is None
+
+
+def test_traefik_cert_arn_set_propagates_to_annotation() -> None:
+    values = _make_traefik_values(cert_arn="arn:aws:acm:us-east-1:123:certificate/abc")
+    assert (
+        values["service"]["annotations"]["service.beta.kubernetes.io/aws-load-balancer-ssl-cert"]
+        == "arn:aws:acm:us-east-1:123:certificate/abc"
+    )
 
 
 def test_build_nlb_tag_string_extra_tags_are_dropped() -> None:
