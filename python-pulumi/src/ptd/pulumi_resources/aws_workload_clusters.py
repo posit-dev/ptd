@@ -236,6 +236,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 role_policies=[
                     self._define_read_secrets_inline(),
                 ],
+                pod_identity=self.workload.cfg.clusters[release].enable_pod_identity_agent,
             )
 
     def _define_connect_iam(self):
@@ -243,12 +244,14 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         self.connect_session_roles = {}
 
         for release in self.managed_clusters_by_release:
+            pod_identity = self.workload.cfg.clusters[release].enable_pod_identity_agent
             self.connect_roles[release] = self._define_k8s_iam_role(
                 name=self.workload.cluster_connect_role_name(release),
                 release=release,
                 namespace=ptd.POSIT_TEAM_NAMESPACE,
                 service_accounts=[f"{site_name}-connect" for site_name in sorted(self.workload.cfg.sites.keys())],
                 role_policies=[self._define_read_secrets_inline()],
+                pod_identity=pod_identity,
             )
 
             for site_name in sorted(self.workload.cfg.sites.keys()):
@@ -262,6 +265,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     policy=policy,
                     policy_name=role_name,
                     role_policies=[self._define_streaming_bedrock_access()],
+                    pod_identity=pod_identity,
                 )
 
     def _define_workbench_iam(self):
@@ -292,6 +296,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 namespace=ptd.POSIT_TEAM_NAMESPACE,
                 service_accounts=[f"{site_name}-workbench" for site_name in sorted(self.workload.cfg.sites.keys())],
                 role_policies=workbench_role_policies,
+                pod_identity=cluster_cfg.enable_pod_identity_agent,
             )
 
             for site_name in sorted(self.workload.cfg.sites.keys()):
@@ -317,6 +322,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     policy_name=role_name,
                     service_accounts=[f"{site_name}-workbench-session"],
                     role_policies=workbench_session_role_policies,
+                    pod_identity=cluster_cfg.enable_pod_identity_agent,
                 )
 
     def _define_packagemanager_iam(self, persistent_stack):
@@ -352,6 +358,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     policy=policy,
                     policy_name=policy_name,
                     role_policies=[self._define_read_secrets_inline()],
+                    pod_identity=self.workload.cfg.clusters[release].enable_pod_identity_agent,
                 )
 
     def _define_k8s_iam_role(
@@ -389,16 +396,29 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         if opts is None:
             opts = pulumi.ResourceOptions()
 
-        base_policy = (
-            ptd.aws_iam.build_hybrid_irsa_role_assume_role_policy(
+        extra_statements = (
+            [
+                {
+                    "Action": ["sts:AssumeRole", "sts:TagSession"],
+                    "Effect": "Allow",
+                    "Principal": {"Service": "pods.eks.amazonaws.com"},
+                }
+            ]
+            if pod_identity
+            else []
+        )
+
+        if len(self._oidc_url_tails) > 0 or len(auth_issuers) > 0:
+            irsa_policy = ptd.aws_iam.build_hybrid_irsa_role_assume_role_policy(
                 service_accounts=service_accounts,
                 namespace=namespace,
                 managed_account_id=self.workload.cfg.account_id,
                 oidc_url_tails=self._oidc_url_tails,
                 auth_issuers=auth_issuers,
             )
-            if len(self._oidc_url_tails) > 0 or len(auth_issuers) > 0
-            else {
+            base_policy = {**irsa_policy, "Statement": list(irsa_policy["Statement"]) + extra_statements}
+        else:
+            base_policy = {
                 "Version": "2012-10-17",
                 "Statement": [
                     {
@@ -408,17 +428,9 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                             "AWS": aws.get_caller_identity().arn,
                         },
                     },
-                ],
+                ]
+                + extra_statements,
             }
-        )
-        if pod_identity:
-            base_policy["Statement"].append(
-                {
-                    "Action": ["sts:AssumeRole", "sts:TagSession"],
-                    "Effect": "Allow",
-                    "Principal": {"Service": "pods.eks.amazonaws.com"},
-                }
-            )
 
         role = aws.iam.Role(
             name,
@@ -494,6 +506,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     policy=policy,
                     policy_name=policy_name,
                     role_policies=[self._define_read_secrets_inline()],
+                    pod_identity=self.workload.cfg.clusters[release].enable_pod_identity_agent,
                 )
 
                 read_only_policy_name = self.workload.chronicle_read_only_s3_bucket_policy_name(release, site_name)
@@ -577,7 +590,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 policy_name=self.workload.team_operator_policy_name,
             )
 
-    def _define_external_secrets_iam(self):
+    def _define_external_secrets_iam(self) -> None:
         """Define IAM roles for external-secrets-operator to access AWS Secrets Manager."""
         self.external_secrets_roles = {}
 
@@ -598,7 +611,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 pod_identity=True,
             )
 
-    def _define_pod_identity_associations(self):
+    def _define_pod_identity_associations(self) -> None:
         """
         Create EKS Pod Identity associations for all product service accounts.
 

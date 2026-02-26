@@ -189,7 +189,7 @@ class AWSWorkloadSites(pulumi.ComponentResource):
                     ),
                 )
 
-    def _define_external_secrets(self):
+    def _define_external_secrets(self) -> None:
         """
         Create ExternalSecret CRs for each site to sync secrets from AWS Secrets Manager to K8s Secrets.
 
