@@ -234,7 +234,10 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "is missing or does not contain 'fs-dns-name'."
             )
             if pulumi.runtime.is_dry_run():
-                pulumi.warn(msg)
+                pulumi.warn(
+                    msg + " NFS subdir provisioner will be ABSENT from this preview diff; "
+                    "`pulumi up` will raise an error unless the secret is populated first."
+                )
                 return
             raise ValueError(msg)
 
