@@ -7,6 +7,32 @@ import pulumi_kubernetes as k8s
 
 import ptd.pulumi_resources.aws_eks_cluster
 import ptd.pulumi_resources.aws_vpc
+from ptd.pulumi_resources.lib import format_lb_tags
+
+
+def _build_nlb_tag_string(tags: dict[str, str] | None, cluster_name: str) -> str:
+    """Build the NLB annotation tag string from cluster tags."""
+    if tags is None:
+        msg = (
+            "Cluster tags must not be None; expected a dict with "
+            "'posit.team/true-name' and 'posit.team/environment' for NLB tagging."
+        )
+        raise ValueError(msg)
+    true_name = tags.get("posit.team/true-name")
+    environment = tags.get("posit.team/environment")
+    if true_name is None:
+        msg = f"Missing required tag: 'posit.team/true-name' for NLB tagging. Available tags: {list(tags.keys())}"
+        raise ValueError(msg)
+    if environment is None:
+        msg = f"Missing required tag: 'posit.team/environment' for NLB tagging. Available tags: {list(tags.keys())}"
+        raise ValueError(msg)
+    return format_lb_tags(
+        {
+            "posit.team/true-name": true_name,
+            "posit.team/environment": environment,
+            "Name": cluster_name,
+        }
+    )
 
 
 class Traefik(pulumi.ComponentResource):
@@ -120,6 +146,12 @@ class Traefik(pulumi.ComponentResource):
         :return:
         """
 
+        # Build tag string from cluster tags for NLB annotation.
+        # cluster.name, true_name, and environment are plain str values (logical resource
+        # names / config loaded at startup), not Pulumi Outputs, so format_lb_tags() checks
+        # work correctly at graph-construction time.
+        nlb_tags = _build_nlb_tag_string(self.cluster.tags, self.cluster.name)
+
         self.traefik = k8s.helm.v3.Release(
             f"{self.cluster.name}-traefik",
             k8s.helm.v3.ReleaseArgs(
@@ -147,6 +179,7 @@ class Traefik(pulumi.ComponentResource):
                             "service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold": "3",
                             "service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout": "10",
                             "service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval": "10",
+                            "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags": nlb_tags,
                         },
                     },
                     "ports": {
