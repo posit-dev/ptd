@@ -9,6 +9,7 @@ import yaml
 
 import ptd.azure_roles
 import ptd.azure_workload
+import ptd.paths
 from ptd import azure_sdk
 from ptd.pulumi_resources.grafana_alloy import AlloyConfig
 
@@ -280,6 +281,8 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
         )
 
     def _define_alloy(self, release: str, version: str):
+        alloy_identity = self._define_alloy_monitoring_identity(release)
+
         namespace = kubernetes.core.v1.Namespace(
             f"{self.workload.compound_name}-{release}-alloy-ns",
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -325,58 +328,69 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                 "chart": "alloy",
                 "targetNamespace": ALLOY_NAMESPACE,
                 "version": version,
-                "valuesContent": yaml.dump(
-                    {
-                        "serviceAccount": {
-                            "create": True,
-                            "name": str(ptd.Roles.ALLOY),
-                        },
-                        "controller": {
-                            "volumes": {
-                                "extra": [
+                "valuesContent": alloy_identity.client_id.apply(
+                    lambda client_id: yaml.dump(
+                        {
+                            "serviceAccount": {
+                                "create": True,
+                                "name": str(ptd.Roles.ALLOY),
+                                "annotations": {
+                                    "azure.workload.identity/client-id": client_id,
+                                },
+                                "labels": {
+                                    "azure.workload.identity/use": "true",
+                                },
+                            },
+                            "controller": {
+                                "podLabels": {
+                                    "azure.workload.identity/use": "true",
+                                },
+                                "volumes": {
+                                    "extra": [
+                                        {
+                                            "name": "mimir-auth",
+                                            "secret": {
+                                                "secretName": "mimir-auth",
+                                                "items": [
+                                                    {
+                                                        "key": "password",
+                                                        "path": "password",
+                                                    }
+                                                ],
+                                            },
+                                        }
+                                    ]
+                                },
+                            },
+                            "alloy": {
+                                "clustering": {"enabled": True},
+                                "extraPorts": [
                                     {
-                                        "name": "mimir-auth",
-                                        "secret": {
-                                            "secretName": "mimir-auth",
-                                            "items": [
-                                                {
-                                                    "key": "password",
-                                                    "path": "password",
-                                                }
-                                            ],
-                                        },
-                                    }
-                                ]
-                            }
-                        },
-                        "alloy": {
-                            "clustering": {"enabled": True},
-                            "extraPorts": [
-                                {
-                                    "name": "faro",
-                                    "port": 12347,
-                                    "targetPort": 12347,
-                                    "protocol": "TCP",
-                                }
-                            ],
-                            "mounts": {
-                                "extra": [
-                                    {
-                                        "name": "mimir-auth",
-                                        "mountPath": "/etc/mimir/",
-                                        "readOnly": True,
+                                        "name": "faro",
+                                        "port": 12347,
+                                        "targetPort": 12347,
+                                        "protocol": "TCP",
                                     }
                                 ],
-                                "varlog": True,
+                                "mounts": {
+                                    "extra": [
+                                        {
+                                            "name": "mimir-auth",
+                                            "mountPath": "/etc/mimir/",
+                                            "readOnly": True,
+                                        }
+                                    ],
+                                    "varlog": True,
+                                },
+                                "configMap": {"create": False, "name": "alloy-config", "key": "config.alloy"},
                             },
-                            "configMap": {"create": False, "name": "alloy-config", "key": "config.alloy"},
-                        },
-                        "ingress": {
-                            "enabled": True,
-                            "faroPort": 12347,
-                            "hosts": [f"faro.{self.workload.cfg.domain}"],
-                        },
-                    }
+                            "ingress": {
+                                "enabled": True,
+                                "faroPort": 12347,
+                                "hosts": [f"faro.{self.workload.cfg.domain}"],
+                            },
+                        }
+                    )
                 ),
             },
             opts=pulumi.ResourceOptions(depends_on=[namespace], provider=self.kube_providers[release]),
@@ -409,6 +423,38 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
             federated_identity_credential_resource_name=f"fedid-{self.workload.compound_name}-{release}-{component}",
             resource_group_name=self.workload.resource_group_name,
             subject=f"system:serviceaccount:{namespace}:{service_account}",
+            issuer=oidc_issuer_url,
+            audiences=["api://AzureADTokenExchange"],
+            opts=pulumi.ResourceOptions(parent=identity),
+        )
+
+        return identity
+
+    def _define_alloy_monitoring_identity(self, release: str) -> azure.managedidentity.UserAssignedIdentity:
+        identity = azure.managedidentity.UserAssignedIdentity(
+            resource_name=f"id-{self.workload.compound_name}-{release}-alloy",
+            resource_group_name=self.workload.resource_group_name,
+            location=self.workload.cfg.region,
+            tags=self.workload.required_tags,
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
+        azure.authorization.RoleAssignment(
+            f"{self.workload.compound_name}-{release}-alloy-monitoring-reader",
+            scope=f"/subscriptions/{self.workload.cfg.subscription_id}/resourceGroups/{self.workload.resource_group_name}",
+            principal_id=identity.principal_id,
+            role_definition_id=f"/providers/Microsoft.Authorization/roleDefinitions/{ptd.azure_roles.MONITORING_READER_ROLE_DEFINITION_ID}",
+            principal_type=azure.authorization.PrincipalType.SERVICE_PRINCIPAL,
+            opts=pulumi.ResourceOptions(parent=identity),
+        )
+
+        oidc_issuer_url = self.workload.cluster_oidc_issuer_url(release)
+        azure.managedidentity.FederatedIdentityCredential(
+            resource_name=f"fedid-{self.workload.compound_name}-{release}-alloy",
+            resource_name_=identity.name,
+            federated_identity_credential_resource_name=f"fedid-{self.workload.compound_name}-{release}-alloy",
+            resource_group_name=self.workload.resource_group_name,
+            subject=f"system:serviceaccount:{ALLOY_NAMESPACE}:{ptd.Roles.ALLOY!s}",
             issuer=oidc_issuer_url,
             audiences=["api://AzureADTokenExchange"],
             opts=pulumi.ResourceOptions(parent=identity),
@@ -597,6 +643,12 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                                 ],
                             },
                         },
+                        "sidecar": {
+                            "alerts": {
+                                "enabled": True,
+                                "searchNamespace": "grafana",
+                            }
+                        },
                     }
                 ),
             },
@@ -631,7 +683,7 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
 
             db_url = pulumi.Output.secret(f"postgres://{role}:{pw}@{fqdn}/{database}")
 
-            kubernetes.core.v1.Namespace(
+            grafana_ns = kubernetes.core.v1.Namespace(
                 f"{self.workload.compound_name}-{release}-grafana-ns",
                 metadata={
                     "name": "grafana",
@@ -648,6 +700,38 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                 data={"PTD_DATABASE_URL": db_url.apply(lambda url: base64.b64encode(url.encode()).decode())},
                 opts=pulumi.ResourceOptions(parent=self, providers=[self.kube_providers[release]]),
             )
+
+            # Create alert ConfigMaps for Grafana sidecar
+            # Cloud-agnostic alerts
+            self._create_alert_configmap("pods", grafana_ns, self.kube_providers[release], release)
+            self._create_alert_configmap("healthchecks", grafana_ns, self.kube_providers[release], release)
+            self._create_alert_configmap("nodes", grafana_ns, self.kube_providers[release], release)
+            self._create_alert_configmap("applications", grafana_ns, self.kube_providers[release], release)
+            self._create_alert_configmap("mimir", grafana_ns, self.kube_providers[release], release)
+
+            # Azure-specific alerts
+            self._create_alert_configmap("azure_postgres", grafana_ns, self.kube_providers[release], release)
+            self._create_alert_configmap("azure_netapp", grafana_ns, self.kube_providers[release], release)
+            self._create_alert_configmap("azure_loadbalancer", grafana_ns, self.kube_providers[release], release)
+            self._create_alert_configmap("azure_storage", grafana_ns, self.kube_providers[release], release)
+
+    def _create_alert_configmap(
+        self, name: str, ns: kubernetes.core.v1.Namespace, provider: kubernetes.Provider, release: str
+    ) -> kubernetes.core.v1.ConfigMap:
+        file_path = ptd.paths.alerts() / f"{name}.yaml"
+        with open(file_path) as alert_file:
+            alert_yaml = alert_file.read()
+
+        return kubernetes.core.v1.ConfigMap(
+            f"{self.workload.compound_name}-{release}-grafana-{name}-alerts",
+            metadata={
+                "name": f"grafana-{name}-alerts",
+                "namespace": "grafana",
+                "labels": {"grafana_alert": "1"},
+            },
+            data={"alerts.yaml": alert_yaml},
+            opts=pulumi.ResourceOptions(parent=self, provider=provider, depends_on=[ns]),
+        )
 
     def _define_kube_state_metrics(self, release: str, version: str):
         kubernetes.apiextensions.CustomResource(
