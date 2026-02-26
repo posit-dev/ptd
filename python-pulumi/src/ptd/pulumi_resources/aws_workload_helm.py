@@ -13,6 +13,7 @@ from ptd.pulumi_resources.lib import format_lb_tags
 
 ALLOY_NAMESPACE = "alloy"
 NFS_STORAGE_CLASS_NAME = "posit-shared-storage"
+CLUSTER_SECRET_STORE_NAME = "aws-secrets-manager"
 
 
 def _nfs_subdir_provisioner_values(fsx_dns_name: str, fsx_nfs_path: str = "/fsx") -> dict:
@@ -308,7 +309,7 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
         k8s.apiextensions.CustomResource(
             f"{self.workload.compound_name}-{release}-cluster-secret-store",
             metadata=k8s.meta.v1.ObjectMetaArgs(
-                name="aws-secrets-manager",
+                name=CLUSTER_SECRET_STORE_NAME,
                 labels=self.required_tags,
             ),
             api_version="external-secrets.io/v1beta1",

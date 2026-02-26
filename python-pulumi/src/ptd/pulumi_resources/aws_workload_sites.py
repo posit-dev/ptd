@@ -11,6 +11,7 @@ import ptd.aws_workload
 import ptd.pulumi_resources.aws_eks_cluster
 import ptd.pulumi_resources.team_site
 import ptd.secrecy
+from ptd.pulumi_resources.aws_workload_helm import CLUSTER_SECRET_STORE_NAME
 
 
 def _external_secret_spec(site_name: str, secret_key: str) -> dict:
@@ -18,7 +19,7 @@ def _external_secret_spec(site_name: str, secret_key: str) -> dict:
     return {
         "refreshInterval": "1h",
         "secretStoreRef": {
-            "name": "aws-secrets-manager",
+            "name": CLUSTER_SECRET_STORE_NAME,
             "kind": "ClusterSecretStore",
         },
         "target": {
@@ -218,5 +219,6 @@ class AWSWorkloadSites(pulumi.ComponentResource):
                     opts=pulumi.ResourceOptions(
                         parent=self,
                         provider=self.kube_providers[release],
+                        custom_timeouts=pulumi.CustomTimeouts(create="10m"),
                     ),
                 )

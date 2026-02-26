@@ -105,3 +105,15 @@ def test_nfs_provisioner_warns_on_dry_run_when_key_missing():
                 AWSWorkloadHelm._define_nfs_subdir_provisioner(_make_helm_mock(), "20250328", "4.0.18")
                 assert mock_warn.called
                 assert "fs-dns-name" in mock_warn.call_args[0][0]
+
+
+def test_nfs_provisioner_version_none_omits_version_key():
+    """When version=None, no 'version' key is added to the spec (uses latest chart)."""
+    dns = "fs-123.fsx.us-east-1.amazonaws.com"
+    with patch("ptd.secrecy.aws_get_secret_value_json", return_value=({"fs-dns-name": dns}, True)):
+        with patch("ptd.pulumi_resources.aws_workload_helm.k8s") as mock_k8s:
+            AWSWorkloadHelm._define_nfs_subdir_provisioner(_make_helm_mock(), "20250328", None)
+            mock_k8s.apiextensions.CustomResource.assert_called_once()
+            spec = mock_k8s.apiextensions.CustomResource.call_args.kwargs["spec"]
+            assert "version" not in spec
+            assert spec["chart"] == "nfs-subdir-external-provisioner"
