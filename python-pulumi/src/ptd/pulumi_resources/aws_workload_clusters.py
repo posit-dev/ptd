@@ -27,6 +27,26 @@ import ptd.pulumi_resources.traefik_forward_auth_aws
 import ptd.secrecy
 
 
+def _pod_identity_assoc(
+    resource: "AWSWorkloadClusters",
+    logical_name: str,
+    cluster_name: str,
+    namespace: str,
+    service_account: str,
+    role_arn: pulumi.Input[str],
+) -> None:
+    """Create a single EKS PodIdentityAssociation with standard naming and tagging."""
+    aws.eks.PodIdentityAssociation(
+        f"{cluster_name}-{logical_name}-pod-identity",
+        cluster_name=cluster_name,
+        namespace=namespace,
+        service_account=service_account,
+        role_arn=role_arn,
+        tags=resource.required_tags,
+        opts=pulumi.ResourceOptions(parent=resource),
+    )
+
+
 class AWSWorkloadClusters(pulumi.ComponentResource):
     workload: ptd.aws_workload.AWSWorkload
 
@@ -666,87 +686,59 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
 
             # External Secrets Operator (per-release, only if ESO is also enabled)
             if cluster_cfg.enable_external_secrets_operator:
-                aws.eks.PodIdentityAssociation(
-                    f"{cluster_name}-external-secrets-pod-identity",
-                    cluster_name=cluster_name,
-                    namespace="external-secrets",
-                    service_account="external-secrets",
-                    role_arn=self.external_secrets_roles[release].arn,
-                    tags=self.required_tags,
-                    opts=pulumi.ResourceOptions(parent=self),
+                _pod_identity_assoc(
+                    self, "external-secrets", cluster_name,
+                    "external-secrets", "external-secrets",
+                    self.external_secrets_roles[release].arn,
                 )
 
             # Per-site product associations
             for site_name in sorted(self.workload.cfg.sites.keys()):
                 # Connect
-                aws.eks.PodIdentityAssociation(
-                    f"{cluster_name}-{site_name}-connect-pod-identity",
-                    cluster_name=cluster_name,
-                    namespace=ptd.POSIT_TEAM_NAMESPACE,
-                    service_account=f"{site_name}-connect",
-                    role_arn=self.connect_roles[release].arn,
-                    tags=self.required_tags,
-                    opts=pulumi.ResourceOptions(parent=self),
+                _pod_identity_assoc(
+                    self, f"{site_name}-connect", cluster_name,
+                    ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-connect",
+                    self.connect_roles[release].arn,
                 )
 
                 # Connect Session — always present: _define_connect_iam populates connect_session_roles
                 # for every release/site combo unconditionally.
-                aws.eks.PodIdentityAssociation(
-                    f"{cluster_name}-{site_name}-connect-session-pod-identity",
-                    cluster_name=cluster_name,
-                    namespace=ptd.POSIT_TEAM_NAMESPACE,
-                    service_account=f"{site_name}-connect-session",
-                    role_arn=self.connect_session_roles[f"{release}-{site_name}"].arn,
-                    tags=self.required_tags,
-                    opts=pulumi.ResourceOptions(parent=self),
+                _pod_identity_assoc(
+                    self, f"{site_name}-connect-session", cluster_name,
+                    ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-connect-session",
+                    self.connect_session_roles[f"{release}-{site_name}"].arn,
                 )
 
                 # Workbench
-                aws.eks.PodIdentityAssociation(
-                    f"{cluster_name}-{site_name}-workbench-pod-identity",
-                    cluster_name=cluster_name,
-                    namespace=ptd.POSIT_TEAM_NAMESPACE,
-                    service_account=f"{site_name}-workbench",
-                    role_arn=self.workbench_roles[release].arn,
-                    tags=self.required_tags,
-                    opts=pulumi.ResourceOptions(parent=self),
+                _pod_identity_assoc(
+                    self, f"{site_name}-workbench", cluster_name,
+                    ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-workbench",
+                    self.workbench_roles[release].arn,
                 )
 
                 # Workbench Session — always present: _define_workbench_iam populates workbench_session_roles
                 # for every release/site combo unconditionally.
-                aws.eks.PodIdentityAssociation(
-                    f"{cluster_name}-{site_name}-workbench-session-pod-identity",
-                    cluster_name=cluster_name,
-                    namespace=ptd.POSIT_TEAM_NAMESPACE,
-                    service_account=f"{site_name}-workbench-session",
-                    role_arn=self.workbench_session_roles[f"{release}-{site_name}"].arn,
-                    tags=self.required_tags,
-                    opts=pulumi.ResourceOptions(parent=self),
+                _pod_identity_assoc(
+                    self, f"{site_name}-workbench-session", cluster_name,
+                    ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-workbench-session",
+                    self.workbench_session_roles[f"{release}-{site_name}"].arn,
                 )
 
                 # Package Manager
                 # Key format uses "//" separator — must match _define_packagemanager_iam (release + "//" + site_name).
                 if release + "//" + site_name in self.packagemanager_roles:
-                    aws.eks.PodIdentityAssociation(
-                        f"{cluster_name}-{site_name}-packagemanager-pod-identity",
-                        cluster_name=cluster_name,
-                        namespace=ptd.POSIT_TEAM_NAMESPACE,
-                        service_account=f"{site_name}-packagemanager",
-                        role_arn=self.packagemanager_roles[release + "//" + site_name].arn,
-                        tags=self.required_tags,
-                        opts=pulumi.ResourceOptions(parent=self),
+                    _pod_identity_assoc(
+                        self, f"{site_name}-packagemanager", cluster_name,
+                        ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-packagemanager",
+                        self.packagemanager_roles[release + "//" + site_name].arn,
                     )
 
                 # Chronicle (optional product — skip if not configured for this release/site)
                 if f"{release}-{site_name}" in self.chronicle_roles:
-                    aws.eks.PodIdentityAssociation(
-                        f"{cluster_name}-{site_name}-chronicle-pod-identity",
-                        cluster_name=cluster_name,
-                        namespace=ptd.POSIT_TEAM_NAMESPACE,
-                        service_account=f"{site_name}-chronicle",
-                        role_arn=self.chronicle_roles[f"{release}-{site_name}"].arn,
-                        tags=self.required_tags,
-                        opts=pulumi.ResourceOptions(parent=self),
+                    _pod_identity_assoc(
+                        self, f"{site_name}-chronicle", cluster_name,
+                        ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-chronicle",
+                        self.chronicle_roles[f"{release}-{site_name}"].arn,
                     )
 
                 # Home/Flightdeck (optional product — skip if not configured for this release)
@@ -754,14 +746,10 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 # policy allows all per-site SAs ({site_name}-home) — see _define_home_iam.
                 # Pod Identity requires one association per SA, so this block stays inside the loop.
                 if release in self.home_roles:
-                    aws.eks.PodIdentityAssociation(
-                        f"{cluster_name}-{site_name}-home-pod-identity",
-                        cluster_name=cluster_name,
-                        namespace=ptd.POSIT_TEAM_NAMESPACE,
-                        service_account=f"{site_name}-home",
-                        role_arn=self.home_roles[release].arn,
-                        tags=self.required_tags,
-                        opts=pulumi.ResourceOptions(parent=self),
+                    _pod_identity_assoc(
+                        self, f"{site_name}-home", cluster_name,
+                        ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-home",
+                        self.home_roles[release].arn,
                     )
 
     def _apply_custom_k8s_resources(self):

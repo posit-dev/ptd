@@ -196,8 +196,9 @@ class AWSWorkloadSites(pulumi.ComponentResource):
         This creates K8s Secrets that the operator can reference by name instead of calling AWS SDK directly.
 
         Note: these CRs reference the `aws-secrets-manager` ClusterSecretStore which is created by
-        AWSWorkloadHelm. No Pulumi depends_on can be declared across stack boundaries; on a fresh
-        deploy, ESO will log errors until the ClusterSecretStore converges (~1-2 reconcile loops).
+        AWSWorkloadHelm. No Pulumi ``depends_on`` is wired here because even if we declared one, it
+        would only guarantee the HelmChart CR object exists — not that ESO's CRDs have converged.
+        The ClusterSecretStore will retry until ESO is ready (~1-2 reconcile loops).
         """
         for release in self.managed_clusters_by_release:
             if not self.workload.cfg.clusters[release].enable_external_secrets_operator:

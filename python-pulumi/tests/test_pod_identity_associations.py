@@ -1,5 +1,6 @@
 """Tests for _define_pod_identity_associations and _define_external_secrets_iam in AWSWorkloadClusters."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 from ptd.pulumi_resources.aws_workload_clusters import AWSWorkloadClusters
@@ -119,6 +120,56 @@ def test_home_association_created_per_site_when_role_present():
         assert mock_pia.call_count == 12
         names_called = [c[0][0] for c in mock_pia.call_args_list]
         assert sum(1 for n in names_called if "home" in n) == 2  # one per site
+
+
+def _make_role_mock(oidc_url_tails: list[str]) -> MagicMock:
+    """Build a minimal AWSWorkloadClusters mock for testing _define_k8s_iam_role."""
+    m = MagicMock()
+    m._oidc_url_tails = oidc_url_tails
+    m.workload.cfg.account_id = "123456789012"
+    m.workload.iam_permissions_boundary = None
+    m.required_tags = {}
+    return m
+
+
+def test_define_k8s_iam_role_trust_policy_includes_pod_identity_statement():
+    """With pod_identity=True, the assume_role_policy includes pods.eks.amazonaws.com."""
+    m = _make_role_mock(oidc_url_tails=["oidc.eks.us-east-1.amazonaws.com/id/ABCD1234"])
+    with (
+        patch("ptd.pulumi_resources.aws_workload_clusters.aws.iam.Role"),
+        patch("ptd.pulumi_resources.aws_workload_clusters.aws.iam.RoleArgs") as mock_role_args,
+    ):
+        AWSWorkloadClusters._define_k8s_iam_role(m, name="test-role", pod_identity=True)
+        policy = json.loads(mock_role_args.call_args.kwargs["assume_role_policy"])
+
+    services = [
+        s.get("Principal", {}).get("Service")
+        for s in policy["Statement"]
+        if isinstance(s.get("Principal"), dict)
+    ]
+    assert "pods.eks.amazonaws.com" in services
+
+    pod_stmt = next(s for s in policy["Statement"] if s.get("Principal", {}).get("Service") == "pods.eks.amazonaws.com")
+    assert "sts:AssumeRole" in pod_stmt["Action"]
+    assert "sts:TagSession" in pod_stmt["Action"]
+
+
+def test_define_k8s_iam_role_trust_policy_excludes_pod_identity_statement_when_disabled():
+    """With pod_identity=False, the assume_role_policy does not include pods.eks.amazonaws.com."""
+    m = _make_role_mock(oidc_url_tails=["oidc.eks.us-east-1.amazonaws.com/id/ABCD1234"])
+    with (
+        patch("ptd.pulumi_resources.aws_workload_clusters.aws.iam.Role"),
+        patch("ptd.pulumi_resources.aws_workload_clusters.aws.iam.RoleArgs") as mock_role_args,
+    ):
+        AWSWorkloadClusters._define_k8s_iam_role(m, name="test-role", pod_identity=False)
+        policy = json.loads(mock_role_args.call_args.kwargs["assume_role_policy"])
+
+    services = [
+        s.get("Principal", {}).get("Service")
+        for s in policy["Statement"]
+        if isinstance(s.get("Principal"), dict)
+    ]
+    assert "pods.eks.amazonaws.com" not in services
 
 
 def test_define_external_secrets_iam_skipped_when_disabled():

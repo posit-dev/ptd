@@ -57,6 +57,20 @@ def _make_helm_mock(secret_name: str = "my-workload-secret") -> MagicMock:
     return helm
 
 
+def test_nfs_provisioner_success_creates_helm_chart_cr():
+    """Happy path: valid secret creates HelmChart CR with valuesContent containing the NFS server."""
+    dns = "fs-123.fsx.us-east-1.amazonaws.com"
+    with patch("ptd.secrecy.aws_get_secret_value_json", return_value=({"fs-dns-name": dns}, True)):
+        with patch("ptd.pulumi_resources.aws_workload_helm.k8s") as mock_k8s:
+            AWSWorkloadHelm._define_nfs_subdir_provisioner(_make_helm_mock(), "20250328", "4.0.18")
+            mock_k8s.apiextensions.CustomResource.assert_called_once()
+            spec = mock_k8s.apiextensions.CustomResource.call_args.kwargs["spec"]
+            assert spec["chart"] == "nfs-subdir-external-provisioner"
+            assert spec["version"] == "4.0.18"
+            parsed_values = yaml.safe_load(spec["valuesContent"])
+            assert parsed_values["nfs"]["server"] == dns
+
+
 def test_nfs_provisioner_warns_on_dry_run_when_secret_fetch_fails():
     """When secret fetch fails during a dry run, warn and return without raising."""
     with patch("ptd.secrecy.aws_get_secret_value_json", return_value=({}, False)):
