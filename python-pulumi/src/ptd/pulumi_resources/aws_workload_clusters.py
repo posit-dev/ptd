@@ -147,6 +147,9 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         # resources=["*"] is intentional: workload roles (connect, workbench, packagemanager, ESO, etc.)
         # all use this same broad policy. Scoping to specific ARN prefixes (e.g., per-workload prefix)
         # is deferred work tracked separately.
+        # TODO: ESO uses a cluster-wide ClusterSecretStore, so its blast radius is larger than
+        # per-product IRSA roles — it can read every secret in the account. Scope ESO's policy to
+        # arn:aws:secretsmanager:<region>:<account>:secret:<workload-prefix>/* in a follow-up.
         return aws.iam.get_policy_document(
             statements=[
                 aws.iam.GetPolicyDocumentStatementArgs(

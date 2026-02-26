@@ -235,7 +235,7 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
             )
             if pulumi.runtime.is_dry_run():
                 pulumi.warn(
-                    msg + " NFS subdir provisioner will be ABSENT from this preview diff; "
+                    "[ACTION REQUIRED] " + msg + " NFS subdir provisioner will be ABSENT from this preview diff; "
                     "`pulumi up` will raise an error unless the secret is populated first."
                 )
                 return
@@ -303,6 +303,8 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
 
         # Create ClusterSecretStore for AWS Secrets Manager.
         # depends_on the HelmChart CR so Pulumi applies it after the ESO chart CR is registered.
+        # CustomTimeouts makes the eventual-consistency explicit: on a fresh cluster the CRD may not
+        # be available immediately; Pulumi will retry for up to 10 minutes before failing.
         k8s.apiextensions.CustomResource(
             f"{self.workload.compound_name}-{release}-cluster-secret-store",
             metadata=k8s.meta.v1.ObjectMetaArgs(
@@ -312,7 +314,11 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
             api_version="external-secrets.io/v1beta1",
             kind="ClusterSecretStore",
             spec=_cluster_secret_store_spec(self.workload.cfg.region),
-            opts=pulumi.ResourceOptions(provider=self.kube_providers[release], depends_on=[eso_helm_release]),
+            opts=pulumi.ResourceOptions(
+                provider=self.kube_providers[release],
+                depends_on=[eso_helm_release],
+                custom_timeouts=pulumi.CustomTimeouts(create="10m"),
+            ),
         )
 
     def _define_secret_store_csi(self, release: str, version: str):

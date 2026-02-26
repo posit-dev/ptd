@@ -341,7 +341,7 @@ def test_session_roles_key_format():
     release = "20250328"
     site_name = "mysite"
     # Form used by _define_connect_iam / _define_workbench_iam
-    population_key = f"{release}-{site_name}"
+    population_key = release + "-" + site_name
     # Form used by _define_pod_identity_associations
     lookup_key = f"{release}-{site_name}"
     assert population_key == lookup_key
