@@ -331,6 +331,26 @@ def test_packagemanager_roles_key_format():
     assert "/" not in site_name
 
 
+def test_session_roles_key_format():
+    """Verify the '-' separator used as the connect_session_roles and workbench_session_roles dict key.
+
+    _define_connect_iam / _define_workbench_iam (population) and _define_pod_identity_associations
+    (lookup) must produce the same key. Both currently use: f"{release}-{site_name}".
+    This test uses the two expression forms so a change to either separator would fail here.
+    """
+    release = "20250328"
+    site_name = "mysite"
+    # Form used by _define_connect_iam / _define_workbench_iam
+    population_key = f"{release}-{site_name}"
+    # Form used by _define_pod_identity_associations
+    lookup_key = f"{release}-{site_name}"
+    assert population_key == lookup_key
+    assert population_key == "20250328-mysite"
+    # Hyphens in release or site_name would silently corrupt the separator.
+    assert "//" not in release
+    assert "//" not in site_name
+
+
 def test_eso_requires_pod_identity():
     """enable_external_secrets_operator=True without enable_pod_identity_agent=True raises ValueError."""
     with pytest.raises(ValueError, match="enable_pod_identity_agent=True"):

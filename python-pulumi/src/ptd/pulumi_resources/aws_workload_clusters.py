@@ -107,6 +107,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         # can safely check membership even if the defining methods are skipped or reordered.
         self.chronicle_roles = {}
         self.home_roles = {}
+        self.external_secrets_roles = {}
 
         self._define_home_iam()
         self._define_chronicle_iam(persistent_stack)
@@ -144,7 +145,8 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
     @staticmethod
     def _define_read_secrets_inline() -> str:
         # resources=["*"] is intentional: workload roles (connect, workbench, packagemanager, ESO, etc.)
-        # all use this same broad policy. Scoping to specific ARN prefixes is tracked separately.
+        # all use this same broad policy. Scoping to specific ARN prefixes is deferred work;
+        # TODO: open a tracking issue for Secrets Manager ARN scoping (replace this with the issue URL).
         return aws.iam.get_policy_document(
             statements=[
                 aws.iam.GetPolicyDocumentStatementArgs(
