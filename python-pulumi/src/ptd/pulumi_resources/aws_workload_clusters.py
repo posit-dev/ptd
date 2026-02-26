@@ -572,10 +572,11 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
             if not cluster_cfg.enable_external_secrets_operator:
                 continue
             if not cluster_cfg.enable_pod_identity_agent:
-                raise ValueError(
+                msg = (
                     f"Release '{release}': enable_external_secrets_operator requires enable_pod_identity_agent=True "
                     "(ClusterSecretStore uses no auth block and relies on Pod Identity for credentials)."
                 )
+                raise ValueError(msg)
             self.external_secrets_roles[release] = self._define_k8s_iam_role(
                 name=self.workload.external_secrets_role_name(release),
                 release=release,
