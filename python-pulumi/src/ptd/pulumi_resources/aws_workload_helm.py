@@ -183,9 +183,39 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(provider=self.kube_providers[release]),
         )
 
-    def _define_nfs_subdir_provisioner(self, release: str, version: str):
+    def _define_nfs_subdir_provisioner(self, release: str, version: str | None):
         """Deploy nfs-subdir-external-provisioner for FSx storage."""
         fsx_dns_name = self.workload_secrets_dict["fs-dns-name"]
+        fsx_nfs_path = self.workload_secrets_dict.get("fs-nfs-path", "/fsx")
+
+        spec: dict = {
+            "repo": "https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/",
+            "chart": "nfs-subdir-external-provisioner",
+            "targetNamespace": ptd.KUBE_SYSTEM_NAMESPACE,
+            "valuesContent": yaml.dump(
+                {
+                    "nfs": {
+                        "server": fsx_dns_name,
+                        "path": fsx_nfs_path,
+                    },
+                    "storageClass": {
+                        "name": "posit-shared-storage",
+                        "reclaimPolicy": "Retain",
+                        "accessModes": "ReadWriteMany",
+                        "onDelete": "retain",
+                        "pathPattern": "${.PVC.annotations.nfs.io/storage-path}",
+                    },
+                    "nfs.mountOptions": [
+                        "nfsvers=4.2",
+                        "rsize=1048576",
+                        "wsize=1048576",
+                        "timeo=600",
+                    ],
+                }
+            ),
+        }
+        if version is not None:
+            spec["version"] = version
 
         k8s.apiextensions.CustomResource(
             f"{self.workload.compound_name}-{release}-nfs-subdir-provisioner-helm-release",
@@ -196,39 +226,30 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
             ),
             api_version="helm.cattle.io/v1",
             kind="HelmChart",
-            spec={
-                "repo": "https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/",
-                "chart": "nfs-subdir-external-provisioner",
-                "targetNamespace": ptd.KUBE_SYSTEM_NAMESPACE,
-                "version": version,
-                "valuesContent": yaml.dump(
-                    {
-                        "nfs": {
-                            "server": fsx_dns_name,
-                            "path": "/fsx",
-                        },
-                        "storageClass": {
-                            "name": "posit-shared-storage",
-                            "reclaimPolicy": "Retain",
-                            "accessModes": "ReadWriteMany",
-                            "onDelete": "retain",
-                            "pathPattern": "${.PVC.annotations.nfs.io/storage-path}",
-                        },
-                        "nfs.mountOptions": [
-                            "nfsvers=4.2",
-                            "rsize=1048576",
-                            "wsize=1048576",
-                            "timeo=600",
-                        ],
-                    }
-                ),
-            },
+            spec=spec,
             opts=pulumi.ResourceOptions(provider=self.kube_providers[release]),
         )
 
-    def _define_external_secrets_operator(self, release: str, version: str):
+    def _define_external_secrets_operator(self, release: str, version: str | None):
         """Deploy external-secrets-operator and create ClusterSecretStore for AWS Secrets Manager."""
         # Deploy external-secrets-operator Helm chart
+        eso_spec: dict = {
+            "repo": "https://charts.external-secrets.io",
+            "chart": "external-secrets",
+            "targetNamespace": "external-secrets",
+            "valuesContent": yaml.dump(
+                {
+                    "installCRDs": True,
+                    "serviceAccount": {
+                        "create": True,
+                        "name": "external-secrets",
+                    },
+                }
+            ),
+        }
+        if version is not None:
+            eso_spec["version"] = version
+
         eso_helm_release = k8s.apiextensions.CustomResource(
             f"{self.workload.compound_name}-{release}-external-secrets-helm-release",
             metadata=k8s.meta.v1.ObjectMetaArgs(
@@ -238,21 +259,7 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
             ),
             api_version="helm.cattle.io/v1",
             kind="HelmChart",
-            spec={
-                "repo": "https://charts.external-secrets.io",
-                "chart": "external-secrets",
-                "targetNamespace": "external-secrets",
-                "version": version,
-                "valuesContent": yaml.dump(
-                    {
-                        "installCRDs": True,
-                        "serviceAccount": {
-                            "create": True,
-                            "name": "external-secrets",
-                        },
-                    }
-                ),
-            },
+            spec=eso_spec,
             opts=pulumi.ResourceOptions(provider=self.kube_providers[release]),
         )
 
@@ -271,14 +278,8 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                     "aws": {
                         "service": "SecretsManager",
                         "region": self.workload.cfg.region,
-                        "auth": {
-                            "jwt": {
-                                "serviceAccountRef": {
-                                    "name": "external-secrets",
-                                    "namespace": "external-secrets",
-                                },
-                            },
-                        },
+                        # No auth block: Pod Identity injects credentials via the agent;
+                        # omitting auth causes ESO to use the ambient pod credentials.
                     },
                 },
             },

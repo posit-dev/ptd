@@ -255,6 +255,7 @@ class AWSWorkloadClusterConfig(ptd.WorkloadClusterConfig):
     additional_node_groups: dict[str, ptd.NodeGroupConfig] = dataclasses.field(default_factory=dict)
     public_endpoint_access: bool = True
     ebs_csi_addon_version: str = "v1.41.0-eksbuild.1"
+    pod_identity_agent_version: str | None = None
     enable_efs_csi_driver: bool = False
     efs_config: ptd.EFSConfig | None = None
     karpenter_config: KarpenterConfig | None = None

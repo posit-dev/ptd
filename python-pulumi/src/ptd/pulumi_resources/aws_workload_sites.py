@@ -172,6 +172,10 @@ class AWSWorkloadSites(pulumi.ComponentResource):
         Create ExternalSecret CRs for each site to sync secrets from AWS Secrets Manager to K8s Secrets.
 
         This creates K8s Secrets that the operator can reference by name instead of calling AWS SDK directly.
+
+        Note: these CRs reference the `aws-secrets-manager` ClusterSecretStore which is created by
+        AWSWorkloadHelm. No Pulumi depends_on can be declared across stack boundaries; on a fresh
+        deploy, ESO will log errors until the ClusterSecretStore converges (~1-2 reconcile loops).
         """
         for release in self.managed_clusters_by_release:
             for site_name in sorted(self.workload.cfg.sites.keys()):
