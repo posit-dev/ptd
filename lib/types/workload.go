@@ -92,14 +92,8 @@ type AzureWorkloadConfig struct {
 	Region                     string                                `yaml:"region"`
 	SubscriptionID             string                                `yaml:"subscription_id"`
 	TenantID                   string                                `yaml:"tenant_id"`
-	ClientID                   string                                `yaml:"client_id"`
-	SecretsProviderClientID    string                                `yaml:"secrets_provider_client_id"`
 	AdminGroupID               string                                `yaml:"admin_group_id"`
 	BastionInstanceType        string                                `yaml:"bastion_instance_type"`
-	InstanceType               string                                `yaml:"instance_type"`
-	ControlPlaneNodeCount      int                                   `yaml:"control_plane_node_count"`
-	WorkerNodeCount            int                                   `yaml:"worker_node_count"`
-	DBStorageSizeGB            int                                   `yaml:"db_storage_size_gb"`
 	ResourceTags               map[string]string                     `yaml:"resource_tags"`
 	Sites                      map[string]SiteConfig                 `json:"sites" yaml:"sites"` // didn't find this on the python side.
 	ProtectPersistentResources bool                                  `yaml:"protect_persistent_resources"`

@@ -96,15 +96,9 @@ func TestAWSWorkloadConfigSerialization(t *testing.T) {
 func TestAzureWorkloadConfigSerialization(t *testing.T) {
 	// Create a minimal Azure workload config
 	config := AzureWorkloadConfig{
-		SubscriptionID:          "123456789-abcd-efgh-ijkl-1234567890ab",
-		TenantID:                "abcdefgh-1234-5678-ijkl-1234567890ab",
-		Region:                  "eastus",
-		ClientID:                "12345678-abcd-efgh-ijkl-1234567890ab",
-		SecretsProviderClientID: "98765432-abcd-efgh-ijkl-1234567890ab",
-		InstanceType:            "Standard_D4s_v3",
-		ControlPlaneNodeCount:   3,
-		WorkerNodeCount:         2,
-		DBStorageSizeGB:         20,
+		SubscriptionID: "123456789-abcd-efgh-ijkl-1234567890ab",
+		TenantID:       "abcdefgh-1234-5678-ijkl-1234567890ab",
+		Region:         "eastus",
 		ResourceTags: map[string]string{
 			"Environment": "test",
 			"Owner":       "team",
@@ -141,8 +135,6 @@ func TestAzureWorkloadConfigSerialization(t *testing.T) {
 	assert.Equal(t, config.SubscriptionID, unmarshaledConfig.SubscriptionID)
 	assert.Equal(t, config.TenantID, unmarshaledConfig.TenantID)
 	assert.Equal(t, config.Region, unmarshaledConfig.Region)
-	assert.Equal(t, config.ClientID, unmarshaledConfig.ClientID)
-	assert.Equal(t, config.InstanceType, unmarshaledConfig.InstanceType)
 
 	// Check nested structures
 	assert.Equal(t, config.Sites["main"].Domain, unmarshaledConfig.Sites["main"].Domain)
@@ -154,16 +146,10 @@ func TestAzureWorkloadConfigSerialization(t *testing.T) {
 func TestAzureWorkloadConfigBastionInstanceType(t *testing.T) {
 	// Test that bastion_instance_type field is properly serialized/deserialized
 	config := AzureWorkloadConfig{
-		SubscriptionID:          "123456789-abcd-efgh-ijkl-1234567890ab",
-		TenantID:                "abcdefgh-1234-5678-ijkl-1234567890ab",
-		Region:                  "eastus",
-		ClientID:                "12345678-abcd-efgh-ijkl-1234567890ab",
-		SecretsProviderClientID: "98765432-abcd-efgh-ijkl-1234567890ab",
-		BastionInstanceType:     "Standard_B2s",
-		InstanceType:            "Standard_D4s_v3",
-		ControlPlaneNodeCount:   1,
-		WorkerNodeCount:         1,
-		DBStorageSizeGB:         20,
+		SubscriptionID:      "123456789-abcd-efgh-ijkl-1234567890ab",
+		TenantID:            "abcdefgh-1234-5678-ijkl-1234567890ab",
+		Region:              "eastus",
+		BastionInstanceType: "Standard_B2s",
 	}
 
 	// Marshal to YAML
