@@ -428,6 +428,9 @@ class WorkloadClusterConfig:
     # After migration, set to False to let Helm manage CRDs going forward.
     team_operator_skip_crds: bool = False
 
+    def __post_init__(self) -> None:
+        pass
+
 
 def load_workload_cluster_site_dict(
     cluster_site_dict: dict[str, typing.Any],

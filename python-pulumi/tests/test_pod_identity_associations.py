@@ -1,4 +1,4 @@
-"""Tests for _define_pod_identity_associations in AWSWorkloadClusters."""
+"""Tests for _define_pod_identity_associations and _define_external_secrets_iam in AWSWorkloadClusters."""
 
 from unittest.mock import MagicMock, patch
 
@@ -119,3 +119,30 @@ def test_home_association_created_per_site_when_role_present():
         assert mock_pia.call_count == 12
         names_called = [c[0][0] for c in mock_pia.call_args_list]
         assert sum(1 for n in names_called if "home" in n) == 2  # one per site
+
+
+def test_define_external_secrets_iam_skipped_when_disabled():
+    """When enable_external_secrets_operator=False, no IAM roles are created and external_secrets_roles is empty."""
+    m = MagicMock()
+    m.managed_clusters_by_release = ["20250328"]
+    cluster_cfg = MagicMock()
+    cluster_cfg.enable_external_secrets_operator = False
+    m.workload.cfg.clusters.__getitem__ = lambda _self, k: cluster_cfg
+
+    AWSWorkloadClusters._define_external_secrets_iam(m)
+    # _define_k8s_iam_role is resolved on the mock instance; call_count==0 means it was never called.
+    assert m._define_k8s_iam_role.call_count == 0
+    assert m.external_secrets_roles == {}
+
+
+def test_define_external_secrets_iam_creates_role_per_release_when_enabled():
+    """When enable_external_secrets_operator=True, one IAM role is created per release."""
+    m = MagicMock()
+    m.managed_clusters_by_release = ["20250328", "20250415"]
+    cluster_cfg = MagicMock()
+    cluster_cfg.enable_external_secrets_operator = True
+    m.workload.cfg.clusters.__getitem__ = lambda _self, k: cluster_cfg
+
+    AWSWorkloadClusters._define_external_secrets_iam(m)
+    assert m._define_k8s_iam_role.call_count == 2
+    assert set(m.external_secrets_roles.keys()) == {"20250328", "20250415"}

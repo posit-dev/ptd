@@ -12,6 +12,7 @@ from ptd.pulumi_resources.grafana_alloy import AlloyConfig
 from ptd.pulumi_resources.lib import format_lb_tags
 
 ALLOY_NAMESPACE = "alloy"
+NFS_STORAGE_CLASS_NAME = "posit-shared-storage"
 
 
 def _nfs_subdir_provisioner_values(fsx_dns_name: str, fsx_nfs_path: str = "/fsx") -> dict:
@@ -28,7 +29,7 @@ def _nfs_subdir_provisioner_values(fsx_dns_name: str, fsx_nfs_path: str = "/fsx"
             ],
         },
         "storageClass": {
-            "name": "posit-shared-storage",
+            "name": NFS_STORAGE_CLASS_NAME,
             "reclaimPolicy": "Retain",
             "accessModes": "ReadWriteMany",
             "onDelete": "retain",

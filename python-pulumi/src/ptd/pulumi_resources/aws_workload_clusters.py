@@ -145,8 +145,8 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
     @staticmethod
     def _define_read_secrets_inline() -> str:
         # resources=["*"] is intentional: workload roles (connect, workbench, packagemanager, ESO, etc.)
-        # all use this same broad policy. Scoping to specific ARN prefixes is deferred work;
-        # TODO: open a tracking issue for Secrets Manager ARN scoping (replace this with the issue URL).
+        # all use this same broad policy. Scoping to specific ARN prefixes (e.g., per-workload prefix)
+        # is deferred work tracked separately.
         return aws.iam.get_policy_document(
             statements=[
                 aws.iam.GetPolicyDocumentStatementArgs(
@@ -667,7 +667,8 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     opts=pulumi.ResourceOptions(parent=self),
                 )
 
-                # Connect Session
+                # Connect Session — always present: _define_connect_iam populates connect_session_roles
+                # for every release/site combo unconditionally.
                 aws.eks.PodIdentityAssociation(
                     f"{cluster_name}-{site_name}-connect-session-pod-identity",
                     cluster_name=cluster_name,
@@ -687,7 +688,8 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     opts=pulumi.ResourceOptions(parent=self),
                 )
 
-                # Workbench Session
+                # Workbench Session — always present: _define_workbench_iam populates workbench_session_roles
+                # for every release/site combo unconditionally.
                 aws.eks.PodIdentityAssociation(
                     f"{cluster_name}-{site_name}-workbench-session-pod-identity",
                     cluster_name=cluster_name,

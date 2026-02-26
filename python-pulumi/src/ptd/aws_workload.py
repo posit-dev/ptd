@@ -264,6 +264,7 @@ class AWSWorkloadClusterConfig(ptd.WorkloadClusterConfig):
     karpenter_config: KarpenterConfig | None = None
 
     def __post_init__(self) -> None:
+        super().__post_init__()
         if self.enable_external_secrets_operator and not self.enable_pod_identity_agent:
             msg = (
                 "enable_external_secrets_operator requires enable_pod_identity_agent=True "
