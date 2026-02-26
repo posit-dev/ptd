@@ -232,6 +232,9 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 f"enable_nfs_subdir_provisioner=True but secret '{self.workload.secret_name}' "
                 "is missing or does not contain 'fs-dns-name'."
             )
+            if pulumi.runtime.is_dry_run():
+                pulumi.warn(msg)
+                return
             raise ValueError(msg)
 
         fsx_dns_name = workload_secrets["fs-dns-name"]

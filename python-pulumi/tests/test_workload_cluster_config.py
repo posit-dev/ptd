@@ -3,6 +3,7 @@ import dataclasses
 import pytest
 
 import ptd
+import ptd.aws_workload
 
 
 def test_workload_cluster_config_default_initialization():
@@ -308,3 +309,22 @@ def test_workload_cluster_config_custom_k8s_resources_in_workload():
 
     assert workload_config.clusters["20250328"].custom_k8s_resources == ["storage", "common"]
     assert workload_config.clusters["20250415"].custom_k8s_resources == ["monitoring"]
+
+
+def test_eso_requires_pod_identity():
+    """enable_external_secrets_operator=True without enable_pod_identity_agent=True raises ValueError."""
+    with pytest.raises(ValueError, match="enable_pod_identity_agent=True"):
+        ptd.aws_workload.AWSWorkloadClusterConfig(
+            enable_external_secrets_operator=True,
+            enable_pod_identity_agent=False,
+        )
+
+
+def test_eso_with_pod_identity_is_valid():
+    """enable_external_secrets_operator=True with enable_pod_identity_agent=True is allowed."""
+    cfg = ptd.aws_workload.AWSWorkloadClusterConfig(
+        enable_external_secrets_operator=True,
+        enable_pod_identity_agent=True,
+    )
+    assert cfg.enable_external_secrets_operator is True
+    assert cfg.enable_pod_identity_agent is True

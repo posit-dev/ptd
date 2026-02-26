@@ -26,6 +26,11 @@ def test_nfs_server_and_path_set():
     assert values["nfs"]["path"] == path
 
 
+def test_nfs_default_path():
+    values = _nfs_subdir_provisioner_values("fs-123.fsx.us-east-1.amazonaws.com")
+    assert values["nfs"]["path"] == "/fsx"
+
+
 def test_values_yaml_roundtrip():
     """Verify the structure survives a yaml.dump/yaml.safe_load round-trip."""
     values = _nfs_subdir_provisioner_values("fs-abc.fsx.us-east-1.amazonaws.com")

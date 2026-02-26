@@ -263,6 +263,14 @@ class AWSWorkloadClusterConfig(ptd.WorkloadClusterConfig):
     efs_config: ptd.EFSConfig | None = None
     karpenter_config: KarpenterConfig | None = None
 
+    def __post_init__(self) -> None:
+        if self.enable_external_secrets_operator and not self.enable_pod_identity_agent:
+            msg = (
+                "enable_external_secrets_operator requires enable_pod_identity_agent=True "
+                "(ClusterSecretStore uses no auth block and relies on Pod Identity for credentials)."
+            )
+            raise ValueError(msg)
+
 
 @dataclasses.dataclass(frozen=True)
 class AWSWorkloadClusterComponentConfig(ptd.WorkloadClusterComponentConfig):
