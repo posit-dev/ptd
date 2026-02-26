@@ -188,6 +188,10 @@ class AWSWorkloadSites(pulumi.ComponentResource):
                         name=f"{site_name}-secrets",
                         namespace=ptd.POSIT_TEAM_NAMESPACE,
                         labels=self.required_tags,
+                        annotations={
+                            # Bound the retry window on fresh deploys while ESO CRDs converge.
+                            "external-secrets.io/reconcile-timeout": "5m",
+                        },
                     ),
                     api_version="external-secrets.io/v1beta1",
                     kind="ExternalSecret",

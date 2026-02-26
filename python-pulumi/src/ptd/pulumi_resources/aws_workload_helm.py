@@ -14,6 +14,52 @@ from ptd.pulumi_resources.lib import format_lb_tags
 ALLOY_NAMESPACE = "alloy"
 
 
+def _nfs_subdir_provisioner_values(fsx_dns_name: str, fsx_nfs_path: str = "/fsx") -> dict:
+    """Build the Helm values dict for nfs-subdir-external-provisioner."""
+    return {
+        "nfs": {
+            "server": fsx_dns_name,
+            "path": fsx_nfs_path,
+            "mountOptions": [
+                "nfsvers=4.2",
+                "rsize=1048576",
+                "wsize=1048576",
+                "timeo=600",
+            ],
+        },
+        "storageClass": {
+            "name": "posit-shared-storage",
+            "reclaimPolicy": "Retain",
+            "accessModes": "ReadWriteMany",
+            "onDelete": "retain",
+            "pathPattern": "${.PVC.annotations.nfs.io/storage-path}",
+        },
+    }
+
+
+def _eso_helm_values() -> dict:
+    """Build the Helm values dict for external-secrets-operator."""
+    return {
+        "installCRDs": True,
+        "serviceAccount": {
+            "create": True,
+            "name": "external-secrets",
+        },
+    }
+
+
+def _cluster_secret_store_spec(region: str) -> dict:
+    """Build the ClusterSecretStore spec for AWS Secrets Manager (no auth — uses Pod Identity)."""
+    return {
+        "provider": {
+            "aws": {
+                "service": "SecretsManager",
+                "region": region,
+            },
+        },
+    }
+
+
 def _build_alb_tag_string(true_name: str, environment: str, compound_name: str) -> str:
     """Build the ALB annotation tag string from workload config values.
 
@@ -74,7 +120,9 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
 
             self._define_aws_lbc(release, components.aws_load_balancer_controller_version)
             self._define_aws_fsx_openzfs_csi(release, components.aws_fsx_openzfs_csi_driver_version)
-            self._define_nfs_subdir_provisioner(release, components.nfs_subdir_provisioner_version)
+            # Deploy nfs-subdir-external-provisioner (opt-in via enable_nfs_subdir_provisioner)
+            if self.workload.cfg.clusters[release].enable_nfs_subdir_provisioner:
+                self._define_nfs_subdir_provisioner(release, components.nfs_subdir_provisioner_version)
             if not self.workload.cfg.secrets_store_addon_enabled:
                 self._define_secret_store_csi(release, components.secret_store_csi_driver_version)
                 self._define_secret_store_csi_aws(release, components.secret_store_csi_driver_aws_provider_version)
@@ -189,27 +237,7 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
             "repo": "https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/",
             "chart": "nfs-subdir-external-provisioner",
             "targetNamespace": ptd.KUBE_SYSTEM_NAMESPACE,
-            "valuesContent": yaml.dump(
-                {
-                    "nfs": {
-                        "server": fsx_dns_name,
-                        "path": fsx_nfs_path,
-                        "mountOptions": [
-                            "nfsvers=4.2",
-                            "rsize=1048576",
-                            "wsize=1048576",
-                            "timeo=600",
-                        ],
-                    },
-                    "storageClass": {
-                        "name": "posit-shared-storage",
-                        "reclaimPolicy": "Retain",
-                        "accessModes": "ReadWriteMany",
-                        "onDelete": "retain",
-                        "pathPattern": "${.PVC.annotations.nfs.io/storage-path}",
-                    },
-                }
-            ),
+            "valuesContent": yaml.dump(_nfs_subdir_provisioner_values(fsx_dns_name, fsx_nfs_path)),
         }
         if version is not None:
             spec["version"] = version
@@ -242,15 +270,7 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
             "repo": "https://charts.external-secrets.io",
             "chart": "external-secrets",
             "targetNamespace": "external-secrets",
-            "valuesContent": yaml.dump(
-                {
-                    "installCRDs": True,
-                    "serviceAccount": {
-                        "create": True,
-                        "name": "external-secrets",
-                    },
-                }
-            ),
+            "valuesContent": yaml.dump(_eso_helm_values()),
         }
         if version is not None:
             eso_spec["version"] = version
@@ -278,16 +298,7 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
             ),
             api_version="external-secrets.io/v1beta1",
             kind="ClusterSecretStore",
-            spec={
-                "provider": {
-                    "aws": {
-                        "service": "SecretsManager",
-                        "region": self.workload.cfg.region,
-                        # No auth block: Pod Identity injects credentials via the agent;
-                        # omitting auth causes ESO to use the ambient pod credentials.
-                    },
-                },
-            },
+            spec=_cluster_secret_store_spec(self.workload.cfg.region),
             opts=pulumi.ResourceOptions(provider=self.kube_providers[release], depends_on=[eso_helm_release]),
         )
 

@@ -2,28 +2,10 @@
 
 import yaml
 
-
-def _build_eso_helm_values() -> dict:
-    """Build the ESO Helm values dict (mirrors _define_external_secrets_operator)."""
-    return {
-        "installCRDs": True,
-        "serviceAccount": {
-            "create": True,
-            "name": "external-secrets",
-        },
-    }
-
-
-def _build_cluster_secret_store_spec(region: str) -> dict:
-    """Build the ClusterSecretStore spec (mirrors _define_external_secrets_operator)."""
-    return {
-        "provider": {
-            "aws": {
-                "service": "SecretsManager",
-                "region": region,
-            },
-        },
-    }
+from ptd.pulumi_resources.aws_workload_helm import (
+    _cluster_secret_store_spec,
+    _eso_helm_values,
+)
 
 
 def _build_external_secret_spec(site_name: str, secret_key: str) -> dict:
@@ -49,12 +31,12 @@ def _build_external_secret_spec(site_name: str, secret_key: str) -> dict:
 
 
 def test_eso_helm_values_install_crds():
-    values = _build_eso_helm_values()
+    values = _eso_helm_values()
     assert values["installCRDs"] is True
 
 
 def test_eso_helm_values_service_account():
-    values = _build_eso_helm_values()
+    values = _eso_helm_values()
     sa = values["serviceAccount"]
     assert sa["create"] is True
     assert sa["name"] == "external-secrets"
@@ -63,7 +45,7 @@ def test_eso_helm_values_service_account():
 
 
 def test_eso_helm_values_yaml_roundtrip():
-    values = _build_eso_helm_values()
+    values = _eso_helm_values()
     parsed = yaml.safe_load(yaml.dump(values))
     assert parsed["installCRDs"] is True
     assert parsed["serviceAccount"]["name"] == "external-secrets"
@@ -72,7 +54,7 @@ def test_eso_helm_values_yaml_roundtrip():
 
 def test_cluster_secret_store_no_auth_block():
     """ClusterSecretStore must have no auth block — credentials come from Pod Identity."""
-    spec = _build_cluster_secret_store_spec("us-east-1")
+    spec = _cluster_secret_store_spec("us-east-1")
     aws_provider = spec["provider"]["aws"]
     assert aws_provider["service"] == "SecretsManager"
     assert aws_provider["region"] == "us-east-1"
@@ -80,7 +62,7 @@ def test_cluster_secret_store_no_auth_block():
 
 
 def test_cluster_secret_store_region_propagated():
-    spec = _build_cluster_secret_store_spec("eu-west-1")
+    spec = _cluster_secret_store_spec("eu-west-1")
     assert spec["provider"]["aws"]["region"] == "eu-west-1"
 
 

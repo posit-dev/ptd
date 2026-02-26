@@ -1321,7 +1321,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
             By setting this to None, the latest version will be installed.
         :return: self
         """
-        aws.eks.Addon(
+        self.pod_identity_agent_addon = aws.eks.Addon(
             f"{self.name}-eks-pod-identity-agent",
             args=aws.eks.AddonArgs(
                 addon_name="eks-pod-identity-agent",
