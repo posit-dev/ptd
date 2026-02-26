@@ -78,7 +78,7 @@ class StandardPulumiMocks(pulumi.runtime.Mocks):
         return args.name, dict(args.inputs)
 
     def call(
-        self, args: pulumi.runtime.MockCallArgs
+        self, args: pulumi.runtime.MockCallArgs  # noqa: ARG002
     ) -> dict[typing.Any, typing.Any] | tuple[dict[typing.Any, typing.Any], list[tuple[str, str]] | None]:
         """Mock function calls - returns empty dict."""
         return {}

@@ -5,16 +5,13 @@ of how to use them in your own tests.
 """
 
 import pathlib
-import typing
 
 import pulumi
 import pulumi_aws as aws
-import pytest
 
 import ptd.aws_workload
 import ptd.azure_workload
 from ptd.paths import Paths
-
 
 # ============================================================================
 # Tests for ptd_root fixture
@@ -82,7 +79,7 @@ def test_aws_workload_has_site(aws_workload: ptd.aws_workload.AWSWorkload) -> No
     assert site.domain == "puppy.party"
 
 
-def test_aws_workload_sets_ptd_root(aws_workload: ptd.aws_workload.AWSWorkload) -> None:
+def test_aws_workload_sets_ptd_root(aws_workload: ptd.aws_workload.AWSWorkload) -> None:  # noqa: ARG001
     """Test that aws_workload fixture also sets PTD_ROOT."""
     paths = Paths()
     # Should not raise RuntimeError
@@ -123,7 +120,7 @@ def test_azure_workload_has_network_config(azure_workload: ptd.azure_workload.Az
     assert network.db_subnet_cidr == "10.0.2.0/24"
 
 
-def test_azure_workload_sets_ptd_root(azure_workload: ptd.azure_workload.AzureWorkload) -> None:
+def test_azure_workload_sets_ptd_root(azure_workload: ptd.azure_workload.AzureWorkload) -> None:  # noqa: ARG001
     """Test that azure_workload fixture also sets PTD_ROOT."""
     paths = Paths()
     # Should not raise RuntimeError
