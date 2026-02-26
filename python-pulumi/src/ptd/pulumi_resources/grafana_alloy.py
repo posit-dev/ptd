@@ -574,6 +574,12 @@ class AlloyConfig(pulumi.ComponentResource):
                         target_label = "cluster"
                         replacement  = "{cluster_name}"
                     }}
+
+                    rule {{
+                        action       = "replace"
+                        target_label = "tenant_name"
+                        replacement  = "{tenant_name}"
+                    }}
                 }}
 
                 prometheus.remote_write "control_room" {{
