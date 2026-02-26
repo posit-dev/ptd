@@ -341,6 +341,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     required_tags=self.required_tags,
                 )
 
+                # Key format: release + "//" + site_name — must stay in sync with _define_pod_identity_associations.
                 self.packagemanager_roles[release + "//" + site_name] = self._define_k8s_iam_role(
                     name=self.workload.cluster_packagemanager_role_name(release, site_name),
                     release=release,
@@ -571,12 +572,8 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
             cluster_cfg = self.workload.cfg.clusters[release]
             if not cluster_cfg.enable_external_secrets_operator:
                 continue
-            if not cluster_cfg.enable_pod_identity_agent:
-                msg = (
-                    f"Release '{release}': enable_external_secrets_operator requires enable_pod_identity_agent=True "
-                    "(ClusterSecretStore uses no auth block and relies on Pod Identity for credentials)."
-                )
-                raise ValueError(msg)
+            # Invariant: enable_pod_identity_agent=True when enable_external_secrets_operator=True
+            # is enforced by AWSWorkloadClusterConfig.__post_init__; no need to re-check here.
             self.external_secrets_roles[release] = self._define_k8s_iam_role(
                 name=self.workload.external_secrets_role_name(release),
                 release=release,
@@ -665,6 +662,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 )
 
                 # Package Manager
+                # Key format uses "//" separator — must match _define_packagemanager_iam (release + "//" + site_name).
                 aws.eks.PodIdentityAssociation(
                     f"{cluster_name}-{site_name}-packagemanager-pod-identity",
                     cluster_name=cluster_name,
@@ -686,6 +684,10 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     )
 
                 # Home/Flightdeck (optional product — skip if not configured for this release)
+                # Note: home_roles is keyed per-release (one role per release), but the association
+                # targets a per-site service account ({site_name}-home). This assumes Home uses
+                # per-site service accounts consistent with other products (connect, workbench).
+                # If Home uses a single per-release SA, move this block outside the site loop.
                 if release in self.home_roles:
                     aws.eks.PodIdentityAssociation(
                         f"{cluster_name}-{site_name}-home-pod-identity",

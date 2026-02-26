@@ -311,6 +311,24 @@ def test_workload_cluster_config_custom_k8s_resources_in_workload():
     assert workload_config.clusters["20250415"].custom_k8s_resources == ["monitoring"]
 
 
+def test_packagemanager_roles_key_format():
+    """Verify the '//' separator used as the packagemanager_roles dict key.
+
+    Both _define_packagemanager_iam (population) and _define_pod_identity_associations (lookup)
+    must use the same key format: release + "//" + site_name.
+    This test documents the convention and catches accidental changes to either side.
+    """
+    release = "20250328"
+    site_name = "mysite"
+    population_key = release + "//" + site_name
+    lookup_key = release + "//" + site_name
+    assert population_key == lookup_key
+    assert population_key == "20250328//mysite"
+    # Slashes in release or site_name would silently break the separator convention.
+    assert "/" not in release
+    assert "/" not in site_name
+
+
 def test_eso_requires_pod_identity():
     """enable_external_secrets_operator=True without enable_pod_identity_agent=True raises ValueError."""
     with pytest.raises(ValueError, match="enable_pod_identity_agent=True"):

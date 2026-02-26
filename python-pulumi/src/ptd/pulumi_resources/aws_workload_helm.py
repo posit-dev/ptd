@@ -272,6 +272,12 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
         (~1-2 reconcile loops). This is an architectural constraint of using HelmChart CRDs
         rather than ``pulumi_kubernetes.helm.v3.Release``.
         """
+        if pulumi.runtime.is_dry_run():
+            pulumi.warn(
+                f"[{release}] ESO is enabled: on a fresh deploy, the ClusterSecretStore and "
+                "ExternalSecret CRs will log errors until ESO's CRDs converge "
+                "(~1-2 reconcile loops, up to ~5 minutes). This is expected and self-resolving."
+            )
         # Deploy external-secrets-operator Helm chart
         eso_spec: dict = {
             "repo": "https://charts.external-secrets.io",
