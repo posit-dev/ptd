@@ -104,8 +104,6 @@ groups:
               Issue:       No metrics received
               Duration:    10 minutes
 
-              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/workload-metrics-silent.md
-              📊 https://grafana.example.com/d/mimir?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false

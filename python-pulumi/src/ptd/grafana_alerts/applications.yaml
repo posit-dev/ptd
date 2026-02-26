@@ -78,8 +78,6 @@ groups:
               Issue:       WAL disk full
               Duration:    5 minutes
 
-              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/loki-wal-disk-full.md
-              📊 https://grafana.example.com/d/loki?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false

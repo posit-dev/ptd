@@ -79,8 +79,6 @@ groups:
               Threshold:   80%
               Duration:    5 minutes
 
-              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/fsx-capacity-low.md
-              📊 https://grafana.example.com/d/cloudwatch?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false
@@ -156,8 +154,6 @@ groups:
               Threshold:   300 MiB/s
               Duration:    5 minutes
 
-              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/ec2-network-high.md
-              📊 https://grafana.example.com/d/cloudwatch?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false
@@ -229,8 +225,6 @@ groups:
               Threshold:   400,000 packets/s
               Duration:    5 minutes
 
-              📖 https://github.com/posit-dev/ptd/blob/main/docs/runbooks/ec2-network-high.md
-              📊 https://grafana.example.com/d/cloudwatch?var-cluster={{ $labels.cluster }}
           labels:
             opsgenie: "1"
           isPaused: false
