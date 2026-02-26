@@ -11,7 +11,7 @@ import ptd.aws_workload
 import ptd.pulumi_resources.aws_eks_cluster
 import ptd.pulumi_resources.team_site
 import ptd.secrecy
-from ptd.pulumi_resources.aws_workload_helm import CLUSTER_SECRET_STORE_NAME
+from ptd.pulumi_resources.aws_workload_helm import CLUSTER_SECRET_STORE_NAME, ESO_API_VERSION
 
 
 def _external_secret_spec(site_name: str, secret_key: str) -> dict:
@@ -213,9 +213,7 @@ class AWSWorkloadSites(pulumi.ComponentResource):
                         namespace=ptd.POSIT_TEAM_NAMESPACE,
                         labels=self.required_tags,
                     ),
-                    # v1beta1 matches external_secrets_operator_version default "0.10.7".
-                    # Update this if ESO is upgraded past the version that drops v1beta1 support.
-                    api_version="external-secrets.io/v1beta1",
+                    api_version=ESO_API_VERSION,
                     kind="ExternalSecret",
                     spec=_external_secret_spec(site_name, self.workload.site_secret_name(site_name)),
                     opts=pulumi.ResourceOptions(

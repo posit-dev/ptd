@@ -34,6 +34,9 @@ def _make_clusters_mock(
     m.connect_roles = {r: MagicMock() for r in releases}
     m.workbench_roles = {r: MagicMock() for r in releases}
 
+    # external_secrets_roles is keyed by release and uses an invariant guard when ESO is enabled.
+    m.external_secrets_roles = {r: MagicMock() for r in releases} if enable_eso else {}
+
     # connect_session_roles and workbench_session_roles are keyed by "{release}-{site}" and use
     # explicit invariant guards, so they must be real dicts populated for every release/site combo.
     m.connect_session_roles = {f"{r}-{s}": MagicMock() for r in releases for s in sites}
@@ -143,6 +146,38 @@ def _make_role_mock(oidc_url_tails: list[str]) -> MagicMock:
     m.workload.iam_permissions_boundary = None
     m.required_tags = {}
     return m
+
+
+def test_define_k8s_iam_role_fallback_path_pod_identity_no_oidc():
+    """With pod_identity=True and no OIDC provider, policy uses caller ARN + Pod Identity statements."""
+    m = _make_role_mock(oidc_url_tails=[])
+    with (
+        patch("ptd.pulumi_resources.aws_workload_clusters.aws.iam.Role"),
+        patch("ptd.pulumi_resources.aws_workload_clusters.aws.iam.RoleArgs") as mock_role_args,
+        patch("ptd.pulumi_resources.aws_workload_clusters.aws.get_caller_identity") as mock_id,
+    ):
+        mock_id.return_value.arn = "arn:aws:iam::123456789012:root"
+        AWSWorkloadClusters._define_k8s_iam_role(m, name="test-role", release="test-release", namespace="test-ns", pod_identity=True)
+        policy = json.loads(mock_role_args.call_args.kwargs["assume_role_policy"])
+
+    # Should have caller ARN statement (fallback) + Pod Identity statement
+    services = [
+        s.get("Principal", {}).get("Service")
+        for s in policy["Statement"]
+        if isinstance(s.get("Principal"), dict)
+    ]
+    assert "pods.eks.amazonaws.com" in services
+
+    principals_aws = [
+        s.get("Principal", {}).get("AWS")
+        for s in policy["Statement"]
+        if isinstance(s.get("Principal"), dict) and "AWS" in s.get("Principal", {})
+    ]
+    assert len(principals_aws) == 1
+
+    pod_stmt = next(s for s in policy["Statement"] if s.get("Principal", {}).get("Service") == "pods.eks.amazonaws.com")
+    assert "sts:AssumeRole" in pod_stmt["Action"]
+    assert "sts:TagSession" in pod_stmt["Action"]
 
 
 def test_define_k8s_iam_role_trust_policy_includes_pod_identity_statement():

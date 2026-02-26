@@ -695,10 +695,16 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
 
             # External Secrets Operator (per-release, only if ESO is also enabled)
             if cluster_cfg.enable_external_secrets_operator:
+                if release not in self.external_secrets_roles:
+                    raise RuntimeError(
+                        f"external_secrets_roles missing key {release!r}; "
+                        "_define_external_secrets_iam must be called before _define_pod_identity_associations"
+                    )
                 _eso_sa = ptd.pulumi_resources.aws_workload_helm.ESO_SERVICE_ACCOUNT
+                _eso_ns = ptd.pulumi_resources.aws_workload_helm.ESO_NAMESPACE
                 _pod_identity_assoc(
                     self, _eso_sa, cluster_name,
-                    _eso_sa, _eso_sa,
+                    _eso_ns, _eso_sa,
                     self.external_secrets_roles[release].arn,
                 )
 

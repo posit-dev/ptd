@@ -15,6 +15,10 @@ ALLOY_NAMESPACE = "alloy"
 NFS_STORAGE_CLASS_NAME = "posit-shared-storage"
 CLUSTER_SECRET_STORE_NAME = "aws-secrets-manager"
 ESO_SERVICE_ACCOUNT = "external-secrets"
+ESO_NAMESPACE = "external-secrets"
+# v1beta1 matches external_secrets_operator_version default "0.10.7".
+# Update this if ESO is upgraded past the version that drops v1beta1 support.
+ESO_API_VERSION = "external-secrets.io/v1beta1"
 
 
 def _nfs_subdir_provisioner_values(fsx_dns_name: str, fsx_nfs_path: str = "/fsx") -> dict:
@@ -60,6 +64,9 @@ def _cluster_secret_store_spec(region: str) -> dict:
                 "region": region,
             },
         },
+        "conditions": [
+            {"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": ptd.POSIT_TEAM_NAMESPACE}}}
+        ],
     }
 
 
@@ -284,7 +291,7 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
         eso_spec: dict = {
             "repo": "https://charts.external-secrets.io",
             "chart": "external-secrets",
-            "targetNamespace": ESO_SERVICE_ACCOUNT,
+            "targetNamespace": ESO_NAMESPACE,
             "valuesContent": yaml.dump(_eso_helm_values()),
         }
         if version is not None:
@@ -313,9 +320,7 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 name=CLUSTER_SECRET_STORE_NAME,
                 labels=self.required_tags,
             ),
-            # v1beta1 matches external_secrets_operator_version default "0.10.7".
-            # Update this if ESO is upgraded past the version that drops v1beta1 support.
-            api_version="external-secrets.io/v1beta1",
+            api_version=ESO_API_VERSION,
             kind="ClusterSecretStore",
             spec=_cluster_secret_store_spec(self.workload.cfg.region),
             opts=pulumi.ResourceOptions(
