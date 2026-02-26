@@ -568,8 +568,14 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         self.external_secrets_roles = {}
 
         for release in self.managed_clusters_by_release:
-            if not self.workload.cfg.clusters[release].enable_external_secrets_operator:
+            cluster_cfg = self.workload.cfg.clusters[release]
+            if not cluster_cfg.enable_external_secrets_operator:
                 continue
+            if not cluster_cfg.enable_pod_identity_agent:
+                raise ValueError(
+                    f"Release '{release}': enable_external_secrets_operator requires enable_pod_identity_agent=True "
+                    "(ClusterSecretStore uses no auth block and relies on Pod Identity for credentials)."
+                )
             self.external_secrets_roles[release] = self._define_k8s_iam_role(
                 name=self.workload.external_secrets_role_name(release),
                 release=release,
@@ -592,6 +598,10 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         Note: team_operator_roles is intentionally excluded here. The team-operator's service
         account retains IRSA-based access; Pod Identity will be added in a future phase once
         the operator itself is updated to remove IRSA annotation computation.
+
+        Note: fsx_openzfs_roles is also intentionally excluded. The FSx OpenZFS CSI driver uses
+        node-level IAM (instance profile) rather than pod-level credentials, so no Pod Identity
+        association is needed for those roles.
         """
         for release in self.managed_clusters_by_release:
             cluster_cfg = self.workload.cfg.clusters[release]

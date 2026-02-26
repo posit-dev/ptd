@@ -13,6 +13,28 @@ import ptd.pulumi_resources.team_site
 import ptd.secrecy
 
 
+def _external_secret_spec(site_name: str, secret_key: str) -> dict:
+    """Build the ExternalSecret spec dict for a site."""
+    return {
+        "refreshInterval": "1h",
+        "secretStoreRef": {
+            "name": "aws-secrets-manager",
+            "kind": "ClusterSecretStore",
+        },
+        "target": {
+            "name": f"{site_name}-secrets",
+            "creationPolicy": "Owner",
+        },
+        "dataFrom": [
+            {
+                "extract": {
+                    "key": secret_key,
+                }
+            }
+        ],
+    }
+
+
 class AWSWorkloadSites(pulumi.ComponentResource):
     workload: ptd.aws_workload.AWSWorkload
 
@@ -195,24 +217,7 @@ class AWSWorkloadSites(pulumi.ComponentResource):
                     ),
                     api_version="external-secrets.io/v1beta1",
                     kind="ExternalSecret",
-                    spec={
-                        "refreshInterval": "1h",
-                        "secretStoreRef": {
-                            "name": "aws-secrets-manager",
-                            "kind": "ClusterSecretStore",
-                        },
-                        "target": {
-                            "name": f"{site_name}-secrets",
-                            "creationPolicy": "Owner",
-                        },
-                        "dataFrom": [
-                            {
-                                "extract": {
-                                    "key": self.workload.site_secret_name(site_name),
-                                }
-                            }
-                        ],
-                    },
+                    spec=_external_secret_spec(site_name, self.workload.site_secret_name(site_name)),
                     opts=pulumi.ResourceOptions(
                         parent=self,
                         provider=self.kube_providers[release],

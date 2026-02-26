@@ -6,28 +6,7 @@ from ptd.pulumi_resources.aws_workload_helm import (
     _cluster_secret_store_spec,
     _eso_helm_values,
 )
-
-
-def _build_external_secret_spec(site_name: str, secret_key: str) -> dict:
-    """Build the ExternalSecret spec (mirrors _define_external_secrets in aws_workload_sites)."""
-    return {
-        "refreshInterval": "1h",
-        "secretStoreRef": {
-            "name": "aws-secrets-manager",
-            "kind": "ClusterSecretStore",
-        },
-        "target": {
-            "name": f"{site_name}-secrets",
-            "creationPolicy": "Owner",
-        },
-        "dataFrom": [
-            {
-                "extract": {
-                    "key": secret_key,
-                }
-            }
-        ],
-    }
+from ptd.pulumi_resources.aws_workload_sites import _external_secret_spec as _build_external_secret_spec
 
 
 def test_eso_helm_values_install_crds():
