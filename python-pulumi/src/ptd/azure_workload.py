@@ -94,8 +94,19 @@ class AzureWorkloadClusterConfig(ptd.WorkloadClusterConfig):
     public_endpoint_access: bool = True
     system_node_pool_instance_type: str | None = "Standard_D2s_v6"
 
-    # Required: defines user node pools as separate AgentPool resources
+    # Legacy field - maintained for backward compatibility
+    # Used to configure the hardcoded "userpool" in AgentPoolProfiles for legacy clusters
+    user_node_pool_instance_type: str | None = "Standard_D2s_v6"
+
+    # defines additional user node pools as separate AgentPool resources
+    # Works for both new clusters (all user pools) and legacy clusters (additional pools)
     user_node_pools: list[AzureUserNodePoolConfig] | None = None
+
+    # Optional: explicit flag to control whether to include legacy user pool in agentPoolProfiles
+    # Set to True for existing clusters to maintain the hardcoded "userpool" in AgentPoolProfiles
+    # Set to False (or omit) for new clusters to have all user pools as separate AgentPool resources
+    # Legacy clusters can have BOTH the hardcoded userpool AND additional user_node_pools
+    use_legacy_user_pool: bool | None = None
 
     # Optional: Root disk size for system node pool in GB (defaults to 128)
     system_node_pool_root_disk_size: int | None = None
