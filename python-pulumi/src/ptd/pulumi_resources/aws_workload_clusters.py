@@ -590,6 +590,16 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         for release in self.managed_clusters_by_release:
             cluster_name = f"{self.workload.compound_name}-{release}"
 
+            # External Secrets Operator (per-release, not per-site)
+            aws.eks.PodIdentityAssociation(
+                f"{cluster_name}-external-secrets-pod-identity",
+                cluster_name=cluster_name,
+                namespace="external-secrets",
+                service_account="external-secrets",
+                role_arn=self.external_secrets_roles[release].arn,
+                opts=pulumi.ResourceOptions(parent=self),
+            )
+
             # Per-site product associations
             for site_name in sorted(self.workload.cfg.sites.keys()):
                 # Connect

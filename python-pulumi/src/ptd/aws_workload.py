@@ -268,6 +268,8 @@ class AWSWorkloadClusterComponentConfig(ptd.WorkloadClusterComponentConfig):
     secret_store_csi_driver_aws_provider_version: str | None = "0.3.5"  # noqa: S105
     nvidia_device_plugin_version: str | None = "0.17.1"
     karpenter_version: str | None = "1.6.0"
+    nfs_subdir_provisioner_version: str | None = "4.0.18"
+    external_secrets_operator_version: str | None = "0.10.7"
 
 
 class AWSWorkload(ptd.workload.AbstractWorkload):
