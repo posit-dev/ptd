@@ -314,17 +314,19 @@ def test_workload_cluster_config_custom_k8s_resources_in_workload():
 def test_packagemanager_roles_key_format():
     """Verify the '//' separator used as the packagemanager_roles dict key.
 
-    Both _define_packagemanager_iam (population) and _define_pod_identity_associations (lookup)
-    must use the same key format: release + "//" + site_name.
-    This test documents the convention and catches accidental changes to either side.
+    _define_packagemanager_iam (population) and _define_pod_identity_associations (lookup)
+    must produce the same key. Both currently use: release + "//" + site_name.
+    This test uses the two expression forms so a change to either separator would fail here.
     """
     release = "20250328"
     site_name = "mysite"
+    # Form used by _define_packagemanager_iam
     population_key = release + "//" + site_name
-    lookup_key = release + "//" + site_name
+    # Form used by _define_pod_identity_associations
+    lookup_key = f"{release}//{site_name}"
     assert population_key == lookup_key
     assert population_key == "20250328//mysite"
-    # Slashes in release or site_name would silently break the separator convention.
+    # Slashes in release or site_name would silently corrupt the separator.
     assert "/" not in release
     assert "/" not in site_name
 

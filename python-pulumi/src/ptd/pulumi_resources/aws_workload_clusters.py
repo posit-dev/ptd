@@ -138,6 +138,8 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
 
     @staticmethod
     def _define_read_secrets_inline() -> str:
+        # resources=["*"] is intentional: workload roles (connect, workbench, packagemanager, ESO, etc.)
+        # all use this same broad policy. Scoping to specific ARN prefixes is tracked separately.
         return aws.iam.get_policy_document(
             statements=[
                 aws.iam.GetPolicyDocumentStatementArgs(
@@ -684,10 +686,9 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     )
 
                 # Home/Flightdeck (optional product — skip if not configured for this release)
-                # Note: home_roles is keyed per-release (one role per release), but the association
-                # targets a per-site service account ({site_name}-home). This assumes Home uses
-                # per-site service accounts consistent with other products (connect, workbench).
-                # If Home uses a single per-release SA, move this block outside the site loop.
+                # home_roles is keyed per-release (one IAM role per release), but Home's trust
+                # policy allows all per-site SAs ({site_name}-home) — see _define_home_iam.
+                # Pod Identity requires one association per SA, so this block stays inside the loop.
                 if release in self.home_roles:
                     aws.eks.PodIdentityAssociation(
                         f"{cluster_name}-{site_name}-home-pod-identity",
