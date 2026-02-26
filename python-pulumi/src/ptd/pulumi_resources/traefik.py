@@ -43,6 +43,7 @@ class Traefik(pulumi.ComponentResource):
         node_selector: str = "",
         cert: aws.acm.Certificate | None = None,
         deployment_replicas: int = 3,
+        version: str = "33.2.1",
         *args,
         **kwargs,
     ):
@@ -63,6 +64,7 @@ class Traefik(pulumi.ComponentResource):
         self.cluster = cluster
         self.node_selector: str = node_selector
         self.deployment_replicas = deployment_replicas
+        self.version = version
         self.traefik: k8s.helm.v3.Release | None = None
         self._deploy(cert)
 
@@ -156,7 +158,7 @@ class Traefik(pulumi.ComponentResource):
             f"{self.cluster.name}-traefik",
             k8s.helm.v3.ReleaseArgs(
                 chart="traefik",
-                version="33.2.1",
+                version=self.version,
                 namespace=self.namespace,
                 name="traefik",
                 repository_opts=k8s.helm.v3.RepositoryOptsArgs(

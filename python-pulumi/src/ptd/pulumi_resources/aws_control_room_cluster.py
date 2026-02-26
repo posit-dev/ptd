@@ -218,6 +218,7 @@ class AWSControlRoomCluster(pulumi.ComponentResource):
             "",
             cert,
             deployment_replicas=self.control_room.cfg.traefik_deployment_replicas,
+            version=self.control_room.cfg.traefik_version,
             opts=pulumi.ResourceOptions(
                 parent=self.eks,
                 provider=self.eks.provider,
