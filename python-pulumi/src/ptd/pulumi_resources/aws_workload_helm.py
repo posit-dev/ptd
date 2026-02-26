@@ -68,23 +68,13 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
         )
         cert_arns_output = persistent_stack.require_output("cert_arns")
 
-        self.workload_secrets_dict, ok = ptd.secrecy.aws_get_secret_value_json(
-            self.workload.secret_name, region=self.workload.cfg.region
-        )
-        if not ok:
-            msg = f"Failed to look up secret {self.workload.secret_name!r}"
-            pulumi.error(msg, self)
-            raise ValueError(msg)
-
         for release in self.managed_clusters_by_release:
             components = self.workload.cfg.clusters[release].components
             weight = self.workload.cfg.clusters[release].routing_weight
 
             self._define_aws_lbc(release, components.aws_load_balancer_controller_version)
             self._define_aws_fsx_openzfs_csi(release, components.aws_fsx_openzfs_csi_driver_version)
-            # Deploy nfs-subdir-external-provisioner if FSx is configured
-            if "fs-dns-name" in self.workload_secrets_dict:
-                self._define_nfs_subdir_provisioner(release, components.nfs_subdir_provisioner_version)
+            self._define_nfs_subdir_provisioner(release, components.nfs_subdir_provisioner_version)
             if not self.workload.cfg.secrets_store_addon_enabled:
                 self._define_secret_store_csi(release, components.secret_store_csi_driver_version)
                 self._define_secret_store_csi_aws(release, components.secret_store_csi_driver_aws_provider_version)
@@ -185,8 +175,14 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
 
     def _define_nfs_subdir_provisioner(self, release: str, version: str | None):
         """Deploy nfs-subdir-external-provisioner for FSx storage."""
-        fsx_dns_name = self.workload_secrets_dict["fs-dns-name"]
-        fsx_nfs_path = self.workload_secrets_dict.get("fs-nfs-path", "/fsx")
+        workload_secrets, ok = ptd.secrecy.aws_get_secret_value_json(
+            self.workload.secret_name, region=self.workload.cfg.region
+        )
+        if not ok or "fs-dns-name" not in workload_secrets:
+            return
+
+        fsx_dns_name = workload_secrets["fs-dns-name"]
+        fsx_nfs_path = workload_secrets.get("fs-nfs-path", "/fsx")
 
         spec: dict = {
             "repo": "https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/",
@@ -197,6 +193,12 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                     "nfs": {
                         "server": fsx_dns_name,
                         "path": fsx_nfs_path,
+                        "mountOptions": [
+                            "nfsvers=4.2",
+                            "rsize=1048576",
+                            "wsize=1048576",
+                            "timeo=600",
+                        ],
                     },
                     "storageClass": {
                         "name": "posit-shared-storage",
@@ -205,12 +207,6 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                         "onDelete": "retain",
                         "pathPattern": "${.PVC.annotations.nfs.io/storage-path}",
                     },
-                    "nfs.mountOptions": [
-                        "nfsvers=4.2",
-                        "rsize=1048576",
-                        "wsize=1048576",
-                        "timeo=600",
-                    ],
                 }
             ),
         }
@@ -231,7 +227,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
         )
 
     def _define_external_secrets_operator(self, release: str, version: str | None):
-        """Deploy external-secrets-operator and create ClusterSecretStore for AWS Secrets Manager."""
+        """Deploy external-secrets-operator and create ClusterSecretStore for AWS Secrets Manager.
+
+        Note: the ClusterSecretStore is created with ``depends_on=[eso_helm_release]``, which
+        ensures Pulumi registers it after the HelmChart CR object exists in the API server.
+        However, this does NOT wait for the Helm release to complete and CRDs to be installed.
+        On a fresh deploy, the ClusterSecretStore apply will fail until ESO's CRDs converge
+        (~1-2 reconcile loops). This is an architectural constraint of using HelmChart CRDs
+        rather than ``pulumi_kubernetes.helm.v3.Release``.
+        """
         # Deploy external-secrets-operator Helm chart
         eso_spec: dict = {
             "repo": "https://charts.external-secrets.io",
