@@ -312,6 +312,8 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 name=CLUSTER_SECRET_STORE_NAME,
                 labels=self.required_tags,
             ),
+            # v1beta1 matches external_secrets_operator_version default "0.10.7".
+            # Update this if ESO is upgraded past the version that drops v1beta1 support.
             api_version="external-secrets.io/v1beta1",
             kind="ClusterSecretStore",
             spec=_cluster_secret_store_spec(self.workload.cfg.region),

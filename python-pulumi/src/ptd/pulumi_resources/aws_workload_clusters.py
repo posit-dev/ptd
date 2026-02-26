@@ -128,7 +128,9 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         self.chronicle_roles = {}
         self.home_roles = {}
         self.external_secrets_roles = {}
+        self.connect_roles = {}
         self.connect_session_roles = {}
+        self.workbench_roles = {}
         self.workbench_session_roles = {}
 
         self._define_home_iam()
@@ -196,7 +198,9 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     actions=[
                         "secretsmanager:GetSecretValue",
                         "secretsmanager:DescribeSecret",
-                        "secretsmanager:ListSecrets",
+                        # ListSecrets does not support resource-level permissions in IAM;
+                        # including it in a resource-scoped statement would silently grant
+                        # list access to all secrets in the account.
                     ],
                     resources=[f"arn:aws:secretsmanager:{region}:{account_id}:secret:{prefix}/*"],
                 )
@@ -464,6 +468,9 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 managed_account_id=self.workload.cfg.account_id,
                 oidc_url_tails=self._oidc_url_tails,
                 auth_issuers=auth_issuers,
+            )
+            assert isinstance(irsa_policy.get("Statement"), list), (
+                "Expected Statement list from build_hybrid_irsa_role_assume_role_policy"
             )
             base_policy = {**irsa_policy, "Statement": list(irsa_policy["Statement"]) + extra_statements}
         else:

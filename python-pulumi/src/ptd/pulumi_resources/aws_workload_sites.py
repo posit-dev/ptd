@@ -213,6 +213,8 @@ class AWSWorkloadSites(pulumi.ComponentResource):
                         namespace=ptd.POSIT_TEAM_NAMESPACE,
                         labels=self.required_tags,
                     ),
+                    # v1beta1 matches external_secrets_operator_version default "0.10.7".
+                    # Update this if ESO is upgraded past the version that drops v1beta1 support.
                     api_version="external-secrets.io/v1beta1",
                     kind="ExternalSecret",
                     spec=_external_secret_spec(site_name, self.workload.site_secret_name(site_name)),

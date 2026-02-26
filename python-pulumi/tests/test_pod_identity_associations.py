@@ -1,4 +1,4 @@
-"""Tests for _define_pod_identity_associations and _define_external_secrets_iam in AWSWorkloadClusters."""
+"""Tests for _define_pod_identity_associations, _define_external_secrets_iam, and _define_eso_read_secrets_inline in AWSWorkloadClusters."""
 
 import json
 from unittest.mock import MagicMock, patch
@@ -201,3 +201,26 @@ def test_define_external_secrets_iam_creates_role_per_release_when_enabled():
     assert set(m.external_secrets_roles.keys()) == {"20250328", "20250415"}
     for call in m._define_k8s_iam_role.call_args_list:
         assert call.kwargs.get("pod_identity") is True
+
+
+def test_eso_read_secrets_inline_scoped_arn_no_list_secrets():
+    """ESO policy must be scoped to compound_name/* and must not include ListSecrets."""
+    m = MagicMock()
+    m.workload.cfg.region = "us-east-1"
+    m.workload.compound_name = "myworkload"
+
+    with (
+        patch("ptd.pulumi_resources.aws_workload_clusters.aws.get_caller_identity") as mock_id,
+        patch("ptd.pulumi_resources.aws_workload_clusters.aws.iam.get_policy_document") as mock_gpd,
+    ):
+        mock_id.return_value.account_id = "123456789012"
+        mock_gpd.return_value.json = "{}"
+        AWSWorkloadClusters._define_eso_read_secrets_inline(m)
+
+    statements = mock_gpd.call_args.kwargs["statements"]
+    assert len(statements) == 1
+    stmt = statements[0]
+    assert "secretsmanager:ListSecrets" not in stmt.actions
+    assert "secretsmanager:GetSecretValue" in stmt.actions
+    assert "secretsmanager:DescribeSecret" in stmt.actions
+    assert stmt.resources == ["arn:aws:secretsmanager:us-east-1:123456789012:secret:myworkload/*"]
