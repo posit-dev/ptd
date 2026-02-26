@@ -128,6 +128,8 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         self.chronicle_roles = {}
         self.home_roles = {}
         self.external_secrets_roles = {}
+        self.connect_session_roles = {}
+        self.workbench_session_roles = {}
 
         self._define_home_iam()
         self._define_chronicle_iam(persistent_stack)
@@ -192,8 +194,8 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 aws.iam.GetPolicyDocumentStatementArgs(
                     effect="Allow",
                     actions=[
-                        "secretsmanager:Get*",
-                        "secretsmanager:Describe*",
+                        "secretsmanager:GetSecretValue",
+                        "secretsmanager:DescribeSecret",
                         "secretsmanager:ListSecrets",
                     ],
                     resources=[f"arn:aws:secretsmanager:{region}:{account_id}:secret:{prefix}/*"],
@@ -639,8 +641,6 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
 
     def _define_external_secrets_iam(self) -> None:
         """Define IAM roles for external-secrets-operator to access AWS Secrets Manager."""
-        self.external_secrets_roles = {}
-
         for release in self.managed_clusters_by_release:
             cluster_cfg = self.workload.cfg.clusters[release]
             if not cluster_cfg.enable_external_secrets_operator:

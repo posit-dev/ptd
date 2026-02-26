@@ -176,6 +176,7 @@ def test_define_external_secrets_iam_skipped_when_disabled():
     """When enable_external_secrets_operator=False, no IAM roles are created and external_secrets_roles is empty."""
     m = MagicMock()
     m.managed_clusters_by_release = ["20250328"]
+    m.external_secrets_roles = {}
     cluster_cfg = MagicMock()
     cluster_cfg.enable_external_secrets_operator = False
     m.workload.cfg.clusters.__getitem__ = lambda _self, k: cluster_cfg
@@ -190,6 +191,7 @@ def test_define_external_secrets_iam_creates_role_per_release_when_enabled():
     """When enable_external_secrets_operator=True, one IAM role is created per release."""
     m = MagicMock()
     m.managed_clusters_by_release = ["20250328", "20250415"]
+    m.external_secrets_roles = {}
     cluster_cfg = MagicMock()
     cluster_cfg.enable_external_secrets_operator = True
     m.workload.cfg.clusters.__getitem__ = lambda _self, k: cluster_cfg
@@ -197,3 +199,5 @@ def test_define_external_secrets_iam_creates_role_per_release_when_enabled():
     AWSWorkloadClusters._define_external_secrets_iam(m)
     assert m._define_k8s_iam_role.call_count == 2
     assert set(m.external_secrets_roles.keys()) == {"20250328", "20250415"}
+    for call in m._define_k8s_iam_role.call_args_list:
+        assert call.kwargs.get("pod_identity") is True
