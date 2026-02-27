@@ -134,19 +134,7 @@ type AzureWorkloadClusterConfig struct {
 	PublicEndpointAccess       bool                                `yaml:"public_endpoint_access"`
 	SystemNodePoolInstanceType string                              `yaml:"system_node_pool_instance_type"`
 
-	// Legacy field - maintained for backward compatibility
-	// Used to configure the hardcoded "userpool" in AgentPoolProfiles for legacy clusters
-	UserNodePoolInstanceType string `yaml:"user_node_pool_instance_type,omitempty"`
-
-	// New field - defines additional user node pools as separate AgentPool resources
-	// Works for both new clusters (all user pools) and legacy clusters (additional pools)
-	UserNodePools []AzureUserNodePoolConfig `yaml:"user_node_pools,omitempty"`
-
-	// Optional: explicit flag to control whether to include legacy user pool in agentPoolProfiles
-	// Set to true for existing clusters to maintain the hardcoded "userpool" in AgentPoolProfiles
-	// Set to false (or omit) for new clusters to have all user pools as separate AgentPool resources
-	// Legacy clusters can have BOTH the hardcoded userpool AND additional user_node_pools
-	UseLegacyUserPool *bool `yaml:"use_legacy_user_pool,omitempty"`
+	UserNodePools []AzureUserNodePoolConfig `yaml:"user_node_pools"`
 
 	// Optional: Root disk size for system node pool in GB (defaults to 128)
 	SystemNodePoolRootDiskSize *int `yaml:"system_node_pool_root_disk_size,omitempty"`
@@ -181,27 +169,11 @@ func (c *AzureWorkloadClusterConfig) ValidateOutboundType() error {
 	return nil
 }
 
-// ResolveUserNodePools resolves which user node pools should be created based on configuration
-// For NEW clusters (use_legacy_user_pool = false or omitted): user_node_pools is REQUIRED
-// For LEGACY clusters (use_legacy_user_pool = true): user_node_pools is optional (adds ADDITIONAL pools)
+// ResolveUserNodePools validates that user_node_pools is defined
+// All Azure workloads must define user_node_pools in configuration
 func (c *AzureWorkloadClusterConfig) ResolveUserNodePools() ([]AzureUserNodePoolConfig, error) {
-	useLegacy := c.UseLegacyUserPool != nil && *c.UseLegacyUserPool
-
-	// If user_node_pools is explicitly defined, use it
-	if len(c.UserNodePools) > 0 {
-		return c.UserNodePools, nil
+	if len(c.UserNodePools) == 0 {
+		return nil, fmt.Errorf("user_node_pools must be defined in cluster configuration")
 	}
-
-	// For legacy clusters, user_node_pools being empty is OK
-	// The legacy userpool in AgentPoolProfiles is sufficient
-	if useLegacy {
-		// But we still need UserNodePoolInstanceType for the legacy pool
-		if c.UserNodePoolInstanceType == "" {
-			return nil, fmt.Errorf("legacy clusters require user_node_pool_instance_type to be set")
-		}
-		return []AzureUserNodePoolConfig{}, nil
-	}
-
-	// For new clusters, user_node_pools is required
-	return nil, fmt.Errorf("new clusters must define user_node_pools in configuration")
+	return c.UserNodePools, nil
 }
