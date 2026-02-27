@@ -17,6 +17,51 @@ EXTERNAL_DNS_NAMESPACE = "external-dns"
 GRAFANA_NAMESPACE = "grafana"
 LOKI_NAMESPACE = "loki"
 MIMIR_NAMESPACE = "mimir"
+ESO_NAMESPACE = "external-secrets"
+ESO_SERVICE_ACCOUNT = "external-secrets"
+CLUSTER_SECRET_STORE_NAME = "azure-key-vault"  # noqa: S105
+# v1beta1 matches external_secrets_operator_version default "0.10.7".
+# Update this if ESO is upgraded past the version that drops v1beta1 support.
+ESO_API_VERSION = "external-secrets.io/v1beta1"
+
+
+def _eso_helm_values() -> dict:
+    """Build the Helm values dict for external-secrets-operator."""
+    return {
+        "installCRDs": True,
+        "serviceAccount": {
+            "create": True,
+            "name": ESO_SERVICE_ACCOUNT,
+        },
+    }
+
+
+def _cluster_secret_store_spec(tenant_id: str, vault_url: str) -> dict:
+    """Build the ClusterSecretStore spec for Azure Key Vault (Workload Identity auth).
+
+    Args:
+        tenant_id: Azure tenant ID
+        vault_url: Azure Key Vault URL (e.g., https://<vault-name>.vault.azure.net/)
+
+    Returns:
+        ClusterSecretStore spec dict for Azure Key Vault provider
+    """
+    return {
+        "provider": {
+            "azurekv": {
+                "authType": "WorkloadIdentity",
+                "tenantId": tenant_id,
+                "vaultUrl": vault_url,
+                "serviceAccountRef": {
+                    "name": ESO_SERVICE_ACCOUNT,
+                    "namespace": ESO_NAMESPACE,
+                },
+            },
+        },
+        "conditions": [
+            {"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": ptd.POSIT_TEAM_NAMESPACE}}}
+        ],
+    }
 
 
 class AzureWorkloadHelm(pulumi.ComponentResource):
@@ -66,6 +111,10 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
 
         for release in self.managed_clusters_by_release:
             components = self.workload.cfg.clusters[release].components
+
+            # Deploy external-secrets-operator (opt-in via enable_external_secrets_operator)
+            if self.workload.cfg.clusters[release].enable_external_secrets_operator:
+                self._define_external_secrets_operator(release, components.external_secrets_operator_version)
 
             self._define_external_dns(release, components.external_dns_version)
             self._define_loki(release, components.loki_version)
@@ -673,3 +722,120 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
             },
             opts=pulumi.ResourceOptions(provider=self.kube_providers[release]),
         )
+
+    def _define_external_secrets_operator(self, release: str, version: str | None) -> None:
+        """Deploy external-secrets-operator and create ClusterSecretStore for Azure Key Vault.
+
+        Note: the ClusterSecretStore is created with ``depends_on=[eso_helm_release]``, which
+        ensures Pulumi registers it after the HelmChart CR object exists in the API server.
+        However, this does NOT wait for the Helm release to complete and CRDs to be installed.
+        On a fresh deploy, the ClusterSecretStore apply will fail until ESO's CRDs converge
+        (~1-2 reconcile loops). This is an architectural constraint of using HelmChart CRDs
+        rather than ``pulumi_kubernetes.helm.v3.Release``.
+        """
+        # Create managed identity for ESO with Key Vault Secrets User role
+        eso_identity = self._define_key_vault_secrets_managed_identity(
+            release=release, component="eso", namespace=ESO_NAMESPACE, service_account=ESO_SERVICE_ACCOUNT
+        )
+
+        # Deploy external-secrets-operator Helm chart
+        # Note: helm-controller auto-creates the targetNamespace from the HelmChart CR,
+        # so the "external-secrets" namespace does not need to be created explicitly here.
+        eso_spec: dict = {
+            "repo": "https://charts.external-secrets.io",
+            "chart": "external-secrets",
+            "targetNamespace": ESO_NAMESPACE,
+            "valuesContent": eso_identity.client_id.apply(
+                lambda client_id: yaml.dump(
+                    {
+                        **_eso_helm_values(),
+                        "serviceAccount": {
+                            "create": True,
+                            "name": ESO_SERVICE_ACCOUNT,
+                            "annotations": {
+                                "azure.workload.identity/client-id": client_id,
+                            },
+                            "labels": {
+                                "azure.workload.identity/use": "true",
+                            },
+                        },
+                        "podLabels": {
+                            "azure.workload.identity/use": "true",
+                        },
+                    }
+                )
+            ),
+        }
+        if version is not None:
+            eso_spec["version"] = version
+
+        eso_helm_release = kubernetes.apiextensions.CustomResource(
+            f"{self.workload.compound_name}-{release}-external-secrets-helm-release",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name="external-secrets",
+                namespace=ptd.HELM_CONTROLLER_NAMESPACE,
+                labels=self.required_tags,
+            ),
+            api_version="helm.cattle.io/v1",
+            kind="HelmChart",
+            spec=eso_spec,
+            opts=pulumi.ResourceOptions(provider=self.kube_providers[release]),
+        )
+
+        # Create ClusterSecretStore for Azure Key Vault.
+        # depends_on the HelmChart CR so Pulumi applies it after the ESO chart CR is registered.
+        # CustomTimeouts makes the eventual-consistency explicit: on a fresh cluster the CRD may not
+        # be available immediately; Pulumi will retry for up to 10 minutes before failing.
+        vault_url = f"https://{self.workload.key_vault_name}.vault.azure.net/"
+        kubernetes.apiextensions.CustomResource(
+            f"{self.workload.compound_name}-{release}-cluster-secret-store",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=CLUSTER_SECRET_STORE_NAME,
+                labels=self.required_tags,
+            ),
+            api_version=ESO_API_VERSION,
+            kind="ClusterSecretStore",
+            spec=_cluster_secret_store_spec(tenant_id=self.workload.cfg.tenant_id, vault_url=vault_url),
+            opts=pulumi.ResourceOptions(
+                provider=self.kube_providers[release],
+                depends_on=[eso_helm_release],
+                custom_timeouts=pulumi.CustomTimeouts(create="10m"),
+            ),
+        )
+
+    def _define_key_vault_secrets_managed_identity(
+        self, release: str, component: str, namespace: str, service_account: str
+    ) -> azure.managedidentity.UserAssignedIdentity:
+        """Create a managed identity with Key Vault Secrets User role and federated identity credential."""
+        identity = azure.managedidentity.UserAssignedIdentity(
+            resource_name=f"id-{self.workload.compound_name}-{release}-{component}",
+            resource_group_name=self.workload.resource_group_name,
+            location=self.workload.cfg.region,
+            tags=self.workload.required_tags,
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
+        # Grant Key Vault Secrets User role (read-only access to secrets)
+        azure.authorization.RoleAssignment(
+            f"{self.workload.compound_name}-{release}-{component}-kv-secrets-user",
+            scope=f"/subscriptions/{self.workload.cfg.subscription_id}/resourceGroups/{self.workload.resource_group_name}/providers/Microsoft.KeyVault/vaults/{self.workload.key_vault_name}",
+            principal_id=identity.principal_id,
+            role_definition_id=f"/providers/Microsoft.Authorization/roleDefinitions/{ptd.azure_roles.KEY_VAULT_SECRETS_USER_ROLE_DEFINITION_ID}",
+            principal_type=azure.authorization.PrincipalType.SERVICE_PRINCIPAL,
+            opts=pulumi.ResourceOptions(parent=identity),
+        )
+
+        # Create federated identity credential for Workload Identity
+        oidc_issuer_url = self.workload.cluster_oidc_issuer_url(release)
+        azure.managedidentity.FederatedIdentityCredential(
+            resource_name=f"fedid-{self.workload.compound_name}-{release}-{component}",
+            resource_name_=identity.name,
+            federated_identity_credential_resource_name=f"fedid-{self.workload.compound_name}-{release}-{component}",
+            resource_group_name=self.workload.resource_group_name,
+            subject=f"system:serviceaccount:{namespace}:{service_account}",
+            issuer=oidc_issuer_url,
+            audiences=["api://AzureADTokenExchange"],
+            opts=pulumi.ResourceOptions(parent=identity),
+        )
+
+        return identity
