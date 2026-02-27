@@ -12,6 +12,62 @@ from ptd.pulumi_resources.grafana_alloy import AlloyConfig
 from ptd.pulumi_resources.lib import format_lb_tags
 
 ALLOY_NAMESPACE = "alloy"
+NFS_STORAGE_CLASS_NAME = "posit-shared-storage"
+CLUSTER_SECRET_STORE_NAME = "aws-secrets-manager"  # noqa: S105
+ESO_SERVICE_ACCOUNT = "external-secrets"
+ESO_NAMESPACE = "external-secrets"
+# v1beta1 matches external_secrets_operator_version default "0.10.7".
+# Update this if ESO is upgraded past the version that drops v1beta1 support.
+ESO_API_VERSION = "external-secrets.io/v1beta1"
+
+
+def _nfs_subdir_provisioner_values(fsx_dns_name: str, fsx_nfs_path: str = "/fsx") -> dict:
+    """Build the Helm values dict for nfs-subdir-external-provisioner."""
+    return {
+        "nfs": {
+            "server": fsx_dns_name,
+            "path": fsx_nfs_path,
+            "mountOptions": [
+                "nfsvers=4.2",
+                "rsize=1048576",
+                "wsize=1048576",
+                "timeo=600",
+            ],
+        },
+        "storageClass": {
+            "name": NFS_STORAGE_CLASS_NAME,
+            "reclaimPolicy": "Retain",
+            "accessModes": "ReadWriteMany",
+            "onDelete": "retain",
+            "pathPattern": "${.PVC.annotations.nfs.io/storage-path}",
+        },
+    }
+
+
+def _eso_helm_values() -> dict:
+    """Build the Helm values dict for external-secrets-operator."""
+    return {
+        "installCRDs": True,
+        "serviceAccount": {
+            "create": True,
+            "name": ESO_SERVICE_ACCOUNT,
+        },
+    }
+
+
+def _cluster_secret_store_spec(region: str) -> dict:
+    """Build the ClusterSecretStore spec for AWS Secrets Manager (no auth — uses Pod Identity)."""
+    return {
+        "provider": {
+            "aws": {
+                "service": "SecretsManager",
+                "region": region,
+            },
+        },
+        "conditions": [
+            {"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": ptd.POSIT_TEAM_NAMESPACE}}}
+        ],
+    }
 
 
 def _build_alb_tag_string(true_name: str, environment: str, compound_name: str) -> str:
@@ -74,9 +130,15 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
 
             self._define_aws_lbc(release, components.aws_load_balancer_controller_version)
             self._define_aws_fsx_openzfs_csi(release, components.aws_fsx_openzfs_csi_driver_version)
+            # Deploy nfs-subdir-external-provisioner (opt-in via enable_nfs_subdir_provisioner)
+            if self.workload.cfg.clusters[release].enable_nfs_subdir_provisioner:
+                self._define_nfs_subdir_provisioner(release, components.nfs_subdir_provisioner_version)
             if not self.workload.cfg.secrets_store_addon_enabled:
                 self._define_secret_store_csi(release, components.secret_store_csi_driver_version)
                 self._define_secret_store_csi_aws(release, components.secret_store_csi_driver_aws_provider_version)
+            # Deploy external-secrets-operator (opt-in via enable_external_secrets_operator)
+            if self.workload.cfg.clusters[release].enable_external_secrets_operator:
+                self._define_external_secrets_operator(release, components.external_secrets_operator_version)
             self._define_traefik(release, components.traefik_version, weight, cert_arns_output)
             self._define_metrics_server(release, components.metrics_server_version)
             self._define_loki(release, components.loki_version, components)
@@ -168,6 +230,104 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 ),
             },
             opts=pulumi.ResourceOptions(provider=self.kube_providers[release]),
+        )
+
+    def _define_nfs_subdir_provisioner(self, release: str, version: str | None) -> None:
+        """Deploy nfs-subdir-external-provisioner for FSx storage."""
+        workload_secrets, ok = ptd.secrecy.aws_get_secret_value_json(
+            self.workload.secret_name, region=self.workload.cfg.region
+        )
+        if not ok or "fs-dns-name" not in workload_secrets:
+            msg = (
+                f"enable_nfs_subdir_provisioner=True but secret '{self.workload.secret_name}' "
+                "is missing or does not contain 'fs-dns-name'."
+            )
+            if pulumi.runtime.is_dry_run():
+                pulumi.warn(
+                    "[ACTION REQUIRED] " + msg + " NFS subdir provisioner will be ABSENT from this preview diff; "
+                    "`pulumi up` will raise an error unless the secret is populated first."
+                )
+                return
+            raise ValueError(msg)
+
+        fsx_dns_name = workload_secrets["fs-dns-name"]
+        fsx_nfs_path = workload_secrets.get("fs-nfs-path", "/fsx")
+
+        spec: dict = {
+            "repo": "https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/",
+            "chart": "nfs-subdir-external-provisioner",
+            "targetNamespace": ptd.KUBE_SYSTEM_NAMESPACE,
+            "valuesContent": yaml.dump(_nfs_subdir_provisioner_values(fsx_dns_name, fsx_nfs_path)),
+        }
+        if version is not None:
+            spec["version"] = version
+
+        k8s.apiextensions.CustomResource(
+            f"{self.workload.compound_name}-{release}-nfs-subdir-provisioner-helm-release",
+            metadata=k8s.meta.v1.ObjectMetaArgs(
+                name="nfs-subdir-external-provisioner",
+                namespace=ptd.HELM_CONTROLLER_NAMESPACE,
+                labels=self.required_tags,
+            ),
+            api_version="helm.cattle.io/v1",
+            kind="HelmChart",
+            spec=spec,
+            opts=pulumi.ResourceOptions(provider=self.kube_providers[release]),
+        )
+
+    def _define_external_secrets_operator(self, release: str, version: str | None) -> None:
+        """Deploy external-secrets-operator and create ClusterSecretStore for AWS Secrets Manager.
+
+        Note: the ClusterSecretStore is created with ``depends_on=[eso_helm_release]``, which
+        ensures Pulumi registers it after the HelmChart CR object exists in the API server.
+        However, this does NOT wait for the Helm release to complete and CRDs to be installed.
+        On a fresh deploy, the ClusterSecretStore apply will fail until ESO's CRDs converge
+        (~1-2 reconcile loops). This is an architectural constraint of using HelmChart CRDs
+        rather than ``pulumi_kubernetes.helm.v3.Release``.
+        """
+        # Deploy external-secrets-operator Helm chart
+        # Note: helm-controller (RKE2) auto-creates the targetNamespace from the HelmChart CR,
+        # so the "external-secrets" namespace does not need to be created explicitly here.
+        eso_spec: dict = {
+            "repo": "https://charts.external-secrets.io",
+            "chart": "external-secrets",
+            "targetNamespace": ESO_NAMESPACE,
+            "valuesContent": yaml.dump(_eso_helm_values()),
+        }
+        if version is not None:
+            eso_spec["version"] = version
+
+        eso_helm_release = k8s.apiextensions.CustomResource(
+            f"{self.workload.compound_name}-{release}-external-secrets-helm-release",
+            metadata=k8s.meta.v1.ObjectMetaArgs(
+                name="external-secrets",
+                namespace=ptd.HELM_CONTROLLER_NAMESPACE,
+                labels=self.required_tags,
+            ),
+            api_version="helm.cattle.io/v1",
+            kind="HelmChart",
+            spec=eso_spec,
+            opts=pulumi.ResourceOptions(provider=self.kube_providers[release]),
+        )
+
+        # Create ClusterSecretStore for AWS Secrets Manager.
+        # depends_on the HelmChart CR so Pulumi applies it after the ESO chart CR is registered.
+        # CustomTimeouts makes the eventual-consistency explicit: on a fresh cluster the CRD may not
+        # be available immediately; Pulumi will retry for up to 10 minutes before failing.
+        k8s.apiextensions.CustomResource(
+            f"{self.workload.compound_name}-{release}-cluster-secret-store",
+            metadata=k8s.meta.v1.ObjectMetaArgs(
+                name=CLUSTER_SECRET_STORE_NAME,
+                labels=self.required_tags,
+            ),
+            api_version=ESO_API_VERSION,
+            kind="ClusterSecretStore",
+            spec=_cluster_secret_store_spec(self.workload.cfg.region),
+            opts=pulumi.ResourceOptions(
+                provider=self.kube_providers[release],
+                depends_on=[eso_helm_release],
+                custom_timeouts=pulumi.CustomTimeouts(create="10m"),
+            ),
         )
 
     def _define_secret_store_csi(self, release: str, version: str):
