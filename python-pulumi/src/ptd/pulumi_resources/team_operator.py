@@ -71,13 +71,9 @@ class TeamOperator(pulumi.ComponentResource):
         self._define_helm_release()
 
     def _define_image(self):
-        # Use adhoc_team_operator_image if set, otherwise use team_operator_image if explicitly set.
-        # If neither is set (team_operator_image is None), self.image stays None so the Helm chart
-        # defaults to its appVersion.
+        # Use adhoc_team_operator_image if set, otherwise use team_operator_image
+        # adhoc images can be tags like "test", "dev", or full image references
         image_config = self.cluster_cfg.adhoc_team_operator_image or self.cluster_cfg.team_operator_image
-        if image_config is None:
-            self.image = None
-            return
         self.image = ptd.define_component_image(
             image_config=image_config,
             component_image=ptd.ComponentImages.TEAM_OPERATOR,
@@ -248,19 +244,17 @@ echo "Migration complete - Helm will now create fresh resources"
     def _define_helm_release(self):
         # Parse self.image (from _define_image) into repository and tag
         # Format is either "repo@sha256:digest" or "repo:tag"
-        # If self.image is None, we skip image configuration to let the Helm chart use its default appVersion
-        if self.image is not None:
-            if "@" in self.image:
-                # Image with digest: "hostname/repo@sha256:abc123"
-                image_repository, image_tag = self.image.rsplit("@", 1)
-                image_tag = f"@{image_tag}"  # Helm needs the @ prefix for digests
-            elif ":" in self.image.split("/")[-1]:
-                # Image with tag: "hostname/repo:tag"
-                image_repository, image_tag = self.image.rsplit(":", 1)
-            else:
-                # No tag specified, use latest
-                image_repository = self.image
-                image_tag = "latest"
+        if "@" in self.image:
+            # Image with digest: "hostname/repo@sha256:abc123"
+            image_repository, image_tag = self.image.rsplit("@", 1)
+            image_tag = f"@{image_tag}"  # Helm needs the @ prefix for digests
+        elif ":" in self.image.split("/")[-1]:
+            # Image with tag: "hostname/repo:tag"
+            image_repository, image_tag = self.image.rsplit(":", 1)
+        else:
+            # No tag specified, use latest
+            image_repository = self.image
+            image_tag = "latest"
 
         # Build environment variables
         env_vars = {
@@ -271,19 +265,17 @@ echo "Migration complete - Helm will now create fresh resources"
         if self.workload.cfg.region:
             env_vars["AWS_REGION"] = self.workload.cfg.region
 
-        # Build container config - only include image if explicitly set
-        container_config = {"env": env_vars}
-        if self.image is not None:
-            container_config["image"] = {
-                "repository": image_repository,
-                "tag": image_tag,
-            }
-
         # Helm values for the team-operator chart
         helm_values = {
             "controllerManager": {
                 "replicas": 1,
-                "container": container_config,
+                "container": {
+                    "image": {
+                        "repository": image_repository,
+                        "tag": image_tag,
+                    },
+                    "env": env_vars,
+                },
                 # Use default serviceAccountName from chart (team-operator-controller-manager)
                 # to match existing kustomize resources for seamless migration
                 "serviceAccount": {
