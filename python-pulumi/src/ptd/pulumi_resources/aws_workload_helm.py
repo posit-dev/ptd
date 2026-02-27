@@ -13,7 +13,7 @@ from ptd.pulumi_resources.lib import format_lb_tags
 
 ALLOY_NAMESPACE = "alloy"
 NFS_STORAGE_CLASS_NAME = "posit-shared-storage"
-CLUSTER_SECRET_STORE_NAME = "aws-secrets-manager"
+CLUSTER_SECRET_STORE_NAME = "aws-secrets-manager"  # noqa: S105
 ESO_SERVICE_ACCOUNT = "external-secrets"
 ESO_NAMESPACE = "external-secrets"
 # v1beta1 matches external_secrets_operator_version default "0.10.7".

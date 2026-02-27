@@ -427,7 +427,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         role_policies: pulumi.Input[typing.Sequence[pulumi.Input[str]],] | None = None,
         auth_issuers: list[ptd.aws_iam.AuthIssuer] | None = None,
         opts: pulumi.ResourceOptions | None = None,
-        pod_identity: bool = False,
+        pod_identity: bool = False,  # noqa: FBT001, FBT002
     ) -> aws.iam.Role:
         """
         Define a Kubernetes IAM role with appropriate trust relationships.
@@ -471,9 +471,8 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 auth_issuers=auth_issuers,
             )
             if not isinstance(irsa_policy.get("Statement"), list):
-                raise ValueError(
-                    "Expected Statement list from build_hybrid_irsa_role_assume_role_policy"
-                )
+                msg = "Expected Statement list from build_hybrid_irsa_role_assume_role_policy"
+                raise ValueError(msg)
             base_policy = {**irsa_policy, "Statement": list(irsa_policy["Statement"]) + extra_statements}
         else:
             base_policy = {
@@ -486,8 +485,8 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                             "AWS": aws.get_caller_identity().arn,
                         },
                     },
-                ]
-                + extra_statements,
+                    *extra_statements,
+                ],
             }
 
         role = aws.iam.Role(
@@ -696,15 +695,19 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
             # External Secrets Operator (per-release, only if ESO is also enabled)
             if cluster_cfg.enable_external_secrets_operator:
                 if release not in self.external_secrets_roles:
-                    raise RuntimeError(
+                    msg = (
                         f"external_secrets_roles missing key {release!r}; "
                         "_define_external_secrets_iam must be called before _define_pod_identity_associations"
                     )
+                    raise RuntimeError(msg)
                 _eso_sa = ptd.pulumi_resources.aws_workload_helm.ESO_SERVICE_ACCOUNT
                 _eso_ns = ptd.pulumi_resources.aws_workload_helm.ESO_NAMESPACE
                 _pod_identity_assoc(
-                    self, _eso_sa, cluster_name,
-                    _eso_ns, _eso_sa,
+                    self,
+                    _eso_sa,
+                    cluster_name,
+                    _eso_ns,
+                    _eso_sa,
                     self.external_secrets_roles[release].arn,
                 )
 
@@ -712,13 +715,17 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
             for site_name in sorted(self.workload.cfg.sites.keys()):
                 # Connect
                 if release not in self.connect_roles:
-                    raise RuntimeError(
+                    msg = (
                         f"connect_roles missing key {release!r}; "
                         "_define_connect_iam must be called before _define_pod_identity_associations"
                     )
+                    raise RuntimeError(msg)
                 _pod_identity_assoc(
-                    self, f"{site_name}-connect", cluster_name,
-                    ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-connect",
+                    self,
+                    f"{site_name}-connect",
+                    cluster_name,
+                    ptd.POSIT_TEAM_NAMESPACE,
+                    f"{site_name}-connect",
                     self.connect_roles[release].arn,
                 )
 
@@ -726,38 +733,50 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 # for every release/site combo unconditionally.
                 _session_key = f"{release}-{site_name}"
                 if _session_key not in self.connect_session_roles:
-                    raise RuntimeError(
+                    msg = (
                         f"connect_session_roles missing key {_session_key!r}; "
                         "_define_connect_iam must be called before _define_pod_identity_associations"
                     )
+                    raise RuntimeError(msg)
                 _pod_identity_assoc(
-                    self, f"{site_name}-connect-session", cluster_name,
-                    ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-connect-session",
+                    self,
+                    f"{site_name}-connect-session",
+                    cluster_name,
+                    ptd.POSIT_TEAM_NAMESPACE,
+                    f"{site_name}-connect-session",
                     self.connect_session_roles[_session_key].arn,
                 )
 
                 # Workbench
                 if release not in self.workbench_roles:
-                    raise RuntimeError(
+                    msg = (
                         f"workbench_roles missing key {release!r}; "
                         "_define_workbench_iam must be called before _define_pod_identity_associations"
                     )
+                    raise RuntimeError(msg)
                 _pod_identity_assoc(
-                    self, f"{site_name}-workbench", cluster_name,
-                    ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-workbench",
+                    self,
+                    f"{site_name}-workbench",
+                    cluster_name,
+                    ptd.POSIT_TEAM_NAMESPACE,
+                    f"{site_name}-workbench",
                     self.workbench_roles[release].arn,
                 )
 
                 # Workbench Session — always present: _define_workbench_iam populates workbench_session_roles
                 # for every release/site combo unconditionally.
                 if _session_key not in self.workbench_session_roles:
-                    raise RuntimeError(
+                    msg = (
                         f"workbench_session_roles missing key {_session_key!r}; "
                         "_define_workbench_iam must be called before _define_pod_identity_associations"
                     )
+                    raise RuntimeError(msg)
                 _pod_identity_assoc(
-                    self, f"{site_name}-workbench-session", cluster_name,
-                    ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-workbench-session",
+                    self,
+                    f"{site_name}-workbench-session",
+                    cluster_name,
+                    ptd.POSIT_TEAM_NAMESPACE,
+                    f"{site_name}-workbench-session",
                     self.workbench_session_roles[_session_key].arn,
                 )
 
@@ -765,16 +784,22 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 # Key format uses "//" separator — must match _define_packagemanager_iam (release + "//" + site_name).
                 if release + "//" + site_name in self.packagemanager_roles:
                     _pod_identity_assoc(
-                        self, f"{site_name}-packagemanager", cluster_name,
-                        ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-packagemanager",
+                        self,
+                        f"{site_name}-packagemanager",
+                        cluster_name,
+                        ptd.POSIT_TEAM_NAMESPACE,
+                        f"{site_name}-packagemanager",
                         self.packagemanager_roles[release + "//" + site_name].arn,
                     )
 
                 # Chronicle (optional product — skip if not configured for this release/site)
                 if f"{release}-{site_name}" in self.chronicle_roles:
                     _pod_identity_assoc(
-                        self, f"{site_name}-chronicle", cluster_name,
-                        ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-chronicle",
+                        self,
+                        f"{site_name}-chronicle",
+                        cluster_name,
+                        ptd.POSIT_TEAM_NAMESPACE,
+                        f"{site_name}-chronicle",
                         self.chronicle_roles[f"{release}-{site_name}"].arn,
                     )
 
@@ -784,8 +809,11 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 # Pod Identity requires one association per SA, so this block stays inside the loop.
                 if release in self.home_roles:
                     _pod_identity_assoc(
-                        self, f"{site_name}-home", cluster_name,
-                        ptd.POSIT_TEAM_NAMESPACE, f"{site_name}-home",
+                        self,
+                        f"{site_name}-home",
+                        cluster_name,
+                        ptd.POSIT_TEAM_NAMESPACE,
+                        f"{site_name}-home",
                         self.home_roles[release].arn,
                     )
 
