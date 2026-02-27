@@ -409,7 +409,7 @@ class Toleration:
 
 @dataclasses.dataclass(frozen=True)
 class WorkloadClusterConfig:
-    team_operator_image: str | None = None
+    team_operator_image: str = "latest"
     # Overrides team_operator_image when set. Can be a tag (e.g., "test", "dev")
     # or a full image reference. For adhoc images from posit-dev/team-operator PRs:
     #   ghcr.io/posit-dev/team-operator:adhoc-{branch}-{version}
