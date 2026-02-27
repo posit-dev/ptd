@@ -70,26 +70,36 @@ class AzureWorkloadSites(pulumi.ComponentResource):
             if obj["kind"] != "Site":
                 return
 
+            site_spec = {
+                # TODO: set chronicle and ppm storage buckets
+                "domain": self.workload.cfg.domain,
+                "networkTrust": self.workload.cfg.network_trust.value,
+                "packageManager": {
+                    "azureFiles": {
+                        "storageClassName": self.workload.azure_files_csi_storage_class_name,
+                        "shareSizeGiB": self.workload.cfg.ppm_file_share_size_gib,
+                    },
+                },
+                "secret": {"type": "kubernetes"},
+                "secretType": "kubernetes",
+                "volumeSource": {
+                    "type": "azure-netapp",
+                },
+            }
+
+            # Cloud-agnostic ingress (when Gateway API is enabled)
+            # Note: Azure workload sites don't have per-site cluster_cfg, so check all releases
+            for release in self.managed_clusters_by_release:
+                if release in self.workload.cfg.clusters and self.workload.cfg.clusters[release].enable_gateway_api:
+                    site_spec["gatewayRef"] = {
+                        "name": "posit-team",
+                        "namespace": "traefik",
+                    }
+                    break  # Only need to set once if any cluster has it enabled
+
             obj["spec"] = deepmerge.always_merger.merge(
                 obj.get("spec", {}),
-                copy.deepcopy(
-                    {
-                        # TODO: set chronicle and ppm storage buckets
-                        "domain": self.workload.cfg.domain,
-                        "networkTrust": self.workload.cfg.network_trust.value,
-                        "packageManager": {
-                            "azureFiles": {
-                                "storageClassName": self.workload.azure_files_csi_storage_class_name,
-                                "shareSizeGiB": self.workload.cfg.ppm_file_share_size_gib,
-                            },
-                        },
-                        "secret": {"type": "kubernetes"},
-                        "secretType": "kubernetes",
-                        "volumeSource": {
-                            "type": "azure-netapp",
-                        },
-                    }
-                ),
+                copy.deepcopy(site_spec),
             )
 
         for release in self.managed_clusters_by_release:

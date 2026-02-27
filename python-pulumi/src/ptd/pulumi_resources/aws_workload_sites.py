@@ -177,6 +177,14 @@ class AWSWorkloadSites(pulumi.ComponentResource):
                         site_spec.setdefault("chronicle", {})["serviceAccountName"] = f"{site_name}-chronicle"
                         site_spec.setdefault("flightdeck", {})["serviceAccountName"] = f"{site_name}-home"
 
+                    # Cloud-agnostic ingress (when Gateway API is enabled)
+                    if cluster_cfg and cluster_cfg.enable_gateway_api:
+                        # Reference the Gateway resource created by infrastructure
+                        site_spec["gatewayRef"] = {
+                            "name": "posit-team",
+                            "namespace": "traefik",
+                        }
+
                     obj["spec"] = deepmerge.always_merger.merge(
                         obj.get("spec", {}),
                         copy.deepcopy(site_spec),

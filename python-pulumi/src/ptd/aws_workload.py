@@ -268,6 +268,7 @@ class AWSWorkloadClusterConfig(ptd.WorkloadClusterConfig):
     enable_efs_csi_driver: bool = False
     efs_config: ptd.EFSConfig | None = None
     karpenter_config: KarpenterConfig | None = None
+    enable_gateway_api: bool = False  # Enables Gateway API CRDs, Traefik Gateway provider, and gatewayRef in Site CRs
 
     def __post_init__(self) -> None:
         super().__post_init__()
