@@ -337,8 +337,8 @@ class AlloyConfig(pulumi.ComponentResource):
                     type    = "AWS/NATGateway"
                     regions = ["{self.region}"]
 
-                    # NAT Gateways inherit VPC tags including posit.team/true-name
-                    # (see python-pulumi/src/ptd/pulumi_resources/aws_vpc.py:607-616)
+                    // NAT Gateways inherit VPC tags including posit.team/true-name
+                    // (see python-pulumi/src/ptd/pulumi_resources/aws_vpc.py:607-616)
                     search_tags = {{
                         "posit.team/true-name" = "{self.workload.cfg.true_name}",
                     }}
@@ -360,12 +360,12 @@ class AlloyConfig(pulumi.ComponentResource):
                     type    = "AWS/ApplicationELB"
                     regions = ["{self.region}"]
 
-                    # ALBs are tagged at creation time via aws_workload_helm.py.
-                    # LBs provisioned before this tag was added won't be discovered
-                    # until the cluster is redeployed.
-                    # FIXME: To tag existing ALBs without redeploying, use the AWS CLI:
-                    #   aws elbv2 add-tags --resource-arns <ALB_ARN> \
-                    #     --tags Key=posit.team/true-name,Value=<true_name>
+                    // ALBs are tagged at creation time via aws_workload_helm.py.
+                    // LBs provisioned before this tag was added won't be discovered
+                    // until the cluster is redeployed.
+                    // FIXME: To tag existing ALBs without redeploying, use the AWS CLI:
+                    //   aws elbv2 add-tags --resource-arns <ALB_ARN>
+                    //     --tags Key=posit.team/true-name,Value=<true_name>
                     search_tags = {{
                         "posit.team/true-name" = "{self.workload.cfg.true_name}",
                     }}
@@ -393,12 +393,12 @@ class AlloyConfig(pulumi.ComponentResource):
                     type    = "AWS/NetworkELB"
                     regions = ["{self.region}"]
 
-                    # NLBs are tagged at creation time via traefik.py.
-                    # LBs provisioned before this tag was added won't be discovered
-                    # until the cluster is redeployed.
-                    # FIXME: To tag existing NLBs without redeploying, use the AWS CLI:
-                    #   aws elbv2 add-tags --resource-arns <NLB_ARN> \
-                    #     --tags Key=posit.team/true-name,Value=<true_name>
+                    // NLBs are tagged at creation time via traefik.py.
+                    // LBs provisioned before this tag was added won't be discovered
+                    // until the cluster is redeployed.
+                    // FIXME: To tag existing NLBs without redeploying, use the AWS CLI:
+                    //   aws elbv2 add-tags --resource-arns <NLB_ARN>
+                    //     --tags Key=posit.team/true-name,Value=<true_name>
                     search_tags = {{
                         "posit.team/true-name" = "{self.workload.cfg.true_name}",
                     }}
