@@ -34,10 +34,38 @@ class AzureTraefik(pulumi.ComponentResource):
         self.workload = workload
         self.traefik: k8s.helm.v3.Release | None = None
 
+        # Install Gateway API CRDs if enabled (before Traefik)
+        if self.release in self.workload.cfg.clusters and self.workload.cfg.clusters[self.release].enable_gateway_api:
+            self._define_gateway_api_crds()
+
         self._define_namespace()
         self._define_helm_release()
 
+        # Create Gateway resources if enabled (after Traefik)
+        if self.release in self.workload.cfg.clusters and self.workload.cfg.clusters[self.release].enable_gateway_api:
+            self._define_gateway_resources()
+
         self.register_outputs({})
+
+    def _build_providers_config(self) -> dict:
+        """Build Traefik providers configuration conditionally based on enable_gateway_api flag."""
+        providers_config = {
+            "kubernetesCRD": {
+                "enabled": True,
+                "allowCrossNamespace": True,
+            },
+            "kubernetesIngress": {
+                "enabled": True,
+            },
+        }
+
+        # Add Gateway API provider if enabled
+        if self.release in self.workload.cfg.clusters and self.workload.cfg.clusters[self.release].enable_gateway_api:
+            providers_config["kubernetesGateway"] = {
+                "enabled": True,
+            }
+
+        return providers_config
 
     def _define_namespace(self):
         k8s.core.v1.Namespace(
@@ -90,15 +118,7 @@ class AzureTraefik(pulumi.ComponentResource):
                         "enabled": True,
                     }
                 },
-                "providers": {
-                    "kubernetesCRD": {
-                        "enabled": True,
-                        "allowCrossNamespace": True,
-                    },
-                    "kubernetesIngress": {
-                        "enabled": True,
-                    },
-                },
+                "providers": self._build_providers_config(),
                 "service": {
                     "annotations": {
                         "service.beta.kubernetes.io/azure-load-balancer-internal": "true",
@@ -188,3 +208,100 @@ class AzureTraefik(pulumi.ComponentResource):
                 }
             },
         }
+
+    def _define_gateway_api_crds(self) -> None:
+        """Install Gateway API standard CRDs before Traefik deployment.
+
+        Installs Gateway API v1.2.1 standard CRDs (Gateway, GatewayClass, HTTPRoute, ReferenceGrant).
+        This must be installed before Traefik's Gateway API provider is enabled.
+        """
+        k8s.yaml.ConfigFile(
+            f"{self.workload.compound_name}-{self.release}-gateway-api-crds",
+            file="https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml",
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
+    def _define_gateway_resources(self) -> None:
+        """Create Gateway API resources (GatewayClass, Gateway, ReferenceGrant).
+
+        Creates the infrastructure Gateway resources that the team-operator will reference
+        via gatewayRef in Site CRs.
+        """
+        # Create GatewayClass
+        k8s.apiextensions.CustomResource(
+            f"{self.workload.compound_name}-{self.release}-traefik-gateway-class",
+            api_version="gateway.networking.k8s.io/v1",
+            kind="GatewayClass",
+            metadata=k8s.meta.v1.ObjectMetaArgs(
+                name="traefik",
+            ),
+            spec={
+                "controllerName": "traefik.io/gateway-controller",
+            },
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
+        # Create Gateway in traefik namespace
+        k8s.apiextensions.CustomResource(
+            f"{self.workload.compound_name}-{self.release}-posit-team-gateway",
+            api_version="gateway.networking.k8s.io/v1",
+            kind="Gateway",
+            metadata=k8s.meta.v1.ObjectMetaArgs(
+                name="posit-team",
+                namespace=AZURE_TRAEFIK_NAMESPACE,
+            ),
+            spec={
+                "gatewayClassName": "traefik",
+                "listeners": [
+                    {
+                        "name": "https",
+                        "protocol": "HTTPS",
+                        "port": 443,
+                        "allowedRoutes": {
+                            "namespaces": {
+                                "from": "All",
+                            },
+                        },
+                    },
+                    {
+                        "name": "http",
+                        "protocol": "HTTP",
+                        "port": 80,
+                        "allowedRoutes": {
+                            "namespaces": {
+                                "from": "All",
+                            },
+                        },
+                    },
+                ],
+            },
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
+        # Create ReferenceGrant to allow HTTPRoutes in posit-team namespace
+        # to reference Services in traefik namespace
+        k8s.apiextensions.CustomResource(
+            f"{self.workload.compound_name}-{self.release}-allow-posit-team-routes",
+            api_version="gateway.networking.k8s.io/v1beta1",
+            kind="ReferenceGrant",
+            metadata=k8s.meta.v1.ObjectMetaArgs(
+                name="allow-posit-team",
+                namespace=AZURE_TRAEFIK_NAMESPACE,
+            ),
+            spec={
+                "from": [
+                    {
+                        "group": "gateway.networking.k8s.io",
+                        "kind": "HTTPRoute",
+                        "namespace": "posit-team",
+                    }
+                ],
+                "to": [
+                    {
+                        "group": "",
+                        "kind": "Service",
+                    }
+                ],
+            },
+            opts=pulumi.ResourceOptions(parent=self),
+        )

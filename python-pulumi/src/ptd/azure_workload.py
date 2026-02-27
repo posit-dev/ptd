@@ -105,6 +105,7 @@ class AzureWorkloadClusterConfig(ptd.WorkloadClusterConfig):
     system_node_pool_root_disk_size: int | None = None
 
     use_lets_encrypt: bool = False
+    enable_gateway_api: bool = False  # Enables Gateway API CRDs, Traefik Gateway provider, and gatewayRef in Site CRs
 
 
 @dataclasses.dataclass(frozen=True)

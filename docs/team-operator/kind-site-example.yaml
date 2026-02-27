@@ -1,0 +1,72 @@
+# Example Site CR for kind local development
+# Demonstrates cloud-agnostic configuration using standard Kubernetes resources
+#
+# Prerequisites:
+# - kind cluster with standard StorageClass (default local-path-provisioner)
+# - K8s Secrets created manually (dev-secrets, workload-secrets)
+# - PostgreSQL database accessible from the cluster
+#
+# Usage:
+#   kubectl apply -f kind-site-example.yaml
+
+apiVersion: core.posit.team/v1beta1
+kind: Site
+metadata:
+  name: dev
+  namespace: posit-team
+  labels:
+    app.kubernetes.io/instance: dev
+spec:
+  # Cloud-agnostic storage: uses kind's default StorageClass
+  storageClassName: standard
+
+  # Cloud-agnostic secrets: reference K8s Secrets by name
+  # Create these manually for kind:
+  #   kubectl create secret generic dev-secrets -n posit-team \
+  #     --from-literal=dev.lic="..." \
+  #     --from-literal=connect-apikey="..." \
+  #     --from-literal=admin_token="..."
+  secret:
+    name: dev-secrets
+
+  workloadSecret:
+    name: workload-secrets
+
+  # Database credentials (still needs type/vaultName format for now)
+  mainDatabaseCredentialSecret:
+    type: kubernetes
+    name: postgres-credentials
+
+  # Domain for accessing services
+  domain: dev.localhost
+
+  # Network trust level
+  networkTrust: anyone
+
+  # Product-specific configuration
+  connect:
+    # Cloud-agnostic IAM: explicit ServiceAccount name
+    # For kind, no annotations needed (no cloud IAM integration)
+    serviceAccountName: dev-connect
+    # Storage buckets (not needed for local dev)
+
+  workbench:
+    serviceAccountName: dev-workbench
+    # sessionTolerations: [] # optional, for node taints
+
+  packageManager:
+    serviceAccountName: dev-packagemanager
+    # For kind, Package Manager can use the same storage as other products
+    # No special Azure Files configuration needed
+
+  chronicle:
+    serviceAccountName: dev-chronicle
+
+  flightdeck:
+    serviceAccountName: dev-home
+
+  # No gatewayRef needed for basic kind testing
+  # kind can use traditional Ingress resources instead of Gateway API
+
+  # No nfsEgressCIDR needed for local development
+  # Network policies can be disabled or simplified for kind

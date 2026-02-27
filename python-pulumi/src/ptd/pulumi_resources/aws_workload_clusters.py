@@ -14,6 +14,7 @@ import ptd.pulumi_resources.aws_bucket
 import ptd.pulumi_resources.aws_eks_cluster
 import ptd.pulumi_resources.aws_iam
 import ptd.pulumi_resources.aws_karpenter
+import ptd.pulumi_resources.aws_workload_helm
 import ptd.pulumi_resources.custom_k8s_resources
 import ptd.pulumi_resources.external_dns
 import ptd.pulumi_resources.helm_controller
@@ -25,6 +26,26 @@ import ptd.pulumi_resources.team_site
 import ptd.pulumi_resources.traefik_forward_auth
 import ptd.pulumi_resources.traefik_forward_auth_aws
 import ptd.secrecy
+
+
+def _pod_identity_assoc(
+    resource: "AWSWorkloadClusters",
+    logical_name: str,
+    cluster_name: str,
+    namespace: str,
+    service_account: str,
+    role_arn: pulumi.Input[str],
+) -> None:
+    """Create a single EKS PodIdentityAssociation with standard naming and tagging."""
+    aws.eks.PodIdentityAssociation(
+        f"{cluster_name}-{logical_name}-pod-identity",
+        cluster_name=cluster_name,
+        namespace=namespace,
+        service_account=service_account,
+        role_arn=role_arn,
+        tags=resource.required_tags,
+        opts=pulumi.ResourceOptions(parent=resource),
+    )
 
 
 class AWSWorkloadClusters(pulumi.ComponentResource):
@@ -48,6 +69,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
     autoscaling_queues: dict[str, aws.sqs.Queue]
     packagemanager_roles: dict[str, aws.iam.Role | pulumi.Output[aws.iam.Role]]
     team_operator_roles: dict[str, aws.iam.Role]
+    external_secrets_roles: dict[str, aws.iam.Role]
     workbench_roles: dict[str, aws.iam.Role]
     workbench_session_roles: dict[str, aws.iam.Role]
 
@@ -102,12 +124,25 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
             f"organization/ptd-aws-workload-persistent/{self.workload.compound_name}"
         )
 
+        # Initialize optional product role dicts defensively so _define_pod_identity_associations
+        # can safely check membership even if the defining methods are skipped or reordered.
+        self.chronicle_roles = {}
+        self.home_roles = {}
+        self.external_secrets_roles = {}
+        self.connect_roles = {}
+        self.connect_session_roles = {}
+        self.workbench_roles = {}
+        self.workbench_session_roles = {}
+
         self._define_home_iam()
         self._define_chronicle_iam(persistent_stack)
         self._define_connect_iam()
         self._define_workbench_iam()
         self._define_packagemanager_iam(persistent_stack)
         self._define_team_operator_iam()
+        self._define_external_secrets_iam()
+        # Create Pod Identity associations for all products (ADDITIVE - keeps IRSA for backward compatibility)
+        self._define_pod_identity_associations()
         self._apply_custom_k8s_resources()
         self._define_team_operator()
         # after team operator so we can reuse the namespaces
@@ -134,6 +169,8 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
 
     @staticmethod
     def _define_read_secrets_inline() -> str:
+        # resources=["*"] is intentional: workload roles (connect, workbench, packagemanager, etc.)
+        # all use this same broad policy. Scoping to specific ARN prefixes is deferred work.
         return aws.iam.get_policy_document(
             statements=[
                 aws.iam.GetPolicyDocumentStatementArgs(
@@ -144,6 +181,29 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                         "secretsmanager:ListSecrets",
                     ],
                     resources=["*"],
+                )
+            ]
+        ).json
+
+    def _define_eso_read_secrets_inline(self) -> str:
+        # ESO uses a cluster-wide ClusterSecretStore, so its blast radius is larger than
+        # per-product IRSA roles. Scope to this workload's secret prefix to prevent
+        # cross-workload reads when multiple workloads share the same AWS account.
+        account_id = aws.get_caller_identity().account_id
+        region = self.workload.cfg.region
+        prefix = self.workload.compound_name
+        return aws.iam.get_policy_document(
+            statements=[
+                aws.iam.GetPolicyDocumentStatementArgs(
+                    effect="Allow",
+                    actions=[
+                        "secretsmanager:GetSecretValue",
+                        "secretsmanager:DescribeSecret",
+                        # ListSecrets does not support resource-level permissions in IAM;
+                        # including it in a resource-scoped statement would silently grant
+                        # list access to all secrets in the account.
+                    ],
+                    resources=[f"arn:aws:secretsmanager:{region}:{account_id}:secret:{prefix}/*"],
                 )
             ]
         ).json
@@ -230,6 +290,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 role_policies=[
                     self._define_read_secrets_inline(),
                 ],
+                pod_identity=self.workload.cfg.clusters[release].enable_pod_identity_agent,
             )
 
     def _define_connect_iam(self):
@@ -237,12 +298,14 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         self.connect_session_roles = {}
 
         for release in self.managed_clusters_by_release:
+            pod_identity = self.workload.cfg.clusters[release].enable_pod_identity_agent
             self.connect_roles[release] = self._define_k8s_iam_role(
                 name=self.workload.cluster_connect_role_name(release),
                 release=release,
                 namespace=ptd.POSIT_TEAM_NAMESPACE,
                 service_accounts=[f"{site_name}-connect" for site_name in sorted(self.workload.cfg.sites.keys())],
                 role_policies=[self._define_read_secrets_inline()],
+                pod_identity=pod_identity,
             )
 
             for site_name in sorted(self.workload.cfg.sites.keys()):
@@ -256,6 +319,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     policy=policy,
                     policy_name=role_name,
                     role_policies=[self._define_streaming_bedrock_access()],
+                    pod_identity=pod_identity,
                 )
 
     def _define_workbench_iam(self):
@@ -286,6 +350,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 namespace=ptd.POSIT_TEAM_NAMESPACE,
                 service_accounts=[f"{site_name}-workbench" for site_name in sorted(self.workload.cfg.sites.keys())],
                 role_policies=workbench_role_policies,
+                pod_identity=cluster_cfg.enable_pod_identity_agent,
             )
 
             for site_name in sorted(self.workload.cfg.sites.keys()):
@@ -311,6 +376,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     policy_name=role_name,
                     service_accounts=[f"{site_name}-workbench-session"],
                     role_policies=workbench_session_role_policies,
+                    pod_identity=cluster_cfg.enable_pod_identity_agent,
                 )
 
     def _define_packagemanager_iam(self, persistent_stack):
@@ -337,6 +403,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     required_tags=self.required_tags,
                 )
 
+                # Key format: release + "//" + site_name — must stay in sync with _define_pod_identity_associations.
                 self.packagemanager_roles[release + "//" + site_name] = self._define_k8s_iam_role(
                     name=self.workload.cluster_packagemanager_role_name(release, site_name),
                     release=release,
@@ -345,6 +412,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     policy=policy,
                     policy_name=policy_name,
                     role_policies=[self._define_read_secrets_inline()],
+                    pod_identity=self.workload.cfg.clusters[release].enable_pod_identity_agent,
                 )
 
     def _define_k8s_iam_role(
@@ -359,6 +427,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         role_policies: pulumi.Input[typing.Sequence[pulumi.Input[str]],] | None = None,
         auth_issuers: list[ptd.aws_iam.AuthIssuer] | None = None,
         opts: pulumi.ResourceOptions | None = None,
+        pod_identity: bool = False,  # noqa: FBT001, FBT002
     ) -> aws.iam.Role:
         """
         Define a Kubernetes IAM role with appropriate trust relationships.
@@ -371,6 +440,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
         :param role_policies: Role policies to attach to the role (Previously known as inline_policies)
         :param auth_issuers: A list of auth issuers that the role should trust. DO NOT list the same auth issuer more
             than once! Use a list of client_ids instead
+        :param pod_identity: When True, adds pods.eks.amazonaws.com as a trusted principal (required for Pod Identity)
         :return: aws.iam.Role
         """
         if auth_issuers is None:
@@ -379,34 +449,51 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
             service_accounts = []
         if opts is None:
             opts = pulumi.ResourceOptions()
+
+        extra_statements = (
+            [
+                {
+                    "Action": ["sts:AssumeRole", "sts:TagSession"],
+                    "Effect": "Allow",
+                    "Principal": {"Service": "pods.eks.amazonaws.com"},
+                }
+            ]
+            if pod_identity
+            else []
+        )
+
+        if len(self._oidc_url_tails) > 0 or len(auth_issuers) > 0:
+            irsa_policy = ptd.aws_iam.build_hybrid_irsa_role_assume_role_policy(
+                service_accounts=service_accounts,
+                namespace=namespace,
+                managed_account_id=self.workload.cfg.account_id,
+                oidc_url_tails=self._oidc_url_tails,
+                auth_issuers=auth_issuers,
+            )
+            if not isinstance(irsa_policy.get("Statement"), list):
+                msg = "Expected Statement list from build_hybrid_irsa_role_assume_role_policy"
+                raise ValueError(msg)
+            base_policy = {**irsa_policy, "Statement": list(irsa_policy["Statement"]) + extra_statements}
+        else:
+            base_policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Action": "sts:AssumeRole",
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": aws.get_caller_identity().arn,
+                        },
+                    },
+                    *extra_statements,
+                ],
+            }
+
         role = aws.iam.Role(
             name,
             aws.iam.RoleArgs(
                 name=name,
-                assume_role_policy=json.dumps(
-                    (
-                        ptd.aws_iam.build_hybrid_irsa_role_assume_role_policy(
-                            service_accounts=service_accounts,
-                            namespace=namespace,
-                            managed_account_id=self.workload.cfg.account_id,
-                            oidc_url_tails=self._oidc_url_tails,
-                            auth_issuers=auth_issuers,
-                        )
-                        if len(self._oidc_url_tails) > 0 or len(auth_issuers) > 0
-                        else {
-                            "Version": "2012-10-17",
-                            "Statement": [
-                                {
-                                    "Action": "sts:AssumeRole",
-                                    "Effect": "Allow",
-                                    "Principal": {
-                                        "AWS": aws.get_caller_identity().arn,
-                                    },
-                                },
-                            ],
-                        }
-                    ),
-                ),
+                assume_role_policy=json.dumps(base_policy),
                 permissions_boundary=self.workload.iam_permissions_boundary,
                 tags=self.required_tags,
             ),
@@ -476,6 +563,7 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                     policy=policy,
                     policy_name=policy_name,
                     role_policies=[self._define_read_secrets_inline()],
+                    pod_identity=self.workload.cfg.clusters[release].enable_pod_identity_agent,
                 )
 
                 read_only_policy_name = self.workload.chronicle_read_only_s3_bucket_policy_name(release, site_name)
@@ -558,6 +646,176 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
                 service_accounts=[helm_service_account_name],
                 policy_name=self.workload.team_operator_policy_name,
             )
+
+    def _define_external_secrets_iam(self) -> None:
+        """Define IAM roles for external-secrets-operator to access AWS Secrets Manager."""
+        for release in self.managed_clusters_by_release:
+            cluster_cfg = self.workload.cfg.clusters[release]
+            if not cluster_cfg.enable_external_secrets_operator:
+                continue
+            # Invariant: enable_pod_identity_agent=True when enable_external_secrets_operator=True
+            # is enforced by AWSWorkloadClusterConfig.__post_init__; no need to re-check here.
+            # pod_identity=True: ESO uses no auth block in ClusterSecretStore and relies exclusively
+            # on Pod Identity, so the role trust policy must trust pods.eks.amazonaws.com.
+            self.external_secrets_roles[release] = self._define_k8s_iam_role(
+                name=self.workload.external_secrets_role_name(release),
+                release=release,
+                namespace=ptd.pulumi_resources.aws_workload_helm.ESO_NAMESPACE,
+                service_accounts=[ptd.pulumi_resources.aws_workload_helm.ESO_SERVICE_ACCOUNT],
+                role_policies=[self._define_eso_read_secrets_inline()],
+                pod_identity=True,
+            )
+
+    def _define_pod_identity_associations(self) -> None:
+        """
+        Create EKS Pod Identity associations for all product service accounts.
+
+        This is ADDITIVE - existing IRSA roles and annotations are kept for backward compatibility.
+        Both Pod Identity and IRSA can coexist. The operator will be updated to stop computing
+        IRSA annotations in a future phase.
+
+        Pod Identity associations connect service accounts directly to IAM roles without requiring
+        annotations on the ServiceAccount resource.
+
+        Note: team_operator_roles is intentionally excluded here. The team-operator's service
+        account retains IRSA-based access; Pod Identity will be added in a future phase once
+        the operator itself is updated to remove IRSA annotation computation.
+
+        Note: fsx_openzfs_roles is also intentionally excluded. The FSx OpenZFS CSI driver uses
+        node-level IAM (instance profile) rather than pod-level credentials, so no Pod Identity
+        association is needed for those roles.
+        """
+        for release in self.managed_clusters_by_release:
+            cluster_cfg = self.workload.cfg.clusters[release]
+            if not cluster_cfg.enable_pod_identity_agent:
+                continue
+
+            cluster_name = f"{self.workload.compound_name}-{release}"
+
+            # External Secrets Operator (per-release, only if ESO is also enabled)
+            if cluster_cfg.enable_external_secrets_operator:
+                if release not in self.external_secrets_roles:
+                    msg = (
+                        f"external_secrets_roles missing key {release!r}; "
+                        "_define_external_secrets_iam must be called before _define_pod_identity_associations"
+                    )
+                    raise RuntimeError(msg)
+                _eso_sa = ptd.pulumi_resources.aws_workload_helm.ESO_SERVICE_ACCOUNT
+                _eso_ns = ptd.pulumi_resources.aws_workload_helm.ESO_NAMESPACE
+                _pod_identity_assoc(
+                    self,
+                    _eso_sa,
+                    cluster_name,
+                    _eso_ns,
+                    _eso_sa,
+                    self.external_secrets_roles[release].arn,
+                )
+
+            # Per-site product associations
+            for site_name in sorted(self.workload.cfg.sites.keys()):
+                # Connect
+                if release not in self.connect_roles:
+                    msg = (
+                        f"connect_roles missing key {release!r}; "
+                        "_define_connect_iam must be called before _define_pod_identity_associations"
+                    )
+                    raise RuntimeError(msg)
+                _pod_identity_assoc(
+                    self,
+                    f"{site_name}-connect",
+                    cluster_name,
+                    ptd.POSIT_TEAM_NAMESPACE,
+                    f"{site_name}-connect",
+                    self.connect_roles[release].arn,
+                )
+
+                # Connect Session — always present: _define_connect_iam populates connect_session_roles
+                # for every release/site combo unconditionally.
+                _session_key = f"{release}-{site_name}"
+                if _session_key not in self.connect_session_roles:
+                    msg = (
+                        f"connect_session_roles missing key {_session_key!r}; "
+                        "_define_connect_iam must be called before _define_pod_identity_associations"
+                    )
+                    raise RuntimeError(msg)
+                _pod_identity_assoc(
+                    self,
+                    f"{site_name}-connect-session",
+                    cluster_name,
+                    ptd.POSIT_TEAM_NAMESPACE,
+                    f"{site_name}-connect-session",
+                    self.connect_session_roles[_session_key].arn,
+                )
+
+                # Workbench
+                if release not in self.workbench_roles:
+                    msg = (
+                        f"workbench_roles missing key {release!r}; "
+                        "_define_workbench_iam must be called before _define_pod_identity_associations"
+                    )
+                    raise RuntimeError(msg)
+                _pod_identity_assoc(
+                    self,
+                    f"{site_name}-workbench",
+                    cluster_name,
+                    ptd.POSIT_TEAM_NAMESPACE,
+                    f"{site_name}-workbench",
+                    self.workbench_roles[release].arn,
+                )
+
+                # Workbench Session — always present: _define_workbench_iam populates workbench_session_roles
+                # for every release/site combo unconditionally.
+                if _session_key not in self.workbench_session_roles:
+                    msg = (
+                        f"workbench_session_roles missing key {_session_key!r}; "
+                        "_define_workbench_iam must be called before _define_pod_identity_associations"
+                    )
+                    raise RuntimeError(msg)
+                _pod_identity_assoc(
+                    self,
+                    f"{site_name}-workbench-session",
+                    cluster_name,
+                    ptd.POSIT_TEAM_NAMESPACE,
+                    f"{site_name}-workbench-session",
+                    self.workbench_session_roles[_session_key].arn,
+                )
+
+                # Package Manager
+                # Key format uses "//" separator — must match _define_packagemanager_iam (release + "//" + site_name).
+                if release + "//" + site_name in self.packagemanager_roles:
+                    _pod_identity_assoc(
+                        self,
+                        f"{site_name}-packagemanager",
+                        cluster_name,
+                        ptd.POSIT_TEAM_NAMESPACE,
+                        f"{site_name}-packagemanager",
+                        self.packagemanager_roles[release + "//" + site_name].arn,
+                    )
+
+                # Chronicle (optional product — skip if not configured for this release/site)
+                if f"{release}-{site_name}" in self.chronicle_roles:
+                    _pod_identity_assoc(
+                        self,
+                        f"{site_name}-chronicle",
+                        cluster_name,
+                        ptd.POSIT_TEAM_NAMESPACE,
+                        f"{site_name}-chronicle",
+                        self.chronicle_roles[f"{release}-{site_name}"].arn,
+                    )
+
+                # Home/Flightdeck (optional product — skip if not configured for this release)
+                # home_roles is keyed per-release (one IAM role per release), but Home's trust
+                # policy allows all per-site SAs ({site_name}-home) — see _define_home_iam.
+                # Pod Identity requires one association per SA, so this block stays inside the loop.
+                if release in self.home_roles:
+                    _pod_identity_assoc(
+                        self,
+                        f"{site_name}-home",
+                        cluster_name,
+                        ptd.POSIT_TEAM_NAMESPACE,
+                        f"{site_name}-home",
+                        self.home_roles[release].arn,
+                    )
 
     def _apply_custom_k8s_resources(self):
         """Apply custom Kubernetes resources from the custom_k8s_resources/ directory."""

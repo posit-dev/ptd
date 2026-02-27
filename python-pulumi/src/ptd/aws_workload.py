@@ -255,9 +255,29 @@ class AWSWorkloadClusterConfig(ptd.WorkloadClusterConfig):
     additional_node_groups: dict[str, ptd.NodeGroupConfig] = dataclasses.field(default_factory=dict)
     public_endpoint_access: bool = True
     ebs_csi_addon_version: str = "v1.41.0-eksbuild.1"
+    pod_identity_agent_version: str | None = None
+    enable_pod_identity_agent: bool = False
+    enable_external_secrets_operator: bool = False
+    # Requires the workload secret (secret_name) to contain 'fs-dns-name' (FSx NFS endpoint) before
+    # `pulumi up` is run; a missing key causes a deploy-time error (dry runs warn instead).
+    # Security note: the storageClass pathPattern derives subdirectory paths from the
+    # nfs.io/storage-path PVC annotation, which is user-controlled. Any entity with PVC create
+    # permissions can supply arbitrary paths; restrict via OPA/Gatekeeper or a
+    # ValidatingWebhookConfiguration if cross-path access is a concern.
+    enable_nfs_subdir_provisioner: bool = False  # PVCs must carry the nfs.io/storage-path annotation; the storageClass pathPattern uses it to derive subdirectory paths
     enable_efs_csi_driver: bool = False
     efs_config: ptd.EFSConfig | None = None
     karpenter_config: KarpenterConfig | None = None
+    enable_gateway_api: bool = False  # Enables Gateway API CRDs, Traefik Gateway provider, and gatewayRef in Site CRs
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.enable_external_secrets_operator and not self.enable_pod_identity_agent:
+            msg = (
+                "enable_external_secrets_operator requires enable_pod_identity_agent=True "
+                "(ClusterSecretStore uses no auth block and relies on Pod Identity for credentials)."
+            )
+            raise ValueError(msg)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -268,6 +288,8 @@ class AWSWorkloadClusterComponentConfig(ptd.WorkloadClusterComponentConfig):
     secret_store_csi_driver_aws_provider_version: str | None = "0.3.5"  # noqa: S105
     nvidia_device_plugin_version: str | None = "0.17.1"
     karpenter_version: str | None = "1.6.0"
+    nfs_subdir_provisioner_version: str | None = "4.0.18"
+    external_secrets_operator_version: str | None = "0.10.7"
 
 
 class AWSWorkload(ptd.workload.AbstractWorkload):
@@ -584,6 +606,9 @@ class AWSWorkload(ptd.workload.AbstractWorkload):
     @property
     def fsx_openzfs_role_name(self) -> str:
         return f"aws-fsx-openzfs-csi-driver.{self.compound_name}.posit.team"
+
+    def external_secrets_role_name(self, release: str) -> str:
+        return f"external-secrets.{release}.{self.compound_name}.posit.team"
 
     def cluster_home_role_name(self, release: str) -> str:
         return f"home.{release}.{self.compound_name}.posit.team"

@@ -428,6 +428,12 @@ class WorkloadClusterConfig:
     # After migration, set to False to let Helm manage CRDs going forward.
     team_operator_skip_crds: bool = False
 
+    def __post_init__(self) -> None:
+        # No-op implementation makes super().__post_init__() safe to call from subclasses
+        # (e.g. AWSWorkloadClusterConfig) without requiring every intermediate class to guard
+        # against AttributeError when the MRO reaches this base.
+        pass
+
 
 def load_workload_cluster_site_dict(
     cluster_site_dict: dict[str, typing.Any],
