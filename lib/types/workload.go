@@ -101,14 +101,15 @@ type AzureWorkloadConfig struct {
 }
 
 type NetworkConfig struct {
-	VnetCidr             string `yaml:"vnet_cidr"`
-	PublicSubnetCidr     string `yaml:"public_subnet_cidr"`
-	PrivateSubnetCidr    string `yaml:"private_subnet_cidr"`
-	DbSubnetCidr         string `yaml:"db_subnet_cidr"`
-	NetAppSubnetCidr     string `yaml:"netapp_subnet_cidr"`
-	AppGatewaySubnetCidr string `yaml:"app_gateway_subnet_cidr"`
-	ProvisionedVnetID    string `yaml:"provisioned_vnet_id"`
-	VnetRsgName          string `yaml:"vnet_rsg_name"`
+	VnetCidr                  string `yaml:"vnet_cidr"`
+	PublicSubnetCidr          string `yaml:"public_subnet_cidr"`
+	PrivateSubnetCidr         string `yaml:"private_subnet_cidr"`
+	PrivateSubnetRouteTableID string `yaml:"private_subnet_route_table_id"`
+	DbSubnetCidr              string `yaml:"db_subnet_cidr"`
+	NetAppSubnetCidr          string `yaml:"netapp_subnet_cidr"`
+	AppGatewaySubnetCidr      string `yaml:"app_gateway_subnet_cidr"`
+	ProvisionedVnetID         string `yaml:"provisioned_vnet_id"`
+	VnetRsgName               string `yaml:"vnet_rsg_name"`
 }
 
 // AzureUserNodePoolConfig defines configuration for a single user node pool in AKS
