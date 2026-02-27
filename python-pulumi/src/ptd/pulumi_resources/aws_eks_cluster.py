@@ -1982,6 +1982,9 @@ class AWSEKSCluster(pulumi.ComponentResource):
                                             "settings": {
                                                 "apiKey": '${{ "{" }}POSIT_OPSGENIE_KEY{{ "}" }}',  # ${POSIT_OPSGENIE_KEY} in the resulting configMap,
                                                 "apiUrl": "https://api.opsgenie.com/v2/alerts",
+                                                "sendTagsAs": "tags",
+                                                "message": '{{ "{{" }} .CommonAnnotations.summary {{ "}}" }}',
+                                                "description": '{{ "{{" }} .CommonAnnotations.description {{ "}}" }}',
                                             },
                                         }
                                     ],

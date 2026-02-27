@@ -127,6 +127,7 @@ class AlloyConfig(pulumi.ComponentResource):
 
     def _define_blackbox_targets(self) -> str:
         output = ""
+        tenant_name = self.workload.cfg.tenant_name or self.workload.compound_name
 
         for site_name, site_config in self.workload.cfg.sites.items():
             # Parse site YAML once for this site
@@ -150,6 +151,7 @@ class AlloyConfig(pulumi.ComponentResource):
                   address = {internal_address}
                   module = "{component.module_name}"
                   labels = {{
+                    "tenant_name" = "{tenant_name}",
                     "ptd_site" = "{site_name}",
                     "ptd_component" = "{lower_name}",
                     "check_type" = "internal",
@@ -168,6 +170,7 @@ class AlloyConfig(pulumi.ComponentResource):
                       address = {fqdn_address}
                       module = "{component.module_name}"
                       labels = {{
+                        "tenant_name" = "{tenant_name}",
                         "ptd_site" = "{site_name}",
                         "ptd_component" = "{lower_name}",
                         "check_type" = "fqdn",
@@ -264,12 +267,12 @@ class AlloyConfig(pulumi.ComponentResource):
                         period     = "5m"
                     }}
 
-                    # TODO: Remove ["Sum"] from statistics once all Grafana dashboards have
-                    # been updated to query aws_rds_database_connections_average.
-                    # Collecting both Sum and Average during migration. Average is the
-                    # target metric (aws_rds_database_connections_average); Sum
-                    # (aws_rds_database_connections_sum) is kept temporarily for existing
-                    # dashboards. NOTE: Keeping Sum doubles the CloudWatch API cost for this metric.
+                    // TODO: Remove ["Sum"] from statistics once all Grafana dashboards have
+                    // been updated to query aws_rds_database_connections_average.
+                    // Collecting both Sum and Average during migration. Average is the
+                    // target metric (aws_rds_database_connections_average). Sum
+                    // (aws_rds_database_connections_sum) is kept temporarily for existing
+                    // dashboards. NOTE: Keeping Sum doubles the CloudWatch API cost for this metric.
                     metric {{
                         name       = "DatabaseConnections"
                         statistics = ["Average", "Sum"]
@@ -294,14 +297,14 @@ class AlloyConfig(pulumi.ComponentResource):
                         period     = "5m"
                     }}
 
-                    # Collected for dashboard visibility; no alert rules defined
+                    // Collected for dashboard visibility, no alert rules defined
                     metric {{
                         name       = "WriteLatency"
                         statistics = ["Average"]
                         period     = "5m"
                     }}
 
-                    # Collected for dashboard visibility; no alert rules defined
+                    // Collected for dashboard visibility, no alert rules defined
                     metric {{
                         name       = "Deadlocks"
                         statistics = ["Sum"]
@@ -334,8 +337,8 @@ class AlloyConfig(pulumi.ComponentResource):
                     type    = "AWS/NATGateway"
                     regions = ["{self.region}"]
 
-                    # NAT Gateways inherit VPC tags including posit.team/true-name
-                    # (see python-pulumi/src/ptd/pulumi_resources/aws_vpc.py:607-616)
+                    // NAT Gateways inherit VPC tags including posit.team/true-name
+                    // (see python-pulumi/src/ptd/pulumi_resources/aws_vpc.py:607-616)
                     search_tags = {{
                         "posit.team/true-name" = "{self.workload.cfg.true_name}",
                     }}
@@ -357,12 +360,12 @@ class AlloyConfig(pulumi.ComponentResource):
                     type    = "AWS/ApplicationELB"
                     regions = ["{self.region}"]
 
-                    # ALBs are tagged at creation time via aws_workload_helm.py.
-                    # LBs provisioned before this tag was added won't be discovered
-                    # until the cluster is redeployed.
-                    # FIXME: To tag existing ALBs without redeploying, use the AWS CLI:
-                    #   aws elbv2 add-tags --resource-arns <ALB_ARN> \
-                    #     --tags Key=posit.team/true-name,Value=<true_name>
+                    // ALBs are tagged at creation time via aws_workload_helm.py.
+                    // LBs provisioned before this tag was added won't be discovered
+                    // until the cluster is redeployed.
+                    // FIXME: To tag existing ALBs without redeploying, use the AWS CLI:
+                    //   aws elbv2 add-tags --resource-arns <ALB_ARN>
+                    //     --tags Key=posit.team/true-name,Value=<true_name>
                     search_tags = {{
                         "posit.team/true-name" = "{self.workload.cfg.true_name}",
                     }}
@@ -390,12 +393,12 @@ class AlloyConfig(pulumi.ComponentResource):
                     type    = "AWS/NetworkELB"
                     regions = ["{self.region}"]
 
-                    # NLBs are tagged at creation time via traefik.py.
-                    # LBs provisioned before this tag was added won't be discovered
-                    # until the cluster is redeployed.
-                    # FIXME: To tag existing NLBs without redeploying, use the AWS CLI:
-                    #   aws elbv2 add-tags --resource-arns <NLB_ARN> \
-                    #     --tags Key=posit.team/true-name,Value=<true_name>
+                    // NLBs are tagged at creation time via traefik.py.
+                    // LBs provisioned before this tag was added won't be discovered
+                    // until the cluster is redeployed.
+                    // FIXME: To tag existing NLBs without redeploying, use the AWS CLI:
+                    //   aws elbv2 add-tags --resource-arns <NLB_ARN>
+                    //     --tags Key=posit.team/true-name,Value=<true_name>
                     search_tags = {{
                         "posit.team/true-name" = "{self.workload.cfg.true_name}",
                     }}
@@ -432,6 +435,9 @@ class AlloyConfig(pulumi.ComponentResource):
         else:
             account_id = self.workload.cfg.account_id
             cluster_name = self.workload.eks_cluster_name(self.release)
+
+        # Use tenant_name if set, otherwise fall back to compound_name
+        tenant_name = self.workload.cfg.tenant_name or self.workload.compound_name
 
         # Generate CloudWatch exporter configuration for AWS
         cloudwatch_config = self._define_cloudwatch_config()
@@ -567,6 +573,12 @@ class AlloyConfig(pulumi.ComponentResource):
                         action       = "replace"
                         target_label = "cluster"
                         replacement  = "{cluster_name}"
+                    }}
+
+                    rule {{
+                        action       = "replace"
+                        target_label = "tenant_name"
+                        replacement  = "{tenant_name}"
                     }}
                 }}
 
@@ -753,6 +765,7 @@ class AlloyConfig(pulumi.ComponentResource):
 
                   external_labels = {{
                     data = "true",
+                    tenant_name = "{tenant_name}",
                   }}
                 }}
             """

@@ -55,8 +55,19 @@ groups:
           execErrState: Error
           for: 15m
           annotations:
-            summary: Node not in ready state (instance {{ $labels.instance }})
-            description: "Node {{ $labels.node }} in cluster {{ $labels.cluster }} has been unready for 15 minutes\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+            summary: "🔴 CRITICAL: Node Not Ready"
+            description: |
+              Kubernetes node is not accepting workloads
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Node:        {{ $labels.node }}
+
+              ─── DETAILS ─────────────────────────
+              Condition:   NotReady
+              Duration:    15 minutes
+
           labels:
             opsgenie: "1"
           isPaused: false
@@ -110,8 +121,19 @@ groups:
           execErrState: Error
           for: 15m
           annotations:
-            summary: Kubernetes Node memory pressure (instance {{ $labels.instance }})
-            description: "Node {{ $labels.node }} in cluster {{ $labels.cluster }} has MemoryPressure condition\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+            summary: "🟡 WARNING: Node Memory Pressure"
+            description: |
+              Node is running low on available memory
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Node:        {{ $labels.node }}
+
+              ─── DETAILS ─────────────────────────
+              Condition:   MemoryPressure
+              Duration:    15 minutes
+
           labels:
             opsgenie: "1"
           isPaused: false
@@ -165,8 +187,19 @@ groups:
           execErrState: Error
           for: 15m
           annotations:
-            summary: Kubernetes Node disk pressure (instance {{ $labels.instance }})
-            description: "Node {{ $labels.node }} in cluster {{ $labels.cluster }} has DiskPressure condition\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+            summary: "🟡 WARNING: Node Disk Pressure"
+            description: |
+              Node is running low on available disk space
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Node:        {{ $labels.node }}
+
+              ─── DETAILS ─────────────────────────
+              Condition:   DiskPressure
+              Duration:    15 minutes
+
           labels:
             opsgenie: "1"
           isPaused: false

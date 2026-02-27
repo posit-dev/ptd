@@ -29,7 +29,7 @@ groups:
                     type: prometheus
                     uid: mimir
                 editorMode: code
-                expr: count by (cluster, container)(kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"})
+                expr: count by (cluster, namespace, pod, container)(kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"})
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -96,7 +96,21 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            summary: Container {{ $labels.container }} in {{ $labels.cluster }} is in CrashLoopBackoff state. \n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}
+            summary: "🔴 CRITICAL: Container Crash-Looping"
+            description: |
+              Container keeps crashing and restarting
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Namespace:   {{ $labels.namespace }}
+              Pod:         {{ $labels.pod }}
+              Container:   {{ $labels.container }}
+
+              ─── DETAILS ─────────────────────────
+              Status:      CrashLoopBackOff
+              Duration:    5 minutes
+
           labels:
             opsgenie: "1"
           isPaused: false
@@ -115,7 +129,7 @@ groups:
                     uid: mimir
                 disableTextWrap: false
                 editorMode: code
-                expr: count by(cluster, pod, reason) (kube_pod_container_status_terminated_reason{reason!="Completed"} * on(cluster,pod) group_left(label_launcher_instance_id) kube_pod_labels{label_launcher_instance_id=""})
+                expr: count by(cluster, namespace, pod, reason) (kube_pod_container_status_terminated_reason{reason!="Completed"} * on(cluster,pod) group_left(label_launcher_instance_id) kube_pod_labels{label_launcher_instance_id=""})
                 fullMetaSearch: false
                 includeNullMetadata: true
                 instant: true
@@ -187,7 +201,20 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            summary: Pod {{ $labels.pod }} in cluster {{ $labels.cluster }} is in a {{ $labels.reason }} state.
+            summary: "🟡 WARNING: Pod Error"
+            description: |
+              Pod container terminated with an error
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Namespace:   {{ $labels.namespace }}
+              Pod:         {{ $labels.pod }}
+
+              ─── DETAILS ─────────────────────────
+              Reason:      {{ $labels.reason }}
+              Duration:    5 minutes
+
           labels:
             opsgenie: "1"
           isPaused: false
@@ -206,7 +233,7 @@ groups:
                     uid: mimir
                 disableTextWrap: false
                 editorMode: code
-                expr: sum by (cluster, pod, phase) (kube_pod_status_phase{phase=~"Pending|Unknown|Failed"} * on(cluster,pod) group_left(label_launcher_instance_id) kube_pod_labels{label_launcher_instance_id=""}) > 0
+                expr: sum by (cluster, namespace, pod, phase) (kube_pod_status_phase{phase=~"Pending|Unknown|Failed"} * on(cluster,pod) group_left(label_launcher_instance_id) kube_pod_labels{label_launcher_instance_id=""}) > 0
                 fullMetaSearch: false
                 includeNullMetadata: true
                 instant: true
@@ -274,8 +301,20 @@ groups:
           execErrState: Error
           for: 15m
           annotations:
-            summary: Workload Cluster Pod not healthy (pod {{ $labels.pod }})
-            description: "Cluster: {{ $labels.cluster }}, Pod: {{ $labels.pod }} has been in a non-running state for longer than 15 minutes.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+            summary: "🟡 WARNING: Pod Not Healthy"
+            description: |
+              Pod has been in a non-running state
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Namespace:   {{ $labels.namespace }}
+              Pod:         {{ $labels.pod }}
+
+              ─── DETAILS ─────────────────────────
+              Phase:       {{ $labels.phase }}
+              Duration:    15 minutes
+
           labels:
             opsgenie: "1"
           isPaused: false
@@ -366,8 +405,19 @@ groups:
           execErrState: Error
           for: 15m
           annotations:
-            summary: Workload Cluster Pod {{ $labels.pod }} has more than 5 restarts in 15 minutes.
-            description: "Cluster: {{ $labels.cluster }}, Pod: {{ $labels.pod }} has restarted {{$value}} times in 15 minutes. \n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+            summary: "🟡 WARNING: Pod Restarts"
+            description: |
+              Pod has restarted excessively
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Namespace:   {{ $labels.namespace }}
+              Pod:         {{ $labels.pod }}
+
+              ─── DETAILS ─────────────────────────
+              Issue:       > 5 restarts in 15 minutes
+
           labels:
             opsgenie: "1"
           isPaused: false
@@ -451,8 +501,20 @@ groups:
           execErrState: Error
           for: 15m
           annotations:
-            summary: Deployment replicas mismatch (instance {{ $labels.instance }})
-            description: "Cluster: {{ $labels.cluster }}, Deployment: {{ $labels.deployment }} has mismatched desired and available replicas.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+            summary: "🟡 WARNING: Deployment Unhealthy"
+            description: |
+              Deployment has fewer replicas than expected
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Namespace:   {{ $labels.namespace }}
+              Deployment:  {{ $labels.deployment }}
+
+              ─── DETAILS ─────────────────────────
+              Status:      Replicas mismatch
+              Duration:    15 minutes
+
           labels:
             opsgenie: "1"
           isPaused: false
@@ -536,8 +598,20 @@ groups:
           execErrState: Error
           for: 15m
           annotations:
-            summary: Stateful Set replicas mismatch (instance {{ $labels.instance }})
-            description: "Cluster: {{ $labels.cluster }}, Stateful Set: {{ $labels.statefulset }} does not match the desired number of replicas.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+            summary: "🟡 WARNING: StatefulSet Unhealthy"
+            description: |
+              StatefulSet has fewer replicas than expected
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Namespace:   {{ $labels.namespace }}
+              StatefulSet: {{ $labels.statefulset }}
+
+              ─── DETAILS ─────────────────────────
+              Status:      Replicas mismatch
+              Duration:    15 minutes
+
           labels:
             opsgenie: "1"
           isPaused: false
