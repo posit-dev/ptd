@@ -267,12 +267,12 @@ class AlloyConfig(pulumi.ComponentResource):
                         period     = "5m"
                     }}
 
-                    # TODO: Remove ["Sum"] from statistics once all Grafana dashboards have
-                    # been updated to query aws_rds_database_connections_average.
-                    # Collecting both Sum and Average during migration. Average is the
-                    # target metric (aws_rds_database_connections_average); Sum
-                    # (aws_rds_database_connections_sum) is kept temporarily for existing
-                    # dashboards. NOTE: Keeping Sum doubles the CloudWatch API cost for this metric.
+                    // TODO: Remove ["Sum"] from statistics once all Grafana dashboards have
+                    // been updated to query aws_rds_database_connections_average.
+                    // Collecting both Sum and Average during migration. Average is the
+                    // target metric (aws_rds_database_connections_average). Sum
+                    // (aws_rds_database_connections_sum) is kept temporarily for existing
+                    // dashboards. NOTE: Keeping Sum doubles the CloudWatch API cost for this metric.
                     metric {{
                         name       = "DatabaseConnections"
                         statistics = ["Average", "Sum"]
@@ -297,14 +297,14 @@ class AlloyConfig(pulumi.ComponentResource):
                         period     = "5m"
                     }}
 
-                    # Collected for dashboard visibility; no alert rules defined
+                    // Collected for dashboard visibility, no alert rules defined
                     metric {{
                         name       = "WriteLatency"
                         statistics = ["Average"]
                         period     = "5m"
                     }}
 
-                    # Collected for dashboard visibility; no alert rules defined
+                    // Collected for dashboard visibility, no alert rules defined
                     metric {{
                         name       = "Deadlocks"
                         statistics = ["Sum"]
