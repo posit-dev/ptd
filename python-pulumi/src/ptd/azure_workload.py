@@ -32,6 +32,7 @@ class NetworkConfig:
     public_subnet_cidr: str | None = None
     vnet_rsg_name: str | None = None
     dns_forward_domains: list[dict[str, str]] = dataclasses.field(default_factory=list)
+    private_subnet_route_table_id: str | None = None
 
     def __post_init__(self):
         """Validate DNS forward domain entries if configured."""
