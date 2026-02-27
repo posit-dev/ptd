@@ -92,14 +92,8 @@ type AzureWorkloadConfig struct {
 	Region                     string                                `yaml:"region"`
 	SubscriptionID             string                                `yaml:"subscription_id"`
 	TenantID                   string                                `yaml:"tenant_id"`
-	ClientID                   string                                `yaml:"client_id"`
-	SecretsProviderClientID    string                                `yaml:"secrets_provider_client_id"`
 	AdminGroupID               string                                `yaml:"admin_group_id"`
 	BastionInstanceType        string                                `yaml:"bastion_instance_type"`
-	InstanceType               string                                `yaml:"instance_type"`
-	ControlPlaneNodeCount      int                                   `yaml:"control_plane_node_count"`
-	WorkerNodeCount            int                                   `yaml:"worker_node_count"`
-	DBStorageSizeGB            int                                   `yaml:"db_storage_size_gb"`
 	ResourceTags               map[string]string                     `yaml:"resource_tags"`
 	Sites                      map[string]SiteConfig                 `json:"sites" yaml:"sites"` // didn't find this on the python side.
 	ProtectPersistentResources bool                                  `yaml:"protect_persistent_resources"`
@@ -107,14 +101,15 @@ type AzureWorkloadConfig struct {
 }
 
 type NetworkConfig struct {
-	VnetCidr             string `yaml:"vnet_cidr"`
-	PublicSubnetCidr     string `yaml:"public_subnet_cidr"`
-	PrivateSubnetCidr    string `yaml:"private_subnet_cidr"`
-	DbSubnetCidr         string `yaml:"db_subnet_cidr"`
-	NetAppSubnetCidr     string `yaml:"netapp_subnet_cidr"`
-	AppGatewaySubnetCidr string `yaml:"app_gateway_subnet_cidr"`
-	ProvisionedVnetID    string `yaml:"provisioned_vnet_id"`
-	VnetRsgName          string `yaml:"vnet_rsg_name"`
+	VnetCidr                  string `yaml:"vnet_cidr"`
+	PublicSubnetCidr          string `yaml:"public_subnet_cidr"`
+	PrivateSubnetCidr         string `yaml:"private_subnet_cidr"`
+	PrivateSubnetRouteTableID string `yaml:"private_subnet_route_table_id"`
+	DbSubnetCidr              string `yaml:"db_subnet_cidr"`
+	NetAppSubnetCidr          string `yaml:"netapp_subnet_cidr"`
+	AppGatewaySubnetCidr      string `yaml:"app_gateway_subnet_cidr"`
+	ProvisionedVnetID         string `yaml:"provisioned_vnet_id"`
+	VnetRsgName               string `yaml:"vnet_rsg_name"`
 }
 
 // AzureUserNodePoolConfig defines configuration for a single user node pool in AKS
@@ -139,19 +134,7 @@ type AzureWorkloadClusterConfig struct {
 	PublicEndpointAccess       bool                                `yaml:"public_endpoint_access"`
 	SystemNodePoolInstanceType string                              `yaml:"system_node_pool_instance_type"`
 
-	// Legacy field - maintained for backward compatibility
-	// Used to configure the hardcoded "userpool" in AgentPoolProfiles for legacy clusters
-	UserNodePoolInstanceType string `yaml:"user_node_pool_instance_type,omitempty"`
-
-	// New field - defines additional user node pools as separate AgentPool resources
-	// Works for both new clusters (all user pools) and legacy clusters (additional pools)
-	UserNodePools []AzureUserNodePoolConfig `yaml:"user_node_pools,omitempty"`
-
-	// Optional: explicit flag to control whether to include legacy user pool in agentPoolProfiles
-	// Set to true for existing clusters to maintain the hardcoded "userpool" in AgentPoolProfiles
-	// Set to false (or omit) for new clusters to have all user pools as separate AgentPool resources
-	// Legacy clusters can have BOTH the hardcoded userpool AND additional user_node_pools
-	UseLegacyUserPool *bool `yaml:"use_legacy_user_pool,omitempty"`
+	UserNodePools []AzureUserNodePoolConfig `yaml:"user_node_pools"`
 
 	// Optional: Root disk size for system node pool in GB (defaults to 128)
 	SystemNodePoolRootDiskSize *int `yaml:"system_node_pool_root_disk_size,omitempty"`
@@ -186,27 +169,11 @@ func (c *AzureWorkloadClusterConfig) ValidateOutboundType() error {
 	return nil
 }
 
-// ResolveUserNodePools resolves which user node pools should be created based on configuration
-// For NEW clusters (use_legacy_user_pool = false or omitted): user_node_pools is REQUIRED
-// For LEGACY clusters (use_legacy_user_pool = true): user_node_pools is optional (adds ADDITIONAL pools)
+// ResolveUserNodePools validates that user_node_pools is defined
+// All Azure workloads must define user_node_pools in configuration
 func (c *AzureWorkloadClusterConfig) ResolveUserNodePools() ([]AzureUserNodePoolConfig, error) {
-	useLegacy := c.UseLegacyUserPool != nil && *c.UseLegacyUserPool
-
-	// If user_node_pools is explicitly defined, use it
-	if len(c.UserNodePools) > 0 {
-		return c.UserNodePools, nil
+	if len(c.UserNodePools) == 0 {
+		return nil, fmt.Errorf("user_node_pools must be defined in cluster configuration")
 	}
-
-	// For legacy clusters, user_node_pools being empty is OK
-	// The legacy userpool in AgentPoolProfiles is sufficient
-	if useLegacy {
-		// But we still need UserNodePoolInstanceType for the legacy pool
-		if c.UserNodePoolInstanceType == "" {
-			return nil, fmt.Errorf("legacy clusters require user_node_pool_instance_type to be set")
-		}
-		return []AzureUserNodePoolConfig{}, nil
-	}
-
-	// For new clusters, user_node_pools is required
-	return nil, fmt.Errorf("new clusters must define user_node_pools in configuration")
+	return c.UserNodePools, nil
 }

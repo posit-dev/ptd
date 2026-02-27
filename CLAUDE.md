@@ -103,14 +103,14 @@ The Go CLI communicates the infrastructure path to Python Pulumi stacks via the 
 
 ### Creating a Worktree
 
-This repo is expected to live at `ptd-workspace/ptd/`. The `../../.worktrees/` relative path resolves to `ptd-workspace/.worktrees/` in that layout.
+This repo is expected to live at `ptd-workspace/ptd/`. The `../.worktrees/` relative path resolves to `ptd-workspace/.worktrees/` in that layout.
 
 ```bash
 # New branch
-git worktree add ../../.worktrees/ptd-<branch-name> -b <branch-name>
+git worktree add ../.worktrees/ptd-<branch-name> -b <branch-name>
 
 # Existing remote branch
-git worktree add ../../.worktrees/ptd-<branch-name> <branch-name>
+git worktree add ../.worktrees/ptd-<branch-name> <branch-name>
 ```
 
 Always prefix worktree directories with `ptd-` to avoid collisions with other repos.
@@ -119,7 +119,7 @@ Always prefix worktree directories with `ptd-` to avoid collisions with other re
 
 1. **Build the binary** — each worktree needs its own ptd binary:
    ```bash
-   cd ../../.worktrees/ptd-<branch-name>
+   cd ../.worktrees/ptd-<branch-name>
    just build-cmd
    ```
 2. **direnv** — if direnv is available, copy `envrc.recommended` to `.envrc` in the worktree, then run `direnv allow`. The file uses `source_up` to inherit workspace vars and overrides `PTD` to point to the worktree.
@@ -133,13 +133,13 @@ Always prefix worktree directories with `ptd-` to avoid collisions with other re
 
 ```bash
 # From the main checkout
-git worktree remove ../../.worktrees/ptd-<branch-name>
+git worktree remove ../.worktrees/ptd-<branch-name>
 ```
 
 ### Rules
 
 - **NEVER** use `git checkout -b` for new work — always `git worktree add`
-- **NEVER** put worktrees inside the repo directory — always use `../../.worktrees/ptd-<name>`
+- **NEVER** put worktrees inside the repo directory — always use `../.worktrees/ptd-<name>`
 - **ALWAYS** rebuild the binary after creating a worktree (`just build-cmd`)
 - Branch names: kebab-case, no slashes, no usernames (slashes break worktree directory paths)
 
