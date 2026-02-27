@@ -106,10 +106,15 @@ class AzureWorkloadClusterConfig(ptd.WorkloadClusterConfig):
 
     use_lets_encrypt: bool = False
 
+    # Cloud-agnostic infrastructure feature flags
+    enable_external_secrets_operator: bool = False
+    enable_cloud_agnostic_storage: bool = False
+
 
 @dataclasses.dataclass(frozen=True)
 class AzureWorkloadClusterComponentConfig(ptd.WorkloadClusterComponentConfig):
     secret_store_csi_driver_azure_provider_version: str | None = "1.5.6"  # noqa: S105
+    external_secrets_operator_version: str | None = "0.10.7"
 
 
 def load_workload_cluster_site_dict(
