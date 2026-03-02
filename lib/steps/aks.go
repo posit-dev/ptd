@@ -154,9 +154,7 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 					EnableSecureBoot: pulumi.Bool(false),
 					EnableVTPM:       pulumi.Bool(false),
 				},
-				Tags: pulumi.StringMap{
-					"Owner": pulumi.String("ptd"),
-				},
+				Tags: buildResourceTags(config.ResourceTags),
 				Type: pulumi.String(containerservice.AgentPoolTypeVirtualMachineScaleSets),
 				UpgradeSettings: &containerservice.AgentPoolUpgradeSettingsArgs{
 					MaxSurge: pulumi.String("10%"),
@@ -267,9 +265,7 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 				},
 			},
 			SupportPlan: pulumi.String("KubernetesOfficial"),
-			Tags: pulumi.StringMap{
-				"Owner": pulumi.String("ptd"),
-			},
+			Tags:        buildResourceTags(config.ResourceTags),
 		}, pulumi.Protect(config.ProtectPersistentResources),
 			pulumi.IgnoreChanges(ignoreChanges))
 		if err != nil {
@@ -326,10 +322,8 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 					OsSKU:               pulumi.String(containerservice.OSSKUUbuntu),
 					OsType:              pulumi.String(containerservice.OSTypeLinux),
 					ScaleDownMode:       pulumi.String(containerservice.ScaleDownModeDelete),
-					Tags: pulumi.StringMap{
-						"Owner": pulumi.String("ptd"),
-					},
-					Type: pulumi.String(containerservice.AgentPoolTypeVirtualMachineScaleSets),
+					Tags:                buildResourceTags(config.ResourceTags),
+					Type:                pulumi.String(containerservice.AgentPoolTypeVirtualMachineScaleSets),
 					UpgradeSettings: &containerservice.AgentPoolUpgradeSettingsArgs{
 						MaxSurge: pulumi.String("10%"),
 					},
@@ -396,6 +390,16 @@ func toPulumiStringMap(m map[string]string) pulumi.StringMap {
 		result[k] = pulumi.String(v)
 	}
 	return result
+}
+
+func buildResourceTags(resourceTags map[string]string) pulumi.StringMap {
+	tags := pulumi.StringMap{
+		"Owner": pulumi.String("ptd"),
+	}
+	for k, v := range resourceTags {
+		tags[k] = pulumi.String(v)
+	}
+	return tags
 }
 
 func getPersistentStackOutputs(ctx context.Context, target types.Target) (auto.OutputMap, error) {
