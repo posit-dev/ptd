@@ -577,6 +577,28 @@ All alerts are configured to send notifications to OpsGenie when triggered.
 | **Deployment Replicas Mismatch** | Desired != Available | 15m | Deployment does not have the expected number of available replicas |
 | **StatefulSet Replicas Mismatch** | Ready != Desired | 15m | StatefulSet does not have the expected number of ready replicas |
 
+Pod-related alerts are filtered to only monitor PTD-managed namespaces to prevent false alerts for customer-deployed workloads.
+
+**Monitored Namespaces** (minimal allowlist):
+- **Application namespaces**: `posit-team`, `posit-team-system` - Direct customer-facing applications where failures immediately impact users
+- **Observability stack**: `alloy`, `mimir`, `loki`, `grafana` - Monitoring infrastructure failures cause blindness to other failures
+
+**Excluded Namespaces**:
+- **Infrastructure namespaces** (`calico-system`, `traefik`, `kube-system`, `tigera-operator`, etc.) - Failures manifest as application failures, which trigger alerts naturally
+- **Customer namespaces** (`default`, custom namespaces) - Outside PTD responsibility
+
+**Rationale**: The monitoring strategy follows a "monitor symptoms, not all infrastructure layers" approach. Infrastructure failures (CNI, ingress, storage) cascade to application failures, which trigger alerts. This prevents redundant alerts while ensuring PTD is notified of actual customer impact. The observability stack must be monitored directly since failures prevent other alerts from firing.
+
+**PromQL Filter Pattern**: All pod alerts use the namespace filter:
+```promql
+{namespace=~"posit-team|posit-team-system|alloy|mimir|loki|grafana"}
+```
+
+**Example Failure Cascade**:
+- Calico CNI pod crashes → Network connectivity breaks for application pods → Application pods become unhealthy → `PodNotHealthy` alert fires in `posit-team` namespace
+- Traefik ingress pod crashes → Ingress routing breaks → HTTP health checks fail → `Healthchecks` alert fires
+- Alloy pod crashes → Metrics/logs stop flowing → No alerts fire (blind) → **Must alert on Alloy pod failures directly**
+
 ### Adding or Modifying Alerts
 
 To add or modify alerts, edit the YAML files in `python-pulumi/src/ptd/grafana_alerts/`. Each file contains alerts grouped by category:
