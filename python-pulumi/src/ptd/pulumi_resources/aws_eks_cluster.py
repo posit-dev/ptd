@@ -1991,7 +1991,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
                                 {
                                     "orgId": 1,
                                     "receiver": "posit-opsgenie",
-                                    "group_by": ["alertname", "cluster"],
+                                    "group_by": ["alertname", "cluster", "ptd_component"],
                                     "matchers": ["opsgenie = 1"],
                                     "group_wait": "30s",
                                     "group_interval": "5m",
