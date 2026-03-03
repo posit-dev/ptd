@@ -3,7 +3,6 @@ import collections
 import dataclasses
 import enum
 import json
-import pathlib
 import re
 import typing
 import warnings
