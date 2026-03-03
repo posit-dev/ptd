@@ -178,10 +178,8 @@ class AzureWorkload(ptd.workload.AbstractWorkload):
         for key in list(cluster_spec.keys()):
             cluster_spec[key.replace("-", "_")] = cluster_spec.pop(key)
 
-        team_operator_image = cluster_spec.pop("team_operator_image", None)
-        if team_operator_image is not None:
-            team_operator_image = team_operator_image.strip().lower() or None
-        cluster_spec["team_operator_image"] = team_operator_image
+        team_operator_image = cluster_spec.pop("team_operator_image", "latest").strip().lower()
+        cluster_spec["team_operator_image"] = {"": "latest"}.get(team_operator_image, team_operator_image)
 
         # Handle user_node_pools if present
         if cluster_spec.get("user_node_pools"):
