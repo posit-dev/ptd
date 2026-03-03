@@ -143,6 +143,24 @@ git worktree remove ../.worktrees/ptd-<branch-name>
 - **ALWAYS** rebuild the binary after creating a worktree (`just build-cmd`)
 - Branch names: kebab-case, no slashes, no usernames (slashes break worktree directory paths)
 
+## Monitoring and Alerts
+
+### Alert Namespace Scope
+
+Pod alerts (PodError, CrashLoopBackoff, DeploymentReplicaMismatch, etc.) are scoped to a minimal namespace allowlist to prevent false alerts from customer-deployed workloads:
+
+**Monitored Namespaces**:
+- **Application**: `posit-team`, `posit-team-system` (direct customer impact)
+- **Observability**: `alloy`, `mimir`, `loki`, `grafana` (failures cause monitoring blindness)
+
+**PromQL Filter**: `{namespace=~"posit-team|posit-team-system|alloy|mimir|loki|grafana"}`
+
+**Why Infrastructure Namespaces Are Excluded**: Infrastructure namespaces (Calico, Traefik, kube-system) are excluded because their failures manifest as application failures, avoiding redundant alerts. For example:
+- CNI failure → Network breaks → Application pods fail → Alert fires for application namespace
+- Ingress failure → HTTP checks fail → `Healthchecks` alert fires
+
+**Alert Configuration**: Alert definitions are in `python-pulumi/src/ptd/grafana_alerts/*.yaml`. All pod-related alerts in `pods.yaml` include the namespace filter in their PromQL queries.
+
 ## Contributing
 
 When contributing to the project:

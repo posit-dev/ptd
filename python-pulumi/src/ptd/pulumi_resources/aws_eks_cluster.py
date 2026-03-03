@@ -1947,14 +1947,8 @@ class AWSEKSCluster(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self, providers=[self.provider], depends_on=grafana_ns),
         )
 
-        self._create_alert_configmap("pods", grafana_ns)
-        self._create_alert_configmap("cloudwatch", grafana_ns)
-        self._create_alert_configmap("rds", grafana_ns)
-        self._create_alert_configmap("natgateway", grafana_ns)
-        self._create_alert_configmap("loadbalancer", grafana_ns)
-        self._create_alert_configmap("healthchecks", grafana_ns)
-        self._create_alert_configmap("nodes", grafana_ns)
-        self._create_alert_configmap("applications", grafana_ns)
+        # Create alert configmaps for all YAML files in the alerts directory
+        self._create_alert_configmaps(grafana_ns)
 
         # TODO: auth.proxy should be configurable, prod grafana auth will need tighter controls than letting anyone in as an Editor
         k8s.helm.v3.Release(
@@ -2483,21 +2477,24 @@ class AWSEKSCluster(pulumi.ComponentResource):
             lambda args: get_kubeconfig_for_cluster(self.name, self.tailscale_enabled, args[0], args[1])
         )
 
-    def _create_alert_configmap(self, name: str, ns: k8s.core.v1.Namespace) -> k8s.core.v1.ConfigMap:
-        file_path = ptd.paths.alerts() / f"{name}.yaml"
-        with open(file_path) as alert_file:
-            alert_yaml = alert_file.read()
+    def _create_alert_configmaps(self, ns: k8s.core.v1.Namespace):
+        alerts_dir = ptd.paths.alerts()
 
-        return k8s.core.v1.ConfigMap(
-            f"{self.name}-grafana-{name}-alerts",
-            metadata={
-                "name": f"grafana-{name}-alerts",
-                "namespace": "grafana",
-                "labels": {"grafana_alert": "1"},
-            },
-            data={"alerts.yaml": alert_yaml},
-            opts=pulumi.ResourceOptions(parent=self, provider=self.provider, depends_on=ns),
-        )
+        for alert_file in sorted(alerts_dir.glob("*.yaml")):
+            alert_name = alert_file.stem
+            with open(alert_file) as f:
+                alert_yaml = f.read()
+
+            k8s.core.v1.ConfigMap(
+                f"{self.name}-grafana-{alert_name}-alerts",
+                metadata={
+                    "name": f"grafana-{alert_name}-alerts",
+                    "namespace": "grafana",
+                    "labels": {"grafana_alert": "1"},
+                },
+                data={"alerts.yaml": alert_yaml},
+                opts=pulumi.ResourceOptions(parent=self, provider=self.provider, depends_on=ns),
+            )
 
     def setup_tailscale_access(self):
         sg_name = f"{self.sg_prefix}-tailscale"

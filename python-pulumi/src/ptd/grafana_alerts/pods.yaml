@@ -8,6 +8,26 @@
 #     uid: pod_error
 #
 # See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+#
+# =============================================================================
+# NAMESPACE FILTERING
+# =============================================================================
+# All pod alerts in this file are filtered to the following PTD-managed namespaces:
+#
+#   namespace=~"posit-team|posit-team-system|alloy|mimir|loki|grafana"
+#
+# This prevents false alerts from customer-deployed workloads outside PTD's control.
+#
+# Monitored namespaces:
+#   - posit-team, posit-team-system: Application namespaces (direct customer impact)
+#   - alloy, mimir, loki, grafana: Observability stack (failures cause blindness)
+#
+# Excluded namespaces (failures cascade to application alerts):
+#   - calico-system, tigera-operator, traefik, kube-system, etc.
+#   - default and customer-created namespaces
+#
+# To update the namespace filter, use find/replace on the regex pattern above.
+# =============================================================================
 apiVersion: 1
 groups:
     - orgId: 1
@@ -29,7 +49,7 @@ groups:
                     type: prometheus
                     uid: mimir
                 editorMode: code
-                expr: count by (cluster, namespace, pod, container)(kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"})
+                expr: count by (cluster, namespace, pod)(kube_pod_container_status_waiting_reason{namespace=~"posit-team|posit-team-system|alloy|mimir|loki|grafana",reason="CrashLoopBackOff"})
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -129,7 +149,7 @@ groups:
                     uid: mimir
                 disableTextWrap: false
                 editorMode: code
-                expr: count by(cluster, namespace, pod, reason) (kube_pod_container_status_terminated_reason{reason!="Completed"} * on(cluster,pod) group_left(label_launcher_instance_id) kube_pod_labels{label_launcher_instance_id=""})
+                expr: count by(cluster, namespace, pod, reason) (kube_pod_container_status_terminated_reason{namespace=~"posit-team|posit-team-system|alloy|mimir|loki|grafana",reason!="Completed"} * on(cluster,pod) group_left(label_launcher_instance_id) kube_pod_labels{label_launcher_instance_id=""})
                 fullMetaSearch: false
                 includeNullMetadata: true
                 instant: true
@@ -233,7 +253,7 @@ groups:
                     uid: mimir
                 disableTextWrap: false
                 editorMode: code
-                expr: sum by (cluster, namespace, pod, phase) (kube_pod_status_phase{phase=~"Pending|Unknown|Failed"} * on(cluster,pod) group_left(label_launcher_instance_id) kube_pod_labels{label_launcher_instance_id=""}) > 0
+                expr: sum by (cluster, namespace, pod, phase) (kube_pod_status_phase{namespace=~"posit-team|posit-team-system|alloy|mimir|loki|grafana",phase=~"Pending|Unknown|Failed"} * on(cluster,pod) group_left(label_launcher_instance_id) kube_pod_labels{label_launcher_instance_id=""}) > 0
                 fullMetaSearch: false
                 includeNullMetadata: true
                 instant: true
@@ -333,7 +353,7 @@ groups:
                     uid: mimir
                 disableTextWrap: false
                 editorMode: code
-                expr: avg_over_time(increase(kube_pod_container_status_restarts_total[15m])[15m:1m]) > 5
+                expr: avg_over_time(increase(kube_pod_container_status_restarts_total{namespace=~"posit-team|posit-team-system|alloy|mimir|loki|grafana"}[15m])[15m:1m]) > 5
                 fullMetaSearch: false
                 includeNullMetadata: true
                 instant: false
@@ -436,7 +456,7 @@ groups:
                     uid: mimir
                 disableTextWrap: false
                 editorMode: code
-                expr: kube_deployment_spec_replicas != kube_deployment_status_replicas_available
+                expr: kube_deployment_spec_replicas{namespace=~"posit-team|posit-team-system|alloy|mimir|loki|grafana"} != kube_deployment_status_replicas_available{namespace=~"posit-team|posit-team-system|alloy|mimir|loki|grafana"}
                 fullMetaSearch: false
                 includeNullMetadata: true
                 instant: true
@@ -533,7 +553,7 @@ groups:
                     uid: mimir
                 disableTextWrap: false
                 editorMode: code
-                expr: kube_statefulset_status_replicas_ready != kube_statefulset_status_replicas
+                expr: kube_statefulset_status_replicas_ready{namespace=~"posit-team|posit-team-system|alloy|mimir|loki|grafana"} != kube_statefulset_status_replicas{namespace=~"posit-team|posit-team-system|alloy|mimir|loki|grafana"}
                 fullMetaSearch: false
                 includeNullMetadata: true
                 instant: true
