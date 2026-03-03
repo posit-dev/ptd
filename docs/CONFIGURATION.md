@@ -76,6 +76,9 @@ spec:
   # Required: AWS region
   region: us-east-2
 
+  # VPC configuration
+  vpc_az_count: 2  # Number of availability zones (default: 3, max: 3)
+
   # RDS PostgreSQL configuration
   db_engine_version: "15.12"
   db_instance_class: db.m5d.large
@@ -277,6 +280,23 @@ workbench:
     clientId: "snowflake-client-id"
     accountId: account-name
 ```
+
+## VPC Availability Zone Configuration
+
+The `vpc_az_count` setting controls how many availability zones the VPC subnets span. This affects where EKS nodes and EBS volumes can be placed.
+
+| Value | Use Case |
+|-------|----------|
+| `3` (default) | Maximum redundancy across AZs |
+| `2` | Recommended for workloads with StatefulSets using EBS volumes |
+
+### Why Use 2 AZs?
+
+EBS volumes are bound to a single availability zone. When using StatefulSets (like Loki or Mimir for monitoring), the PersistentVolumes are created in a specific AZ. If a node group rolls and new nodes are placed in different AZs than where the PVs exist, pods cannot schedule.
+
+With 3 AZs and 2 nodes, there's no guarantee that nodes will cover all AZs where PVs may exist. Restricting to 2 AZs ensures that after any node operation, there will always be a node available in each AZ where PVs are located.
+
+**Note:** This setting only affects new VPCs. Changing this value on an existing workload will cause Pulumi to attempt to delete subnets in the removed AZ.
 
 ## See Also
 
