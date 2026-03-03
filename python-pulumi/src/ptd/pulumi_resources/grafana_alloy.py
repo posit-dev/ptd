@@ -219,6 +219,99 @@ class AlloyConfig(pulumi.ComponentResource):
         many_spaces = re.compile(r"\s+")
         return many_spaces.sub(" ", cfg).strip()
 
+    def _define_azure_monitor_config(self) -> str:
+        """Generate Azure Monitor exporter configuration for Azure. Returns empty string for non-Azure."""
+        if self.cloud_provider != "azure":
+            return ""
+
+        subscription_id = self.workload.cfg.subscription_id
+        resource_group_name = self.workload.resource_group_name
+
+        # Base exporters that are always included
+        config = textwrap.dedent(f"""
+            prometheus.exporter.azure "postgres" {{
+                subscriptions    = ["{subscription_id}"]
+                resource_type    = "Microsoft.DBforPostgreSQL/flexibleServers"
+                resource_graph_query_filter = "resourceGroup eq '{resource_group_name}'"
+                metrics          = ["cpu_percent", "memory_percent", "storage_percent", "active_connections", "connections_failed", "deadlocks"]
+                included_dimensions = ["*"]
+            }}
+
+            prometheus.scrape "azure_postgres" {{
+                targets    = prometheus.exporter.azure.postgres.targets
+                forward_to = [prometheus.relabel.default.receiver]
+                clustering {{
+                    enabled = true
+                }}
+            }}
+
+            prometheus.exporter.azure "netapp" {{
+                subscriptions    = ["{subscription_id}"]
+                resource_type    = "Microsoft.NetApp/netAppAccounts/capacityPools/volumes"
+                resource_graph_query_filter = "resourceGroup eq '{resource_group_name}'"
+                metrics          = ["VolumeConsumedSizePercentage", "VolumeLogicalSize", "AverageReadLatency", "AverageWriteLatency", "ReadIops", "WriteIops"]
+            }}
+
+            prometheus.scrape "azure_netapp" {{
+                targets    = prometheus.exporter.azure.netapp.targets
+                forward_to = [prometheus.relabel.default.receiver]
+                clustering {{
+                    enabled = true
+                }}
+            }}
+
+            prometheus.exporter.azure "loadbalancer" {{
+                subscriptions    = ["{subscription_id}"]
+                resource_type    = "Microsoft.Network/loadBalancers"
+                resource_graph_query_filter = "resourceGroup eq '{resource_group_name}'"
+                metrics          = ["DipAvailability", "VipAvailability", "UsedSnatPorts", "AllocatedSnatPorts", "SnatConnectionCount"]
+            }}
+
+            prometheus.scrape "azure_loadbalancer" {{
+                targets    = prometheus.exporter.azure.loadbalancer.targets
+                forward_to = [prometheus.relabel.default.receiver]
+                clustering {{
+                    enabled = true
+                }}
+            }}
+
+            prometheus.exporter.azure "storage" {{
+                subscriptions    = ["{subscription_id}"]
+                resource_type    = "Microsoft.Storage/storageAccounts"
+                resource_graph_query_filter = "resourceGroup eq '{resource_group_name}'"
+                metrics          = ["Availability", "SuccessE2ELatency", "UsedCapacity", "Transactions"]
+            }}
+
+            prometheus.scrape "azure_storage" {{
+                targets    = prometheus.exporter.azure.storage.targets
+                forward_to = [prometheus.relabel.default.receiver]
+                clustering {{
+                    enabled = true
+                }}
+            }}
+        """)
+
+        # Conditionally add NAT Gateway exporter if public_subnet_cidr is configured
+        if isinstance(self.workload, ptd.azure_workload.AzureWorkload) and self.workload.cfg.network.public_subnet_cidr:
+            config += textwrap.dedent(f"""
+            prometheus.exporter.azure "natgateway" {{
+                subscriptions    = ["{subscription_id}"]
+                resource_type    = "Microsoft.Network/natGateways"
+                resource_graph_query_filter = "resourceGroup eq '{resource_group_name}'"
+                metrics          = ["PacketCount", "ByteCount", "DroppedPackets", "TotalConnectionCount", "SNATConnectionCount"]
+            }}
+
+            prometheus.scrape "azure_natgateway" {{
+                targets    = prometheus.exporter.azure.natgateway.targets
+                forward_to = [prometheus.relabel.default.receiver]
+                clustering {{
+                    enabled = true
+                }}
+            }}
+        """)
+
+        return config
+
     def _define_cloudwatch_config(self) -> str:
         """Generate CloudWatch exporter configuration for AWS. Returns empty string for non-AWS."""
         if self.cloud_provider != "aws":
@@ -436,6 +529,9 @@ class AlloyConfig(pulumi.ComponentResource):
         # Generate CloudWatch exporter configuration for AWS
         cloudwatch_config = self._define_cloudwatch_config()
 
+        # Generate Azure Monitor exporter configuration for Azure
+        azure_monitor_config = self._define_azure_monitor_config()
+
         # Generate system log scraping configuration
         system_logs_config = ""
         if self.should_scrape_system_logs:
@@ -556,6 +652,8 @@ class AlloyConfig(pulumi.ComponentResource):
                 }}
 
                 {cloudwatch_config}
+
+                {azure_monitor_config}
 
                 prometheus.relabel "default" {{
                     forward_to = [
