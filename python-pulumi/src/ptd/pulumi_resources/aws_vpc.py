@@ -9,7 +9,7 @@ import pulumi_aws as aws
 import ptd
 
 AWS_UTILITIES_CUTOFF_VERSION_MAJOR = 6
-MIN_AZ_COUNT = 3
+MAX_AZ_COUNT = 3
 MIN_CIDR_BLOCK_SIZE = 4096
 
 
@@ -83,7 +83,7 @@ class AWSVpc(pulumi.ComponentResource):
         if len(azs) == 0:
             pulumi.error("Using zero availability zones is not supported")
 
-        if len(azs) > MIN_AZ_COUNT:
+        if len(azs) > MAX_AZ_COUNT:
             pulumi.error("Using more than three availability zones is not supported")
 
         if len(azs) == 1:

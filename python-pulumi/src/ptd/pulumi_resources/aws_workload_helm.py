@@ -546,7 +546,12 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                         "alertmanager": {"enabled": False},
                         "ruler": {"enabled": False},
                         "ingester": {
-                            "persistentVolume": {"size": "20Gi"},
+                            "persistentVolume": {
+                                "size": "20Gi",
+                                "enableRetentionPolicy": True,
+                                "whenDeleted": "Delete",
+                                "whenScaled": "Delete",
+                            },
                             "replicas": components.mimir_replicas,
                             "zoneAwareReplication": {"enabled": False},
                             "affinity": {
@@ -567,7 +572,12 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                             },
                         },
                         "compactor": {
-                            "persistentVolume": {"size": "20Gi"},
+                            "persistentVolume": {
+                                "size": "20Gi",
+                                "enableRetentionPolicy": True,
+                                "whenDeleted": "Delete",
+                                "whenScaled": "Delete",
+                            },
                             "replicas": components.mimir_replicas,
                             "affinity": {
                                 "nodeAffinity": {
@@ -587,7 +597,12 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                             },
                         },
                         "store_gateway": {
-                            "persistentVolume": {"size": "20Gi"},
+                            "persistentVolume": {
+                                "size": "20Gi",
+                                "enableRetentionPolicy": True,
+                                "whenDeleted": "Delete",
+                                "whenScaled": "Delete",
+                            },
                             "replicas": components.mimir_replicas,
                             "zoneAwareReplication": {"enabled": False},
                             "affinity": {
