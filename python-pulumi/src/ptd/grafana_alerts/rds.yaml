@@ -10,8 +10,6 @@
 #   - orgId: 1
 #     uid: rds_freeable_memory_low
 #   - orgId: 1
-#     uid: rds_read_latency_high
-#   - orgId: 1
 #     uid: rds_database_connections_high
 #
 # See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
@@ -21,6 +19,9 @@
 # If Alloy is not running or relabeling is misconfigured, the label will be absent and
 # the annotation will render as "in cluster " (blank).
 apiVersion: 1
+deleteRules:
+    - orgId: 1
+      uid: rds_read_latency_high
 groups:
     - orgId: 1
       name: RDS
@@ -81,6 +82,7 @@ groups:
             summary: High CPU utilization on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
+            severity: warning
           isPaused: false
         - uid: rds_free_storage_low
           title: RDS Free Storage Low
@@ -136,6 +138,11 @@ groups:
             summary: Low free storage on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
+            severity: warning
+            # Note: threshold is absolute (5 GiB) rather than percentage-based. CloudWatch does not
+            # expose AllocatedStorage as a time-series metric for RDS (it is an instance attribute),
+            # so computing a usage percentage is not feasible without a separate exporter or recording
+            # rule. The 5 GiB threshold is calibrated to PTD's default 100 GiB allocation.
           isPaused: false
         - uid: rds_freeable_memory_low
           title: RDS Freeable Memory Low
@@ -191,63 +198,13 @@ groups:
             summary: Low freeable memory on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
+            severity: warning
             instance_size_dependent: "true"  # Silence this label for known-small instance classes
+            # Note: threshold is absolute (512 MiB) rather than percentage-based. CloudWatch does not
+            # expose total instance RAM as a metric for RDS — it varies by instance type. PTD's default
+            # instance (db.t3.small, 2 GiB) would fire constantly at a 90%-used threshold under normal
+            # Postgres buffer cache load, making percentage-based alerting impractical here.
           isPaused: true  # Paused until a Grafana silence or Alertmanager inhibit rule is configured for the instance_size_dependent label
-        - uid: rds_read_latency_high
-          title: RDS Read Latency High
-          condition: B
-          data:
-            - refId: A
-              relativeTimeRange:
-                from: 600
-                to: 0
-              datasourceUid: mimir
-              model:
-                editorMode: code
-                expr: aws_rds_read_latency_average{job="integrations/cloudwatch"}
-                instant: true
-                intervalMs: 1000
-                legendFormat: __auto
-                maxDataPoints: 43200
-                range: false
-                refId: A
-            - refId: B
-              relativeTimeRange:
-                from: 600
-                to: 0
-              datasourceUid: __expr__
-              model:
-                conditions:
-                    - evaluator:
-                        params:
-                            - 0.1  # 100ms in seconds
-                        type: gt
-                      operator:
-                        type: and
-                      query:
-                        params:
-                            - A
-                      reducer:
-                        params: []
-                        type: last
-                      type: query
-                datasource:
-                    type: __expr__
-                    uid: __expr__
-                expression: A
-                intervalMs: 1000
-                maxDataPoints: 43200
-                refId: B
-                type: threshold
-          noDataState: NoData  # Performance metric; silent suppression on scrape outage is acceptable
-          execErrState: Error
-          for: 10m
-          annotations:
-            description: RDS instance read latency is above 100ms for more than 10 minutes.
-            summary: High read latency on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
-          labels:
-            opsgenie: "1"
-          isPaused: false
         - uid: rds_database_connections_high
           title: RDS Database Connections High
           condition: B
@@ -275,7 +232,7 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            - 500  # Calibrated for db.r5.large (max ~4000). For small instances (db.t3.small max ~36) this alert will never fire; adjust per instance class.
+                            - 80
                         type: gt
                       operator:
                         type: and
@@ -298,9 +255,9 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: RDS instance has more than 500 active database connections for more than 5 minutes. Note: this threshold is calibrated for db.r5.large (max ~4000 connections); it will never fire for small instances (e.g. db.t3.small max ~36). Adjust per instance class.
+            description: RDS instance has more than 80 active database connections for more than 5 minutes.
             summary: High database connections on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
-            instance_size_dependent: "true"  # Silence this label for known-small instance classes
-          isPaused: true  # Paused until a Grafana silence or Alertmanager inhibit rule is configured for the instance_size_dependent label
+            severity: warning
+          isPaused: false
