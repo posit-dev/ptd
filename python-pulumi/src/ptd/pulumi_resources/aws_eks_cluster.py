@@ -1972,9 +1972,9 @@ class AWSEKSCluster(pulumi.ComponentResource):
                                 {
                                     "orgId": 1,
                                     "name": "ptd_templates",
-                                    # Template outputs just the description annotation for each alert.
-                                    # This avoids Grafana's default verbose format.
-                                    "template": '{{ "{{" }} define "ptd.description" {{ "}}" }}{{ "{{" }} range .Alerts {{ "}}" }}{{ "{{" }} .Annotations.description {{ "}}" }}{{ "{{" }} end {{ "}}" }}{{ "{{" }} end {{ "}}" }}',
+                                    # Template outputs description annotation + Source/Silence links for each alert.
+                                    # This avoids Grafana's default verbose format while keeping useful links.
+                                    "template": '{{ "{{" }} define "ptd.description" {{ "}}" }}{{ "{{" }} range .Alerts {{ "}}" }}{{ "{{" }} .Annotations.description {{ "}}" }}\n\nSource: {{ "{{" }} .GeneratorURL {{ "}}" }}\nSilence: {{ "{{" }} .SilenceURL {{ "}}" }}{{ "{{" }} end {{ "}}" }}{{ "{{" }} end {{ "}}" }}',
                                 }
                             ],
                         },
