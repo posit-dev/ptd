@@ -499,9 +499,24 @@ class AlloyConfig(pulumi.ComponentResource):
 
                 prometheus.scrape "blackbox" {{
                     targets    = prometheus.exporter.blackbox.front_door.targets
-                    forward_to = [prometheus.relabel.default.receiver]
+                    forward_to = [prometheus.relabel.blackbox.receiver]
                     clustering {{
                         enabled = true
+                    }}
+                }}
+
+                // Normalize instance label for blackbox metrics to deduplicate across Alloy pods.
+                // Each pod runs its own blackbox exporter, producing metrics with different
+                // instance labels (node hostnames). Replacing instance with a static value
+                // ensures Mimir deduplicates them, preventing duplicate alerts.
+                // See: https://github.com/grafana/alloy/issues/1009
+                prometheus.relabel "blackbox" {{
+                    forward_to = [prometheus.relabel.default.receiver]
+
+                    rule {{
+                        action       = "replace"
+                        target_label = "instance"
+                        replacement  = "blackbox"
                     }}
                 }}
 
