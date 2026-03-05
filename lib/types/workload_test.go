@@ -96,15 +96,9 @@ func TestAWSWorkloadConfigSerialization(t *testing.T) {
 func TestAzureWorkloadConfigSerialization(t *testing.T) {
 	// Create a minimal Azure workload config
 	config := AzureWorkloadConfig{
-		SubscriptionID:          "123456789-abcd-efgh-ijkl-1234567890ab",
-		TenantID:                "abcdefgh-1234-5678-ijkl-1234567890ab",
-		Region:                  "eastus",
-		ClientID:                "12345678-abcd-efgh-ijkl-1234567890ab",
-		SecretsProviderClientID: "98765432-abcd-efgh-ijkl-1234567890ab",
-		InstanceType:            "Standard_D4s_v3",
-		ControlPlaneNodeCount:   3,
-		WorkerNodeCount:         2,
-		DBStorageSizeGB:         20,
+		SubscriptionID: "123456789-abcd-efgh-ijkl-1234567890ab",
+		TenantID:       "abcdefgh-1234-5678-ijkl-1234567890ab",
+		Region:         "eastus",
 		ResourceTags: map[string]string{
 			"Environment": "test",
 			"Owner":       "team",
@@ -141,8 +135,6 @@ func TestAzureWorkloadConfigSerialization(t *testing.T) {
 	assert.Equal(t, config.SubscriptionID, unmarshaledConfig.SubscriptionID)
 	assert.Equal(t, config.TenantID, unmarshaledConfig.TenantID)
 	assert.Equal(t, config.Region, unmarshaledConfig.Region)
-	assert.Equal(t, config.ClientID, unmarshaledConfig.ClientID)
-	assert.Equal(t, config.InstanceType, unmarshaledConfig.InstanceType)
 
 	// Check nested structures
 	assert.Equal(t, config.Sites["main"].Domain, unmarshaledConfig.Sites["main"].Domain)
@@ -154,16 +146,10 @@ func TestAzureWorkloadConfigSerialization(t *testing.T) {
 func TestAzureWorkloadConfigBastionInstanceType(t *testing.T) {
 	// Test that bastion_instance_type field is properly serialized/deserialized
 	config := AzureWorkloadConfig{
-		SubscriptionID:          "123456789-abcd-efgh-ijkl-1234567890ab",
-		TenantID:                "abcdefgh-1234-5678-ijkl-1234567890ab",
-		Region:                  "eastus",
-		ClientID:                "12345678-abcd-efgh-ijkl-1234567890ab",
-		SecretsProviderClientID: "98765432-abcd-efgh-ijkl-1234567890ab",
-		BastionInstanceType:     "Standard_B2s",
-		InstanceType:            "Standard_D4s_v3",
-		ControlPlaneNodeCount:   1,
-		WorkerNodeCount:         1,
-		DBStorageSizeGB:         20,
+		SubscriptionID:      "123456789-abcd-efgh-ijkl-1234567890ab",
+		TenantID:            "abcdefgh-1234-5678-ijkl-1234567890ab",
+		Region:              "eastus",
+		BastionInstanceType: "Standard_B2s",
 	}
 
 	// Marshal to YAML
@@ -249,8 +235,8 @@ func TestAzureUserNodePoolConfigSerialization(t *testing.T) {
 	assert.Equal(t, *poolConfig.RootDiskSize, *unmarshaledPool.RootDiskSize)
 }
 
-func TestResolveUserNodePools_NewCluster_WithPools(t *testing.T) {
-	// New cluster (use_legacy_user_pool not set) with user_node_pools defined
+func TestResolveUserNodePools_WithPools(t *testing.T) {
+	// Cluster with user_node_pools defined
 	config := AzureWorkloadClusterConfig{
 		KubernetesVersion:          "1.28.0",
 		SystemNodePoolInstanceType: "Standard_D2s_v6",
@@ -271,8 +257,8 @@ func TestResolveUserNodePools_NewCluster_WithPools(t *testing.T) {
 	assert.Equal(t, "general", pools[0].Name)
 }
 
-func TestResolveUserNodePools_NewCluster_WithoutPools(t *testing.T) {
-	// New cluster (use_legacy_user_pool not set) without user_node_pools should error
+func TestResolveUserNodePools_WithoutPools(t *testing.T) {
+	// Cluster without user_node_pools should error
 	config := AzureWorkloadClusterConfig{
 		KubernetesVersion:          "1.28.0",
 		SystemNodePoolInstanceType: "Standard_D2s_v6",
@@ -281,60 +267,5 @@ func TestResolveUserNodePools_NewCluster_WithoutPools(t *testing.T) {
 	pools, err := config.ResolveUserNodePools()
 	assert.Error(t, err)
 	assert.Nil(t, pools)
-	assert.Contains(t, err.Error(), "new clusters must define user_node_pools")
-}
-
-func TestResolveUserNodePools_LegacyCluster_WithoutAdditionalPools(t *testing.T) {
-	// Legacy cluster with only user_node_pool_instance_type (no additional pools)
-	useLegacy := true
-	config := AzureWorkloadClusterConfig{
-		KubernetesVersion:          "1.28.0",
-		SystemNodePoolInstanceType: "Standard_D2s_v6",
-		UserNodePoolInstanceType:   "Standard_D8s_v6",
-		UseLegacyUserPool:          &useLegacy,
-	}
-
-	pools, err := config.ResolveUserNodePools()
-	assert.NoError(t, err)
-	assert.Len(t, pools, 0) // Empty array - legacy pool is in AgentPoolProfiles
-}
-
-func TestResolveUserNodePools_LegacyCluster_WithAdditionalPools(t *testing.T) {
-	// Legacy cluster with both user_node_pool_instance_type AND user_node_pools
-	useLegacy := true
-	config := AzureWorkloadClusterConfig{
-		KubernetesVersion:          "1.28.0",
-		SystemNodePoolInstanceType: "Standard_D2s_v6",
-		UserNodePoolInstanceType:   "Standard_D8s_v6",
-		UseLegacyUserPool:          &useLegacy,
-		UserNodePools: []AzureUserNodePoolConfig{
-			{
-				Name:              "gpu",
-				VMSize:            "Standard_NC4as_T4_v3",
-				MinCount:          0,
-				MaxCount:          4,
-				EnableAutoScaling: true,
-			},
-		},
-	}
-
-	pools, err := config.ResolveUserNodePools()
-	assert.NoError(t, err)
-	assert.Len(t, pools, 1)
-	assert.Equal(t, "gpu", pools[0].Name)
-}
-
-func TestResolveUserNodePools_LegacyCluster_MissingInstanceType(t *testing.T) {
-	// Legacy cluster without user_node_pool_instance_type should error
-	useLegacy := true
-	config := AzureWorkloadClusterConfig{
-		KubernetesVersion:          "1.28.0",
-		SystemNodePoolInstanceType: "Standard_D2s_v6",
-		UseLegacyUserPool:          &useLegacy,
-	}
-
-	pools, err := config.ResolveUserNodePools()
-	assert.Error(t, err)
-	assert.Nil(t, pools)
-	assert.Contains(t, err.Error(), "legacy clusters require user_node_pool_instance_type")
+	assert.Contains(t, err.Error(), "user_node_pools must be defined in cluster configuration")
 }

@@ -76,12 +76,6 @@ func TestValidateUserNodePoolName(t *testing.T) {
 			expectError: true,
 			errorMsg:    "reserved and cannot be used",
 		},
-		{
-			name:        "reserved name userpool",
-			poolName:    "userpool",
-			expectError: true,
-			errorMsg:    "reserved and cannot be used",
-		},
 	}
 
 	for _, tt := range tests {
@@ -318,7 +312,7 @@ func TestValidateUserNodePools(t *testing.T) {
 					EnableAutoScaling: true,
 				},
 				{
-					Name:              "userpool", // reserved name
+					Name:              "agentpool", // reserved name
 					VMSize:            "Standard_D4s_v6",
 					MinCount:          2,
 					MaxCount:          5,

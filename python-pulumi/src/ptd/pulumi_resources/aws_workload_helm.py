@@ -9,8 +9,27 @@ import ptd
 import ptd.aws_workload
 import ptd.pulumi_resources.aws_eks_cluster
 from ptd.pulumi_resources.grafana_alloy import AlloyConfig
+from ptd.pulumi_resources.lib import format_lb_tags
 
 ALLOY_NAMESPACE = "alloy"
+
+
+def _build_alb_tag_string(true_name: str, environment: str, compound_name: str) -> str:
+    """Build the ALB annotation tag string from workload config values.
+
+    Uses format_lb_tags, which validates that values are safe for LB controller
+    annotation strings (no commas, equals, or whitespace). Note: format_lb_tags does
+    NOT validate for Alloy River config safety (e.g. it permits `{`, `}`, `"`).
+    Alloy River injection safety is enforced separately by _validate_alloy_true_name
+    in grafana_alloy.py before values are interpolated into the CloudWatch config.
+    """
+    return format_lb_tags(
+        {
+            "posit.team/true-name": true_name,
+            "posit.team/environment": environment,
+            "Name": compound_name,
+        }
+    )
 
 
 class AWSWorkloadHelm(pulumi.ComponentResource):
@@ -547,7 +566,12 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                         "alertmanager": {"enabled": False},
                         "ruler": {"enabled": False},
                         "ingester": {
-                            "persistentVolume": {"size": "20Gi"},
+                            "persistentVolume": {
+                                "size": "20Gi",
+                                "enableRetentionPolicy": True,
+                                "whenDeleted": "Delete",
+                                "whenScaled": "Delete",
+                            },
                             "replicas": components.mimir_replicas,
                             "zoneAwareReplication": {"enabled": False},
                             "affinity": {
@@ -568,7 +592,12 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                             },
                         },
                         "compactor": {
-                            "persistentVolume": {"size": "20Gi"},
+                            "persistentVolume": {
+                                "size": "20Gi",
+                                "enableRetentionPolicy": True,
+                                "whenDeleted": "Delete",
+                                "whenScaled": "Delete",
+                            },
                             "replicas": components.mimir_replicas,
                             "affinity": {
                                 "nodeAffinity": {
@@ -588,7 +617,12 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                             },
                         },
                         "store_gateway": {
-                            "persistentVolume": {"size": "20Gi"},
+                            "persistentVolume": {
+                                "size": "20Gi",
+                                "enableRetentionPolicy": True,
+                                "whenDeleted": "Delete",
+                                "whenScaled": "Delete",
+                            },
                             "replicas": components.mimir_replicas,
                             "zoneAwareReplication": {"enabled": False},
                             "affinity": {
@@ -846,6 +880,8 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
         return annotations
 
     def _define_ingress_alb_annotations(self, cert_arns: list[str]) -> dict[str, str]:
+        # cfg.true_name, cfg.environment, and compound_name are plain str values
+        # loaded from YAML config at startup (see ptd/workload.py), not Pulumi Outputs.
         annotations = {
             "alb.ingress.kubernetes.io/ssl-redirect": "443",
             "alb.ingress.kubernetes.io/listen-ports": json.dumps([{"HTTP": 80}, {"HTTPS": 443}]),
@@ -856,6 +892,11 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
             "alb.ingress.kubernetes.io/healthcheck-path": "/ping",
             "alb.ingress.kubernetes.io/healthcheck-port": "32090",
             "alb.ingress.kubernetes.io/load-balancer-attributes": "routing.http.drop_invalid_header_fields.enabled=true,idle_timeout.timeout_seconds=300",
+            "alb.ingress.kubernetes.io/tags": _build_alb_tag_string(
+                self.workload.cfg.true_name,
+                self.workload.cfg.environment,
+                self.workload.compound_name,
+            ),
         }
 
         if self.workload.cfg.provisioned_vpc:
