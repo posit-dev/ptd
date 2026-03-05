@@ -10,7 +10,7 @@ def test_workload_cluster_config_default_initialization():
     config = ptd.WorkloadClusterConfig()
 
     # Test default values
-    assert config.team_operator_image == "latest"
+    assert config.team_operator_image is None
     assert config.ptd_controller_image == "latest"
     assert config.eks_access_entries.enabled is True
     assert config.eks_access_entries.additional_entries == []
@@ -175,7 +175,7 @@ def test_workload_cluster_config_dataclass_fields():
 
     # team_operator_image field
     team_op_field = field_dict["team_operator_image"]
-    assert team_op_field.default == "latest"
+    assert team_op_field.default is None
 
     # ptd_controller_image field
     ptd_ctrl_field = field_dict["ptd_controller_image"]
