@@ -8,23 +8,24 @@ import (
 )
 
 type SiteSecret struct {
-	DevAdminToken      string `json:"dev-admin-token"` // likely to be removed
-	DevClientSecret    string `json:"dev-client-secret"`
-	DevDBPassword      string `json:"dev-db-password"`
-	DevLicense         string `json:"dev-license"`
-	DevUserToken       string `json:"dev-user-token"` // likely to be removed
-	DevChronicleApiKey string `json:"dev-chronicle-api-key"`
-	HomeAuthMap        string `json:"home-auth-map"`
-	KeycloakDBUser     string `json:"keycloak-db-user"`
-	KeycloakDBPassword string `json:"keycloak-db-password"`
-	PkgDBPassword      string `json:"pkg-db-password"`
-	PkgLicense         string `json:"pkg-license"`
-	PkgSecretKey       string `json:"pkg-secret-key"`
-	PubClientSecret    string `json:"pub-client-secret"`
-	PubDBPassword      string `json:"pub-db-password"`
-	PubLicense         string `json:"pub-license"`
-	PubSecretKey       string `json:"pub-secret-key"`
-	PubChronicleApiKey string `json:"pub-chronicle-api-key"`
+	DevAdminToken       string `json:"dev-admin-token"` // likely to be removed
+	DevClientSecret     string `json:"dev-client-secret"`
+	DevDBPassword       string `json:"dev-db-password"`
+	DevLicense          string `json:"dev-license"`
+	DevUserToken        string `json:"dev-user-token"` // likely to be removed
+	DevChronicleApiKey  string `json:"dev-chronicle-api-key"`
+	HomeAuthMap         string `json:"home-auth-map"`
+	KeycloakDBUser      string `json:"keycloak-db-user"`
+	KeycloakDBPassword  string `json:"keycloak-db-password"`
+	PkgDBPassword       string `json:"pkg-db-password"`
+	PkgLicense          string `json:"pkg-license"`
+	PkgSecretKey        string `json:"pkg-secret-key"`
+	PpmOidcClientSecret string `json:"ppm-oidc-client-secret"`
+	PubClientSecret     string `json:"pub-client-secret"`
+	PubDBPassword       string `json:"pub-db-password"`
+	PubLicense          string `json:"pub-license"`
+	PubSecretKey        string `json:"pub-secret-key"`
+	PubChronicleApiKey  string `json:"pub-chronicle-api-key"`
 }
 
 func NewSiteSecret(siteName string) SiteSecret {
