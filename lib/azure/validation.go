@@ -25,8 +25,7 @@ func ValidateUserNodePoolName(name string) error {
 	}
 
 	// Reserved names that should never be used
-	// (userpool can be dropped here once all Azure clusters have been migrated off legacy user pool)
-	reserved := []string{"agentpool", "userpool"}
+	reserved := []string{"agentpool"}
 	for _, r := range reserved {
 		if name == r {
 			return fmt.Errorf("pool name '%s' is reserved and cannot be used", name)

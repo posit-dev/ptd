@@ -166,44 +166,24 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 			},
 		}
 
-		// For legacy clusters, add the hardcoded "userpool" to AgentPoolProfiles
-		useLegacyUserPool := clusterConfig.UseLegacyUserPool != nil && *clusterConfig.UseLegacyUserPool
-		if useLegacyUserPool {
-			agentPoolProfiles = append(agentPoolProfiles, &containerservice.ManagedClusterAgentPoolProfileArgs{
-				AvailabilityZones: pulumi.StringArray{
-					pulumi.String("2"),
-					pulumi.String("3"),
-				},
-				Count:               pulumi.Int(4),
-				EnableAutoScaling:   pulumi.Bool(true),
-				EnableFIPS:          pulumi.Bool(false),
-				EnableNodePublicIP:  pulumi.Bool(false),
-				KubeletDiskType:     pulumi.String(containerservice.KubeletDiskTypeOS),
-				MaxCount:            pulumi.Int(10),
-				MaxPods:             pulumi.Int(110),
-				MinCount:            pulumi.Int(0),
-				Mode:                pulumi.String(containerservice.AgentPoolModeUser),
-				Name:                pulumi.String("userpool"),
-				OrchestratorVersion: pulumi.String(clusterConfig.KubernetesVersion),
-				OsDiskSizeGB:        pulumi.Int(128),
-				OsDiskType:          pulumi.String(containerservice.OSDiskTypeManaged),
-				OsSKU:               pulumi.String(containerservice.OSSKUUbuntu),
-				OsType:              pulumi.String(containerservice.OSTypeLinux),
-				ScaleDownMode:       pulumi.String(containerservice.ScaleDownModeDelete),
-				SecurityProfile: &containerservice.AgentPoolSecurityProfileArgs{
-					EnableSecureBoot: pulumi.Bool(false),
-					EnableVTPM:       pulumi.Bool(false),
-				},
-				Tags: pulumi.StringMap{
-					"Owner": pulumi.String("ptd"),
-				},
-				Type: pulumi.String(containerservice.AgentPoolTypeVirtualMachineScaleSets),
-				UpgradeSettings: &containerservice.AgentPoolUpgradeSettingsArgs{
-					MaxSurge: pulumi.String("10%"),
-				},
-				VmSize:       pulumi.String(clusterConfig.UserNodePoolInstanceType),
-				VnetSubnetID: pulumi.String(subnetId),
-			})
+		// Build ignore changes list
+		ignoreChanges := []string{
+			// ignored fields when importing existing clusters to avoid altering fields that we're not (yet) managing in Pulumi
+			"autoScalerProfile",
+			"identityProfile",
+			"networkProfile.loadBalancerProfile",
+			"networkProfile.podCidrs",
+			"networkProfile.serviceCidrs",
+			"nodeResourceGroup",
+			"agentPoolProfiles[*].powerState",
+			"privateLinkResources",
+			"windowsProfile",
+		}
+
+		// Always ignore agentPoolProfiles when using separate AgentPool resources
+		// Azure reflects separate pools in this array, but we manage them as distinct resources
+		if len(userNodePools) > 0 {
+			ignoreChanges = append(ignoreChanges, "agentPoolProfiles")
 		}
 
 		aksCluster, err := containerservice.NewManagedCluster(ctx, fmt.Sprintf("aksCluster-%s", release), &containerservice.ManagedClusterArgs{
@@ -291,18 +271,7 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 				"Owner": pulumi.String("ptd"),
 			},
 		}, pulumi.Protect(config.ProtectPersistentResources),
-			pulumi.IgnoreChanges([]string{
-				// ignored fields when importing existing clusters to avoid altering fields that we're not (yet) managing in Pulumi
-				"autoScalerProfile",
-				"identityProfile",
-				"networkProfile.loadBalancerProfile",
-				"networkProfile.podCidrs",
-				"networkProfile.serviceCidrs",
-				"nodeResourceGroup",
-				"agentPoolProfiles[*].powerState",
-				"privateLinkResources",
-				"windowsProfile",
-			}))
+			pulumi.IgnoreChanges(ignoreChanges))
 		if err != nil {
 			return err
 		}

@@ -1123,13 +1123,18 @@ func SqsActions() []Action {
 
 // EventsActions returns EventBridge-related actions
 func EventsActions() []Action {
+	// SupportsManagedByCondition is false for all resource-level actions because
+	// EventBridge rules may not have the posit.team/managed-by tag (e.g., rules
+	// created by Karpenter). Requiring the tag creates a chicken-and-egg problem
+	// where you can't tag, describe, or manage rules that lack the tag.
+	// Account-scoping via ResourceConditionLimitingActions is sufficient.
 	return []Action{
 		{"events:ListRules", false, false},
-		{"events:ListTagsForResource", true, true},
-		{"events:*Rule", true, true},
-		{"events:*Targets", true, true},
-		{"events:*tag*", true, true},
-		{"events:PutRule", true, true},
+		{"events:ListTagsForResource", true, false},
+		{"events:*Rule", true, false},
+		{"events:*Targets", true, false},
+		{"events:*tag*", true, false},
+		{"events:PutRule", true, false},
 	}
 }
 

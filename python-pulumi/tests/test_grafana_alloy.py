@@ -2,9 +2,40 @@ import dataclasses
 from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
 import yaml
 
-from ptd.pulumi_resources.grafana_alloy import AlloyConfig
+from ptd.pulumi_resources.grafana_alloy import AlloyConfig, _validate_alloy_true_name
+
+
+class TestValidateAlloyTrueName:
+    def test_valid_names(self) -> None:
+        _validate_alloy_true_name("myapp")
+        _validate_alloy_true_name("my-app")
+        _validate_alloy_true_name("my.app.v2")
+        _validate_alloy_true_name("app_name")
+        _validate_alloy_true_name("myapp-production")
+        _validate_alloy_true_name("a1b2c3")
+
+    def test_double_quote_rejected(self) -> None:
+        with pytest.raises(ValueError, match="unsafe for Alloy River config"):
+            _validate_alloy_true_name('bad"name')
+
+    def test_open_brace_rejected(self) -> None:
+        with pytest.raises(ValueError, match="unsafe for Alloy River config"):
+            _validate_alloy_true_name("bad{name}")
+
+    def test_close_brace_rejected(self) -> None:
+        with pytest.raises(ValueError, match="unsafe for Alloy River config"):
+            _validate_alloy_true_name("bad}name")
+
+    def test_space_rejected(self) -> None:
+        with pytest.raises(ValueError, match="unsafe for Alloy River config"):
+            _validate_alloy_true_name("bad name")
+
+    def test_empty_string_rejected(self) -> None:
+        with pytest.raises(ValueError, match="unsafe for Alloy River config"):
+            _validate_alloy_true_name("")
 
 
 @dataclasses.dataclass
@@ -544,3 +575,69 @@ class TestReplicasHandling:
         assert 'name = "site-two-workbench-fqdn"' in result
         assert 'name = "site-two-connect"' not in result
         assert 'name = "site-two-connect-fqdn"' not in result
+
+
+def _make_alloy_for_cloudwatch(
+    cloud_provider_name: str,
+    true_name: str = "myapp",
+    compound_name: str = "myapp-production",
+) -> AlloyConfig:
+    """Helper to create an AlloyConfig instance with mocked attributes for cloudwatch tests."""
+    alloy = AlloyConfig.__new__(AlloyConfig)
+    mock_workload = Mock()
+    mock_workload.cfg.true_name = true_name
+    mock_workload.compound_name = compound_name
+    mock_cloud_provider = Mock()
+    mock_cloud_provider.name = cloud_provider_name
+    mock_workload.cloud_provider = mock_cloud_provider
+    alloy.workload = mock_workload
+    alloy.cloud_provider = cloud_provider_name.lower()
+    alloy.region = "us-east-1"
+    return alloy
+
+
+class TestDefineCloudwatchConfig:
+    """Tests for _define_cloudwatch_config method."""
+
+    def test_aws_contains_natgateway_discovery_block(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("aws")
+        result = alloy._define_cloudwatch_config()  # noqa: SLF001
+        assert "AWS/NATGateway" in result
+        assert '"posit.team/true-name" = "myapp"' in result
+
+    def test_aws_contains_applicationelb_discovery_block(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("aws")
+        result = alloy._define_cloudwatch_config()  # noqa: SLF001
+        assert "AWS/ApplicationELB" in result
+        assert '"posit.team/true-name" = "myapp"' in result
+
+    def test_aws_contains_networkelb_discovery_block(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("aws")
+        result = alloy._define_cloudwatch_config()  # noqa: SLF001
+        assert "AWS/NetworkELB" in result
+        assert '"posit.team/true-name" = "myapp"' in result
+
+    def test_aws_search_tags_use_true_name(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("aws", true_name="customapp")
+        result = alloy._define_cloudwatch_config()  # noqa: SLF001
+        assert '"posit.team/true-name" = "customapp"' in result
+
+    def test_aws_fsx_rds_ec2_use_compound_name(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("aws", compound_name="customapp-staging")
+        result = alloy._define_cloudwatch_config()  # noqa: SLF001
+        assert 'Name = "customapp-staging"' in result
+
+    def test_non_aws_returns_empty_string(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("azure")
+        result = alloy._define_cloudwatch_config()  # noqa: SLF001
+        assert result == ""
+
+    def test_invalid_true_name_raises_value_error(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("aws", true_name='bad"name')
+        with pytest.raises(ValueError, match="unsafe for Alloy River config"):
+            alloy._define_cloudwatch_config()  # noqa: SLF001
+
+    def test_invalid_compound_name_raises_value_error(self) -> None:
+        alloy = _make_alloy_for_cloudwatch("aws", compound_name="bad{name}")
+        with pytest.raises(ValueError, match="unsafe for Alloy River config"):
+            alloy._define_cloudwatch_config()  # noqa: SLF001

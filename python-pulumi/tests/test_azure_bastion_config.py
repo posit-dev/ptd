@@ -31,8 +31,6 @@ def test_azure_workload_config_default_bastion_instance_type():
         clusters={},
         subscription_id="test-sub-id",
         tenant_id="test-tenant-id",
-        client_id="test-client-id",
-        secrets_provider_client_id="test-sp-client-id",
         network=ptd.azure_workload.NetworkConfig(
             private_subnet_cidr="10.0.1.0/24",
             db_subnet_cidr="10.0.2.0/24",
@@ -63,8 +61,6 @@ def test_azure_workload_config_custom_bastion_instance_type():
         clusters={},
         subscription_id="test-sub-id",
         tenant_id="test-tenant-id",
-        client_id="test-client-id",
-        secrets_provider_client_id="test-sp-client-id",
         network=ptd.azure_workload.NetworkConfig(
             private_subnet_cidr="10.0.1.0/24",
             db_subnet_cidr="10.0.2.0/24",
@@ -112,8 +108,6 @@ def test_azure_workload_config_bastion_instance_type_matches_aws_pattern():
         clusters={},
         subscription_id="test-sub-id",
         tenant_id="test-tenant-id",
-        client_id="test-client-id",
-        secrets_provider_client_id="test-sp-client-id",
         network=ptd.azure_workload.NetworkConfig(
             private_subnet_cidr="10.0.1.0/24",
             db_subnet_cidr="10.0.2.0/24",
