@@ -589,15 +589,12 @@ class AlloyConfig(pulumi.ComponentResource):
                         target_label = "cluster"
                         replacement  = "{cluster_name}"
                     }}
-
-                    rule {{
-                        action       = "replace"
-                        target_label = "tenant_name"
-                        replacement  = "{tenant_name}"
-                    }}
                 }}
 
                 prometheus.remote_write "control_room" {{
+                    external_labels = {{
+                        tenant_name = "{tenant_name}",
+                    }}
                     endpoint {{
                         url = "{control_room_url}"
                         basic_auth {{
@@ -611,6 +608,9 @@ class AlloyConfig(pulumi.ComponentResource):
                 }}
 
                 prometheus.remote_write "workload" {{
+                    external_labels = {{
+                        tenant_name = "{tenant_name}",
+                    }}
                     endpoint {{
                         url = "{workload_url}"
                     }}
