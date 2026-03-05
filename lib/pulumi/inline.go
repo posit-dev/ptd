@@ -14,6 +14,8 @@ import (
 // Plugins required for the Pulumi stack. These should possibly be moved to a
 // manifest, but this is fine for now IMO.
 var RequiredPlugins = map[string]string{
+	"random":       "4.19.1",
+	"postgresql":   "3.16.2",
 	"aws":          "6.65.0",
 	"azure-native": "3.8.0",
 }
