@@ -194,8 +194,6 @@ def azure_workload(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> p
         true_name="testing01",
         subscription_id="12345678-1234-1234-1234-123456789012",
         tenant_id="87654321-4321-4321-4321-210987654321",
-        client_id="abcdef12-3456-7890-abcd-ef1234567890",
-        secrets_provider_client_id="fedcba09-8765-4321-fedc-ba0987654321",
         region="eastus",
         network=ptd.azure_workload.NetworkConfig(
             private_subnet_cidr="10.0.1.0/24",
