@@ -11,6 +11,9 @@ spec:
   # AWS account ID where the workload will be deployed
   account_id: "123456789012"
 
+  # Human-readable tenant name for alerts (defaults to compound_name if not set)
+  tenant_name: "Example Analytics Team"
+
   # Control room that manages this workload
   control_room_account_id: "123456789012"
   control_room_cluster_name: control-room-production
