@@ -49,7 +49,7 @@ groups:
                     type: prometheus
                     uid: mimir
                 editorMode: code
-                expr: count by (cluster, namespace, pod)(kube_pod_container_status_waiting_reason{namespace=~"posit-team|posit-team-system|alloy|mimir|loki|grafana",reason="CrashLoopBackOff"})
+                expr: count by (cluster, namespace, pod, container)(kube_pod_container_status_waiting_reason{namespace=~"posit-team|posit-team-system|alloy|mimir|loki|grafana",reason="CrashLoopBackOff"})
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
