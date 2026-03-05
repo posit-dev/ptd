@@ -1963,6 +1963,21 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 ),
                 values={
                     "alerting": {
+                        # Custom notification templates for clean alert formatting.
+                        # These templates output ONLY our formatted content without
+                        # Grafana's default prefix (Firing, Value, Labels, Annotations).
+                        "templates.yaml": {
+                            "apiVersion": 1,
+                            "templates": [
+                                {
+                                    "orgId": 1,
+                                    "name": "ptd_templates",
+                                    # Template outputs description annotation + Source/Silence links for each alert.
+                                    # This avoids Grafana's default verbose format while keeping useful links.
+                                    "template": '{{ "{{" }} define "ptd.description" {{ "}}" }}{{ "{{" }} range .Alerts {{ "}}" }}{{ "{{" }} .Annotations.description {{ "}}" }}\n\nSource: {{ "{{" }} .GeneratorURL {{ "}}" }}\nSilence: {{ "{{" }} .SilenceURL {{ "}}" }}{{ "{{" }} end {{ "}}" }}{{ "{{" }} end {{ "}}" }}',
+                                }
+                            ],
+                        },
                         "contactpoints.yaml": {
                             "apiVersion": 1,
                             "contactPoints": [
@@ -1976,6 +1991,10 @@ class AWSEKSCluster(pulumi.ComponentResource):
                                             "settings": {
                                                 "apiKey": '${{ "{" }}POSIT_OPSGENIE_KEY{{ "}" }}',  # ${POSIT_OPSGENIE_KEY} in the resulting configMap,
                                                 "apiUrl": "https://api.opsgenie.com/v2/alerts",
+                                                "sendTagsAs": "tags",
+                                                "message": '{{ "{{" }} .CommonAnnotations.summary {{ "}}" }}',
+                                                # Use custom template for clean description without label dumps
+                                                "description": '{{ "{{" }} template "ptd.description" . {{ "}}" }}',
                                             },
                                         }
                                     ],
@@ -1988,7 +2007,10 @@ class AWSEKSCluster(pulumi.ComponentResource):
                                 {
                                     "orgId": 1,
                                     "receiver": "posit-opsgenie",
-                                    "group_by": ["alertname", "cluster"],
+                                    # health_check_url ensures each health check endpoint gets its own alert
+                                    # (internal vs fqdn checks are separate). This label is empty for
+                                    # non-healthcheck alerts so it won't affect their grouping.
+                                    "group_by": ["alertname", "cluster", "ptd_component", "health_check_url"],
                                     "matchers": ["opsgenie = 1"],
                                     "group_wait": "30s",
                                     "group_interval": "5m",
