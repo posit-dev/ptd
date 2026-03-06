@@ -20,6 +20,7 @@ type JobOptions struct {
 	ConfigName           string
 	Namespace            string
 	CredentialsAvailable bool // whether vip-test-credentials Secret exists
+	InteractiveAuth      bool // whether using interactive auth (API tokens) vs Keycloak (username/password)
 	Timeout              time.Duration
 }
 
@@ -102,25 +103,59 @@ func buildJobSpec(opts JobOptions) map[string]interface{} {
 		},
 	}
 	if opts.CredentialsAvailable {
-		container["env"] = []map[string]interface{}{
-			{
-				"name": "VIP_TEST_USERNAME",
-				"valueFrom": map[string]interface{}{
-					"secretKeyRef": map[string]string{
-						"name": "vip-test-credentials",
-						"key":  "username",
+		if opts.InteractiveAuth {
+			// Interactive auth mode: use API tokens from Secret
+			container["env"] = []map[string]interface{}{
+				{
+					"name": "VIP_CONNECT_API_KEY",
+					"valueFrom": map[string]interface{}{
+						"secretKeyRef": map[string]string{
+							"name": "vip-test-credentials",
+							"key":  "VIP_CONNECT_API_KEY",
+						},
 					},
 				},
-			},
-			{
-				"name": "VIP_TEST_PASSWORD",
-				"valueFrom": map[string]interface{}{
-					"secretKeyRef": map[string]string{
-						"name": "vip-test-credentials",
-						"key":  "password",
+				{
+					"name": "VIP_WORKBENCH_API_KEY",
+					"valueFrom": map[string]interface{}{
+						"secretKeyRef": map[string]string{
+							"name": "vip-test-credentials",
+							"key":  "VIP_WORKBENCH_API_KEY",
+						},
 					},
 				},
-			},
+				{
+					"name": "VIP_PM_TOKEN",
+					"valueFrom": map[string]interface{}{
+						"secretKeyRef": map[string]string{
+							"name": "vip-test-credentials",
+							"key":  "VIP_PM_TOKEN",
+						},
+					},
+				},
+			}
+		} else {
+			// Keycloak mode: use username/password from Secret
+			container["env"] = []map[string]interface{}{
+				{
+					"name": "VIP_TEST_USERNAME",
+					"valueFrom": map[string]interface{}{
+						"secretKeyRef": map[string]string{
+							"name": "vip-test-credentials",
+							"key":  "username",
+						},
+					},
+				},
+				{
+					"name": "VIP_TEST_PASSWORD",
+					"valueFrom": map[string]interface{}{
+						"secretKeyRef": map[string]string{
+							"name": "vip-test-credentials",
+							"key":  "password",
+						},
+					},
+				},
+			}
 		}
 	}
 

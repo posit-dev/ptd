@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
 	"time"
@@ -13,10 +15,12 @@ import (
 	"github.com/posit-dev/ptd/cmd/internal/verify"
 	"github.com/posit-dev/ptd/lib/kube"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 func init() {
 	rootCmd.AddCommand(verifyCmd)
+	verifyCmd.AddCommand(cleanupCmd)
 
 	verifyCmd.Flags().StringVar(&verifySiteName, "site", "main", "Name of the Site CR to verify")
 	verifyCmd.Flags().StringVar(&verifyCategories, "categories", "", "Test categories to run (pytest -m marker)")
@@ -28,6 +32,7 @@ func init() {
 	verifyCmd.Flags().StringVar(&verifyTestUsername, "test-username", "vip-test-user", "Keycloak test user name")
 	verifyCmd.Flags().StringVar(&verifyNamespace, "namespace", "posit-team", "Kubernetes namespace where PTD resources live")
 	verifyCmd.Flags().StringVar(&verifyKeycloakAdminSecret, "keycloak-admin-secret", "", "Name of the K8s secret holding Keycloak admin credentials (defaults to {site}-keycloak-initial-admin)")
+	verifyCmd.Flags().BoolVar(&verifyInteractiveAuth, "interactive-auth", false, "Mint credentials via interactive browser login (requires VIP CLI)")
 	verifyCmd.Flags().DurationVar(&verifyTimeout, "timeout", 15*time.Minute, "Timeout for waiting for the VIP verification Job to complete")
 }
 
@@ -42,6 +47,7 @@ var (
 	verifyTestUsername       string
 	verifyNamespace          string
 	verifyKeycloakAdminSecret string
+	verifyInteractiveAuth    bool
 	verifyTimeout            time.Duration
 )
 
@@ -77,6 +83,131 @@ Examples:
 		target := args[0]
 		runVerify(cmd.Context(), cmd, target)
 	},
+}
+
+var cleanupCmd = &cobra.Command{
+	Use:   "cleanup <target>",
+	Short: "Delete VIP test credentials and resources",
+	Long: `Delete VIP test credentials and resources created by the verify command.
+
+This command:
+1. Reads the vip-test-credentials K8s Secret
+2. Deletes the Connect API key via the Connect API
+3. Deletes the vip-test-credentials K8s Secret
+
+Examples:
+  # Clean up test credentials for ganso01-staging
+  ptd verify cleanup ganso01-staging
+
+  # Clean up test credentials for a specific site
+  ptd verify cleanup ganso01-staging --site secondary`,
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: legacy.ValidTargetArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		target := args[0]
+		runCleanup(cmd.Context(), cmd, target)
+	},
+}
+
+func runCleanup(ctx context.Context, cmd *cobra.Command, target string) {
+	// Load target configuration
+	t, err := legacy.TargetFromName(target)
+	if err != nil {
+		slog.Error("Could not load target", "error", err)
+		os.Exit(1)
+	}
+
+	// Get credentials
+	creds, err := t.Credentials(ctx)
+	if err != nil {
+		slog.Error("Failed to get credentials", "error", err)
+		os.Exit(1)
+	}
+
+	credEnvVars := creds.EnvVars()
+
+	// Start proxy if needed (non-fatal)
+	proxyFile := path.Join(internal.DataDir(), "proxy.json")
+	stopProxy, err := kube.StartProxy(ctx, t, proxyFile)
+	if err != nil {
+		slog.Warn("Failed to start proxy", "error", err)
+	} else {
+		defer stopProxy()
+	}
+
+	// Set up kubeconfig
+	kubeconfigPath, err := kube.SetupKubeConfig(ctx, t, creds)
+	if err != nil {
+		slog.Error("Failed to setup kubeconfig", "error", err)
+		os.Exit(1)
+	}
+
+	// Prepare environment variables for kubectl
+	keysToSet := make(map[string]bool, len(credEnvVars)+1)
+	for k := range credEnvVars {
+		keysToSet[k] = true
+	}
+	keysToSet["KUBECONFIG"] = true
+
+	base := os.Environ()
+	env := make([]string, 0, len(base)+len(keysToSet))
+	for _, e := range base {
+		if idx := strings.Index(e, "="); idx >= 0 {
+			if !keysToSet[e[:idx]] {
+				env = append(env, e)
+			}
+		} else {
+			env = append(env, e)
+		}
+	}
+	for k, v := range credEnvVars {
+		env = append(env, k+"="+v)
+	}
+	env = append(env, "KUBECONFIG="+kubeconfigPath)
+
+	// Get Site CR to fetch Connect URL
+	slog.Info("Fetching Site CR from Kubernetes")
+	cmd2 := exec.CommandContext(ctx, "kubectl", "get", "site", verifySiteName,
+		"-n", verifyNamespace,
+		"-o", "yaml")
+	cmd2.Env = env
+
+	siteYAML, err := cmd2.Output()
+	if err != nil {
+		slog.Error("Failed to get Site CR", "error", err)
+		os.Exit(1)
+	}
+
+	var site verify.SiteCR
+	if err := yaml.Unmarshal(siteYAML, &site); err != nil {
+		slog.Error("Failed to parse Site CR", "error", err)
+		os.Exit(1)
+	}
+
+	// Get Connect URL
+	connectURL := ""
+	if site.Spec.Connect != nil {
+		connectURL = fmt.Sprintf("https://connect.%s", site.Spec.Domain)
+		if site.Spec.Connect.DomainPrefix != "" {
+			connectURL = fmt.Sprintf("https://%s.%s", site.Spec.Connect.DomainPrefix, site.Spec.Domain)
+		}
+		if site.Spec.Connect.BaseDomain != "" {
+			prefix := "connect"
+			if site.Spec.Connect.DomainPrefix != "" {
+				prefix = site.Spec.Connect.DomainPrefix
+			}
+			connectURL = fmt.Sprintf("https://%s.%s", prefix, site.Spec.Connect.BaseDomain)
+		}
+	}
+
+	// Run cleanup
+	slog.Info("Cleaning up VIP test credentials")
+	if err := verify.CleanupCredentials(ctx, env, verifyNamespace, connectURL); err != nil {
+		slog.Error("Cleanup failed", "error", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("\nCleanup completed successfully")
 }
 
 func runVerify(ctx context.Context, cmd *cobra.Command, target string) {
@@ -154,6 +285,7 @@ func runVerify(ctx context.Context, cmd *cobra.Command, target string) {
 		Realm:               verifyRealm,
 		TestUsername:        verifyTestUsername,
 		KeycloakAdminSecret: verifyKeycloakAdminSecret,
+		InteractiveAuth:     verifyInteractiveAuth,
 		Timeout:             verifyTimeout,
 		Env:                 env,
 	}
