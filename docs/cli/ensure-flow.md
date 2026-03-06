@@ -63,7 +63,7 @@ Provisions long-lived infrastructure components that persist across deployments.
 
 **Proxy Required**: Yes (connects to database)
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_control_room_postgres_config.py`)
+**Implementation**: Inline Go Pulumi (`lib/steps/postgres_config.go`)
 
 Connects to the RDS PostgreSQL instance to configure:
 - Database users and permissions
@@ -155,7 +155,7 @@ Creates the foundational infrastructure for the workload:
 
 **Proxy Required**: Yes (connects to database)
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_workload_postgres_config.py`)
+**Implementation**: Inline Go Pulumi (`lib/steps/postgres_config.go`)
 
 Configures the RDS database created in the persistent step:
 - Creates databases for each Posit Team product
