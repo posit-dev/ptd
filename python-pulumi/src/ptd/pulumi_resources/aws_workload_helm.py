@@ -33,6 +33,21 @@ def _build_alb_tag_string(true_name: str, environment: str, compound_name: str) 
 
 
 class AWSWorkloadHelm(pulumi.ComponentResource):
+    """
+    Deploys Helm charts to Kubernetes clusters for a PTD workload.
+    Uses AUTOLOAD + ALL-IN-CONSTRUCTOR pattern: autoload() loads config, __init__() deploys everything.
+
+    Deploys: Team Operator, Traefik, cert-manager, Loki, Grafana, Mimir, metrics-server,
+    kube-state-metrics, AWS Load Balancer Controller, FSx OpenZFS CSI driver, secret store CSI driver.
+
+    Depends on:
+    - EKS cluster (must exist, creates kube_providers for each cluster)
+    - Persistent outputs (loaded via StackReference to aws-workload-persistent)
+    - IAM roles created in persistent step (read from Secrets Manager by Go code, passed to workload config)
+
+    The autoload() classmethod constructs a Workload from the Pulumi stack name, then calls __init__().
+    """
+
     workload: ptd.aws_workload.AWSWorkload
 
     required_tags: dict[str, str]
@@ -40,6 +55,10 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
 
     @classmethod
     def autoload(cls) -> "AWSWorkloadHelm":
+        """
+        Load workload configuration from Pulumi stack name and deploy Helm charts.
+        Called by dynamically generated __main__.py (see lib/pulumi/python.go).
+        """
         return cls(workload=ptd.aws_workload.AWSWorkload(pulumi.get_stack()))
 
     def __init__(self, workload: ptd.aws_workload.AWSWorkload, *args, **kwargs):
@@ -268,6 +287,7 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
         )
 
     def _define_metrics_server(self, release: str, version: str):
+        # HelmChart CRD name affects the Kubernetes resource name (not Pulumi state)
         k8s.apiextensions.CustomResource(
             f"{self.workload.compound_name}-{release}-metrics-server-helm-release",
             metadata=k8s.meta.v1.ObjectMetaArgs(

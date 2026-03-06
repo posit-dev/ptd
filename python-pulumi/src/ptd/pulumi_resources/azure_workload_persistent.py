@@ -14,6 +14,29 @@ DB_ADMIN_USERNAME = "ptd_admin"
 
 
 class AzureWorkloadPersistent(pulumi.ComponentResource):
+    """Azure persistent infrastructure for a PTD workload.
+
+    Creates all long-lived Azure resources that persist across cluster recreations:
+    - Virtual Network (VNet) with subnets for private, database, NetApp, bastion, and app gateway
+    - Azure Database for PostgreSQL Flexible Server (main and Grafana instances)
+    - Azure NetApp Files capacity pool
+    - Azure Files storage account with private endpoint
+    - Azure Container Registry (ACR)
+    - Blob storage containers (Chronicle, Loki, PPM)
+    - DNS zones for external DNS
+    - Azure Bastion for secure VM access
+    - Mimir authentication password
+
+    Uses all-in-constructor pattern with `_define_*()` methods. Unlike AWS EKS builder pattern,
+    there are no method ordering dependencies - all `_define_*()` methods can be called in any order.
+
+    Outputs are consumed by later steps:
+    - postgres_config: Database connection details
+    - clusters: VNet and subnet IDs
+    - helm: Storage account names, registry info
+    - sites: DNS zone configurations
+    """
+
     workload: ptd.azure_workload.AzureWorkload
     required_tags: dict[str, str]
     vnet: network.VirtualNetwork
