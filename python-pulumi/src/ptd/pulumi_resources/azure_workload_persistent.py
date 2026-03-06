@@ -7,6 +7,7 @@ import pulumi_random
 from pulumi_azure_native import containerregistry, dns, netapp, network, privatedns, storage
 
 import ptd
+import ptd.azure_sdk
 import ptd.azure_workload
 from ptd.pulumi_resources.azure_bastion import AzureBastion
 
@@ -787,6 +788,21 @@ class AzureWorkloadPersistent(pulumi.ComponentResource):
                 )
 
     def _define_bastion(self):
+        # Get the latest Ubuntu 22.04 LTS image version
+        # This will cause Pulumi to recreate the VM when a new version is available
+        latest_image_version = "latest"
+        try:
+            latest_image_version = ptd.azure_sdk.get_latest_vm_image_version(
+                subscription_id=self.workload.cfg.subscription_id,
+                location=self.workload.cfg.region,
+                publisher="Canonical",
+                offer="0001-com-ubuntu-server-jammy",
+                sku="22_04-lts-gen2",
+            )
+        except Exception as e:
+            msg = f"Failed to fetch latest VM image version: {e}"
+            raise RuntimeError(msg) from e
+
         self.bastion = AzureBastion(
             name=f"bas-ptd-{self.workload.compound_name}-bastion",
             bastion_subnet=self.bastion_subnet,
@@ -795,6 +811,7 @@ class AzureWorkloadPersistent(pulumi.ComponentResource):
             location=self.workload.cfg.region,
             tags=self.required_tags,
             vm_size=self.workload.cfg.bastion_instance_type,
+            image_version=latest_image_version,
             opts=pulumi.ResourceOptions(
                 protect=self.workload.cfg.protect_persistent_resources,
             ),
