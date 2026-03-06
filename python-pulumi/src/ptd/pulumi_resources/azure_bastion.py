@@ -27,6 +27,7 @@ class AzureBastion(pulumi.ComponentResource):
         location: str | pulumi.Output[str],
         tags: dict[str, str],
         vm_size: str | pulumi.Output[str],
+        image_version: str,
         *args,
         **kwargs,
     ):
@@ -116,12 +117,13 @@ class AzureBastion(pulumi.ComponentResource):
                     publisher="Canonical",
                     offer="0001-com-ubuntu-server-jammy",
                     sku="22_04-lts-gen2",
-                    version="latest",
+                    version=image_version,
                 ),
                 os_disk=compute.OSDiskArgs(
                     name=f"{name}-jumpbox-osdisk",
                     caching=compute.CachingTypes("ReadWrite"),
                     create_option="FromImage",
+                    delete_option="Delete",
                 ),
             ),
             network_profile=compute.NetworkProfileArgs(
@@ -137,6 +139,10 @@ class AzureBastion(pulumi.ComponentResource):
                 computer_name=f"{name}-jumpbox",
                 linux_configuration=compute.LinuxConfigurationArgs(
                     disable_password_authentication=True,
+                    patch_settings=compute.LinuxPatchSettingsArgs(
+                        patch_mode="AutomaticByPlatform",
+                        assessment_mode="AutomaticByPlatform",
+                    ),
                     ssh=compute.SshConfigurationArgs(
                         public_keys=[
                             compute.SshPublicKeyArgs(
@@ -147,6 +153,11 @@ class AzureBastion(pulumi.ComponentResource):
                     ),
                 ),
             ),
-            tags=tags | {"Name": f"{name}-jumpbox"},
-            opts=pulumi.ResourceOptions(parent=self),
+            tags=tags | {"Name": f"{name}-jumpbox", "ImageVersion": image_version},
+            opts=pulumi.ResourceOptions(
+                parent=self,
+                protect=False,  # allow the VM to be recreated on image version updates
+                replace_on_changes=["storageProfile.imageReference.version"],
+                delete_before_replace=True,
+            ),
         )
