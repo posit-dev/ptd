@@ -19,6 +19,7 @@ import ptd.aws_iam
 import ptd.junkdrawer
 import ptd.oidc
 import ptd.paths
+import ptd.pulumi_resources.lib
 import ptd.secrecy
 
 
@@ -2540,8 +2541,9 @@ class AWSEKSCluster(pulumi.ComponentResource):
 
         for dashboard_file in sorted(dashboards_dir.glob("*.json")):
             dashboard_name = dashboard_file.stem
-            # Sanitize name for Kubernetes (RFC 1123: only lowercase alphanumeric, '-', '.')
-            k8s_safe_name = dashboard_name.replace("_", "-")
+
+            # Sanitize name for Kubernetes RFC 1123 compliance
+            k8s_safe_name = ptd.pulumi_resources.lib.sanitize_k8s_name(dashboard_name)
 
             # Read and parse JSON
             try:
