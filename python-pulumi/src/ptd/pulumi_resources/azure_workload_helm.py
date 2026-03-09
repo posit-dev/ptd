@@ -683,11 +683,9 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
 
             db_url = pulumi.Output.secret(f"postgres://{role}:{pw}@{fqdn}/{database}")
 
-            grafana_ns = kubernetes.core.v1.Namespace(
+            ns = kubernetes.core.v1.Namespace(
                 f"{self.workload.compound_name}-{release}-grafana-ns",
-                metadata={
-                    "name": "grafana",
-                },
+                metadata={"name": GRAFANA_NAMESPACE},
                 opts=pulumi.ResourceOptions(parent=self, providers=[self.kube_providers[release]]),
             )
 
@@ -698,40 +696,8 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                     "namespace": GRAFANA_NAMESPACE,
                 },
                 data={"PTD_DATABASE_URL": db_url.apply(lambda url: base64.b64encode(url.encode()).decode())},
-                opts=pulumi.ResourceOptions(parent=self, providers=[self.kube_providers[release]]),
+                opts=pulumi.ResourceOptions(parent=self, providers=[self.kube_providers[release]], depends_on=[ns]),
             )
-
-            # Create alert ConfigMaps for Grafana sidecar
-            # Cloud-agnostic alerts
-            self._create_alert_configmap("pods", grafana_ns, self.kube_providers[release], release)
-            self._create_alert_configmap("healthchecks", grafana_ns, self.kube_providers[release], release)
-            self._create_alert_configmap("nodes", grafana_ns, self.kube_providers[release], release)
-            self._create_alert_configmap("applications", grafana_ns, self.kube_providers[release], release)
-            self._create_alert_configmap("mimir", grafana_ns, self.kube_providers[release], release)
-
-            # Azure-specific alerts
-            self._create_alert_configmap("azure_postgres", grafana_ns, self.kube_providers[release], release)
-            self._create_alert_configmap("azure_netapp", grafana_ns, self.kube_providers[release], release)
-            self._create_alert_configmap("azure_loadbalancer", grafana_ns, self.kube_providers[release], release)
-            self._create_alert_configmap("azure_storage", grafana_ns, self.kube_providers[release], release)
-
-    def _create_alert_configmap(
-        self, name: str, ns: kubernetes.core.v1.Namespace, provider: kubernetes.Provider, release: str
-    ) -> kubernetes.core.v1.ConfigMap:
-        file_path = ptd.paths.alerts() / f"{name}.yaml"
-        with open(file_path) as alert_file:
-            alert_yaml = alert_file.read()
-
-        return kubernetes.core.v1.ConfigMap(
-            f"{self.workload.compound_name}-{release}-grafana-{name}-alerts",
-            metadata={
-                "name": f"grafana-{name}-alerts",
-                "namespace": "grafana",
-                "labels": {"grafana_alert": "1"},
-            },
-            data={"alerts.yaml": alert_yaml},
-            opts=pulumi.ResourceOptions(parent=self, provider=provider, depends_on=[ns]),
-        )
 
     def _define_kube_state_metrics(self, release: str, version: str):
         kubernetes.apiextensions.CustomResource(
