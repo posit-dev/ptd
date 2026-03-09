@@ -177,11 +177,6 @@ class AzureWorkloadPersistent(pulumi.ComponentResource):
             resource_group_name=self.vnet_rsg_name,
             virtual_network_name=self.vnet_name,
             address_prefix=self.workload.cfg.network.private_subnet_cidr,
-            **(
-                {"nat_gateway": network.SubResourceArgs(id=self.nat_gw.id)}
-                if self.workload.cfg.network.public_subnet_cidr
-                else {}
-            ),
             service_endpoints=[
                 network.ServiceEndpointPropertiesFormatArgs(
                     locations=[self.workload.cfg.region],
@@ -193,6 +188,16 @@ class AzureWorkloadPersistent(pulumi.ComponentResource):
                 ),
             ],
             network_security_group=network.SubResourceArgs(id=private_nsg.id),
+            **(
+                {"nat_gateway": network.SubResourceArgs(id=self.nat_gw.id)}
+                if self.workload.cfg.network.public_subnet_cidr
+                else {}
+            ),
+            **(
+                {"route_table": network.SubResourceArgs(id=self.workload.cfg.network.private_subnet_route_table_id)}
+                if self.workload.cfg.network.private_subnet_route_table_id
+                else {}
+            ),
             opts=pulumi.ResourceOptions(
                 parent=self.vnet if hasattr(self, "vnet") and self.vnet else None,
                 protect=self.workload.cfg.protect_persistent_resources,

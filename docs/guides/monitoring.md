@@ -532,6 +532,42 @@ PTD deploys a set of Grafana alerts to the control room for centralized monitori
 
 All alerts are configured to send notifications to OpsGenie when triggered.
 
+### Alert Format
+
+Alerts use a standardized format for consistency across all alert types:
+
+```
+[🔴 CRITICAL | 🟡 WARNING]: [Title]
+
+[Description]
+
+─── WHERE ───────────────────────────
+Tenant:      [tenant name] (Note: The organization or group that a workload cluster is provisioned for)
+Cluster:     [cluster name]
+Component:   [affected component]
+
+─── DETAILS ─────────────────────────
+[Key]:       [Value]
+[Key]:       [Value]
+...
+
+📖 [runbook link]
+📊 [dashboard link]
+```
+
+**Severity levels:**
+- 🔴 **CRITICAL** — Immediate action required
+- 🟡 **WARNING** — Investigate soon
+
+**Alert types and their WHERE/DETAILS fields:**
+
+| Type | WHERE | DETAILS |
+|------|-------|---------|
+| Health Check | Tenant, Cluster, Product | Endpoint, Status, Response Time, Down Since |
+| Kubernetes | Tenant, Cluster, Namespace, Pod/Node | Varies by alert (restarts, replicas, conditions) |
+| Cloud (AWS) | Tenant, Cluster, Resource, Region | Metric, Current, Threshold, Duration |
+| Cloud (Azure) | Tenant, Cluster, Resource, Location | Metric, Current, Threshold, Duration |
+
 ### Application Alerts
 
 | Alert | Threshold | Duration | Description |
@@ -576,6 +612,28 @@ All alerts are configured to send notifications to OpsGenie when triggered.
 | **Pod Restarts** | > 5 restarts in 15m | 15m | Pod has restarted excessively |
 | **Deployment Replicas Mismatch** | Desired != Available | 15m | Deployment does not have the expected number of available replicas |
 | **StatefulSet Replicas Mismatch** | Ready != Desired | 15m | StatefulSet does not have the expected number of ready replicas |
+
+Pod-related alerts are filtered to only monitor PTD-managed namespaces to prevent false alerts for customer-deployed workloads.
+
+**Monitored Namespaces** (minimal allowlist):
+- **Application namespaces**: `posit-team`, `posit-team-system` - Direct customer-facing applications where failures immediately impact users
+- **Observability stack**: `alloy`, `mimir`, `loki`, `grafana` - Monitoring infrastructure failures cause blindness to other failures
+
+**Excluded Namespaces**:
+- **Infrastructure namespaces** (`calico-system`, `traefik`, `kube-system`, `tigera-operator`, etc.) - Failures manifest as application failures, which trigger alerts naturally
+- **Customer namespaces** (`default`, custom namespaces) - Outside PTD responsibility
+
+**Rationale**: The monitoring strategy follows a "monitor symptoms, not all infrastructure layers" approach. Infrastructure failures (CNI, ingress, storage) cascade to application failures, which trigger alerts. This prevents redundant alerts while ensuring PTD is notified of actual customer impact. The observability stack must be monitored directly since failures prevent other alerts from firing.
+
+**PromQL Filter Pattern**: All pod alerts use the namespace filter:
+```promql
+{namespace=~"posit-team|posit-team-system|alloy|mimir|loki|grafana"}
+```
+
+**Example Failure Cascade**:
+- Calico CNI pod crashes → Network connectivity breaks for application pods → Application pods become unhealthy → `PodNotHealthy` alert fires in `posit-team` namespace
+- Traefik ingress pod crashes → Ingress routing breaks → HTTP health checks fail → `Healthchecks` alert fires
+- Alloy pod crashes → Metrics/logs stop flowing → No alerts fire (blind) → **Must alert on Alloy pod failures directly**
 
 ### Adding or Modifying Alerts
 

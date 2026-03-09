@@ -32,6 +32,7 @@ class NetworkConfig:
     public_subnet_cidr: str | None = None
     vnet_rsg_name: str | None = None
     dns_forward_domains: list[dict[str, str]] = dataclasses.field(default_factory=list)
+    private_subnet_route_table_id: str | None = None
 
     def __post_init__(self):
         """Validate DNS forward domain entries if configured."""
@@ -54,15 +55,9 @@ class AzureWorkloadConfig(ptd.WorkloadConfig):
     clusters: dict[str, AzureWorkloadClusterConfig]
     subscription_id: str
     tenant_id: str
-    client_id: str
-    secrets_provider_client_id: str
     network: NetworkConfig
 
     root_domain: str | None = None
-    instance_type: str = "Standard_D2_v4"
-    control_plane_node_count: int = 1
-    worker_node_count: int = 1
-    db_storage_size_gb: int = 128
     resource_tags: dict[str, str] | None = None
     protect_persistent_resources: bool = True
     admin_group_id: str | None = None
