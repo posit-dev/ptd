@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 42,
+  "id": null,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -1869,30 +1869,6 @@
                 }
               }
             ]
-          },
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "{__name__=\"aws_rds_free_storage_space_average\", __tenant_id__=\"654654567442\", account_id=\"654654567442\", cluster=\"default_demo01-staging-20250423-control-plane\", dimension_DatabaseClass=\"db.t3.small\", instance=\"29b39e68f4c08b716b6a68b333b21f5f\", job=\"integrations/cloudwatch\", name=\"global\", region=\"us-east-2\"}"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
           }
         ]
       },
@@ -2646,11 +2622,6 @@
     "list": [
       {
         "allValue": "",
-        "current": {
-          "selected": false,
-          "text": "default_academy01-staging-20250415-control-plane",
-          "value": "default_academy01-staging-20250415-control-plane"
-        },
         "datasource": {
           "type": "prometheus",
           "uid": "mimir"

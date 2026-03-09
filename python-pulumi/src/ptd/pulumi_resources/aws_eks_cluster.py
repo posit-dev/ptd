@@ -2081,7 +2081,6 @@ class AWSEKSCluster(pulumi.ComponentResource):
                             "enabled": True,
                             "searchNamespace": "grafana",
                             "label": "grafana_dashboard",
-                            "folder": "/tmp/dashboards",
                         },
                     },
                 },
