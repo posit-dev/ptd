@@ -259,6 +259,10 @@ class AWSWorkloadClusterConfig(ptd.WorkloadClusterConfig):
     efs_config: ptd.EFSConfig | None = None
     karpenter_config: KarpenterConfig | None = None
 
+    # Optional: When true, enables EKS ForceUpdateVersion which overrides upgrade-blocking readiness checks
+    # (deprecated APIs, compatibility issues, cluster health checks). Use during maintenance windows.
+    force_maintenance: bool = False
+
 
 @dataclasses.dataclass(frozen=True)
 class AWSWorkloadClusterComponentConfig(ptd.WorkloadClusterComponentConfig):
