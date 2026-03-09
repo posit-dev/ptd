@@ -2540,6 +2540,8 @@ class AWSEKSCluster(pulumi.ComponentResource):
 
         for dashboard_file in sorted(dashboards_dir.glob("*.json")):
             dashboard_name = dashboard_file.stem
+            # Sanitize name for Kubernetes (RFC 1123: only lowercase alphanumeric, '-', '.')
+            k8s_safe_name = dashboard_name.replace("_", "-")
 
             # Read and parse JSON
             try:
@@ -2557,9 +2559,9 @@ class AWSEKSCluster(pulumi.ComponentResource):
             dashboard_content = json.dumps(dashboard_json, indent=2)
 
             k8s.core.v1.ConfigMap(
-                f"{self.name}-grafana-{dashboard_name}-dashboard",
+                f"{self.name}-grafana-{k8s_safe_name}-dashboard",
                 metadata={
-                    "name": f"grafana-{dashboard_name}-dashboard",
+                    "name": f"grafana-{k8s_safe_name}-dashboard",
                     "namespace": "grafana",
                     "labels": {"grafana_dashboard": "1"},
                 },
