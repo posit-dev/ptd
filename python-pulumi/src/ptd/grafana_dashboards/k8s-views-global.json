@@ -61,42 +61,6 @@
           "type": "dashboard"
         },
         "type": "dashboard"
-      },
-      {
-        "datasource": {
-          "type": "datasource",
-          "uid": "grafana"
-        },
-        "enable": true,
-        "hide": false,
-        "iconColor": "#5c4ee5",
-        "name": "terraform",
-        "target": {
-          "limit": 100,
-          "matchAny": false,
-          "tags": [
-            "terraform"
-          ],
-          "type": "tags"
-        }
-      },
-      {
-        "datasource": {
-          "type": "datasource",
-          "uid": "grafana"
-        },
-        "enable": true,
-        "hide": false,
-        "iconColor": "red",
-        "name": "oncall",
-        "target": {
-          "limit": 100,
-          "matchAny": false,
-          "tags": [
-            "oncall"
-          ],
-          "type": "tags"
-        }
       }
     ]
   },
@@ -111,7 +75,7 @@
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "gridPos": {
         "h": 1,
@@ -127,7 +91,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -184,11 +148,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "avg(sum by (instance, cpu) (rate(node_cpu_seconds_total{mode!~\"idle|iowait|steal\", cluster=~\"$cluster\", job=~\"$job\"}[$__rate_interval])))",
+          "expr": "avg(sum by (instance, cpu) (rate(node_cpu_seconds_total{mode!~\"idle|iowait|steal\", cluster=~\"$cluster\"}[$__rate_interval])))",
           "interval": "",
           "legendFormat": "Real",
           "range": true,
@@ -197,7 +161,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\", cluster=~\"$cluster\"} and on(namespace, pod) max by (namespace, pod) (kube_pod_status_phase{phase=\"Running\", cluster=~\"$cluster\"} == 1)) / sum(machine_cpu_cores{cluster=~\"$cluster\"})",
@@ -209,7 +173,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "expr": "sum(kube_pod_container_resource_limits{resource=\"cpu\", cluster=~\"$cluster\"} and on(namespace, pod) max by (namespace, pod) (kube_pod_status_phase{phase=\"Running\", cluster=~\"$cluster\"} == 1)) / sum(machine_cpu_cores{cluster=~\"$cluster\"})",
@@ -225,7 +189,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -284,11 +248,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(node_memory_MemTotal_bytes{cluster=~\"$cluster\", job=~\"$job\"} - node_memory_MemAvailable_bytes{cluster=~\"$cluster\", job=~\"$job\"}) / sum(node_memory_MemTotal_bytes{cluster=~\"$cluster\", job=~\"$job\"})",
+          "expr": "sum(node_memory_MemTotal_bytes{cluster=~\"$cluster\"} - node_memory_MemAvailable_bytes{cluster=~\"$cluster\"}) / sum(node_memory_MemTotal_bytes{cluster=~\"$cluster\"})",
           "hide": false,
           "interval": "",
           "legendFormat": "Real",
@@ -298,7 +262,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "expr": "sum(kube_pod_container_resource_requests{resource=\"memory\", cluster=~\"$cluster\"} and on(namespace, pod) max by (namespace, pod) (kube_pod_status_phase{phase=\"Running\", cluster=~\"$cluster\"} == 1)) / sum(machine_memory_bytes{cluster=~\"$cluster\"})",
@@ -310,7 +274,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "expr": "sum(kube_pod_container_resource_limits{resource=\"memory\", cluster=~\"$cluster\"} and on(namespace, pod) max by (namespace, pod) (kube_pod_status_phase{phase=\"Running\", cluster=~\"$cluster\"} == 1)) / sum(machine_memory_bytes{cluster=~\"$cluster\"})",
@@ -326,7 +290,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -374,7 +338,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
@@ -391,7 +355,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -479,7 +443,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "exemplar": true,
           "expr": "sum(kube_namespace_labels{cluster=~\"$cluster\"})",
@@ -490,7 +454,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "expr": "sum(kube_pod_container_status_running{cluster=~\"$cluster\"})",
           "interval": "",
@@ -500,7 +464,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "expr": "sum(kube_pod_status_phase{phase=\"Running\", cluster=~\"$cluster\"})",
           "interval": "",
@@ -510,7 +474,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "expr": "sum(kube_service_info{cluster=~\"$cluster\"})",
           "interval": "",
@@ -520,7 +484,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "expr": "sum(kube_endpoint_info{cluster=~\"$cluster\"})",
           "interval": "",
@@ -530,7 +494,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "expr": "sum(kube_ingress_info{cluster=~\"$cluster\"})",
           "interval": "",
@@ -540,7 +504,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "expr": "sum(kube_deployment_labels{cluster=~\"$cluster\"})",
           "interval": "",
@@ -550,7 +514,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "expr": "sum(kube_statefulset_labels{cluster=~\"$cluster\"})",
           "interval": "",
@@ -560,7 +524,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "expr": "sum(kube_daemonset_labels{cluster=~\"$cluster\"})",
           "interval": "",
@@ -570,7 +534,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "expr": "sum(kube_persistentvolumeclaim_info{cluster=~\"$cluster\"})",
           "interval": "",
@@ -580,7 +544,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "expr": "sum(kube_hpa_labels{cluster=~\"$cluster\"})",
           "interval": "",
@@ -590,7 +554,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "expr": "sum(kube_configmap_info{cluster=~\"$cluster\"})",
           "interval": "",
@@ -600,7 +564,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "expr": "sum(kube_secret_info{cluster=~\"$cluster\"})",
           "interval": "",
@@ -610,7 +574,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "expr": "sum(kube_networkpolicy_labels{cluster=~\"$cluster\"})",
           "interval": "",
@@ -620,7 +584,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "exemplar": true,
           "expr": "count(count by (node) (kube_node_info{cluster=~\"$cluster\"}))",
@@ -636,7 +600,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -684,7 +648,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "expr": "count(kube_namespace_created{cluster=~\"$cluster\"})",
           "interval": "",
@@ -698,7 +662,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -747,11 +711,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(node_cpu_seconds_total{mode!~\"idle|iowait|steal\", cluster=~\"$cluster\", job=~\"$job\"}[$__rate_interval]))",
+          "expr": "sum(rate(node_cpu_seconds_total{mode!~\"idle|iowait|steal\", cluster=~\"$cluster\"}[$__rate_interval]))",
           "interval": "",
           "legendFormat": "Real",
           "range": true,
@@ -760,7 +724,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\", cluster=~\"$cluster\"} and on(namespace, pod) max by (namespace, pod) (kube_pod_status_phase{phase=\"Running\", cluster=~\"$cluster\"} == 1))",
@@ -772,7 +736,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "expr": "sum(kube_pod_container_resource_limits{resource=\"cpu\", cluster=~\"$cluster\"} and on(namespace, pod) max by (namespace, pod) (kube_pod_status_phase{phase=\"Running\", cluster=~\"$cluster\"} == 1))",
@@ -784,7 +748,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "expr": "sum(machine_cpu_cores{cluster=~\"$cluster\"})",
@@ -800,7 +764,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -849,11 +813,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(node_memory_MemTotal_bytes{cluster=~\"$cluster\", job=~\"$job\"} - node_memory_MemAvailable_bytes{cluster=~\"$cluster\", job=~\"$job\"})",
+          "expr": "sum(node_memory_MemTotal_bytes{cluster=~\"$cluster\"} - node_memory_MemAvailable_bytes{cluster=~\"$cluster\"})",
           "interval": "",
           "legendFormat": "Real",
           "range": true,
@@ -862,7 +826,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "expr": "sum(kube_pod_container_resource_requests{resource=\"memory\", cluster=~\"$cluster\"} and on(namespace, pod) max by (namespace, pod) (kube_pod_status_phase{phase=\"Running\", cluster=~\"$cluster\"} == 1))",
@@ -874,7 +838,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "expr": "sum(kube_pod_container_resource_limits{resource=\"memory\", cluster=~\"$cluster\"} and on(namespace, pod) max by (namespace, pod) (kube_pod_status_phase{phase=\"Running\", cluster=~\"$cluster\"} == 1))",
@@ -886,7 +850,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "expr": "sum(machine_memory_bytes{cluster=~\"$cluster\"})",
@@ -902,7 +866,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -950,7 +914,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "expr": "sum(kube_pod_status_phase{phase=\"Running\", cluster=~\"$cluster\"})",
           "interval": "",
@@ -965,7 +929,7 @@
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "gridPos": {
         "h": 1,
@@ -981,7 +945,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -1072,11 +1036,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "avg(sum by (instance, cpu) (rate(node_cpu_seconds_total{mode!~\"idle|iowait|steal\", cluster=~\"$cluster\", job=~\"$job\"}[$__rate_interval])))",
+          "expr": "avg(sum by (instance, cpu) (rate(node_cpu_seconds_total{mode!~\"idle|iowait|steal\", cluster=~\"$cluster\"}[$__rate_interval])))",
           "interval": "$resolution",
           "legendFormat": "CPU usage in %",
           "range": true,
@@ -1102,7 +1066,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -1193,11 +1157,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(node_memory_MemTotal_bytes{cluster=~\"$cluster\", job=~\"$job\"} - node_memory_MemAvailable_bytes{cluster=~\"$cluster\", job=~\"$job\"}) / sum(node_memory_MemTotal_bytes{cluster=~\"$cluster\", job=~\"$job\"})",
+          "expr": "sum(node_memory_MemTotal_bytes{cluster=~\"$cluster\"} - node_memory_MemAvailable_bytes{cluster=~\"$cluster\"}) / sum(node_memory_MemTotal_bytes{cluster=~\"$cluster\"})",
           "interval": "$resolution",
           "legendFormat": "Memory usage in %",
           "range": true,
@@ -1223,7 +1187,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -1315,7 +1279,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
@@ -1334,7 +1298,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -1422,7 +1386,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
@@ -1439,7 +1403,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -1528,11 +1492,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "avg(sum by (instance, cpu) (rate(node_cpu_seconds_total{mode!~\"idle|iowait|steal\", cluster=~\"$cluster\", job=~\"$job\"}[$__rate_interval]))) by (instance)",
+          "expr": "avg(sum by (instance, cpu) (rate(node_cpu_seconds_total{mode!~\"idle|iowait|steal\", cluster=~\"$cluster\"}[$__rate_interval]))) by (instance)",
           "interval": "$resolution",
           "legendFormat": "{{ node }}",
           "range": true,
@@ -1545,7 +1509,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -1633,11 +1597,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(node_memory_MemTotal_bytes{cluster=~\"$cluster\", job=~\"$job\"} - node_memory_MemAvailable_bytes{cluster=~\"$cluster\", job=~\"$job\"}) by (instance)",
+          "expr": "sum(node_memory_MemTotal_bytes{cluster=~\"$cluster\"} - node_memory_MemAvailable_bytes{cluster=~\"$cluster\"}) by (instance)",
           "hide": false,
           "interval": "$resolution",
           "legendFormat": "{{ instance }}",
@@ -1651,7 +1615,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "description": "No data is generally a good thing here.",
       "fieldConfig": {
@@ -1744,7 +1708,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
@@ -1761,7 +1725,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "description": "No data is generally a good thing here.",
       "fieldConfig": {
@@ -1854,11 +1818,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(node_cpu_core_throttles_total{cluster=~\"$cluster\", job=~\"$job\"}[$__rate_interval])) by (instance)",
+          "expr": "sum(rate(node_cpu_core_throttles_total{cluster=~\"$cluster\"}[$__rate_interval])) by (instance)",
           "interval": "$resolution",
           "legendFormat": "{{ instance }}",
           "range": true,
@@ -1884,7 +1848,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -1972,7 +1936,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
@@ -1985,7 +1949,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "expr": "sum(kube_pod_info{cluster=~\"$cluster\"})",
@@ -2001,7 +1965,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -2089,7 +2053,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
@@ -2106,7 +2070,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "description": "No data is generally a good thing here.",
       "fieldConfig": {
@@ -2195,7 +2159,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
@@ -2212,7 +2176,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "description": "No data is generally a good thing here.",
       "fieldConfig": {
@@ -2301,7 +2265,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
@@ -2319,7 +2283,7 @@
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "gridPos": {
         "h": 1,
@@ -2335,7 +2299,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "description": "Dropped noisy virtual devices for readability.",
       "fieldConfig": {
@@ -2418,11 +2382,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(node_network_receive_bytes_total{device!~\"(veth|azv|lxc).*\", cluster=~\"$cluster\", job=~\"$job\"}[$__rate_interval])) by (device)",
+          "expr": "sum(rate(node_network_receive_bytes_total{device!~\"(veth|azv|lxc).*\", cluster=~\"$cluster\"}[$__rate_interval])) by (device)",
           "interval": "$resolution",
           "legendFormat": "Received : {{ device }}",
           "range": true,
@@ -2431,11 +2395,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "- sum(rate(node_network_transmit_bytes_total{device!~\"(veth|azv|lxc).*\", cluster=~\"$cluster\", job=~\"$job\"}[$__rate_interval])) by (device)",
+          "expr": "- sum(rate(node_network_transmit_bytes_total{device!~\"(veth|azv|lxc).*\", cluster=~\"$cluster\"}[$__rate_interval])) by (device)",
           "interval": "$resolution",
           "legendFormat": "Transmitted : {{ device }}",
           "range": true,
@@ -2448,7 +2412,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -2530,11 +2494,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(node_network_receive_drop_total{cluster=~\"$cluster\", job=~\"$job\"}[$__rate_interval]))",
+          "expr": "sum(rate(node_network_receive_drop_total{cluster=~\"$cluster\"}[$__rate_interval]))",
           "interval": "$resolution",
           "legendFormat": "Packets dropped (receive)",
           "range": true,
@@ -2543,11 +2507,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "- sum(rate(node_network_transmit_drop_total{cluster=~\"$cluster\", job=~\"$job\"}[$__rate_interval]))",
+          "expr": "- sum(rate(node_network_transmit_drop_total{cluster=~\"$cluster\"}[$__rate_interval]))",
           "interval": "$resolution",
           "legendFormat": "Packets dropped (transmit)",
           "range": true,
@@ -2561,7 +2525,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -2643,7 +2607,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
@@ -2656,7 +2620,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "expr": "- sum(rate(container_network_transmit_bytes_total{cluster=~\"$cluster\"}[$__rate_interval])) by (namespace)",
@@ -2673,7 +2637,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -2755,11 +2719,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(node_network_receive_bytes_total{cluster=~\"$cluster\", job=~\"$job\"}[$__rate_interval])) by (instance)",
+          "expr": "sum(rate(node_network_receive_bytes_total{cluster=~\"$cluster\"}[$__rate_interval])) by (instance)",
           "interval": "$resolution",
           "legendFormat": "Received bytes in {{ instance }}",
           "range": true,
@@ -2768,10 +2732,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "- sum(rate(node_network_transmit_bytes_total{cluster=~\"$cluster\", job=~\"$job\"}[$__rate_interval])) by (instance)",
+          "expr": "- sum(rate(node_network_transmit_bytes_total{cluster=~\"$cluster\"}[$__rate_interval])) by (instance)",
           "hide": false,
           "interval": "$resolution",
           "legendFormat": "Transmitted bytes in {{ instance }}",
@@ -2785,7 +2749,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "description": "Dropped noisy virtual devices for readability.",
       "fieldConfig": {
@@ -2868,11 +2832,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(node_network_receive_bytes_total{device!~\"(veth|azv|lxc|lo).*\", cluster=~\"$cluster\", job=~\"$job\"}[$__rate_interval])) by (instance)",
+          "expr": "sum(rate(node_network_receive_bytes_total{device!~\"(veth|azv|lxc|lo).*\", cluster=~\"$cluster\"}[$__rate_interval])) by (instance)",
           "interval": "$resolution",
           "legendFormat": "Received bytes in {{ instance }}",
           "range": true,
@@ -2881,10 +2845,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "- sum(rate(node_network_transmit_bytes_total{device!~\"(veth|azv|lxc|lo).*\", cluster=~\"$cluster\", job=~\"$job\"}[$__rate_interval])) by (instance)",
+          "expr": "- sum(rate(node_network_transmit_bytes_total{device!~\"(veth|azv|lxc|lo).*\", cluster=~\"$cluster\"}[$__rate_interval])) by (instance)",
           "hide": false,
           "interval": "$resolution",
           "legendFormat": "Transmitted bytes in {{ instance }}",
@@ -2898,7 +2862,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${datasource}"
+        "uid": "mimir"
       },
       "description": "Dropped noisy virtual devices for readability.",
       "fieldConfig": {
@@ -2981,11 +2945,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(node_network_receive_bytes_total{device=\"lo\", cluster=~\"$cluster\", job=~\"$job\"}[$__rate_interval])) by (instance)",
+          "expr": "sum(rate(node_network_receive_bytes_total{device=\"lo\", cluster=~\"$cluster\"}[$__rate_interval])) by (instance)",
           "interval": "$resolution",
           "legendFormat": "Received bytes in {{ instance }}",
           "range": true,
@@ -2994,10 +2958,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "mimir"
           },
           "editorMode": "code",
-          "expr": "- sum(rate(node_network_transmit_bytes_total{device=\"lo\", cluster=~\"$cluster\", job=~\"$job\"}[$__rate_interval])) by (instance)",
+          "expr": "- sum(rate(node_network_transmit_bytes_total{device=\"lo\", cluster=~\"$cluster\"}[$__rate_interval])) by (instance)",
           "hide": false,
           "interval": "$resolution",
           "legendFormat": "Transmitted bytes in {{ instance }}",
@@ -3018,28 +2982,10 @@
   "templating": {
     "list": [
       {
-        "current": {
-          "selected": false,
-          "text": "",
-          "value": ""
-        },
-        "hide": 0,
-        "includeAll": false,
-        "multi": false,
-        "name": "datasource",
-        "options": [],
-        "query": "prometheus",
-        "queryValue": "",
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "type": "datasource"
-      },
-      {
         "current": {},
         "datasource": {
           "type": "prometheus",
-          "uid": "${datasource}"
+          "uid": "mimir"
         },
         "definition": "label_values(kube_node_info,cluster)",
         "hide": 0,
@@ -3109,33 +3055,6 @@
         "queryValue": "",
         "skipUrlSync": false,
         "type": "custom"
-      },
-      {
-        "current": {
-          "selected": false,
-          "text": "",
-          "value": ""
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${datasource}"
-        },
-        "definition": "label_values(node_cpu_seconds_total{cluster=~\"$cluster\"},job)",
-        "hide": 0,
-        "includeAll": false,
-        "multi": true,
-        "name": "job",
-        "options": [],
-        "query": {
-          "qryType": 1,
-          "query": "label_values(node_cpu_seconds_total{cluster=~\"$cluster\"},job)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
       }
     ]
   },
