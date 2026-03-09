@@ -138,6 +138,10 @@ type AzureWorkloadClusterConfig struct {
 
 	// Optional: Root disk size for system node pool in GB (defaults to 128)
 	SystemNodePoolRootDiskSize *int `yaml:"system_node_pool_root_disk_size,omitempty"`
+
+	// Optional: When true, enables AKS ForceUpgrade which bypasses PDB constraints during cluster upgrades.
+	// Use during maintenance windows when you accept disruption to workloads protected by PDBs.
+	ForceMaintenance bool `yaml:"force_maintenance,omitempty"`
 }
 
 type AzureWorkloadClusterComponentConfig struct {

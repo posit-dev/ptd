@@ -3,7 +3,7 @@ package consts
 const (
 	// Component Names
 
-	Chronicle      = "chronicle"
+	Chronicle = "chronicle"
 	ChronicleAgent = "chronicle-agent"
 	Connect        = "connect"
 	Flightdeck     = "flightdeck"
