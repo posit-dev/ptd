@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/pulumi/pulumi-azure-native-sdk/containerservice/v3"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
@@ -186,6 +187,25 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 			ignoreChanges = append(ignoreChanges, "agentPoolProfiles")
 		}
 
+		// Build cluster resource options
+		clusterOpts := []pulumi.ResourceOption{
+			pulumi.Protect(config.ProtectPersistentResources),
+			pulumi.IgnoreChanges(ignoreChanges),
+		}
+
+		// Configure upgrade settings - use ForceUpgrade to bypass PDBs during maintenance
+		var upgradeSettings *containerservice.ClusterUpgradeSettingsArgs
+		if clusterConfig.ForceMaintenance {
+			// ForceUpgrade bypasses PDB constraints during cluster upgrades
+			// The 'Until' field sets when the override expires (required for it to take effect)
+			upgradeSettings = &containerservice.ClusterUpgradeSettingsArgs{
+				OverrideSettings: &containerservice.UpgradeOverrideSettingsArgs{
+					ForceUpgrade: pulumi.Bool(true),
+					Until:        pulumi.String(time.Now().Add(24 * time.Hour).Format(time.RFC3339)),
+				},
+			}
+		}
+
 		aksCluster, err := containerservice.NewManagedCluster(ctx, fmt.Sprintf("aksCluster-%s", release), &containerservice.ManagedClusterArgs{
 			AadProfile: &containerservice.ManagedClusterAADProfileArgs{
 				EnableAzureRBAC: pulumi.Bool(true),
@@ -266,12 +286,12 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 					Enabled: pulumi.Bool(true),
 				},
 			},
-			SupportPlan: pulumi.String("KubernetesOfficial"),
+			SupportPlan:     pulumi.String("KubernetesOfficial"),
+			UpgradeSettings: upgradeSettings,
 			Tags: pulumi.StringMap{
 				"Owner": pulumi.String("ptd"),
 			},
-		}, pulumi.Protect(config.ProtectPersistentResources),
-			pulumi.IgnoreChanges(ignoreChanges))
+		}, clusterOpts...)
 		if err != nil {
 			return err
 		}
