@@ -3,6 +3,7 @@ import dataclasses
 import pytest
 
 import ptd
+import ptd.aws_workload
 
 
 def test_workload_cluster_config_default_initialization():
@@ -308,3 +309,15 @@ def test_workload_cluster_config_custom_k8s_resources_in_workload():
 
     assert workload_config.clusters["20250328"].custom_k8s_resources == ["storage", "common"]
     assert workload_config.clusters["20250415"].custom_k8s_resources == ["monitoring"]
+
+
+def test_aws_workload_cluster_config_force_node_group_upgrade_default():
+    """Test that force_node_group_upgrade defaults to False."""
+    config = ptd.aws_workload.AWSWorkloadClusterConfig()
+    assert config.force_node_group_upgrade is False
+
+
+def test_aws_workload_cluster_config_force_node_group_upgrade_enabled():
+    """Test that force_node_group_upgrade can be set to True."""
+    config = ptd.aws_workload.AWSWorkloadClusterConfig(force_node_group_upgrade=True)
+    assert config.force_node_group_upgrade is True

@@ -70,7 +70,7 @@ spec:
         routing_weight: "100"
 
         # Force node group version updates even when PDBs block pod eviction (default: false)
-        # force_node_group_upgrade: true
+        # force_node_group_upgrade: false
 
         # Component versions
         components:
