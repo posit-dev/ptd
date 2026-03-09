@@ -69,6 +69,9 @@ spec:
         # Traffic routing weight (for blue/green deployments)
         routing_weight: "100"
 
+        # Force node group version updates even when PDBs block pod eviction (default: false)
+        # force_node_group_upgrade: true
+
         # Component versions
         components:
           traefik_forward_auth_version: "0.0.14"

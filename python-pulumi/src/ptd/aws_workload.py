@@ -258,6 +258,7 @@ class AWSWorkloadClusterConfig(ptd.WorkloadClusterConfig):
     enable_efs_csi_driver: bool = False
     efs_config: ptd.EFSConfig | None = None
     karpenter_config: KarpenterConfig | None = None
+    force_node_group_upgrade: bool = False
 
 
 @dataclasses.dataclass(frozen=True)

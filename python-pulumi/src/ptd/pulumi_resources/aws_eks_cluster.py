@@ -527,6 +527,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         ami_type: str = "AL2_x86_64",
         taints: list[aws.eks.NodeGroupTaintArgs] | None = None,
         depends_on: list[pulumi.Resource] | None = None,
+        force_update_version: bool = False,
         *,
         use_name: bool = False,
     ):
@@ -552,6 +553,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         :param max_unavailable: Optional. The maximum number of unavailable nodes during an update. Default 1
         :param taints: Optional. The Kubernetes taints to be applied to the nodes in the node group
         :param depends_on: Optional. Resources that must be created before the node group (e.g., CNI)
+        :param force_update_version: Optional. Force version update even when PDBs block pod eviction. Default False
         :param opts: Optional. Resource options.
         :return: The AWSEKSCluster component resource
         """
@@ -601,6 +603,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
             ),
             update_config=aws.eks.NodeGroupUpdateConfigArgs(max_unavailable=max_unavailable),
             taints=taints,
+            force_update_version=force_update_version,
             opts=pulumi.ResourceOptions(parent=self.eks, depends_on=depends_on),
         )
 

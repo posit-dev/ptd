@@ -248,6 +248,7 @@ class AWSWorkloadEKS(pulumi.ComponentResource):
             version=cluster_cfg.cluster_version,
             taints=eks_taints,
             depends_on=depends_on,
+            force_update_version=cluster_cfg.force_node_group_upgrade,
         )
 
     def _define_tigera_operator(

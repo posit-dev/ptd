@@ -113,6 +113,7 @@ spec:
         mp_instance_type: r6a.2xlarge
         root_disk_size: 200
         routing_weight: "100"  # For blue/green: 0-255
+        # force_node_group_upgrade: false  # Force version updates even when PDBs block pod eviction
         components:
           traefik_forward_auth_version: "0.0.14"
 
