@@ -527,8 +527,8 @@ class AWSEKSCluster(pulumi.ComponentResource):
         ami_type: str = "AL2_x86_64",
         taints: list[aws.eks.NodeGroupTaintArgs] | None = None,
         depends_on: list[pulumi.Resource] | None = None,
-        force_update_version: bool = False,
         *,
+        force_update_version: bool = False,
         use_name: bool = False,
     ):
         # TODO: what typing should we have for subnets? Consistency?
