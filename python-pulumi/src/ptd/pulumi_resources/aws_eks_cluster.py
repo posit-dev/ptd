@@ -1950,6 +1950,9 @@ class AWSEKSCluster(pulumi.ComponentResource):
         # Create alert configmaps for all YAML files in the alerts directory
         self._create_alert_configmaps(grafana_ns)
 
+        # Create dashboard configmaps for all JSON files in the dashboards directory
+        self._create_dashboard_configmaps(grafana_ns)
+
         # TODO: auth.proxy should be configurable, prod grafana auth will need tighter controls than letting anyone in as an Editor
         k8s.helm.v3.Release(
             f"{self.name}-grafana",
@@ -2073,7 +2076,13 @@ class AWSEKSCluster(pulumi.ComponentResource):
                         "alerts": {
                             "enabled": True,
                             "searchNamespace": "grafana",
-                        }
+                        },
+                        "dashboards": {
+                            "enabled": True,
+                            "searchNamespace": "grafana",
+                            "label": "grafana_dashboard",
+                            "folder": "/tmp/dashboards",
+                        },
                     },
                 },
             ),
@@ -2512,6 +2521,50 @@ class AWSEKSCluster(pulumi.ComponentResource):
                     "labels": {"grafana_alert": "1"},
                 },
                 data={"alerts.yaml": alert_yaml},
+                opts=pulumi.ResourceOptions(parent=self, provider=self.provider, depends_on=ns),
+            )
+
+    def _create_dashboard_configmaps(self, ns: k8s.core.v1.Namespace):
+        """
+        Create ConfigMaps for Grafana dashboard provisioning.
+
+        Reads all JSON files from grafana_dashboards/ directory and creates
+        Kubernetes ConfigMaps with the grafana_dashboard label. The Grafana
+        sidecar watches for this label and provisions dashboards automatically.
+
+        Dashboard UIDs are enforced to match the filename (without .json extension)
+        to ensure idempotent updates and prevent duplicate dashboards.
+        """
+        import json
+
+        dashboards_dir = ptd.paths.dashboards()
+
+        for dashboard_file in sorted(dashboards_dir.glob("*.json")):
+            dashboard_name = dashboard_file.stem
+
+            # Read and parse JSON
+            try:
+                with open(dashboard_file) as f:
+                    dashboard_json = json.load(f)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON in {dashboard_file}: {e}")
+
+            # Enforce UID = filename for idempotency
+            # Set id to null (Grafana provisioning ignores it)
+            dashboard_json["uid"] = dashboard_name
+            dashboard_json["id"] = None
+
+            # Convert back to JSON string
+            dashboard_content = json.dumps(dashboard_json, indent=2)
+
+            k8s.core.v1.ConfigMap(
+                f"{self.name}-grafana-{dashboard_name}-dashboard",
+                metadata={
+                    "name": f"grafana-{dashboard_name}-dashboard",
+                    "namespace": "grafana",
+                    "labels": {"grafana_dashboard": "1"},
+                },
+                data={f"{dashboard_name}.json": dashboard_content},
                 opts=pulumi.ResourceOptions(parent=self, provider=self.provider, depends_on=ns),
             )
 
