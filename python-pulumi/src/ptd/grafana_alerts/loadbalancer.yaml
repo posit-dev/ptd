@@ -79,6 +79,7 @@ groups:
             summary: High 5XX errors on ALB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
+            severity: warning
           isPaused: false
         - uid: alb_unhealthy_targets
           title: ALB Unhealthy Targets
@@ -128,12 +129,13 @@ groups:
                 type: threshold
           noDataState: NoData
           execErrState: Error
-          for: 10m
+          for: 5m
           annotations:
-            description: Application Load Balancer has unhealthy targets for over 10 minutes, indicating backend service health issues. The extended window reduces false positives during rolling deployments.
+            description: Application Load Balancer has unhealthy targets for over 5 minutes, indicating backend service health issues.
             summary: Unhealthy targets on ALB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
+            severity: warning
           isPaused: false
         - uid: nlb_unhealthy_targets
           title: NLB Unhealthy Targets
@@ -183,12 +185,13 @@ groups:
                 type: threshold
           noDataState: NoData
           execErrState: Error
-          for: 10m
+          for: 5m
           annotations:
-            description: Network Load Balancer has unhealthy targets for over 10 minutes, indicating backend service health issues. The extended window reduces false positives during rolling deployments and node drains.
+            description: Network Load Balancer has unhealthy targets for over 5 minutes, indicating backend service health issues.
             summary: Unhealthy targets on NLB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
+            severity: warning
           isPaused: false
         - uid: alb_response_latency_high
           title: ALB Response Latency High
@@ -244,4 +247,5 @@ groups:
             summary: High response latency on ALB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
+            severity: warning
           isPaused: false

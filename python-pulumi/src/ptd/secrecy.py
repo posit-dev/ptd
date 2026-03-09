@@ -112,6 +112,7 @@ SiteSecret = typing.TypedDict(
         "pkg-db-password": str,
         "pkg-license": str,
         "pkg-secret-key": str,
+        "ppm-oidc-client-secret": str,
         "pub-client-secret": str,
         "pub-db-password": str,
         "pub-license": str,

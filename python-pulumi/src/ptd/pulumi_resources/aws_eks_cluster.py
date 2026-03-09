@@ -1947,14 +1947,8 @@ class AWSEKSCluster(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self, providers=[self.provider], depends_on=grafana_ns),
         )
 
-        self._create_alert_configmap("pods", grafana_ns)
-        self._create_alert_configmap("cloudwatch", grafana_ns)
-        self._create_alert_configmap("rds", grafana_ns)
-        self._create_alert_configmap("natgateway", grafana_ns)
-        self._create_alert_configmap("loadbalancer", grafana_ns)
-        self._create_alert_configmap("healthchecks", grafana_ns)
-        self._create_alert_configmap("nodes", grafana_ns)
-        self._create_alert_configmap("applications", grafana_ns)
+        # Create alert configmaps for all YAML files in the alerts directory
+        self._create_alert_configmaps(grafana_ns)
 
         # TODO: auth.proxy should be configurable, prod grafana auth will need tighter controls than letting anyone in as an Editor
         k8s.helm.v3.Release(
@@ -1969,6 +1963,21 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 ),
                 values={
                     "alerting": {
+                        # Custom notification templates for clean alert formatting.
+                        # These templates output ONLY our formatted content without
+                        # Grafana's default prefix (Firing, Value, Labels, Annotations).
+                        "templates.yaml": {
+                            "apiVersion": 1,
+                            "templates": [
+                                {
+                                    "orgId": 1,
+                                    "name": "ptd_templates",
+                                    # Template outputs description annotation + Source/Silence links for each alert.
+                                    # This avoids Grafana's default verbose format while keeping useful links.
+                                    "template": '{{ "{{" }} define "ptd.description" {{ "}}" }}{{ "{{" }} range .Alerts {{ "}}" }}{{ "{{" }} .Annotations.description {{ "}}" }}\n\nSource: {{ "{{" }} .GeneratorURL {{ "}}" }}\nSilence: {{ "{{" }} .SilenceURL {{ "}}" }}{{ "{{" }} end {{ "}}" }}{{ "{{" }} end {{ "}}" }}',
+                                }
+                            ],
+                        },
                         "contactpoints.yaml": {
                             "apiVersion": 1,
                             "contactPoints": [
@@ -1982,6 +1991,10 @@ class AWSEKSCluster(pulumi.ComponentResource):
                                             "settings": {
                                                 "apiKey": '${{ "{" }}POSIT_OPSGENIE_KEY{{ "}" }}',  # ${POSIT_OPSGENIE_KEY} in the resulting configMap,
                                                 "apiUrl": "https://api.opsgenie.com/v2/alerts",
+                                                "sendTagsAs": "tags",
+                                                "message": '{{ "{{" }} .CommonAnnotations.summary {{ "}}" }}',
+                                                # Use custom template for clean description without label dumps
+                                                "description": '{{ "{{" }} template "ptd.description" . {{ "}}" }}',
                                             },
                                         }
                                     ],
@@ -1994,7 +2007,10 @@ class AWSEKSCluster(pulumi.ComponentResource):
                                 {
                                     "orgId": 1,
                                     "receiver": "posit-opsgenie",
-                                    "group_by": ["alertname", "cluster"],
+                                    # health_check_url ensures each health check endpoint gets its own alert
+                                    # (internal vs fqdn checks are separate). This label is empty for
+                                    # non-healthcheck alerts so it won't affect their grouping.
+                                    "group_by": ["alertname", "cluster", "ptd_component", "health_check_url"],
                                     "matchers": ["opsgenie = 1"],
                                     "group_wait": "30s",
                                     "group_interval": "5m",
@@ -2480,21 +2496,24 @@ class AWSEKSCluster(pulumi.ComponentResource):
             lambda args: get_kubeconfig_for_cluster(self.name, self.tailscale_enabled, args[0], args[1])
         )
 
-    def _create_alert_configmap(self, name: str, ns: k8s.core.v1.Namespace) -> k8s.core.v1.ConfigMap:
-        file_path = ptd.paths.alerts() / f"{name}.yaml"
-        with open(file_path) as alert_file:
-            alert_yaml = alert_file.read()
+    def _create_alert_configmaps(self, ns: k8s.core.v1.Namespace):
+        alerts_dir = ptd.paths.alerts()
 
-        return k8s.core.v1.ConfigMap(
-            f"{self.name}-grafana-{name}-alerts",
-            metadata={
-                "name": f"grafana-{name}-alerts",
-                "namespace": "grafana",
-                "labels": {"grafana_alert": "1"},
-            },
-            data={"alerts.yaml": alert_yaml},
-            opts=pulumi.ResourceOptions(parent=self, provider=self.provider, depends_on=ns),
-        )
+        for alert_file in sorted(alerts_dir.glob("*.yaml")):
+            alert_name = alert_file.stem
+            with open(alert_file) as f:
+                alert_yaml = f.read()
+
+            k8s.core.v1.ConfigMap(
+                f"{self.name}-grafana-{alert_name}-alerts",
+                metadata={
+                    "name": f"grafana-{alert_name}-alerts",
+                    "namespace": "grafana",
+                    "labels": {"grafana_alert": "1"},
+                },
+                data={"alerts.yaml": alert_yaml},
+                opts=pulumi.ResourceOptions(parent=self, provider=self.provider, depends_on=ns),
+            )
 
     def setup_tailscale_access(self):
         sg_name = f"{self.sg_prefix}-tailscale"

@@ -68,8 +68,22 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: Calls the health check for each component of each PTD site and errors on non-200 response.
-            summary: "Health check failed! \nCluster: {{ $labels.cluster }} \nSite: {{ $labels.ptd_site }}\nComponent: {{ $labels.ptd_component }}\nCheck Type: {{ $labels.check_type }}\nURL: {{ $labels.health_check_url }}"
+            summary: "🔴 CRITICAL: Health Check Failed"
+            description: |
+              Product health check returning non-200 response
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Site:        {{ $labels.ptd_site }}
+              Product:     {{ $labels.ptd_component }}
+
+              ─── DETAILS ─────────────────────────
+              Check Type:  {{ $labels.check_type }}
+              Endpoint:    {{ $labels.health_check_url }}
+              Status:      Non-200 response
+              Duration:    5 minutes
+
           labels:
             opsgenie: "1"
           isPaused: false
