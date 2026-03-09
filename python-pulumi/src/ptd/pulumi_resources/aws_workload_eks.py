@@ -58,6 +58,7 @@ class AWSWorkloadEKS(pulumi.ComponentResource):
             protect_persistent_resources=self.workload.cfg.protect_persistent_resources,
             eks_role_name=f"{full_name}-eks.posit.team",
             iam_permissions_boundary=self.workload.iam_permissions_boundary,
+            force_update_version=cluster_cfg.force_maintenance,
             opts=pulumi.ResourceOptions(parent=self),
         )
         self.eks_clusters[cluster_release] = eks_cluster

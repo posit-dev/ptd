@@ -113,6 +113,7 @@ spec:
         mp_instance_type: r6a.2xlarge
         root_disk_size: 200
         routing_weight: "100"  # For blue/green: 0-255
+        force_maintenance: false  # Enable to bypass PDBs during upgrades
         components:
           traefik_forward_auth_version: "0.0.14"
 
@@ -297,6 +298,38 @@ EBS volumes are bound to a single availability zone. When using StatefulSets (li
 With 3 AZs and 2 nodes, there's no guarantee that nodes will cover all AZs where PVs may exist. Restricting to 2 AZs ensures that after any node operation, there will always be a node available in each AZ where PVs are located.
 
 **Note:** This setting only affects new VPCs. Changing this value on an existing workload will cause Pulumi to attempt to delete subnets in the removed AZ.
+
+## Cluster Maintenance Options
+
+### force_maintenance
+
+The `force_maintenance` option enables cluster version upgrades to proceed even when they would normally be blocked by safety checks.
+
+```yaml
+clusters:
+  "20250115":
+    spec:
+      cluster_version: "1.33"
+      force_maintenance: true  # Bypass upgrade-blocking checks
+```
+
+| Cloud Provider | Behavior |
+|----------------|----------|
+| AWS EKS | Sets `ForceUpdateVersion` on the cluster, which overrides upgrade-blocking readiness checks including EKS Insights validations (deprecated APIs, compatibility issues, cluster health checks) |
+| Azure AKS | Sets `UpgradeSettings.OverrideSettings.ForceUpgrade` with a 24-hour expiration window, which bypasses PodDisruptionBudget (PDB) constraints and takes precedence over all other drain configurations |
+
+**When to use:**
+- During planned maintenance windows when you accept workload disruption
+- When PDBs are blocking necessary security or version upgrades (Azure)
+- When EKS upgrade insights are blocking an upgrade you've assessed as safe (AWS)
+- When you need to force through an upgrade that has stalled
+
+**Caution:**
+- **Azure**: Bypasses PodDisruptionBudget protections, which may cause service disruption. Pods protected by PDBs may be evicted without respecting minimum availability guarantees.
+- **AWS**: Bypasses pre-upgrade validation checks. Review EKS Insights warnings before forcing an upgrade to understand what issues are being overridden.
+- Only enable temporarily during maintenance windows, then set back to `false`
+
+**Default:** `false` (safety checks are respected during upgrades)
 
 ## See Also
 
