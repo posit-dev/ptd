@@ -40,7 +40,6 @@ def test_dashboard_configmap_structure():
     # This is a documentation test showing the expected structure
     dashboard_name = "alerts_dashboard"
     k8s_safe_name = sanitize_k8s_name(dashboard_name)
-    cluster_name = "test-cluster"
 
     # Expected ConfigMap structure
     expected_metadata = {

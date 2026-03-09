@@ -2550,7 +2550,8 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 with open(dashboard_file) as f:
                     dashboard_json = json.load(f)
             except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON in {dashboard_file}: {e}")
+                msg = f"Invalid JSON in {dashboard_file}: {e}"
+                raise ValueError(msg) from e
 
             # Enforce UID = filename for idempotency
             # Set id to null (Grafana provisioning ignores it)
