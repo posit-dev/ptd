@@ -26,17 +26,17 @@ def sanitize_k8s_name(name: str) -> str:
         raise ValueError(msg)
 
     # Convert to lowercase and replace invalid chars with hyphens
-    sanitized = re.sub(r'[^a-z0-9-]', '-', name.lower())
+    sanitized = re.sub(r"[^a-z0-9-]", "-", name.lower())
 
     # Collapse consecutive hyphens into single hyphen
-    sanitized = re.sub(r'-+', '-', sanitized)
+    sanitized = re.sub(r"-+", "-", sanitized)
 
     # Strip leading/trailing hyphens
-    sanitized = sanitized.strip('-')
+    sanitized = sanitized.strip("-")
 
     # Validate the result matches RFC 1123 subdomain pattern
     # Pattern: must start/end with alphanumeric, can contain hyphens in between
-    if not sanitized or not re.match(r'^[a-z0-9]([a-z0-9-]*[a-z0-9])?$', sanitized):
+    if not sanitized or not re.match(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$", sanitized):
         msg = f"Name '{name}' cannot be sanitized to RFC 1123 format (result: '{sanitized}')"
         raise ValueError(msg)
 

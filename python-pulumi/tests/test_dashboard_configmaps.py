@@ -93,7 +93,7 @@ def test_rfc1123_compliance_validation():
     ]
 
     # Simplified pattern for our use case (no dots)
-    rfc1123_pattern = r'^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'
+    rfc1123_pattern = r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
 
     for name in valid_names:
         assert re.match(rfc1123_pattern, name), f"Valid name failed: {name}"
@@ -168,4 +168,5 @@ def test_configmap_naming_pattern():
 
     # Verify metadata name is RFC 1123 compliant
     import re
-    assert re.match(r'^[a-z0-9]([-a-z0-9]*[a-z0-9])?$', k8s_metadata_name)
+
+    assert re.match(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", k8s_metadata_name)
