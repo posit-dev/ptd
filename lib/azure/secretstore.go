@@ -26,7 +26,7 @@ func (s *SecretStore) GetSecretValue(ctx context.Context, credentials types.Cred
 	if err != nil {
 		return "", err
 	}
-	return getSecretValue(ctx, azureCreds, s.region, secretName)
+	return getSecretValue(ctx, azureCreds, s.vaultName, secretName)
 }
 
 func (s *SecretStore) PutSecretValue(ctx context.Context, credentials types.Credentials, secretName string, secretString string) error {

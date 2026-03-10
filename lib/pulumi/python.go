@@ -84,11 +84,7 @@ func NewPythonPulumiStack(
 		// this is some ridiculous shit right here.
 		// we're building the module and class name to continue supporting the ptd/pulumi-python autoload() feature
 		// without needing to check the files into source code.
-		// the unicode word split algo also doesn't like "postgres_config", so just hack that in manually
 		titleCaseStackBaseName := helpers.TitleCase(stackBaseName)
-		if stackBaseName == "postgres_config" {
-			titleCaseStackBaseName = "PostgresConfig"
-		}
 		if stackBaseName == "eks" {
 			titleCaseStackBaseName = "EKS"
 		}
