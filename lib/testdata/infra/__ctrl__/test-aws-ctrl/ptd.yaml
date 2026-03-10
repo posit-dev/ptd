@@ -1,0 +1,7 @@
+apiVersion: posit.team/v1
+kind: AWSControlRoomConfig
+metadata:
+  name: test-aws-ctrl
+spec:
+  region: us-east-2
+  account_id: "123456789012"
