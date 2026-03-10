@@ -18,17 +18,155 @@
     "editable": true,
     "fiscalYearStartMonth": 0,
     "graphTooltip": 0,
-    "id": null,
+    "id": 49,
     "links": [],
     "liveNow": false,
     "panels": [
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [
+                        {
+                            "type": "special",
+                            "options": {
+                                "match": "null+nan",
+                                "result": {
+                                    "text": "No Data",
+                                    "color": "text"
+                                }
+                            }
+                        },
+                        {
+                            "type": "special",
+                            "options": {
+                                "match": "inf",
+                                "result": {
+                                    "text": "No Limit",
+                                    "color": "blue"
+                                }
+                            }
+                        }
+                    ],
+                    "thresholds": {
+                        "mode": "percentage",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 80
+                            },
+                            {
+                                "color": "dark-red",
+                                "value": 90
+                            }
+                        ]
+                    },
+                    "unit": "percent"
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "C"
+                        },
+                        "properties": [
+                            {
+                                "id": "displayName",
+                                "value": "${__field.labels.ptd_site}"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+            },
+            "id": 3,
+            "options": {
+                "minVizHeight": 75,
+                "minVizWidth": 75,
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true
+            },
+            "pluginVersion": "10.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "name": "Expression",
+                        "type": "__expr__",
+                        "uid": "__expr__"
+                    },
+                    "expression": "($A / $B) * 100",
+                    "hide": false,
+                    "refId": "C",
+                    "type": "math"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "disableTextWrap": false,
+                    "editorMode": "builder",
+                    "expr": "max by(ptd_site) (last_over_time(pwb_license_active_users{cluster=\"$cluster_name\"}[$__interval]))",
+                    "fullMetaSearch": false,
+                    "hide": true,
+                    "includeNullMetadata": true,
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A",
+                    "useBackend": false
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "disableTextWrap": false,
+                    "editorMode": "builder",
+                    "expr": "max by(ptd_site) (last_over_time(pwb_license_user_seats{cluster=\"$cluster_name\"}[$__interval]))",
+                    "fullMetaSearch": false,
+                    "hide": true,
+                    "includeNullMetadata": true,
+                    "instant": false,
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "B",
+                    "useBackend": false
+                }
+            ],
+            "title": "License Consumption by Site",
+            "type": "gauge"
+        },
         {
             "collapsed": false,
             "gridPos": {
                 "h": 1,
                 "w": 24,
                 "x": 0,
-                "y": 0
+                "y": 8
             },
             "id": 2,
             "panels": [],
@@ -74,7 +212,7 @@
                 "h": 14,
                 "w": 10,
                 "x": 0,
-                "y": 1
+                "y": 9
             },
             "id": 1,
             "options": {
@@ -181,6 +319,6 @@
     "timezone": "",
     "title": "Posit Team Overview",
     "uid": "posit_team_overview",
-    "version": 2,
+    "version": 6,
     "weekStart": ""
 }
