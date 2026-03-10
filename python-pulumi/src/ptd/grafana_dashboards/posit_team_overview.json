@@ -18,7 +18,7 @@
     "editable": true,
     "fiscalYearStartMonth": 0,
     "graphTooltip": 0,
-    "id": 48,
+    "id": null,
     "links": [],
     "liveNow": false,
     "panels": [
@@ -194,8 +194,8 @@
             {
                 "current": {
                     "selected": true,
-                    "text": "default_duplicado03-staging-20250411-control-plane",
-                    "value": "default_duplicado03-staging-20250411-control-plane"
+                    "text": "All",
+                    "value": "$__all"
                 },
                 "datasource": {
                     "type": "prometheus",
@@ -229,7 +229,7 @@
     "timepicker": {},
     "timezone": "",
     "title": "Posit Team Overview",
-    "uid": "",
+    "uid": "posit_team_overview",
     "version": 1,
     "weekStart": ""
 }
