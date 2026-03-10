@@ -710,7 +710,7 @@ class TestDefineAzureMonitorConfig:
     def test_azure_resource_group_name_interpolated(self) -> None:
         alloy = _make_alloy_for_azure_monitor(resource_group_name="custom-rg-name")
         result = alloy._define_azure_monitor_config()  # noqa: SLF001
-        assert "resourceGroup eq 'custom-rg-name'" in result
+        assert "where resourceGroup == 'custom-rg-name'" in result
 
     def test_azure_contains_all_postgres_metrics(self) -> None:
         alloy = _make_alloy_for_azure_monitor()

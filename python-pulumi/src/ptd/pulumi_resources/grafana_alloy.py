@@ -235,7 +235,7 @@ class AlloyConfig(pulumi.ComponentResource):
             prometheus.exporter.azure "postgres" {{
                 subscriptions    = ["{subscription_id}"]
                 resource_type    = "Microsoft.DBforPostgreSQL/flexibleServers"
-                resource_graph_query_filter = "resourceGroup eq '{resource_group_name}'"
+                resource_graph_query_filter = "where resourceGroup == '{resource_group_name}'"
                 metrics          = ["cpu_percent", "memory_percent", "storage_percent", "active_connections", "connections_failed", "deadlocks"]
                 included_dimensions = ["*"]
             }}
@@ -251,7 +251,7 @@ class AlloyConfig(pulumi.ComponentResource):
             prometheus.exporter.azure "netapp" {{
                 subscriptions    = ["{subscription_id}"]
                 resource_type    = "Microsoft.NetApp/netAppAccounts/capacityPools/volumes"
-                resource_graph_query_filter = "resourceGroup eq '{resource_group_name}'"
+                resource_graph_query_filter = "where resourceGroup == '{resource_group_name}'"
                 metrics          = ["VolumeConsumedSizePercentage", "VolumeLogicalSize", "AverageReadLatency", "AverageWriteLatency", "ReadIops", "WriteIops"]
             }}
 
@@ -266,7 +266,7 @@ class AlloyConfig(pulumi.ComponentResource):
             prometheus.exporter.azure "loadbalancer" {{
                 subscriptions    = ["{subscription_id}"]
                 resource_type    = "Microsoft.Network/loadBalancers"
-                resource_graph_query_filter = "resourceGroup eq '{resource_group_name}'"
+                resource_graph_query_filter = "where resourceGroup == '{resource_group_name}'"
                 metrics          = ["DipAvailability", "VipAvailability", "UsedSnatPorts", "AllocatedSnatPorts", "SnatConnectionCount"]
             }}
 
@@ -281,7 +281,7 @@ class AlloyConfig(pulumi.ComponentResource):
             prometheus.exporter.azure "storage" {{
                 subscriptions    = ["{subscription_id}"]
                 resource_type    = "Microsoft.Storage/storageAccounts"
-                resource_graph_query_filter = "resourceGroup eq '{resource_group_name}'"
+                resource_graph_query_filter = "where resourceGroup == '{resource_group_name}'"
                 metrics          = ["Availability", "SuccessE2ELatency", "UsedCapacity", "Transactions"]
             }}
 
@@ -300,7 +300,7 @@ class AlloyConfig(pulumi.ComponentResource):
             prometheus.exporter.azure "natgateway" {{
                 subscriptions    = ["{subscription_id}"]
                 resource_type    = "Microsoft.Network/natGateways"
-                resource_graph_query_filter = "resourceGroup eq '{resource_group_name}'"
+                resource_graph_query_filter = "where resourceGroup == '{resource_group_name}'"
                 metrics          = ["PacketCount", "ByteCount", "DroppedPackets", "TotalConnectionCount", "SNATConnectionCount"]
             }}
 

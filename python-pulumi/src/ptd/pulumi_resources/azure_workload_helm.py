@@ -643,12 +643,6 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                                 ],
                             },
                         },
-                        "sidecar": {
-                            "alerts": {
-                                "enabled": True,
-                                "searchNamespace": "grafana",
-                            }
-                        },
                     }
                 ),
             },
