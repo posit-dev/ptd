@@ -3,18 +3,23 @@
 # apiVersion: 1
 # deleteRules:
 #   - orgId: 1
-#     uid: fsx_capacity
+#     uid: fsx_capacity_warning
+#   - orgId: 1
+#     uid: fsx_capacity_critical
 #
 # See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
 apiVersion: 1
+deleteRules:
+    - orgId: 1
+      uid: fsx_capacity
 groups:
     - orgId: 1
       name: Cloudwatch
       folder: Posit Alerts
       interval: 5m
       rules:
-        - uid: fsx_capacity
-          title: FSx Capacity
+        - uid: fsx_capacity_warning
+          title: FSx Capacity Warning
           condition: C
           data:
             - refId: A
@@ -82,9 +87,9 @@ groups:
           labels:
             opsgenie: "1"
           isPaused: false
-        - uid: ec2_network_out_high
-          title: EC2 Network Out High
-          condition: B
+        - uid: fsx_capacity_critical
+          title: FSx Capacity Critical
+          condition: C
           data:
             - refId: A
               relativeTimeRange:
@@ -93,20 +98,14 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                # Network out threshold: 314572800 bytes/s (~300 MiB/s)
-                # Based on analysis of Loki->S3 traffic patterns from issue #2347
-                # Instance-aware thresholds: Using the same threshold for all instances
-                # To set different thresholds by instance type, use:
-                # avg_over_time(aws_ec2_network_out_average{job="integrations/cloudwatch", dimension_InstanceType="t3.xlarge"}[5m]) > 157286400 or
-                # avg_over_time(aws_ec2_network_out_average{job="integrations/cloudwatch", dimension_InstanceType="m5.2xlarge"}[5m]) > 314572800
-                expr: avg_over_time(aws_ec2_network_out_average{job="integrations/cloudwatch"}[5m])
+                expr: aws_fsx_used_storage_capacity_average{job="integrations/cloudwatch", dimension_DataType!="Snapshot", dimension_VolumeId!=""} / aws_fsx_storage_capacity_average{job="integrations/cloudwatch", dimension_VolumeId!=""}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
                 maxDataPoints: 43200
                 range: false
                 refId: A
-            - refId: B
+            - refId: C
               relativeTimeRange:
                 from: 600
                 to: 0
@@ -115,7 +114,7 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            - 3.145728e+08 # ~ 300 MiB/s
+                            - 0.9
                         type: gt
                       operator:
                         type: and
@@ -132,97 +131,26 @@ groups:
                 expression: A
                 intervalMs: 1000
                 maxDataPoints: 43200
-                refId: B
+                refId: C
                 type: threshold
           noDataState: NoData
           execErrState: Error
           for: 5m
           annotations:
-            summary: "🟡 WARNING: EC2 Network Out High"
+            summary: "🔴 CRITICAL: FSx Storage Capacity Critical"
             description: |
-              EC2 instance has unusually high outbound network traffic
+              FSx file system storage capacity is critically low
 
               ─── WHERE ───────────────────────────
               Tenant:      {{ $labels.tenant_name }}
               Cluster:     {{ $labels.cluster }}
-              Resource:    {{ $labels.dimension_InstanceId }}
+              Resource:    {{ $labels.dimension_FileSystemId }}
               Region:      {{ $labels.region }}
 
               ─── DETAILS ─────────────────────────
-              Metric:      Network Out
-              Current:     > 300 MiB/s
-              Threshold:   300 MiB/s
-              Duration:    5 minutes
-
-          labels:
-            opsgenie: "1"
-          isPaused: false
-        - uid: ec2_network_packets_out_high
-          title: EC2 Network Packets Out High
-          condition: B
-          data:
-            - refId: A
-              relativeTimeRange:
-                from: 600
-                to: 0
-              datasourceUid: mimir
-              model:
-                editorMode: code
-                # Network packets out threshold: 400000 packets/s
-                # High packet rate can indicate network bottlenecks or unusual traffic patterns
-                expr: avg_over_time(aws_ec2_network_packets_out_average{job="integrations/cloudwatch"}[5m])
-                instant: true
-                intervalMs: 1000
-                legendFormat: __auto
-                maxDataPoints: 43200
-                range: false
-                refId: A
-            - refId: B
-              relativeTimeRange:
-                from: 600
-                to: 0
-              datasourceUid: __expr__
-              model:
-                conditions:
-                    - evaluator:
-                        params:
-                            - 400000
-                        type: gt
-                      operator:
-                        type: and
-                      query:
-                        params:
-                            - A
-                      reducer:
-                        params: []
-                        type: last
-                      type: query
-                datasource:
-                    type: __expr__
-                    uid: __expr__
-                expression: A
-                intervalMs: 1000
-                maxDataPoints: 43200
-                refId: B
-                type: threshold
-          noDataState: NoData
-          execErrState: Error
-          for: 5m
-          annotations:
-            summary: "🟡 WARNING: EC2 Network Packets Out High"
-            description: |
-              EC2 instance has unusually high packet transmission rate
-
-              ─── WHERE ───────────────────────────
-              Tenant:      {{ $labels.tenant_name }}
-              Cluster:     {{ $labels.cluster }}
-              Resource:    {{ $labels.dimension_InstanceId }}
-              Region:      {{ $labels.region }}
-
-              ─── DETAILS ─────────────────────────
-              Metric:      Network Packets Out
-              Current:     > 400,000 packets/s
-              Threshold:   400,000 packets/s
+              Metric:      Storage Capacity
+              Current:     > 90% used
+              Threshold:   90%
               Duration:    5 minutes
 
           labels:
