@@ -122,13 +122,11 @@
                             "Value": true
                         },
                         "indexByName": {
-                            "cluster": 3,
                             "ptd_site": 0,
                             "release_name": 1,
                             "version": 2
                         },
                         "renameByName": {
-                            "cluster": "Cluster",
                             "ptd_site": "Site",
                             "release_name": "Product",
                             "version": "Version"
