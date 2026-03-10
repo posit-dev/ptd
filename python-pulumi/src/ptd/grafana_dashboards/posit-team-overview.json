@@ -18,7 +18,7 @@
     "editable": true,
     "fiscalYearStartMonth": 0,
     "graphTooltip": 0,
-    "id": 49,
+    "id": null,
     "links": [],
     "liveNow": false,
     "panels": [
@@ -44,10 +44,9 @@
                             }
                         },
                         {
-                            "type": "special",
+                            "type": "value",
                             "options": {
-                                "match": "inf",
-                                "result": {
+                                "Infinity": {
                                     "text": "No Limit",
                                     "color": "blue"
                                 }
@@ -318,7 +317,7 @@
     "timepicker": {},
     "timezone": "",
     "title": "Posit Team Overview",
-    "uid": "posit_team_overview",
+    "uid": "posit-team-overview",
     "version": 6,
     "weekStart": ""
 }
