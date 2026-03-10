@@ -92,6 +92,8 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 
 	credEnvVars := creds.EnvVars()
 
+	ptdRoot := helpers.GetTargetsConfigPath()
+
 	// Start proxy if needed (non-fatal)
 	proxyFile := path.Join(internal.DataDir(), "proxy.json")
 	stopProxy, err := kube.StartProxy(cmd.Context(), t, proxyFile)
@@ -173,6 +175,7 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 		for k, v := range credEnvVars {
 			shellCommand.Env = append(shellCommand.Env, k+"="+v)
 		}
+		shellCommand.Env = append(shellCommand.Env, "PTD_ROOT="+ptdRoot)
 		if kubeconfigPath != "" {
 			shellCommand.Env = append(shellCommand.Env, "KUBECONFIG="+kubeconfigPath)
 		}
@@ -210,6 +213,7 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 	for k, v := range credEnvVars {
 		shellCommand.Env = append(shellCommand.Env, k+"="+v)
 	}
+	shellCommand.Env = append(shellCommand.Env, "PTD_ROOT="+ptdRoot)
 	if kubeconfigPath != "" {
 		shellCommand.Env = append(shellCommand.Env, "KUBECONFIG="+kubeconfigPath)
 	}

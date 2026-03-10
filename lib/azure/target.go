@@ -166,46 +166,18 @@ func (t Target) fullPulumiEnvVars(ctx context.Context) (map[string]string, error
 	return creds.EnvVars(), nil
 }
 
-func (t Target) BastionName(ctx context.Context) (string, error) {
-	envVars, err := t.fullPulumiEnvVars(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	persistentStack, err := pulumi.NewPythonPulumiStack(
-		ctx,
-		"azure",
-		"workload",
-		"persistent",
-		t.Name(),
-		t.Region(),
-		t.PulumiBackendUrl(),
-		t.PulumiSecretsProviderKey(),
-		envVars,
-		false,
-	)
-	if err != nil {
-		return "", err
-	}
-
-	persistentOutputs, err := persistentStack.Outputs(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	if _, ok := persistentOutputs["bastion_name"]; !ok {
-		return "", fmt.Errorf("bastion_name output not found in persistent stack outputs")
-	}
-
-	bastionName := persistentOutputs["bastion_name"].Value.(string)
-
-	return bastionName, nil
+// BastionInfo holds the bastion connection details from the persistent stack.
+type BastionInfo struct {
+	Name          string
+	JumpBoxID     string
+	SSHPrivateKey string
 }
 
-func (t Target) JumpBoxId(ctx context.Context) (string, error) {
+// BastionInfo retrieves bastion connection details from the persistent stack outputs.
+func (t Target) BastionInfo(ctx context.Context) (*BastionInfo, error) {
 	envVars, err := t.fullPulumiEnvVars(ctx)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	persistentStack, err := pulumi.NewPythonPulumiStack(
@@ -221,21 +193,35 @@ func (t Target) JumpBoxId(ctx context.Context) (string, error) {
 		false,
 	)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	persistentOutputs, err := persistentStack.Outputs(ctx)
+	outputs, err := persistentStack.Outputs(ctx)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	if _, ok := persistentOutputs["bastion_jumpbox_id"]; !ok {
-		return "", fmt.Errorf("bastion_jumpbox_id output not found in persistent stack outputs")
+	info := &BastionInfo{}
+
+	if v, ok := outputs["bastion_name"]; ok {
+		info.Name = v.Value.(string)
+	} else {
+		return nil, fmt.Errorf("bastion_name output not found in persistent stack outputs")
 	}
 
-	jumpBoxId := persistentOutputs["bastion_jumpbox_id"].Value.(string)
+	if v, ok := outputs["bastion_jumpbox_id"]; ok {
+		info.JumpBoxID = v.Value.(string)
+	} else {
+		return nil, fmt.Errorf("bastion_jumpbox_id output not found in persistent stack outputs")
+	}
 
-	return jumpBoxId, nil
+	if v, ok := outputs["bastion_ssh_private_key"]; ok {
+		info.SSHPrivateKey = v.Value.(string)
+	} else {
+		return nil, fmt.Errorf("bastion_ssh_private_key output not found in persistent stack outputs")
+	}
+
+	return info, nil
 }
 
 // HashName returns an obfuscated name for the target that can be used as a unique identifier.
