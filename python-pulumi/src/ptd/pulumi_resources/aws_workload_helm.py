@@ -261,6 +261,9 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                             },
                         },
                         "hostNetwork": True,
+                        "enableWaf": False,
+                        "enableWafv2": False,
+                        "enableShield": False,
                     }
                 ),
             },
