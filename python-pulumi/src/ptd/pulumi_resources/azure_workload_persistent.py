@@ -96,6 +96,7 @@ class AzureWorkloadPersistent(pulumi.ComponentResource):
             "app_gateway_subnet_id": self.app_gateway_subnet.id,
             "bastion_name": self.bastion.bastion_host.name,
             "bastion_jumpbox_id": self.bastion.jumpbox_host.id,
+            "bastion_ssh_private_key": self.bastion.jumpbox_ssh_key.private_key_openssh,
             "mimir_password": self.mimir_password.result,
             "private_subnet_name": self.private_subnet.name,
             "private_subnet_cidr": self.private_subnet.address_prefix,
