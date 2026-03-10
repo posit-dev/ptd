@@ -27,76 +27,43 @@
                 "type": "prometheus",
                 "uid": "mimir"
             },
+            "description": "",
             "fieldConfig": {
                 "defaults": {
                     "color": {
                         "mode": "thresholds"
                     },
-                    "mappings": [
-                        {
-                            "type": "special",
-                            "options": {
-                                "match": "null+nan",
-                                "result": {
-                                    "text": "No Data",
-                                    "color": "text"
-                                }
-                            }
-                        },
-                        {
-                            "type": "value",
-                            "options": {
-                                "Infinity": {
-                                    "text": "No Limit",
-                                    "color": "blue"
-                                }
-                            }
-                        }
-                    ],
+                    "mappings": [],
+                    "max": 150,
+                    "min": 0,
                     "thresholds": {
-                        "mode": "percentage",
+                        "mode": "absolute",
                         "steps": [
                             {
                                 "color": "green",
                                 "value": null
                             },
                             {
-                                "color": "yellow",
-                                "value": 80
+                                "color": "orange",
+                                "value": 30
                             },
                             {
-                                "color": "dark-red",
-                                "value": 90
-                            }
-                        ]
-                    },
-                    "unit": "percent"
-                },
-                "overrides": [
-                    {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "C"
-                        },
-                        "properties": [
-                            {
-                                "id": "displayName",
-                                "value": "${__field.labels.ptd_site}"
+                                "color": "red",
+                                "value": 120
                             }
                         ]
                     }
-                ]
+                },
+                "overrides": []
             },
             "gridPos": {
-                "h": 8,
-                "w": 12,
+                "h": 4,
+                "w": 6,
                 "x": 0,
                 "y": 0
             },
-            "id": 3,
+            "id": 24,
             "options": {
-                "minVizHeight": 75,
-                "minVizWidth": 75,
                 "orientation": "auto",
                 "reduceOptions": {
                     "calcs": [
@@ -108,69 +75,22 @@
                 "showThresholdLabels": false,
                 "showThresholdMarkers": true
             },
-            "pluginVersion": "10.2.2",
+            "pluginVersion": "9.2.2",
             "targets": [
                 {
                     "datasource": {
-                        "name": "Expression",
-                        "type": "__expr__",
-                        "uid": "__expr__"
-                    },
-                    "expression": "($A / $B) * 100",
-                    "hide": false,
-                    "refId": "C",
-                    "type": "math"
-                },
-                {
-                    "datasource": {
                         "type": "prometheus",
                         "uid": "mimir"
                     },
-                    "disableTextWrap": false,
-                    "editorMode": "builder",
-                    "expr": "max by(ptd_site) (last_over_time(pwb_license_active_users{cluster=\"$cluster_name\"}[$__interval]))",
-                    "fullMetaSearch": false,
-                    "hide": true,
-                    "includeNullMetadata": true,
-                    "instant": false,
+                    "editorMode": "code",
+                    "expr": "sum by (type) (rate(pwb_session_startup_duration_seconds_sum{cluster=~\"$cluster_name\"}[24h] @ end())) /\nsum by (type) (rate(pwb_session_startup_duration_seconds_count{cluster=~\"$cluster_name\"}[24h] @ end()))",
                     "legendFormat": "__auto",
                     "range": true,
-                    "refId": "A",
-                    "useBackend": false
-                },
-                {
-                    "datasource": {
-                        "type": "prometheus",
-                        "uid": "mimir"
-                    },
-                    "disableTextWrap": false,
-                    "editorMode": "builder",
-                    "expr": "max by(ptd_site) (last_over_time(pwb_license_user_seats{cluster=\"$cluster_name\"}[$__interval]))",
-                    "fullMetaSearch": false,
-                    "hide": true,
-                    "includeNullMetadata": true,
-                    "instant": false,
-                    "legendFormat": "__auto",
-                    "range": true,
-                    "refId": "B",
-                    "useBackend": false
+                    "refId": "A"
                 }
             ],
-            "title": "License Consumption by Site",
+            "title": "Avg session start time (24h)",
             "type": "gauge"
-        },
-        {
-            "collapsed": false,
-            "gridPos": {
-                "h": 1,
-                "w": 24,
-                "x": 0,
-                "y": 8
-            },
-            "id": 2,
-            "panels": [],
-            "title": "Workbench",
-            "type": "row"
         },
         {
             "datasource": {
@@ -182,13 +102,78 @@
                     "color": {
                         "mode": "thresholds"
                     },
-                    "custom": {
-                        "align": "auto",
-                        "cellOptions": {
-                            "type": "auto"
-                        },
-                        "filterable": false,
-                        "inspect": false
+                    "mappings": [],
+                    "max": 1000,
+                    "min": 0,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "#EAB839",
+                                "value": 500
+                            },
+                            {
+                                "color": "red",
+                                "value": 750
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 0
+            },
+            "id": 20,
+            "options": {
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true
+            },
+            "pluginVersion": "9.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "editorMode": "code",
+                    "exemplar": false,
+                    "expr": "pwb_sessions{cluster=~\"$cluster_name\",status=\"Running\"}",
+                    "instant": true,
+                    "interval": "",
+                    "legendFormat": "{{type}}",
+                    "range": false,
+                    "refId": "A"
+                }
+            ],
+            "title": "Active IDE sessions",
+            "type": "gauge"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+            },
+            "description": "",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
                     },
                     "mappings": [],
                     "thresholds": {
@@ -208,70 +193,855 @@
                 "overrides": []
             },
             "gridPos": {
-                "h": 14,
-                "w": 10,
-                "x": 0,
-                "y": 9
+                "h": 4,
+                "w": 3,
+                "x": 12,
+                "y": 0
             },
-            "id": 1,
+            "id": 32,
             "options": {
-                "cellHeight": "sm",
-                "footer": {
-                    "countRows": false,
-                    "enablePagination": true,
-                    "fields": [],
-                    "reducer": [
-                        "sum"
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
                     ],
-                    "show": false
+                    "fields": "",
+                    "values": false
                 },
-                "frameIndex": 2,
-                "showHeader": true
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true
             },
-            "pluginVersion": "10.2.2",
+            "pluginVersion": "9.2.2",
             "targets": [
                 {
                     "datasource": {
                         "type": "prometheus",
                         "uid": "mimir"
                     },
-                    "disableTextWrap": false,
-                    "editorMode": "builder",
+                    "editorMode": "code",
                     "exemplar": false,
-                    "expr": "sum by(release_name, version, ptd_site) (last_over_time(pwb_build_info{cluster=~\"$cluster_name\"}[10m]))",
-                    "format": "table",
-                    "fullMetaSearch": false,
-                    "includeNullMetadata": true,
+                    "expr": "pwb_active_user_sessions{cluster=~\"$cluster_name\"}",
                     "instant": true,
-                    "legendFormat": "{{ptd_site}}: {{release_name}} ({{version}})",
+                    "legendFormat": "__auto",
                     "range": false,
-                    "refId": "A",
-                    "useBackend": false
+                    "refId": "A"
                 }
             ],
-            "title": "Running Version",
-            "transformations": [
-                {
-                    "id": "organize",
-                    "options": {
-                        "excludeByName": {
-                            "Time": true,
-                            "Value": true
-                        },
-                        "indexByName": {
-                            "ptd_site": 0,
-                            "release_name": 1,
-                            "version": 2
-                        },
-                        "renameByName": {
-                            "ptd_site": "Site",
-                            "release_name": "Product",
-                            "version": "Version"
-                        }
+            "title": "Active user sessions",
+            "type": "gauge"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+            },
+            "description": "The number of unlocked users that have logged in to workbench. ",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
                     }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 3,
+                "x": 15,
+                "y": 0
+            },
+            "id": 18,
+            "options": {
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true
+            },
+            "pluginVersion": "9.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "editorMode": "code",
+                    "expr": "pwb_license_active_users{cluster=~\"$cluster_name\"}",
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
                 }
             ],
-            "type": "table"
+            "title": "Registered users",
+            "type": "gauge"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+            },
+            "description": "",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 3,
+                "x": 18,
+                "y": 0
+            },
+            "id": 26,
+            "options": {
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true
+            },
+            "pluginVersion": "9.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "editorMode": "code",
+                    "expr": "pwb_license_user_seats{cluster=~\"$cluster_name\"}",
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Licensed users",
+            "type": "gauge"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+            },
+            "description": "",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    },
+                    "unit": "dateTimeAsLocal"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 2,
+                "w": 3,
+                "x": 21,
+                "y": 0
+            },
+            "id": 30,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "text": {
+                    "valueSize": 12
+                },
+                "textMode": "auto"
+            },
+            "pluginVersion": "9.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "editorMode": "code",
+                    "exemplar": false,
+                    "expr": "pwb_license_expiry{cluster=~\"$cluster_name\"}*1000",
+                    "instant": true,
+                    "legendFormat": "__auto",
+                    "range": false,
+                    "refId": "A"
+                }
+            ],
+            "title": "License expires",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+            },
+            "description": "",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 2,
+                "w": 3,
+                "x": 21,
+                "y": 2
+            },
+            "id": 16,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "text": {
+                    "titleSize": 2,
+                    "valueSize": 12
+                },
+                "textMode": "name"
+            },
+            "pluginVersion": "9.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "editorMode": "code",
+                    "exemplar": false,
+                    "expr": "pwb_build_info{cluster=~\"$cluster_name\"}",
+                    "instant": true,
+                    "legendFormat": "{{release_name}}",
+                    "range": false,
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "editorMode": "code",
+                    "exemplar": false,
+                    "expr": "pwb_build_info{cluster=~\"$cluster_name\"}",
+                    "hide": false,
+                    "instant": true,
+                    "interval": "",
+                    "legendFormat": "{{version}}",
+                    "range": false,
+                    "refId": "B"
+                }
+            ],
+            "title": "Build info",
+            "type": "stat"
+        },
+        {
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 0,
+                "y": 4
+            },
+            "id": 6,
+            "libraryPanel": {
+                "uid": "VF2ADjw4z",
+                "name": "Requests/min"
+            }
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "max": 50000,
+                    "min": 0,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "#EAB839",
+                                "value": 20000
+                            },
+                            {
+                                "color": "red",
+                                "value": 40000
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 3,
+                "w": 3,
+                "x": 12,
+                "y": 4
+            },
+            "id": 28,
+            "options": {
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true
+            },
+            "pluginVersion": "9.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum without(code,uri,method) (increase(pwb_http_requests_total{cluster=~\"$cluster_name\"}[1m]))",
+                    "legendFormat": "__auto",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Requests/min(1m)",
+            "type": "gauge"
+        },
+        {
+            "gridPos": {
+                "h": 6,
+                "w": 9,
+                "x": 15,
+                "y": 4
+            },
+            "id": 2,
+            "libraryPanel": {
+                "uid": "3OZDDjQVz",
+                "name": "Avg request duration (secs)"
+            }
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+            },
+            "description": "Average response time in latency for all requests over the last 5 minutes.",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "decimals": 0,
+                    "mappings": [],
+                    "max": 2,
+                    "min": 0,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "#EAB839",
+                                "value": 0.5
+                            },
+                            {
+                                "color": "red",
+                                "value": 1.5
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 3,
+                "w": 3,
+                "x": 12,
+                "y": 7
+            },
+            "id": 22,
+            "options": {
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showThresholdLabels": false,
+                "showThresholdMarkers": true
+            },
+            "pluginVersion": "9.2.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "editorMode": "code",
+                    "exemplar": false,
+                    "expr": "sum without (code,method,uri)(rate(pwb_http_response_duration_seconds_sum{cluster=~\"$cluster_name\"}[1m] @ end())) / \nsum without (code,method,uri)(rate(pwb_http_response_duration_seconds_count{cluster=~\"$cluster_name\"}[1m] @ end()))\n\n",
+                    "format": "time_series",
+                    "instant": true,
+                    "interval": "",
+                    "legendFormat": "__auto",
+                    "range": false,
+                    "refId": "A"
+                }
+            ],
+            "title": "Avg resp secs (1m)",
+            "type": "gauge"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "lineInterpolation": "linear",
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "auto",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 0,
+                "y": 10
+            },
+            "id": 34,
+            "options": {
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single",
+                    "sort": "none"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "editorMode": "code",
+                    "expr": "increase(pwb_http_response_size_bytes_total{cluster=~\"$cluster_name\"}[1m]) / 1024",
+                    "interval": "",
+                    "legendFormat": "{{uri}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Response size /min (kb)",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+            },
+            "description": "Shows the response time threshold that partitions 99.9%, 99%, 95%, and 50% of the requests, to understand SLA agreements and how response times are distributed.",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "lineInterpolation": "linear",
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "auto",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 7,
+                "x": 12,
+                "y": 10
+            },
+            "id": 14,
+            "options": {
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single",
+                    "sort": "none"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.999, sum(rate(pwb_http_response_duration_seconds_bucket{cluster=~\"$cluster_name\"}[1m])) by (le)) ",
+                    "interval": "",
+                    "legendFormat": "99.9%",
+                    "range": true,
+                    "refId": "A"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.99, sum(rate(pwb_http_response_duration_seconds_bucket{cluster=~\"$cluster_name\"}[1m])) by (le)) ",
+                    "hide": false,
+                    "interval": "",
+                    "legendFormat": "99%",
+                    "range": true,
+                    "refId": "B"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.95, sum(rate(pwb_http_response_duration_seconds_bucket{cluster=~\"$cluster_name\"}[1m])) by (le)) ",
+                    "hide": false,
+                    "interval": "",
+                    "legendFormat": "95%",
+                    "range": true,
+                    "refId": "C"
+                },
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.5, sum(rate(pwb_http_response_duration_seconds_bucket{cluster=~\"$cluster_name\"}[1m])) by (le)) ",
+                    "hide": false,
+                    "interval": "",
+                    "legendFormat": "50%",
+                    "range": true,
+                    "refId": "D"
+                }
+            ],
+            "title": "Request time quantiles (1m)",
+            "type": "timeseries"
+        },
+        {
+            "gridPos": {
+                "h": 6,
+                "w": 5,
+                "x": 19,
+                "y": 10
+            },
+            "id": 10,
+            "libraryPanel": {
+                "uid": "OZ7ovCw4k",
+                "name": "Requests/handlers in progress"
+            }
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+            },
+            "description": "Includes running,, pending, starting",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "lineInterpolation": "linear",
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "auto",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "decimals": 0,
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 5,
+                "w": 12,
+                "x": 0,
+                "y": 16
+            },
+            "id": 12,
+            "options": {
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "single",
+                    "sort": "none"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "mimir"
+                    },
+                    "editorMode": "code",
+                    "expr": "pwb_sessions{cluster=~\"$cluster_name\",status=~\"Running|Pending|Starting\"}",
+                    "interval": "",
+                    "legendFormat": "{{type}} - {{cluster}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Active sessions",
+            "type": "timeseries"
+        },
+        {
+            "gridPos": {
+                "h": 5,
+                "w": 6,
+                "x": 12,
+                "y": 16
+            },
+            "id": 4,
+            "libraryPanel": {
+                "uid": "C7lvvCQ4z",
+                "name": "Session start secs"
+            }
+        },
+        {
+            "gridPos": {
+                "h": 5,
+                "w": 6,
+                "x": 18,
+                "y": 16
+            },
+            "id": 8,
+            "libraryPanel": {
+                "uid": "oSsbDjw4k",
+                "name": "Session start to join secs"
+            }
         }
     ],
     "refresh": "",
