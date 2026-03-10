@@ -2535,7 +2535,6 @@ class AWSEKSCluster(pulumi.ComponentResource):
         Dashboard UIDs are enforced to match the filename (without .json extension)
         to ensure idempotent updates and prevent duplicate dashboards.
         """
-        import json
 
         dashboards_dir = ptd.paths.dashboards()
 
