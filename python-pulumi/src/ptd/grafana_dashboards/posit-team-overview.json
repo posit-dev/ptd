@@ -50,6 +50,7 @@
                         "cellOptions": {
                             "type": "auto"
                         },
+                        "filterable": false,
                         "inspect": false
                     },
                     "mappings": [],
@@ -67,60 +68,11 @@
                         ]
                     }
                 },
-                "overrides": [
-                    {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "Site"
-                        },
-                        "properties": [
-                            {
-                                "id": "custom.width",
-                                "value": 200
-                            }
-                        ]
-                    },
-                    {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "Product"
-                        },
-                        "properties": [
-                            {
-                                "id": "custom.width",
-                                "value": 150
-                            }
-                        ]
-                    },
-                    {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "Version"
-                        },
-                        "properties": [
-                            {
-                                "id": "custom.width",
-                                "value": 120
-                            }
-                        ]
-                    },
-                    {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "Cluster"
-                        },
-                        "properties": [
-                            {
-                                "id": "custom.width",
-                                "value": 150
-                            }
-                        ]
-                    }
-                ]
+                "overrides": []
             },
             "gridPos": {
                 "h": 14,
-                "w": 13,
+                "w": 10,
                 "x": 0,
                 "y": 1
             },
@@ -129,6 +81,7 @@
                 "cellHeight": "sm",
                 "footer": {
                     "countRows": false,
+                    "enablePagination": true,
                     "fields": [],
                     "reducer": [
                         "sum"
@@ -148,7 +101,7 @@
                     "disableTextWrap": false,
                     "editorMode": "builder",
                     "exemplar": false,
-                    "expr": "sum by(release_name, version, cluster, ptd_site) (last_over_time(pwb_build_info{cluster=~\"$cluster_name\"}[10m]))",
+                    "expr": "sum by(release_name, version, ptd_site) (last_over_time(pwb_build_info{cluster=~\"$cluster_name\"}[10m]))",
                     "format": "table",
                     "fullMetaSearch": false,
                     "includeNullMetadata": true,
@@ -159,30 +112,30 @@
                     "useBackend": false
                 }
             ],
+            "title": "Running Version",
             "transformations": [
                 {
                     "id": "organize",
                     "options": {
                         "excludeByName": {
-                            "Value": true,
-                            "Time": true
+                            "Time": true,
+                            "Value": true
                         },
                         "indexByName": {
+                            "cluster": 3,
                             "ptd_site": 0,
                             "release_name": 1,
-                            "version": 2,
-                            "cluster": 3
+                            "version": 2
                         },
                         "renameByName": {
+                            "cluster": "Cluster",
                             "ptd_site": "Site",
                             "release_name": "Product",
-                            "version": "Version",
-                            "cluster": "Cluster"
+                            "version": "Version"
                         }
                     }
                 }
             ],
-            "title": "Running Version",
             "type": "table"
         }
     ],
@@ -230,6 +183,6 @@
     "timezone": "",
     "title": "Posit Team Overview",
     "uid": "posit_team_overview",
-    "version": 1,
+    "version": 2,
     "weekStart": ""
 }
