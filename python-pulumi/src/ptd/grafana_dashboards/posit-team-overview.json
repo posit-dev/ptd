@@ -293,7 +293,7 @@
                     },
                     "disableTextWrap": false,
                     "editorMode": "builder",
-                    "expr": "max by(ptd_site, cluster) (pwb_license_active_users{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\"})",
+                    "expr": "max by(cluster, ptd_site) (pwb_license_active_users{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\"})",
                     "fullMetaSearch": false,
                     "includeNullMetadata": true,
                     "legendFormat": "__auto",
