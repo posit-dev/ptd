@@ -268,8 +268,8 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            # 200 MiB in bytes
-                            - 209715200
+                            # 256 MiB in bytes
+                            - 268435456
                         type: lt
                       operator:
                         type: and
@@ -304,8 +304,8 @@ groups:
 
               ─── DETAILS ─────────────────────────
               Metric:      Freeable Memory
-              Current:     < 200 MiB free
-              Threshold:   200 MiB
+              Current:     < 256 MiB free
+              Threshold:   256 MiB
               Duration:    10 minutes
 
           labels:
