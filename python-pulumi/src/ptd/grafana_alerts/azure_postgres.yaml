@@ -134,7 +134,7 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: Azure PostgreSQL Flexible Server has more than 80% storage utilization for more than 5 minutes. Note: on new cluster deployments where Azure Monitor scraping has not yet initialized, noDataState=Alerting may produce a false positive after the for:5m window; this is expected during provisioning.
+            description: "Azure PostgreSQL Flexible Server has more than 80% storage utilization for more than 5 minutes. Note: on new cluster deployments where Azure Monitor scraping has not yet initialized, noDataState=Alerting may produce a false positive after the for:5m window; this is expected during provisioning."
             summary: High storage utilization on Azure PostgreSQL server {{$labels.resource}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
@@ -244,7 +244,7 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: Azure PostgreSQL Flexible Server has more than 500 active database connections for more than 5 minutes. Note: this threshold is calibrated for mid-size SKUs; it may need adjustment for smaller or larger instance sizes.
+            description: "Azure PostgreSQL Flexible Server has more than 500 active database connections for more than 5 minutes. Note: this threshold is calibrated for mid-size SKUs; it may need adjustment for smaller or larger instance sizes."
             summary: High database connections on Azure PostgreSQL server {{$labels.resource}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
