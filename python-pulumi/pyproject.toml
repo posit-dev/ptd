@@ -21,6 +21,7 @@ dependencies = [
   "azure-containerregistry>=1.2.0,<2.0.0",
   "azure-identity>=1.19.0,<2.0.0",
   "azure-keyvault-secrets>=4.9.0,<5.0.0",
+  "azure-mgmt-compute>=33.0.0,<34.0.0",
   # NOTE: The pulumi dependencies are pinned to exact versions so that the plugins used in
   # each pulumi stack state remain stable.
   "pulumi==3.187.0",

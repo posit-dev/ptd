@@ -36,6 +36,23 @@ class InternalSiteConfig:
 
 
 class AWSWorkloadPersistent(pulumi.ComponentResource):
+    """
+    Creates foundational AWS infrastructure for a PTD workload.
+    Uses the ALL-IN-CONSTRUCTOR pattern: all resources created in __init__().
+
+    Creates: VPC, RDS database, S3 buckets (packagemanager, chronicle, loki, mimir),
+    IAM roles/policies, ACM certificates, FSx for OpenZFS, security groups.
+
+    Outputs are registered and consumed by later steps:
+    - postgres_config step reads DB connection info
+    - eks/helm steps read IAM roles, VPC, subnets
+    - sites step reads certificate ARNs
+
+    Post-stack: Go code (persistent_reprise) reads Pulumi outputs and updates AWS Secrets Manager.
+
+    The autoload() classmethod constructs a Workload from the Pulumi stack name, then calls __init__().
+    """
+
     workload: ptd.aws_workload.AWSWorkload
     vpc_net: ipaddress.IPv4Network
     required_tags: dict[str, str]
@@ -90,6 +107,10 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
 
     @classmethod
     def autoload(cls) -> "AWSWorkloadPersistent":
+        """
+        Load workload configuration from Pulumi stack name and construct the persistent resources.
+        Called by dynamically generated __main__.py (see lib/pulumi/python.go).
+        """
         return cls(workload=ptd.aws_workload.AWSWorkload(pulumi.get_stack()))
 
     def __init__(
@@ -240,6 +261,7 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
         self.vpc_net = self.workload.vpc_cidr()
         azs = aws.get_availability_zones()
 
+        # PULUMI STATE NAME — changing workload.compound_name will destroy and recreate the VPC
         self.vpc = ptd.pulumi_resources.aws_vpc.AWSVpc(
             self.workload.compound_name,
             cidr_block=str(self.vpc_net),
@@ -375,6 +397,7 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self.vpc),
         )
 
+        # PULUMI STATE NAME — changing workload.compound_name will destroy and recreate the RDS instance
         self.db = aws.rds.Instance(
             self.workload.compound_name,
             identifier_prefix=f"{self.workload.compound_name}-",
@@ -422,8 +445,10 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
         )
 
     def _define_named_bucket(self, name: str, opts: pulumi.ResourceOptions | None = None) -> aws.s3.Bucket:
+        """Helper to create a named S3 bucket (bucket name explicitly set, not prefixed)."""
         if opts is None:
             opts = pulumi.ResourceOptions()
+        # PULUMI STATE NAME — changing the first arg will destroy and recreate the bucket
         return aws.s3.Bucket(
             f"{self.workload.compound_name}-{name}-bucket",
             aws.s3.BucketArgs(
