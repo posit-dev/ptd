@@ -497,13 +497,17 @@
                         "type": "prometheus",
                         "uid": "mimir"
                     },
+                    "disableTextWrap": false,
                     "editorMode": "code",
                     "exemplar": false,
-                    "expr": "pwb_build_info{cluster=~\"$cluster_name\"}",
+                    "expr": "pwb_build_info{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}",
+                    "fullMetaSearch": false,
+                    "includeNullMetadata": true,
                     "instant": true,
                     "legendFormat": "{{release_name}}",
                     "range": false,
-                    "refId": "A"
+                    "refId": "A",
+                    "useBackend": false
                 },
                 {
                     "datasource": {
@@ -512,7 +516,7 @@
                     },
                     "editorMode": "code",
                     "exemplar": false,
-                    "expr": "pwb_build_info{cluster=~\"$cluster_name\"}",
+                    "expr": "pwb_build_info{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}",
                     "hide": false,
                     "instant": true,
                     "interval": "",
@@ -1567,20 +1571,24 @@
             },
             {
                 "current": {
-                    "selected": true,
-                    "text": "databricks",
-                    "value": "databricks"
+                    "selected": false,
+                    "text": "All",
+                    "value": "$__all"
                 },
-                "definition": "label_values(pwb_build_info,ptd_site)",
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "mimir"
+                },
+                "definition": "label_values(pwb_build_info{cluster=~\"$cluster_name\"},ptd_site)",
                 "hide": 0,
-                "includeAll": false,
+                "includeAll": true,
                 "label": "Site",
                 "multi": false,
                 "name": "site_name",
                 "options": [],
                 "query": {
                     "qryType": 1,
-                    "query": "label_values(pwb_build_info,ptd_site)",
+                    "query": "label_values(pwb_build_info{cluster=~\"$cluster_name\"},ptd_site)",
                     "refId": "PrometheusVariableQueryEditor-VariableQuery"
                 },
                 "refresh": 1,
@@ -1599,6 +1607,6 @@
     "timezone": "",
     "title": "Posit Team Overview",
     "uid": "posit-team-overview",
-    "version": 7,
+    "version": 1,
     "weekStart": ""
 }
