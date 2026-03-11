@@ -12,6 +12,10 @@ apiVersion: 1
 deleteRules:
     - orgId: 1
       uid: fsx_capacity
+    - orgId: 1
+      uid: ec2_network_out_high
+    - orgId: 1
+      uid: ec2_network_packets_out_high
 groups:
     - orgId: 1
       name: Cloudwatch
