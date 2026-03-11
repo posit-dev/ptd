@@ -10,6 +10,6 @@ Dashboards are deployed as Kubernetes ConfigMaps and automatically loaded into G
 2. Each JSON file becomes a ConfigMap in the `grafana` namespace
 3. Grafana's dashboard provisioning sidecar watches these ConfigMaps and loads dashboards automatically
 4. Changes to JSON files trigger ConfigMap updates, which Grafana detects and reloads
-5. The dashboard `uid` is automatically set to match a sanitized version of the filename (without `.json` extension) for idempotency
+5. The dashboard `uid` is automatically set to match the filename (without `.json` extension) for idempotency
 
 **Important:** The `version` field in dashboard JSON is **not used** for version control since we're deploying via ConfigMap (AWS).
