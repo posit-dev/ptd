@@ -1,0 +1,362 @@
+# To delete these alerts, simply removing the configMap that uses this method will not work.
+# Replace file contents with the following and apply in order to delete the alerts
+# (repeat the deleteRules entry for each uid listed below):
+# apiVersion: 1
+# deleteRules:
+#   - orgId: 1
+#     uid: azure_postgres_cpu_high
+#   - orgId: 1
+#     uid: azure_postgres_storage_high
+#   - orgId: 1
+#     uid: azure_postgres_memory_high
+#   - orgId: 1
+#     uid: azure_postgres_connections_high
+#   - orgId: 1
+#     uid: azure_postgres_failed_connections
+#   - orgId: 1
+#     uid: azure_postgres_deadlocks
+#
+# See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+#
+# Note: alert annotations reference {{$labels.cluster}}. For Azure Monitor-sourced metrics,
+# this label is injected by the prometheus.relabel.default block in grafana_alloy.py.
+# If Alloy is not running or relabeling is misconfigured, the label will be absent and
+# the annotation will render as "in cluster " (blank).
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: Azure PostgreSQL
+      folder: Posit Alerts
+      interval: 5m
+      rules:
+        - uid: azure_postgres_cpu_high
+          title: Azure PostgreSQL CPU High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: azure_microsoft_dbforpostgresql_flexibleservers_cpu_percent{job="integrations/azure"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 80
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData  # Performance metric; silent suppression on scrape outage is acceptable
+          execErrState: Error
+          for: 10m
+          annotations:
+            description: Azure PostgreSQL Flexible Server CPU utilization is above 80% for more than 10 minutes.
+            summary: High CPU utilization on Azure PostgreSQL server {{$labels.resource}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: azure_postgres_storage_high
+          title: Azure PostgreSQL Storage High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: azure_microsoft_dbforpostgresql_flexibleservers_storage_percent{job="integrations/azure"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 80
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: Alerting  # Storage exhaustion is latent; alert even when scraping stops so we don't silently miss a full disk
+          execErrState: Error
+          for: 5m
+          annotations:
+            description: Azure PostgreSQL Flexible Server has more than 80% storage utilization for more than 5 minutes. Note: on new cluster deployments where Azure Monitor scraping has not yet initialized, noDataState=Alerting may produce a false positive after the for:5m window; this is expected during provisioning.
+            summary: High storage utilization on Azure PostgreSQL server {{$labels.resource}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: azure_postgres_memory_high
+          title: Azure PostgreSQL Memory High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: azure_microsoft_dbforpostgresql_flexibleservers_memory_percent{job="integrations/azure"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 80
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: Alerting  # Memory exhaustion is latent; alert even when scraping stops so we don't silently miss an OOM condition
+          execErrState: Error
+          for: 10m
+          annotations:
+            description: Azure PostgreSQL Flexible Server has more than 80% memory utilization for more than 10 minutes.
+            summary: High memory utilization on Azure PostgreSQL server {{$labels.resource}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: azure_postgres_connections_high
+          title: Azure PostgreSQL Connections High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: azure_microsoft_dbforpostgresql_flexibleservers_active_connections{job="integrations/azure"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 500  # Calibrated for mid-size SKUs (e.g., Standard_D4s_v3). Adjust per SKU; smaller SKUs may have lower connection limits.
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData  # Performance metric; silent suppression on scrape outage is acceptable
+          execErrState: Error
+          for: 5m
+          annotations:
+            description: Azure PostgreSQL Flexible Server has more than 500 active database connections for more than 5 minutes. Note: this threshold is calibrated for mid-size SKUs; it may need adjustment for smaller or larger instance sizes.
+            summary: High database connections on Azure PostgreSQL server {{$labels.resource}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+            instance_size_dependent: "true"  # Silence this label for known-small instance classes
+          isPaused: true  # Paused until a Grafana silence or Alertmanager inhibit rule is configured for the instance_size_dependent label
+        - uid: azure_postgres_failed_connections
+          title: Azure PostgreSQL Failed Connections
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: azure_microsoft_dbforpostgresql_flexibleservers_connections_failed{job="integrations/azure"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 10
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            description: Azure PostgreSQL Flexible Server has more than 10 failed connection attempts for over 5 minutes, indicating potential authentication or connectivity issues.
+            summary: Failed connections on Azure PostgreSQL server {{$labels.resource}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: azure_postgres_deadlocks
+          title: Azure PostgreSQL Deadlocks
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: azure_microsoft_dbforpostgresql_flexibleservers_deadlocks{job="integrations/azure"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            description: Azure PostgreSQL Flexible Server is experiencing deadlocks, indicating potential application-level locking issues that may require investigation.
+            summary: Deadlocks detected on Azure PostgreSQL server {{$labels.resource}} in cluster {{$labels.cluster}}
+          labels:
+            opsgenie: "1"
+          isPaused: false
