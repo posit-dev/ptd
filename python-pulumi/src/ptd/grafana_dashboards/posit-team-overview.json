@@ -3130,7 +3130,10 @@
                             }
                         ]
                     },
-                    "unit": "d"
+                    "unit": "none",
+                    "custom": {
+                        "suffix": " days"
+                    }
                 },
                 "overrides": []
             },
