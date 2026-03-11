@@ -1042,6 +1042,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 cluster_name=self.eks.name,
                 principal_arn=principal_arn,
                 type=entry_type,
+                kubernetes_groups=entry.get("kubernetesGroups"),
                 opts=pulumi.ResourceOptions(parent=self.eks, import_=entry_import),
             )
 
