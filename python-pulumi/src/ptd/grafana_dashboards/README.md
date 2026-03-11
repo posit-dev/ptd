@@ -4,14 +4,30 @@ This directory contains JSON definitions for Grafana dashboards deployed with Po
 
 ## Dashboard Deployment
 
+**⚠️ Important: Dashboard provisioning via ConfigMaps is currently only supported for AWS workloads. Azure workloads require manual dashboard import through the Grafana UI.**
+
+### AWS Dashboard Deployment
+
 Dashboards are deployed as Kubernetes ConfigMaps and automatically loaded into Grafana. The deployment process:
 
-1. JSON files in this directory are read by `pulumi_resources/aws_workload_helm.py` or `pulumi_resources/azure_workload_helm.py`
+1. JSON files in this directory are read by `pulumi_resources/aws_eks_cluster.py` (method `_create_dashboard_configmaps`)
 2. Each JSON file becomes a ConfigMap in the `grafana` namespace
-3. Grafana's dashboard provisioning watches these ConfigMaps and loads dashboards automatically
+3. Grafana's dashboard provisioning sidecar watches these ConfigMaps and loads dashboards automatically
 4. Changes to JSON files trigger ConfigMap updates, which Grafana detects and reloads
+5. The dashboard `uid` is automatically set to match the filename (without `.json` extension) for idempotency
 
-**Important:** The `version` field in dashboard JSON is **not used** for version control since we're deploying via ConfigMap. Grafana ignores this field during provisioning. Version numbers are informational only.
+### Azure Dashboard Deployment
+
+Azure deployments do not currently support automatic dashboard provisioning. To use dashboards on Azure:
+
+1. Export the JSON from this directory
+2. Access Grafana in your Azure deployment: `ptd proxy <azure-workload-name>`
+3. Navigate to **Dashboards** → **Import**
+4. Paste the JSON and click **Import**
+
+**Note:** The rest of this documentation assumes AWS deployment unless otherwise noted.
+
+**Important:** The `version` field in dashboard JSON is **not used** for version control since we're deploying via ConfigMap (AWS) or manual import (Azure). Grafana ignores this field during provisioning. Version numbers are informational only.
 
 ## Creating a New Dashboard
 
@@ -65,8 +81,10 @@ jq '.' my-new-dashboard.json > tmp.json && mv tmp.json my-new-dashboard.json
 
 **What to remove:**
 - `"id"` field at the root level (Grafana auto-generates IDs)
-- `"uid"` field if you want Grafana to generate a new unique identifier
 - Any datasource UIDs that are environment-specific (use `"uid": "mimir"` for Prometheus)
+
+**What gets automatically set (AWS only):**
+- `"uid"` field - Will be automatically set to match the filename (without `.json` extension) for idempotency
 
 **What to keep:**
 - Panel IDs (these are stable and used for referencing)
