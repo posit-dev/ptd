@@ -809,7 +809,7 @@
                     },
                     "editorMode": "code",
                     "exemplar": false,
-                    "expr": "(sum without(code,method) (rate(pwb_http_response_duration_seconds_sum[30s]))) / (sum without(code,method) (rate(pwb_http_response_duration_seconds_count[30s])))",
+                    "expr": "(sum without(code,method) (rate(pwb_http_response_duration_seconds_sum{cluster=~\"$cluster_name\"}[30s]))) / (sum without(code,method) (rate(pwb_http_response_duration_seconds_count{cluster=~\"$cluster_name\"}[30s])))",
                     "format": "time_series",
                     "instant": false,
                     "interval": "",
@@ -1230,7 +1230,7 @@
                         "uid": "ee711a05-f90f-47d1-acad-0a3a79a54662"
                     },
                     "editorMode": "code",
-                    "expr": "pwb_http_handlers_inflight",
+                    "expr": "pwb_http_handlers_inflight{cluster=~\"$cluster_name\"}",
                     "hide": false,
                     "interval": "",
                     "legendFormat": "handlers",
@@ -1424,7 +1424,7 @@
                         "uid": "ee711a05-f90f-47d1-acad-0a3a79a54662"
                     },
                     "editorMode": "code",
-                    "expr": "rate(pwb_session_startup_duration_seconds_sum[20s]) / rate(pwb_session_startup_duration_seconds_count[20s])",
+                    "expr": "rate(pwb_session_startup_duration_seconds_sum{cluster=~\"$cluster_name\"}[20s]) / rate(pwb_session_startup_duration_seconds_count{cluster=~\"$cluster_name\"}[20s])",
                     "interval": "",
                     "legendFormat": "{{type}}",
                     "range": true,
@@ -1520,7 +1520,7 @@
                         "uid": "ee711a05-f90f-47d1-acad-0a3a79a54662"
                     },
                     "editorMode": "code",
-                    "expr": "rate(pwb_session_startup_and_connect_duration_seconds_sum[1m]) / \nrate(pwb_session_startup_and_connect_duration_seconds_count[1m])",
+                    "expr": "rate(pwb_session_startup_and_connect_duration_seconds_sum{cluster=~\"$cluster_name\"}[1m]) / \nrate(pwb_session_startup_and_connect_duration_seconds_count{cluster=~\"$cluster_name\"}[1m])",
                     "interval": "",
                     "legendFormat": "{{type}}",
                     "range": true,
@@ -1539,8 +1539,8 @@
             {
                 "current": {
                     "selected": true,
-                    "text": "default_demo01-staging-20250423-control-plane",
-                    "value": "default_demo01-staging-20250423-control-plane"
+                    "text": "All",
+                    "value": "$__all"
                 },
                 "datasource": {
                     "type": "prometheus",
@@ -1599,6 +1599,6 @@
     "timezone": "",
     "title": "Posit Team Overview",
     "uid": "posit-team-overview",
-    "version": 1,
+    "version": 7,
     "weekStart": ""
 }
