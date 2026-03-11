@@ -27,6 +27,13 @@
 # To update the namespace filter, use find/replace on the regex pattern above.
 # =============================================================================
 apiVersion: 1
+deleteRules:
+    - orgId: 1
+      uid: pod_error
+    - orgId: 1
+      uid: PodNotHealthy
+    - orgId: 1
+      uid: PodRestarts
 groups:
     - orgId: 1
       name: Pods
