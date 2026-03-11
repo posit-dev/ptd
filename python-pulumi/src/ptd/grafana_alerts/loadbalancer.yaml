@@ -75,11 +75,24 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: Application Load Balancer has more than 10 target 5XX errors for over 5 minutes, indicating backend service failures.
-            summary: High 5XX errors on ALB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
+            summary: "🟡 WARNING: ALB Target 5XX Errors High"
+            description: |
+              Application Load Balancer has elevated 5XX errors
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_LoadBalancer }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Target 5XX Count
+              Current:     > 10 errors
+              Threshold:   10
+              Duration:    5 minutes
+
           labels:
             opsgenie: "1"
-            severity: warning
           isPaused: false
         - uid: alb_unhealthy_targets
           title: ALB Unhealthy Targets
@@ -131,11 +144,24 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: Application Load Balancer has unhealthy targets for over 5 minutes, indicating backend service health issues.
-            summary: Unhealthy targets on ALB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
+            summary: "🟡 WARNING: ALB Unhealthy Targets"
+            description: |
+              Application Load Balancer has unhealthy targets
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_LoadBalancer }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Unhealthy Host Count
+              Current:     > 0
+              Threshold:   0
+              Duration:    5 minutes
+
           labels:
             opsgenie: "1"
-            severity: warning
           isPaused: false
         - uid: nlb_unhealthy_targets
           title: NLB Unhealthy Targets
@@ -187,11 +213,24 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: Network Load Balancer has unhealthy targets for over 5 minutes, indicating backend service health issues.
-            summary: Unhealthy targets on NLB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
+            summary: "🟡 WARNING: NLB Unhealthy Targets"
+            description: |
+              Network Load Balancer has unhealthy targets
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_LoadBalancer }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Unhealthy Host Count
+              Current:     > 0
+              Threshold:   0
+              Duration:    5 minutes
+
           labels:
             opsgenie: "1"
-            severity: warning
           isPaused: false
         - uid: alb_response_latency_high
           title: ALB Response Latency High
@@ -243,9 +282,22 @@ groups:
           execErrState: Error
           for: 10m
           annotations:
-            description: Application Load Balancer target response time is above 2 seconds for more than 10 minutes, indicating performance degradation.
-            summary: High response latency on ALB {{$labels.dimension_LoadBalancer}} in cluster {{$labels.cluster}}
+            summary: "🟡 WARNING: ALB Response Latency High"
+            description: |
+              Application Load Balancer response time is elevated
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_LoadBalancer }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Target Response Time
+              Current:     > 2 seconds
+              Threshold:   2 seconds
+              Duration:    10 minutes
+
           labels:
             opsgenie: "1"
-            severity: warning
           isPaused: false
