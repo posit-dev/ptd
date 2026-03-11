@@ -1775,7 +1775,7 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "sum by (cluster, ptd_site) (connect_users_active{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\", window=\"24h\"})",
+                    "expr": "max by (cluster, ptd_site) (connect_users_active{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\", window=\"24h\"})",
                     "legendFormat": "__auto",
                     "range": true,
                     "refId": "A"
@@ -1847,7 +1847,7 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "sum by (cluster, ptd_site) (connect_users_active{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\", window=\"7d\"})",
+                    "expr": "max by (cluster, ptd_site) (connect_users_active{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\", window=\"7d\"})",
                     "legendFormat": "__auto",
                     "range": true,
                     "refId": "A"
@@ -1919,7 +1919,7 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "sum by (cluster, ptd_site) (connect_users_active{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\", window=\"30d\"})",
+                    "expr": "max by (cluster, ptd_site) (connect_users_active{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\", window=\"30d\"})",
                     "legendFormat": "__auto",
                     "range": true,
                     "refId": "A"
@@ -2054,7 +2054,7 @@
                     },
                     "editorMode": "code",
                     "exemplar": false,
-                    "expr": "sum by (cluster, ptd_site) (connect_jobs_queue_total_jobs_in_queue{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\"})",
+                    "expr": "max by (cluster, ptd_site) (connect_jobs_queue_total_jobs_in_queue{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\"})",
                     "instant": true,
                     "legendFormat": "__auto",
                     "range": false,
