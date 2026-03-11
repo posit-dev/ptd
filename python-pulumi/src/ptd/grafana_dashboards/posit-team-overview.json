@@ -84,7 +84,7 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "sum by (type) (rate(pwb_session_startup_duration_seconds_sum{cluster=~\"$cluster_name\"}[24h] @ end())) /\nsum by (type) (rate(pwb_session_startup_duration_seconds_count{cluster=~\"$cluster_name\"}[24h] @ end()))",
+                    "expr": "sum by (type) (rate(pwb_session_startup_duration_seconds_sum{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[24h] @ end())) /\nsum by (type) (rate(pwb_session_startup_duration_seconds_count{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[24h] @ end()))",
                     "legendFormat": "__auto",
                     "range": true,
                     "refId": "A"
@@ -156,7 +156,7 @@
                     },
                     "editorMode": "code",
                     "exemplar": false,
-                    "expr": "pwb_sessions{cluster=~\"$cluster_name\",status=\"Running\"}",
+                    "expr": "pwb_sessions{cluster=~\"$cluster_name\", ptd_site=\"$site_name\",status=\"Running\"}",
                     "instant": true,
                     "interval": "",
                     "legendFormat": "{{type}}",
@@ -225,7 +225,7 @@
                     },
                     "editorMode": "code",
                     "exemplar": false,
-                    "expr": "pwb_active_user_sessions{cluster=~\"$cluster_name\"}",
+                    "expr": "pwb_active_user_sessions{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}",
                     "instant": true,
                     "legendFormat": "__auto",
                     "range": false,
@@ -292,7 +292,7 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "pwb_license_active_users{cluster=~\"$cluster_name\"}",
+                    "expr": "pwb_license_active_users{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}",
                     "legendFormat": "__auto",
                     "range": true,
                     "refId": "A"
@@ -358,7 +358,7 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "pwb_license_user_seats{cluster=~\"$cluster_name\"}",
+                    "expr": "pwb_license_user_seats{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}",
                     "legendFormat": "__auto",
                     "range": true,
                     "refId": "A"
@@ -426,7 +426,7 @@
                     },
                     "editorMode": "code",
                     "exemplar": false,
-                    "expr": "pwb_license_expiry{cluster=~\"$cluster_name\"}*1000",
+                    "expr": "pwb_license_expiry{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}*1000",
                     "instant": true,
                     "legendFormat": "__auto",
                     "range": false,
@@ -616,7 +616,7 @@
                     },
                     "disableTextWrap": false,
                     "editorMode": "builder",
-                    "expr": "sum without(code, method) (increase(pwb_http_requests_total{cluster=~\"$cluster_name\"}[1m]))",
+                    "expr": "sum without(code, method) (increase(pwb_http_requests_total{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[1m]))",
                     "fullMetaSearch": false,
                     "hide": false,
                     "includeNullMetadata": true,
@@ -692,7 +692,7 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "sum without(code,uri,method) (increase(pwb_http_requests_total{cluster=~\"$cluster_name\"}[1m]))",
+                    "expr": "sum without(code,uri,method) (increase(pwb_http_requests_total{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[1m]))",
                     "legendFormat": "__auto",
                     "range": true,
                     "refId": "A"
@@ -813,7 +813,7 @@
                     },
                     "editorMode": "code",
                     "exemplar": false,
-                    "expr": "(sum without(code,method) (rate(pwb_http_response_duration_seconds_sum{cluster=~\"$cluster_name\"}[30s]))) / (sum without(code,method) (rate(pwb_http_response_duration_seconds_count{cluster=~\"$cluster_name\"}[30s])))",
+                    "expr": "(sum without(code,method) (rate(pwb_http_response_duration_seconds_sum{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[30s]))) / (sum without(code,method) (rate(pwb_http_response_duration_seconds_count{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[30s])))",
                     "format": "time_series",
                     "instant": false,
                     "interval": "",
@@ -890,7 +890,7 @@
                     },
                     "editorMode": "code",
                     "exemplar": false,
-                    "expr": "sum without (code,method,uri)(rate(pwb_http_response_duration_seconds_sum{cluster=~\"$cluster_name\"}[1m] @ end())) / \nsum without (code,method,uri)(rate(pwb_http_response_duration_seconds_count{cluster=~\"$cluster_name\"}[1m] @ end()))\n\n",
+                    "expr": "sum without (code,method,uri)(rate(pwb_http_response_duration_seconds_sum{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[1m] @ end())) / \nsum without (code,method,uri)(rate(pwb_http_response_duration_seconds_count{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[1m] @ end()))\n\n",
                     "format": "time_series",
                     "instant": true,
                     "interval": "",
@@ -987,7 +987,7 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "increase(pwb_http_response_size_bytes_total{cluster=~\"$cluster_name\"}[1m]) / 1024",
+                    "expr": "increase(pwb_http_response_size_bytes_total{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[1m]) / 1024",
                     "interval": "",
                     "legendFormat": "{{uri}}",
                     "range": true,
@@ -1083,7 +1083,7 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "histogram_quantile(0.999, sum(rate(pwb_http_response_duration_seconds_bucket{cluster=~\"$cluster_name\"}[1m])) by (le)) ",
+                    "expr": "histogram_quantile(0.999, sum(rate(pwb_http_response_duration_seconds_bucket{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[1m])) by (le)) ",
                     "interval": "",
                     "legendFormat": "99.9%",
                     "range": true,
@@ -1095,7 +1095,7 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "histogram_quantile(0.99, sum(rate(pwb_http_response_duration_seconds_bucket{cluster=~\"$cluster_name\"}[1m])) by (le)) ",
+                    "expr": "histogram_quantile(0.99, sum(rate(pwb_http_response_duration_seconds_bucket{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[1m])) by (le)) ",
                     "hide": false,
                     "interval": "",
                     "legendFormat": "99%",
@@ -1108,7 +1108,7 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "histogram_quantile(0.95, sum(rate(pwb_http_response_duration_seconds_bucket{cluster=~\"$cluster_name\"}[1m])) by (le)) ",
+                    "expr": "histogram_quantile(0.95, sum(rate(pwb_http_response_duration_seconds_bucket{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[1m])) by (le)) ",
                     "hide": false,
                     "interval": "",
                     "legendFormat": "95%",
@@ -1121,7 +1121,7 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "histogram_quantile(0.5, sum(rate(pwb_http_response_duration_seconds_bucket{cluster=~\"$cluster_name\"}[1m])) by (le)) ",
+                    "expr": "histogram_quantile(0.5, sum(rate(pwb_http_response_duration_seconds_bucket{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[1m])) by (le)) ",
                     "hide": false,
                     "interval": "",
                     "legendFormat": "50%",
@@ -1219,7 +1219,7 @@
                     },
                     "disableTextWrap": false,
                     "editorMode": "builder",
-                    "expr": "pwb_http_requests_inflight{cluster=~\"$cluster_name\"}",
+                    "expr": "pwb_http_requests_inflight{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}",
                     "fullMetaSearch": false,
                     "includeNullMetadata": true,
                     "interval": "",
@@ -1234,7 +1234,7 @@
                         "uid": "ee711a05-f90f-47d1-acad-0a3a79a54662"
                     },
                     "editorMode": "code",
-                    "expr": "pwb_http_handlers_inflight{cluster=~\"$cluster_name\"}",
+                    "expr": "pwb_http_handlers_inflight{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}",
                     "hide": false,
                     "interval": "",
                     "legendFormat": "handlers",
@@ -1332,7 +1332,7 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "pwb_sessions{cluster=~\"$cluster_name\",status=~\"Running|Pending|Starting\"}",
+                    "expr": "pwb_sessions{cluster=~\"$cluster_name\", ptd_site=\"$site_name\",status=~\"Running|Pending|Starting\"}",
                     "interval": "",
                     "legendFormat": "{{type}} - {{cluster}}",
                     "range": true,
@@ -1428,7 +1428,7 @@
                         "uid": "ee711a05-f90f-47d1-acad-0a3a79a54662"
                     },
                     "editorMode": "code",
-                    "expr": "rate(pwb_session_startup_duration_seconds_sum{cluster=~\"$cluster_name\"}[20s]) / rate(pwb_session_startup_duration_seconds_count{cluster=~\"$cluster_name\"}[20s])",
+                    "expr": "rate(pwb_session_startup_duration_seconds_sum{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[20s]) / rate(pwb_session_startup_duration_seconds_count{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[20s])",
                     "interval": "",
                     "legendFormat": "{{type}}",
                     "range": true,
@@ -1524,7 +1524,7 @@
                         "uid": "ee711a05-f90f-47d1-acad-0a3a79a54662"
                     },
                     "editorMode": "code",
-                    "expr": "rate(pwb_session_startup_and_connect_duration_seconds_sum{cluster=~\"$cluster_name\"}[1m]) / \nrate(pwb_session_startup_and_connect_duration_seconds_count{cluster=~\"$cluster_name\"}[1m])",
+                    "expr": "rate(pwb_session_startup_and_connect_duration_seconds_sum{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[1m]) / \nrate(pwb_session_startup_and_connect_duration_seconds_count{cluster=~\"$cluster_name\", ptd_site=\"$site_name\"}[1m])",
                     "interval": "",
                     "legendFormat": "{{type}}",
                     "range": true,
@@ -1607,6 +1607,6 @@
     "timezone": "",
     "title": "Posit Team Overview",
     "uid": "posit-team-overview",
-    "version": 1,
+    "version": 8,
     "weekStart": ""
 }
