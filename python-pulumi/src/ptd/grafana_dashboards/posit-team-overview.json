@@ -3090,7 +3090,7 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "sum(increase(ppm_pkg_downloads_total{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\"}[24h] @ end())) / (24 * 60)",
+                    "expr": "sum(increase(ppm_pkg_downloads_total{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\"}[24h])) / (24 * 60)",
                     "legendFormat": "__auto",
                     "range": true,
                     "refId": "A"
@@ -4199,7 +4199,8 @@
                                 "value": 80
                             }
                         ]
-                    }
+                    },
+                    "unit": "decgbytes"
                 },
                 "overrides": []
             },
