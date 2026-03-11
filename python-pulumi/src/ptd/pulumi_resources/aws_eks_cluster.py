@@ -2500,7 +2500,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         alerts_dir = ptd.paths.alerts()
 
         for alert_file in sorted(alerts_dir.glob("*.yaml")):
-            alert_name = alert_file.stem
+            alert_name = alert_file.stem.replace("_", "-")
             with open(alert_file) as f:
                 alert_yaml = f.read()
 
