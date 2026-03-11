@@ -1,5 +1,46 @@
+import re
+
 _AWS_TAG_KEY_MAX_LENGTH = 128
 _AWS_TAG_VALUE_MAX_LENGTH = 256
+
+
+def sanitize_k8s_name(name: str) -> str:
+    """Sanitize a name to be RFC 1123 compliant for Kubernetes resources.
+
+    RFC 1123 subdomain rules:
+    - Must contain only lowercase alphanumeric characters and hyphens
+    - Must start and end with an alphanumeric character
+    - Maximum length is 253 characters (not enforced here)
+
+    This function:
+    1. Converts to lowercase
+    2. Replaces all non-alphanumeric characters with hyphens
+    3. Collapses consecutive hyphens into a single hyphen
+    4. Strips leading/trailing hyphens
+
+    Raises:
+        ValueError: If the sanitized name is empty or still RFC 1123 non-compliant
+    """
+    if not name:
+        msg = "Name cannot be empty"
+        raise ValueError(msg)
+
+    # Convert to lowercase and replace invalid chars with hyphens
+    sanitized = re.sub(r"[^a-z0-9-]", "-", name.lower())
+
+    # Collapse consecutive hyphens into single hyphen
+    sanitized = re.sub(r"-+", "-", sanitized)
+
+    # Strip leading/trailing hyphens
+    sanitized = sanitized.strip("-")
+
+    # Validate the result matches RFC 1123 subdomain pattern
+    # Pattern: must start/end with alphanumeric, can contain hyphens in between
+    if not sanitized or not re.match(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$", sanitized):
+        msg = f"Name '{name}' cannot be sanitized to RFC 1123 format (result: '{sanitized}')"
+        raise ValueError(msg)
+
+    return sanitized
 
 
 def format_lb_tags(tags: dict[str, str]) -> str:

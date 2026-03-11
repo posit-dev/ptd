@@ -174,6 +174,11 @@ cli:
 check-python-pulumi:
   cd {{ justfile_directory() }}/python-pulumi && just check
 
+# Validate Go↔Python config field sync
+[group('check')]
+validate-config-sync:
+  python3 {{ justfile_directory() }}/scripts/validate-config-sync.py
+
 #############################################################################
 # Format targets
 #############################################################################
