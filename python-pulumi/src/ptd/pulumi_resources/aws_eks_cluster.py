@@ -641,6 +641,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         use_eks_access_entries: bool = False,
         additional_access_entries: list[dict] | None = None,
         include_poweruser: bool = False,
+        admin_role_arn: str | None = None,
     ):
         """
         Add IAM roles to EKS cluster using either aws-auth ConfigMap or EKS Access Entries.
@@ -664,6 +665,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 node_role=node_role,
                 additional_access_entries=additional_access_entries,
                 include_poweruser=include_poweruser,
+                admin_role_arn=admin_role_arn,
             )
 
         # Use the legacy aws-auth ConfigMap approach
@@ -689,7 +691,8 @@ class AWSEKSCluster(pulumi.ComponentResource):
         # as suggested by this blogger (how they determine this is unclear):
         #  https://www.powerupcloud.com/aws-eks-authentication-and-authorization-using-aws-single-signon/#:%7E:text=ensure%20to%20remove,role_arn
         poweruser_arn = f"arn:aws:iam::{account_id}:role/{ptd.aws_iam.get_role_name_for_permission_set('PowerUser')}"
-        adminrole_arn = f"arn:aws:iam::{account_id}:role/admin.posit.team"
+        if admin_role_arn is None:
+            admin_role_arn = f"arn:aws:iam::{account_id}:role/admin.posit.team"
 
         if additional_users is None:
             additional_users = []
@@ -702,7 +705,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
                         ["system:bootstrappers", "system:nodes"],
                     ),
                     ptd.aws_auth_user.AWSAuthUser(poweruser_arn, "admin", ["system:masters"]),
-                    ptd.aws_auth_user.AWSAuthUser(adminrole_arn, "admin", ["system:masters"]),
+                    ptd.aws_auth_user.AWSAuthUser(admin_role_arn, "admin", ["system:masters"]),
                     *additional_users,
                 ]
             )
@@ -766,6 +769,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         additional_access_entries: list[dict] | None = None,
         *,
         include_poweruser: bool = False,
+        admin_role_arn: str | None = None,
     ):
         """
         Add IAM roles to EKS cluster using Access Entries (modern approach).
@@ -818,8 +822,9 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 raise ValueError(msg)
 
         # Get the ARNs for Admin (and PowerUser if needed)
-        account_id = aws.get_caller_identity().account_id
-        adminrole_arn = f"arn:aws:iam::{account_id}:role/admin.posit.team"
+        if admin_role_arn is None:
+            account_id = aws.get_caller_identity().account_id
+            admin_role_arn = f"arn:aws:iam::{account_id}:role/admin.posit.team"
 
         # Check which Access Entries already exist in AWS (for import decisions)
         # AWS auto-migrates some entries when changing auth mode to API_AND_CONFIG_MAP
@@ -860,30 +865,30 @@ class AWSEKSCluster(pulumi.ComponentResource):
 
         # --- Admin Role Access Entry (always created) ---
         admin_existing_policies = (
-            self._get_associated_policies(adminrole_arn) if adminrole_arn in existing_entries else set()
+            self._get_associated_policies(admin_role_arn) if admin_role_arn in existing_entries else set()
         )
         admin_policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 
-        admin_import = access_entry_import_id(adminrole_arn)
+        admin_import = access_entry_import_id(admin_role_arn)
         if admin_import:
-            pulumi.log.debug(f"Setting import flag for Admin Access Entry: {adminrole_arn}")
+            pulumi.log.debug(f"Setting import flag for Admin Access Entry: {admin_role_arn}")
 
         aws.eks.AccessEntry(
             f"{self.name}-admin-access-entry",
             cluster_name=self.eks.name,
-            principal_arn=adminrole_arn,
+            principal_arn=admin_role_arn,
             type="STANDARD",
             opts=pulumi.ResourceOptions(parent=self.eks, import_=admin_import),
         )
 
-        admin_policy_import = policy_association_import_id(adminrole_arn, admin_policy_arn, admin_existing_policies)
+        admin_policy_import = policy_association_import_id(admin_role_arn, admin_policy_arn, admin_existing_policies)
         if admin_policy_import:
-            pulumi.log.debug(f"Setting import flag for Admin Policy Association: {adminrole_arn}")
+            pulumi.log.debug(f"Setting import flag for Admin Policy Association: {admin_role_arn}")
 
         aws.eks.AccessPolicyAssociation(
             f"{self.name}-admin-policy-association",
             cluster_name=self.eks.name,
-            principal_arn=adminrole_arn,
+            principal_arn=admin_role_arn,
             policy_arn=admin_policy_arn,
             access_scope=aws.eks.AccessPolicyAssociationAccessScopeArgs(
                 type="cluster",
