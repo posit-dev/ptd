@@ -2161,7 +2161,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "Requests/5m",
+            "title": "Requests/min (5m)",
             "type": "gauge"
         },
         {
@@ -2425,7 +2425,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "Response size/min (kb)",
+            "title": "Response size/5m (kb)",
             "type": "timeseries"
         },
         {
