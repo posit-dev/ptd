@@ -25,6 +25,10 @@ def alerts() -> pathlib.Path:
     return top() / "python-pulumi" / "src" / "ptd" / "grafana_alerts"
 
 
+def dashboards() -> pathlib.Path:
+    return top() / "python-pulumi" / "src" / "ptd" / "grafana_dashboards"
+
+
 class Paths:
     @property
     def root(self) -> pathlib.Path:

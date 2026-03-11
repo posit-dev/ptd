@@ -4,9 +4,9 @@ on:
   push:
     branches: [main]
     tags: [v*]
-    paths: [python-pulumi/**,.github/workflows/python-pulumi.yml]
+    paths: [python-pulumi/**,lib/types/**,scripts/validate-config-sync.py,.github/workflows/python-pulumi.yml]
   pull_request:
-    paths: [python-pulumi/**,.github/workflows/python-pulumi.yml]
+    paths: [python-pulumi/**,lib/types/**,scripts/validate-config-sync.py,.github/workflows/python-pulumi.yml]
 
 permissions:
   actions: read
@@ -65,3 +65,19 @@ jobs:
 
       - run: just lint
         working-directory: python-pulumi
+
+  validate-config-sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: extractions/setup-just@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate Go↔Python config sync
+        run: just validate-config-sync
