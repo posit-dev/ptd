@@ -3130,10 +3130,7 @@
                             }
                         ]
                     },
-                    "unit": "none",
-                    "custom": {
-                        "suffix": " days"
-                    }
+                    "unit": "none"
                 },
                 "overrides": []
             },
@@ -3187,26 +3184,16 @@
                         "mode": "thresholds"
                     },
                     "mappings": [],
-                    "max": 1000,
-                    "min": 0,
                     "thresholds": {
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "red",
-                                "value": null
-                            },
-                            {
-                                "color": "orange",
-                                "value": 100
-                            },
-                            {
                                 "color": "green",
-                                "value": 300
+                                "value": null
                             }
                         ]
                     },
-                    "unit": "decgbytes"
+                    "unit": "dateTimeAsLocal"
                 },
                 "overrides": []
             },
@@ -3216,10 +3203,11 @@
                 "x": 15,
                 "y": 45
             },
-            "id": 204,
+            "id": 208,
             "options": {
-                "minVizHeight": 75,
-                "minVizWidth": 75,
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
                 "orientation": "auto",
                 "reduceOptions": {
                     "calcs": [
@@ -3228,8 +3216,11 @@
                     "fields": "",
                     "values": false
                 },
-                "showThresholdLabels": false,
-                "showThresholdMarkers": true
+                "text": {
+                    "valueSize": 12
+                },
+                "textMode": "auto",
+                "wideLayout": true
             },
             "pluginVersion": "10.2.2",
             "targets": [
@@ -3239,14 +3230,16 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "max by (cluster, ptd_site) (ppm_storage_free{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\"})",
+                    "exemplar": false,
+                    "expr": "max by (cluster, ptd_site) (ppm_license_expiry{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\"}) * 1000",
+                    "instant": true,
                     "legendFormat": "__auto",
-                    "range": true,
+                    "range": false,
                     "refId": "A"
                 }
             ],
-            "title": "Storage free (GB)",
-            "type": "gauge"
+            "title": "License expires",
+            "type": "stat"
         },
         {
             "datasource": {
@@ -3343,74 +3336,6 @@
             "gridPos": {
                 "h": 2,
                 "w": 3,
-                "x": 21,
-                "y": 45
-            },
-            "id": 206,
-            "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "reduceOptions": {
-                    "calcs": [
-                        "lastNotNull"
-                    ],
-                    "fields": "",
-                    "values": false
-                },
-                "text": {
-                    "valueSize": 12
-                },
-                "textMode": "auto",
-                "wideLayout": true
-            },
-            "pluginVersion": "10.2.2",
-            "targets": [
-                {
-                    "datasource": {
-                        "type": "prometheus",
-                        "uid": "mimir"
-                    },
-                    "editorMode": "code",
-                    "exemplar": false,
-                    "expr": "go_build_info{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\", job=~\".*package-manager.*\"}",
-                    "instant": true,
-                    "legendFormat": "__auto",
-                    "range": false,
-                    "refId": "A"
-                }
-            ],
-            "title": "Build info",
-            "type": "stat"
-        },
-        {
-            "datasource": {
-                "type": "prometheus",
-                "uid": "mimir"
-            },
-            "description": "",
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "thresholds"
-                    },
-                    "mappings": [],
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "color": "green",
-                                "value": null
-                            }
-                        ]
-                    }
-                },
-                "overrides": []
-            },
-            "gridPos": {
-                "h": 2,
-                "w": 3,
                 "x": 18,
                 "y": 47
             },
@@ -3450,75 +3375,6 @@
                 }
             ],
             "title": "Requests in flight",
-            "type": "stat"
-        },
-        {
-            "datasource": {
-                "type": "prometheus",
-                "uid": "mimir"
-            },
-            "description": "",
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "thresholds"
-                    },
-                    "mappings": [],
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "color": "green",
-                                "value": null
-                            }
-                        ]
-                    },
-                    "unit": "dateTimeAsLocal"
-                },
-                "overrides": []
-            },
-            "gridPos": {
-                "h": 2,
-                "w": 3,
-                "x": 21,
-                "y": 47
-            },
-            "id": 208,
-            "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "reduceOptions": {
-                    "calcs": [
-                        "lastNotNull"
-                    ],
-                    "fields": "",
-                    "values": false
-                },
-                "text": {
-                    "valueSize": 12
-                },
-                "textMode": "auto",
-                "wideLayout": true
-            },
-            "pluginVersion": "10.2.2",
-            "targets": [
-                {
-                    "datasource": {
-                        "type": "prometheus",
-                        "uid": "mimir"
-                    },
-                    "editorMode": "code",
-                    "exemplar": false,
-                    "expr": "max by (cluster, ptd_site) (ppm_license_expiry{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\"}) * 1000",
-                    "instant": true,
-                    "legendFormat": "__auto",
-                    "range": false,
-                    "refId": "A"
-                }
-            ],
-            "title": "License expires",
             "type": "stat"
         },
         {
@@ -4508,6 +4364,6 @@
     "timezone": "",
     "title": "Posit Team Overview",
     "uid": "posit-team-overview",
-    "version": 16,
+    "version": 17,
     "weekStart": ""
 }
