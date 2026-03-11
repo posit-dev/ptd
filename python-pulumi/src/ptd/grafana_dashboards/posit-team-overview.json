@@ -2493,7 +2493,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "Response size/min (kb)",
+            "title": "Response size/5m (kb)",
             "type": "timeseries"
         },
         {
