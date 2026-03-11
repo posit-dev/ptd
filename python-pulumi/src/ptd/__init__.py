@@ -448,7 +448,7 @@ class WorkloadClusterConfig:
     # or a full image reference. For adhoc images from posit-dev/team-operator PRs:
     #   ghcr.io/posit-dev/team-operator:adhoc-{branch}-{version}
     adhoc_team_operator_image: str | None = None
-    # Helm chart version for team-operator (None = latest from OCI registry)
+    # Helm chart version for team-operator (None = use DEFAULT_CHART_VERSION)
     team_operator_chart_version: str | None = None
     ptd_controller_image: str = "latest"
     eks_access_entries: EKSAccessEntriesConfig = dataclasses.field(default_factory=EKSAccessEntriesConfig)
