@@ -14,13 +14,11 @@ import ptd.pulumi_resources
 import ptd.pulumi_resources.aws_bastion
 import ptd.pulumi_resources.aws_control_room_cluster
 import ptd.pulumi_resources.aws_control_room_persistent
-import ptd.pulumi_resources.aws_control_room_postgres_config
 import ptd.pulumi_resources.aws_eks_cluster
 import ptd.pulumi_resources.aws_fsx_openzfs_multi
 import ptd.pulumi_resources.aws_vpc
 import ptd.pulumi_resources.aws_workload_clusters
 import ptd.pulumi_resources.aws_workload_persistent
-import ptd.pulumi_resources.aws_workload_postgres_config
 import ptd.pulumi_resources.external_dns
 import ptd.pulumi_resources.grafana_alloy
 import ptd.pulumi_resources.keycloak_operator
@@ -51,13 +49,11 @@ def test_import_only() -> None:
     assert ptd.pulumi_resources.aws_bastion is not None
     assert ptd.pulumi_resources.aws_control_room_cluster is not None
     assert ptd.pulumi_resources.aws_control_room_persistent is not None
-    assert ptd.pulumi_resources.aws_control_room_postgres_config is not None
     assert ptd.pulumi_resources.aws_eks_cluster is not None
     assert ptd.pulumi_resources.aws_fsx_openzfs_multi is not None
     assert ptd.pulumi_resources.aws_vpc is not None
     assert ptd.pulumi_resources.aws_workload_clusters is not None
     assert ptd.pulumi_resources.aws_workload_persistent is not None
-    assert ptd.pulumi_resources.aws_workload_postgres_config is not None
     assert ptd.pulumi_resources.external_dns is not None
     assert ptd.pulumi_resources.grafana_alloy is not None
     assert ptd.pulumi_resources.keycloak_operator is not None

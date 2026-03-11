@@ -410,8 +410,8 @@ func getPersistentStackOutputs(ctx context.Context, target types.Target) (auto.O
 	}
 	persistentStack, err := ptdpulumi.NewPythonPulumiStack(
 		ctx,
-		"azure",
-		"workload",
+		string(target.CloudProvider()),
+		string(target.Type()),
 		"persistent",
 		target.Name(),
 		target.Region(),

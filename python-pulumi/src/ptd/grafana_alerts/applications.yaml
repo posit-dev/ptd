@@ -63,7 +63,7 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            summary: "🔴 CRITICAL: Loki WAL Disk Full"
+            summary: "🟡 WARNING: Loki WAL Disk Full"
             description: |
               Loki ingester experiencing WAL disk full failures
 
