@@ -2487,7 +2487,7 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "sum without(code, method) (increase(connect_http_response_size_bytes{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\"}[1m])) / 1024",
+                    "expr": "sum without(code, method) (increase(connect_http_response_size_bytes_sum{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\"}[5m])) / 1024",
                     "legendFormat": "{{route}}",
                     "range": true,
                     "refId": "A"
@@ -3017,7 +3017,7 @@
         "list": [
             {
                 "current": {
-                    "selected": true,
+                    "selected": false,
                     "text": "All",
                     "value": "$__all"
                 },
@@ -3082,6 +3082,6 @@
     "timezone": "",
     "title": "Posit Team Overview",
     "uid": "posit-team-overview",
-    "version": 12,
+    "version": 13,
     "weekStart": ""
 }
