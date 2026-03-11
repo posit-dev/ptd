@@ -73,7 +73,7 @@ groups:
           execErrState: Error
           for: 10m
           annotations:
-            description: Azure NetApp Files volume has more than 80% capacity utilization for more than 10 minutes. Note: on new cluster deployments where Azure Monitor scraping has not yet initialized, noDataState=Alerting may produce a false positive after the for:10m window; this is expected during provisioning.
+            description: "Azure NetApp Files volume has more than 80% capacity utilization for more than 10 minutes. Note: on new cluster deployments where Azure Monitor scraping has not yet initialized, noDataState=Alerting may produce a false positive after the for:10m window; this is expected during provisioning."
             summary: High capacity utilization on Azure NetApp Files volume {{$labels.resource}} in cluster {{$labels.cluster}}
           labels:
             opsgenie: "1"
