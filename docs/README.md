@@ -9,6 +9,12 @@ Welcome to the Posit Team Dedicated (PTD) documentation.
 - [PTD CLI Reference](cli/PTD_CLI_REFERENCE.md) - Complete CLI command documentation
 - [Adding Config Options](guides/adding-config-options.md) - How to add new configuration options to Team Operator
 
+### Architecture
+
+- [Config Flow](architecture/config-flow.md) - How configuration flows from YAML through Go to Python
+- [Step Dependencies](architecture/step-dependencies.md) - The step execution pipeline and dependencies
+- [Pulumi Conventions](architecture/pulumi-conventions.md) - Pulumi-specific patterns and resource naming
+
 ### For Operators
 
 - [Team Operator Overview](team-operator/README.md) - Understanding the Kubernetes operator
@@ -25,6 +31,7 @@ Welcome to the Posit Team Dedicated (PTD) documentation.
 
 ```
 docs/
+├── architecture/           # Architecture documentation
 ├── cli/                    # PTD CLI documentation
 ├── team-operator/          # Team Operator documentation
 ├── guides/                 # How-to guides
