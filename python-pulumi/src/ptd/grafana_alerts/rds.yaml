@@ -6,7 +6,9 @@
 #   - orgId: 1
 #     uid: rds_cpu_utilization_high
 #   - orgId: 1
-#     uid: rds_free_storage_low
+#     uid: rds_free_storage_low_warning
+#   - orgId: 1
+#     uid: rds_free_storage_low_critical
 #   - orgId: 1
 #     uid: rds_freeable_memory_low
 #   - orgId: 1
@@ -22,6 +24,8 @@ apiVersion: 1
 deleteRules:
     - orgId: 1
       uid: rds_read_latency_high
+    - orgId: 1
+      uid: rds_free_storage_low
 groups:
     - orgId: 1
       name: RDS
@@ -74,18 +78,31 @@ groups:
                 maxDataPoints: 43200
                 refId: B
                 type: threshold
-          noDataState: NoData  # Performance metric; silent suppression on scrape outage is acceptable
+          noDataState: NoData
           execErrState: Error
           for: 10m
           annotations:
-            description: RDS instance CPU utilization is above 80% for more than 10 minutes.
-            summary: High CPU utilization on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
+            summary: "🟡 WARNING: RDS CPU Utilization High"
+            description: |
+              RDS instance CPU utilization is elevated
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_DBInstanceIdentifier }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      CPU Utilization
+              Current:     > 80%
+              Threshold:   80%
+              Duration:    10 minutes
+
           labels:
             opsgenie: "1"
-            severity: warning
           isPaused: false
-        - uid: rds_free_storage_low
-          title: RDS Free Storage Low
+        - uid: rds_free_storage_low_warning
+          title: RDS Free Storage Low (Warning)
           condition: B
           data:
             - refId: A
@@ -111,7 +128,8 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            - 5368709120  # 5 GiB in bytes; calibrated for mid-size instances (100–500 GiB). Adjust for larger (e.g. 1 TiB) or smaller instances.
+                            # 10 GiB in bytes
+                            - 10737418240
                         type: lt
                       operator:
                         type: and
@@ -130,19 +148,98 @@ groups:
                 maxDataPoints: 43200
                 refId: B
                 type: threshold
-          noDataState: Alerting  # Storage exhaustion is latent; alert even when scraping stops so we don't silently miss a full disk
+          noDataState: Alerting
           execErrState: Error
           for: 5m
           annotations:
-            description: "RDS instance has less than 5 GiB of free storage space remaining. Note: on new cluster deployments where CloudWatch scraping has not yet initialized, noDataState=Alerting may produce a false positive after the for:5m window; this is expected during provisioning."
-            summary: Low free storage on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
+            summary: "🟡 WARNING: RDS Free Storage Low"
+            description: |
+              RDS instance storage capacity is running low
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_DBInstanceIdentifier }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Free Storage Space
+              Current:     < 10 GiB free
+              Threshold:   10 GiB
+              Duration:    5 minutes
+
           labels:
             opsgenie: "1"
-            severity: warning
-            # Note: threshold is absolute (5 GiB) rather than percentage-based. CloudWatch does not
-            # expose AllocatedStorage as a time-series metric for RDS (it is an instance attribute),
-            # so computing a usage percentage is not feasible without a separate exporter or recording
-            # rule. The 5 GiB threshold is calibrated to PTD's default 100 GiB allocation.
+          isPaused: false
+        - uid: rds_free_storage_low_critical
+          title: RDS Free Storage Low (Critical)
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_rds_free_storage_space_average{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            # 5 GiB in bytes
+                            - 5368709120
+                        type: lt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: Alerting
+          execErrState: Error
+          for: 5m
+          annotations:
+            summary: "🔴 CRITICAL: RDS Free Storage Critical"
+            description: |
+              RDS instance storage capacity is critically low
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_DBInstanceIdentifier }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Free Storage Space
+              Current:     < 5 GiB free
+              Threshold:   5 GiB
+              Duration:    5 minutes
+
+          labels:
+            opsgenie: "1"
           isPaused: false
         - uid: rds_freeable_memory_low
           title: RDS Freeable Memory Low
@@ -171,7 +268,8 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            - 536870912  # 512 MiB in bytes; calibrated for db.r5.large (~16 GiB RAM). Adjust for other instance classes.
+                            # 256 MiB in bytes
+                            - 268435456
                         type: lt
                       operator:
                         type: and
@@ -190,21 +288,29 @@ groups:
                 maxDataPoints: 43200
                 refId: B
                 type: threshold
-          noDataState: Alerting  # Memory exhaustion is latent; alert even when scraping stops so we don't silently miss an OOM condition
+          noDataState: Alerting
           execErrState: Error
           for: 10m
           annotations:
-            description: "RDS instance has less than 512 MiB of freeable memory remaining for more than 10 minutes. Note: this threshold is calibrated for db.r5.large (~16 GiB RAM); it will fire continuously for small instances (e.g. db.t3.micro, db.t3.small). Adjust per instance class."
-            summary: Low freeable memory on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
+            summary: "🟡 WARNING: RDS Freeable Memory Low"
+            description: |
+              RDS instance freeable memory is low
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_DBInstanceIdentifier }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Freeable Memory
+              Current:     < 256 MiB free
+              Threshold:   256 MiB
+              Duration:    10 minutes
+
           labels:
             opsgenie: "1"
-            severity: warning
-            instance_size_dependent: "true"  # Silence this label for known-small instance classes
-            # Note: threshold is absolute (512 MiB) rather than percentage-based. CloudWatch does not
-            # expose total instance RAM as a metric for RDS — it varies by instance type. PTD's default
-            # instance (db.t3.small, 2 GiB) would fire constantly at a 90%-used threshold under normal
-            # Postgres buffer cache load, making percentage-based alerting impractical here.
-          isPaused: true  # Paused until a Grafana silence or Alertmanager inhibit rule is configured for the instance_size_dependent label
+          isPaused: false
         - uid: rds_database_connections_high
           title: RDS Database Connections High
           condition: B
@@ -251,13 +357,26 @@ groups:
                 maxDataPoints: 43200
                 refId: B
                 type: threshold
-          noDataState: NoData  # Performance metric; silent suppression on scrape outage is acceptable
+          noDataState: NoData
           execErrState: Error
           for: 5m
           annotations:
-            description: RDS instance has more than 80 active database connections for more than 5 minutes.
-            summary: High database connections on RDS instance {{$labels.dimension_DBInstanceIdentifier}} in cluster {{$labels.cluster}}
+            summary: "🟡 WARNING: RDS Database Connections High"
+            description: |
+              RDS instance has high number of database connections
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_DBInstanceIdentifier }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Database Connections
+              Current:     > 80 connections
+              Threshold:   80
+              Duration:    5 minutes
+
           labels:
             opsgenie: "1"
-            severity: warning
           isPaused: false
