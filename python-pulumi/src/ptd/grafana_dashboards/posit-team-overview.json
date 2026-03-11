@@ -1561,7 +1561,7 @@
                 "h": 1,
                 "w": 24,
                 "x": 0,
-                "y": 23
+                "y": 22
             },
             "id": 100,
             "panels": [],
@@ -1580,6 +1580,8 @@
                         "mode": "thresholds"
                     },
                     "mappings": [],
+                    "max": 1000,
+                    "min": 0,
                     "thresholds": {
                         "mode": "absolute",
                         "steps": [
@@ -1596,9 +1598,7 @@
                                 "value": 800
                             }
                         ]
-                    },
-                    "max": 1000,
-                    "min": 0
+                    }
                 },
                 "overrides": []
             },
@@ -1606,7 +1606,7 @@
                 "h": 4,
                 "w": 6,
                 "x": 0,
-                "y": 24
+                "y": 23
             },
             "id": 101,
             "options": {
@@ -1652,6 +1652,8 @@
                         "mode": "thresholds"
                     },
                     "mappings": [],
+                    "max": 100,
+                    "min": 0,
                     "thresholds": {
                         "mode": "absolute",
                         "steps": [
@@ -1668,9 +1670,7 @@
                                 "value": 80
                             }
                         ]
-                    },
-                    "max": 100,
-                    "min": 0
+                    }
                 },
                 "overrides": []
             },
@@ -1678,7 +1678,7 @@
                 "h": 4,
                 "w": 6,
                 "x": 6,
-                "y": 24
+                "y": 23
             },
             "id": 102,
             "options": {
@@ -1724,6 +1724,8 @@
                         "mode": "thresholds"
                     },
                     "mappings": [],
+                    "max": 100,
+                    "min": 0,
                     "thresholds": {
                         "mode": "absolute",
                         "steps": [
@@ -1740,9 +1742,7 @@
                                 "value": 80
                             }
                         ]
-                    },
-                    "max": 100,
-                    "min": 0
+                    }
                 },
                 "overrides": []
             },
@@ -1750,7 +1750,7 @@
                 "h": 4,
                 "w": 3,
                 "x": 12,
-                "y": 24
+                "y": 23
             },
             "id": 103,
             "options": {
@@ -1796,6 +1796,8 @@
                         "mode": "thresholds"
                     },
                     "mappings": [],
+                    "max": 200,
+                    "min": 0,
                     "thresholds": {
                         "mode": "absolute",
                         "steps": [
@@ -1812,9 +1814,7 @@
                                 "value": 150
                             }
                         ]
-                    },
-                    "max": 200,
-                    "min": 0
+                    }
                 },
                 "overrides": []
             },
@@ -1822,7 +1822,7 @@
                 "h": 4,
                 "w": 3,
                 "x": 15,
-                "y": 24
+                "y": 23
             },
             "id": 104,
             "options": {
@@ -1868,6 +1868,8 @@
                         "mode": "thresholds"
                     },
                     "mappings": [],
+                    "max": 300,
+                    "min": 0,
                     "thresholds": {
                         "mode": "absolute",
                         "steps": [
@@ -1884,9 +1886,7 @@
                                 "value": 250
                             }
                         ]
-                    },
-                    "max": 300,
-                    "min": 0
+                    }
                 },
                 "overrides": []
             },
@@ -1894,7 +1894,7 @@
                 "h": 4,
                 "w": 3,
                 "x": 18,
-                "y": 24
+                "y": 23
             },
             "id": 105,
             "options": {
@@ -1956,7 +1956,7 @@
                 "h": 2,
                 "w": 3,
                 "x": 21,
-                "y": 24
+                "y": 23
             },
             "id": 106,
             "options": {
@@ -2024,7 +2024,7 @@
                 "h": 2,
                 "w": 3,
                 "x": 21,
-                "y": 26
+                "y": 25
             },
             "id": 107,
             "options": {
@@ -2128,7 +2128,7 @@
                 "h": 6,
                 "w": 12,
                 "x": 0,
-                "y": 28
+                "y": 27
             },
             "id": 108,
             "maxDataPoints": 300,
@@ -2151,13 +2151,13 @@
                         "uid": "mimir"
                     },
                     "editorMode": "code",
-                    "expr": "sum without(code, method) (increase(connect_http_request_count{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\"}[1m]))",
+                    "expr": "sum without(code, method) (increase(connect_http_request_count{cluster=~\"$cluster_name\", ptd_site=~\"$site_name\"}[5m]))",
                     "legendFormat": "{{route}}",
                     "range": true,
                     "refId": "A"
                 }
             ],
-            "title": "Requests/minute",
+            "title": "Requests/5m",
             "type": "timeseries"
         },
         {
@@ -2172,6 +2172,8 @@
                         "mode": "thresholds"
                     },
                     "mappings": [],
+                    "max": 1000,
+                    "min": 0,
                     "thresholds": {
                         "mode": "absolute",
                         "steps": [
@@ -2188,9 +2190,7 @@
                                 "value": 800
                             }
                         ]
-                    },
-                    "max": 1000,
-                    "min": 0
+                    }
                 },
                 "overrides": []
             },
@@ -2198,7 +2198,7 @@
                 "h": 3,
                 "w": 3,
                 "x": 12,
-                "y": 28
+                "y": 27
             },
             "id": 109,
             "options": {
@@ -2296,7 +2296,7 @@
                 "h": 6,
                 "w": 9,
                 "x": 15,
-                "y": 28
+                "y": 27
             },
             "id": 110,
             "maxDataPoints": 300,
@@ -2340,6 +2340,8 @@
                         "mode": "thresholds"
                     },
                     "mappings": [],
+                    "max": 5,
+                    "min": 0,
                     "thresholds": {
                         "mode": "absolute",
                         "steps": [
@@ -2356,9 +2358,7 @@
                                 "value": 4
                             }
                         ]
-                    },
-                    "max": 5,
-                    "min": 0
+                    }
                 },
                 "overrides": []
             },
@@ -2366,7 +2366,7 @@
                 "h": 3,
                 "w": 3,
                 "x": 12,
-                "y": 31
+                "y": 30
             },
             "id": 111,
             "options": {
@@ -2464,7 +2464,7 @@
                 "h": 6,
                 "w": 12,
                 "x": 0,
-                "y": 34
+                "y": 33
             },
             "id": 112,
             "maxDataPoints": 300,
@@ -2560,7 +2560,7 @@
                 "h": 6,
                 "w": 7,
                 "x": 12,
-                "y": 34
+                "y": 33
             },
             "id": 113,
             "maxDataPoints": 300,
@@ -2689,7 +2689,7 @@
                 "h": 6,
                 "w": 5,
                 "x": 19,
-                "y": 34
+                "y": 33
             },
             "id": 114,
             "maxDataPoints": 300,
@@ -2785,7 +2785,7 @@
                 "h": 5,
                 "w": 12,
                 "x": 0,
-                "y": 40
+                "y": 39
             },
             "id": 115,
             "maxDataPoints": 300,
@@ -2881,7 +2881,7 @@
                 "h": 5,
                 "w": 6,
                 "x": 12,
-                "y": 40
+                "y": 39
             },
             "id": 116,
             "maxDataPoints": 300,
@@ -2977,7 +2977,7 @@
                 "h": 5,
                 "w": 6,
                 "x": 18,
-                "y": 40
+                "y": 39
             },
             "id": 117,
             "maxDataPoints": 300,
@@ -3082,6 +3082,6 @@
     "timezone": "",
     "title": "Posit Team Overview",
     "uid": "posit-team-overview",
-    "version": 11,
+    "version": 12,
     "weekStart": ""
 }
