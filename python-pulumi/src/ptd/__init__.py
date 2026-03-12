@@ -443,20 +443,12 @@ class Toleration:
 
 @dataclasses.dataclass(frozen=True)
 class WorkloadClusterConfig:
-    """
-    Configuration for a single cluster within a workload.
-    Must stay in sync with Go struct: lib/types/workload.go (WorkloadClusterConfig).
-
-    Contains cluster-specific settings: Team Operator image, EKS access entries,
-    custom K8s resources, tolerations, component versions, node groups, routing weight.
-    """
-
-    team_operator_image: str = "latest"
+    team_operator_image: str | None = None
     # Overrides team_operator_image when set. Can be a tag (e.g., "test", "dev")
     # or a full image reference. For adhoc images from posit-dev/team-operator PRs:
     #   ghcr.io/posit-dev/team-operator:adhoc-{branch}-{version}
     adhoc_team_operator_image: str | None = None
-    # Helm chart version for team-operator (None = latest from OCI registry)
+    # Helm chart version for team-operator (None = use DEFAULT_CHART_VERSION)
     team_operator_chart_version: str | None = None
     ptd_controller_image: str = "latest"
     eks_access_entries: EKSAccessEntriesConfig = dataclasses.field(default_factory=EKSAccessEntriesConfig)
