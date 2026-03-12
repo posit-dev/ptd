@@ -32,7 +32,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: azure_microsoft_storage_storageaccounts_availability{job="integrations/azure"}
+                expr: azure_microsoft_storage_storageaccounts_availability_average_percent{job="integrations/azure"}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -71,8 +71,22 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: Azure Storage Account availability is below 99.9% for over 5 minutes, indicating potential service degradation or outages.
-            summary: Low availability on Azure Storage Account {{$labels.resource}} in cluster {{$labels.cluster}}
+            summary: "🔴 CRITICAL: Azure Storage Availability Low"
+            description: |
+              Storage account availability is below 99.9%
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.resource }}
+              Location:    {{ $labels.location }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Availability
+              Current:     < 99.9%
+              Threshold:   99.9%
+              Duration:    5 minutes
+
           labels:
             opsgenie: "1"
           isPaused: false
@@ -87,7 +101,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: azure_microsoft_storage_storageaccounts_successe2elatency{job="integrations/azure"}
+                expr: azure_microsoft_storage_storageaccounts_successe2elatency_average_milliseconds{job="integrations/azure"}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -126,8 +140,22 @@ groups:
           execErrState: Error
           for: 10m
           annotations:
-            description: Azure Storage Account end-to-end latency is above 1000ms for more than 10 minutes, indicating performance degradation.
-            summary: High latency on Azure Storage Account {{$labels.resource}} in cluster {{$labels.cluster}}
+            summary: "🟡 WARNING: Azure Storage Latency High"
+            description: |
+              Storage account end-to-end latency is above 1000ms
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.resource }}
+              Location:    {{ $labels.location }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      End-to-End Latency
+              Current:     > 1000ms (1 second)
+              Threshold:   1000ms
+              Duration:    10 minutes
+
           labels:
             opsgenie: "1"
           isPaused: false
