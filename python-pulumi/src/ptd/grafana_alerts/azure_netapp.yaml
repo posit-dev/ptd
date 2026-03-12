@@ -34,7 +34,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage{job="integrations/azure"}
+                expr: azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -73,8 +73,25 @@ groups:
           execErrState: Error
           for: 10m
           annotations:
-            description: "Azure NetApp Files volume has more than 80% capacity utilization for more than 10 minutes. Note: on new cluster deployments where Azure Monitor scraping has not yet initialized, noDataState=Alerting may produce a false positive after the for:10m window; this is expected during provisioning."
-            summary: High capacity utilization on Azure NetApp Files volume {{$labels.resource}} in cluster {{$labels.cluster}}
+            summary: "🟡 WARNING: Azure NetApp Files Capacity High"
+            description: |
+              NetApp Files volume capacity utilization is above 80%
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.resource }}
+              Location:    {{ $labels.location }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Volume Capacity
+              Current:     > 80%
+              Threshold:   80%
+              Duration:    10 minutes
+
+              Note: On new deployments, noDataState=Alerting may produce
+              a false positive during Azure Monitor initialization (first 10m)
+
           labels:
             opsgenie: "1"
           isPaused: false
@@ -89,7 +106,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagereadlatency{job="integrations/azure"}
+                expr: azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagereadlatency_average_milliseconds{job="integrations/azure"}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -128,8 +145,23 @@ groups:
           execErrState: Error
           for: 10m
           annotations:
-            description: Azure NetApp Files volume read latency is above 10ms for more than 10 minutes, indicating potential performance degradation.
-            summary: High read latency on Azure NetApp Files volume {{$labels.resource}} in cluster {{$labels.cluster}}
+            summary: "🟡 WARNING: Azure NetApp Files Read Latency High"
+            description: |
+              NetApp Files volume read latency is above 10ms
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.resource }}
+              Location:    {{ $labels.location }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Read Latency
+              Current:     > 10ms
+              Threshold:   10ms
+              Duration:    10 minutes
+              Baseline:    Sub-millisecond typical
+
           labels:
             opsgenie: "1"
           isPaused: false
@@ -144,7 +176,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagewritelatency{job="integrations/azure"}
+                expr: azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagewritelatency_average_milliseconds{job="integrations/azure"}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -183,8 +215,23 @@ groups:
           execErrState: Error
           for: 10m
           annotations:
-            description: Azure NetApp Files volume write latency is above 10ms for more than 10 minutes, indicating potential performance degradation.
-            summary: High write latency on Azure NetApp Files volume {{$labels.resource}} in cluster {{$labels.cluster}}
+            summary: "🟡 WARNING: Azure NetApp Files Write Latency High"
+            description: |
+              NetApp Files volume write latency is above 10ms
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.resource }}
+              Location:    {{ $labels.location }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Write Latency
+              Current:     > 10ms
+              Threshold:   10ms
+              Duration:    10 minutes
+              Baseline:    Sub-millisecond typical
+
           labels:
             opsgenie: "1"
           isPaused: false
