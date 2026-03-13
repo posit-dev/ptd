@@ -109,6 +109,16 @@ class AzureTraefik(pulumi.ComponentResource):
                     self._define_redirect_middleware(),
                     *self._define_ingresses(),
                 ],
+                **(
+                    {
+                        "globalArguments": [
+                            "--global.checknewversion=false",
+                            "--global.sendanonymoususage=false",
+                        ],
+                    }
+                    if not self.workload.cfg.third_party_telemetry_enabled
+                    else {}
+                ),
             },
             opts=pulumi.ResourceOptions(parent=self),
         )

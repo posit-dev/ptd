@@ -75,6 +75,7 @@ type AWSWorkloadConfig struct {
 	HostedZoneManagementEnabled             *bool                               `json:"hosted_zone_management_enabled,omitempty" yaml:"hosted_zone_management_enabled,omitempty"`
 	VpcAzCount                              int                                 `json:"vpc_az_count" yaml:"vpc_az_count"`
 	VpcCidr                                 string                              `json:"vpc_cidr" yaml:"vpc_cidr"`
+	ThirdPartyTelemetryEnabled              bool                                `json:"third_party_telemetry_enabled" yaml:"third_party_telemetry_enabled"`
 }
 
 type AWSProvisionedVpc struct {
@@ -97,6 +98,7 @@ type AzureWorkloadConfig struct {
 	ResourceTags               map[string]string                     `yaml:"resource_tags"`
 	Sites                      map[string]SiteConfig                 `json:"sites" yaml:"sites"` // didn't find this on the python side.
 	ProtectPersistentResources bool                                  `yaml:"protect_persistent_resources"`
+	ThirdPartyTelemetryEnabled bool                                  `yaml:"third_party_telemetry_enabled"`
 	Network                    NetworkConfig                         `yaml:"network"`
 }
 

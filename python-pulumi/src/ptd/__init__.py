@@ -350,6 +350,7 @@ class WorkloadConfig:
     sites: typing.Mapping[str, SiteConfig]
     true_name: str
     tenant_name: str | None = dataclasses.field(default=None, kw_only=True)  # Human-readable name for the tenant
+    third_party_telemetry_enabled: bool = True
 
     @property
     def domain(self) -> str:
@@ -372,7 +373,7 @@ class WorkloadClusterComponentConfig:
     mimir_version: str | None = "5.2.1"
     mimir_replicas: int = 2
     secret_store_csi_driver_version: str | None = "1.3.4"  # noqa: S105
-    tigera_operator_version: str | None = "3.26.1"
+    tigera_operator_version: str | None = "3.29.3"
     traefik_forward_auth_version: str | None = None
     traefik_version: str | None = "37.1.2"
 

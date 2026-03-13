@@ -10,6 +10,8 @@ class TigeraOperator(pulumi.ComponentResource):
         self,
         name: str,
         release: str,
+        version: str = "3.29.3",
+        third_party_telemetry_enabled: bool = True,
         *args,
         **kwargs,
     ):
@@ -22,6 +24,8 @@ class TigeraOperator(pulumi.ComponentResource):
 
         self.name = name
         self.release = release
+        self.version = version
+        self.third_party_telemetry_enabled = third_party_telemetry_enabled
 
         self._define_namespace()
         self._define_helm_release()
@@ -46,7 +50,7 @@ class TigeraOperator(pulumi.ComponentResource):
         self.helm_release = k8s.helm.v3.Release(
             f"{self.name}-{self.release}-tigera-operator",
             chart="tigera-operator",
-            version="3.26.1",
+            version=self.version,
             namespace="tigera-operator",
             name="tigera-operator",
             repository_opts=k8s.helm.v3.RepositoryOptsArgs(
@@ -78,7 +82,17 @@ class TigeraOperator(pulumi.ComponentResource):
                         "type": "Calico",
                     },
                     "nonPrivileged": "Enabled",
-                }
+                },
+                **(
+                    {
+                        "defaultFelixConfiguration": {
+                            "enabled": True,
+                            "usageReportingEnabled": False,
+                        },
+                    }
+                    if not self.third_party_telemetry_enabled
+                    else {}
+                ),
             },
             opts=pulumi.ResourceOptions(parent=self, depends_on=self.namespace),
         )
