@@ -267,9 +267,17 @@ class AWSWorkloadEKS(pulumi.ComponentResource):
             The TigeraOperator so it can be used as a dependency.
         """
         kube_provider = self.eks_clusters[release].provider
+        cluster_cfg = self.workload.cfg.clusters[release]
+        version = (
+            cluster_cfg.components.tigera_operator_version
+            if cluster_cfg.components and cluster_cfg.components.tigera_operator_version
+            else ptd.WorkloadClusterComponentConfig.tigera_operator_version
+        )
         return ptd.pulumi_resources.tigera_operator.TigeraOperator(
             name=self.workload.compound_name,
             release=release,
+            version=version,
+            third_party_telemetry_enabled=self.workload.cfg.third_party_telemetry_enabled,
             opts=pulumi.ResourceOptions(
                 parent=self,
                 provider=kube_provider,
