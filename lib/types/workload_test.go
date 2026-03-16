@@ -269,3 +269,103 @@ func TestResolveUserNodePools_WithoutPools(t *testing.T) {
 	assert.Nil(t, pools)
 	assert.Contains(t, err.Error(), "user_node_pools must be defined in cluster configuration")
 }
+
+func TestAzureWorkloadClusterConfig_ForceMaintenance(t *testing.T) {
+	// Test that force_maintenance field is properly serialized/deserialized
+	config := AzureWorkloadClusterConfig{
+		KubernetesVersion:          "1.28.0",
+		SystemNodePoolInstanceType: "Standard_D2s_v6",
+		ForceMaintenance:           true,
+		UserNodePools: []AzureUserNodePoolConfig{
+			{
+				Name:              "general",
+				VMSize:            "Standard_D8s_v6",
+				MinCount:          2,
+				MaxCount:          10,
+				EnableAutoScaling: true,
+			},
+		},
+	}
+
+	// Marshal to YAML
+	yamlData, err := yaml.Marshal(config)
+	assert.NoError(t, err)
+
+	// Verify the YAML contains the force_maintenance field
+	yamlString := string(yamlData)
+	assert.Contains(t, yamlString, "force_maintenance: true")
+
+	// Unmarshal from YAML
+	var unmarshaledConfig AzureWorkloadClusterConfig
+	err = yaml.Unmarshal(yamlData, &unmarshaledConfig)
+	assert.NoError(t, err)
+
+	// Verify force_maintenance matches
+	assert.True(t, unmarshaledConfig.ForceMaintenance)
+}
+
+func TestAzureWorkloadClusterConfig_ForceMaintenanceFromYAML(t *testing.T) {
+	// Test parsing force_maintenance from YAML (simulating ptd.yaml)
+	yamlContent := `
+kubernetes_version: "1.28.0"
+system_node_pool_instance_type: "Standard_D2s_v6"
+force_maintenance: true
+user_node_pools:
+  - name: "general"
+    vm_size: "Standard_D8s_v6"
+    min_count: 2
+    max_count: 10
+    enable_auto_scaling: true
+`
+
+	var config AzureWorkloadClusterConfig
+	err := yaml.Unmarshal([]byte(yamlContent), &config)
+	assert.NoError(t, err)
+	assert.True(t, config.ForceMaintenance)
+	assert.Equal(t, "1.28.0", config.KubernetesVersion)
+}
+
+func TestAzureWorkloadClusterConfig_ForceMaintenanceDefaultFalse(t *testing.T) {
+	// Test that force_maintenance defaults to false when not specified
+	yamlContent := `
+kubernetes_version: "1.28.0"
+system_node_pool_instance_type: "Standard_D2s_v6"
+user_node_pools:
+  - name: "general"
+    vm_size: "Standard_D8s_v6"
+    min_count: 2
+    max_count: 10
+    enable_auto_scaling: true
+`
+
+	var config AzureWorkloadClusterConfig
+	err := yaml.Unmarshal([]byte(yamlContent), &config)
+	assert.NoError(t, err)
+	assert.False(t, config.ForceMaintenance)
+}
+
+func TestAzureWorkloadClusterConfig_ForceMaintenanceOmittedWhenFalse(t *testing.T) {
+	// Test that force_maintenance is omitted from YAML when false (omitempty)
+	config := AzureWorkloadClusterConfig{
+		KubernetesVersion:          "1.28.0",
+		SystemNodePoolInstanceType: "Standard_D2s_v6",
+		ForceMaintenance:           false, // explicitly false
+		UserNodePools: []AzureUserNodePoolConfig{
+			{
+				Name:              "general",
+				VMSize:            "Standard_D8s_v6",
+				MinCount:          2,
+				MaxCount:          10,
+				EnableAutoScaling: true,
+			},
+		},
+	}
+
+	// Marshal to YAML
+	yamlData, err := yaml.Marshal(config)
+	assert.NoError(t, err)
+
+	// Verify the YAML does NOT contain force_maintenance (omitempty)
+	yamlString := string(yamlData)
+	assert.NotContains(t, yamlString, "force_maintenance")
+}

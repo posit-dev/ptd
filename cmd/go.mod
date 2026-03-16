@@ -7,7 +7,7 @@ replace github.com/posit-dev/ptd/lib => ../lib
 require (
 	github.com/charmbracelet/log v0.4.2
 	github.com/posit-dev/ptd/lib v0.0.0-00010101000000-000000000000
-	github.com/spf13/cobra v1.9.1
+	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/term v0.39.0
