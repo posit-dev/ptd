@@ -1,7 +1,6 @@
 import pulumi
 import pulumi_tls as tls
 from pulumi_azure_native import compute, network
-from pulumi_command import local
 
 
 class AzureBastion(pulumi.ComponentResource):
@@ -48,19 +47,6 @@ class AzureBastion(pulumi.ComponentResource):
         self.jumpbox_ssh_key = tls.PrivateKey(
             "ssh-key",
             algorithm="ED25519",
-        )
-
-        # write the private key to a file on the local machine
-        # this needs to be repeated by any engineer who wants to access the jumpbox
-        local.run_output(
-            command=pulumi.Output.format(
-                "FILE=~/.ssh/{1}; "
-                'if [ ! -f "$FILE" ]; then '
-                'echo \'{0}\' > "$FILE" && chmod 600 "$FILE"; '
-                'else echo "File $FILE already exists, skipping."; fi',
-                self.jumpbox_ssh_key.private_key_openssh,
-                name,
-            ),
         )
 
         # Create a Public IP for Bastion

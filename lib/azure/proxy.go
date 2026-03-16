@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"regexp"
 	"time"
 
 	"github.com/posit-dev/ptd/lib/helpers"
@@ -22,6 +21,7 @@ type ProxySession struct {
 	tunnelCommand *exec.Cmd
 	socksCommand  *exec.Cmd
 	localPort     string
+	sshKeyPath    string // temp file for bastion SSH key, cleaned up on Stop
 
 	runningProxy *proxy.RunningProxy
 	isReused     bool // indicates if the session is reused from an existing running proxy
@@ -88,16 +88,10 @@ func (p *ProxySession) Start(ctx context.Context) error {
 		return err
 	}
 
-	bastionName, err := p.target.BastionName(ctx)
-
+	bastionInfo, err := p.target.BastionInfo(ctx)
 	if err != nil {
-		slog.Error("Error getting bastion name", "error", err)
-	}
-
-	jumpBoxId, err := p.target.JumpBoxId(ctx)
-
-	if err != nil {
-		slog.Error("Error getting jump box ID", "error", err)
+		slog.Error("Error getting bastion info", "error", err)
+		return fmt.Errorf("failed to get bastion info: %w", err)
 	}
 
 	// Determine which resource group to use for the bastion tunnel
@@ -114,25 +108,32 @@ func (p *ProxySession) Start(ctx context.Context) error {
 		return fmt.Errorf("Resource Group name is empty, cannot continue.")
 	}
 
-	// HACK: at the moment, the ssh key is written to a path and named based on the bastion name.
-	// This is a temporary workaround to remove the "-host" suffix from the bastion name, since that isn't in the key name
-	r := regexp.MustCompile(`-host.*`)
-	bastionSshKeyName := r.ReplaceAllString(bastionName, "")
+	// Write the SSH private key from Pulumi state to a temp file (cleaned up in Stop)
+	sshKeyFile, err := os.CreateTemp("", "ptd-bastion-ssh-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file for SSH key: %w", err)
+	}
+	if _, err := sshKeyFile.WriteString(bastionInfo.SSHPrivateKey); err != nil {
+		sshKeyFile.Close()
+		os.Remove(sshKeyFile.Name())
+		return fmt.Errorf("failed to write SSH key: %w", err)
+	}
+	sshKeyFile.Close()
+	p.sshKeyPath = sshKeyFile.Name()
 
 	// build the command to start the bastion tunnel, this will connect jumpbox:22 to localhost:22001 (enabling SSH connection via separate command)
 	p.tunnelCommand = exec.CommandContext(
 		ctx,
 		p.azCliPath,
 		"network", "bastion", "tunnel",
-		"--name", bastionName,
+		"--name", bastionInfo.Name,
 		"--resource-group", resourceGroupName,
-		"--target-resource-id", jumpBoxId,
+		"--target-resource-id", bastionInfo.JumpBoxID,
 		"--resource-port", "22",
 		"--port", "22001",
 	)
 
 	// build the command to start the SOCKS proxy via SSH, using the jumpbox tunnel from above
-	// ssh -ND 1080 ptd-admin@localhost -p 22001 -i ~/.ssh/bas-ptd-madrigal01-production-bastion
 	p.socksCommand = exec.CommandContext(
 		ctx,
 		"ssh",
@@ -141,7 +142,7 @@ func (p *ProxySession) Start(ctx context.Context) error {
 		"-p", "22001",
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null",
-		"-i", fmt.Sprintf("%s/.ssh/%s", os.Getenv("HOME"), bastionSshKeyName))
+		"-i", p.sshKeyPath)
 
 	// set the environment variables for the command
 	// add each az env var to command
@@ -150,7 +151,7 @@ func (p *ProxySession) Start(ctx context.Context) error {
 		p.socksCommand.Env = append(p.socksCommand.Env, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	slog.Debug("Starting Azure bastion tunnel", "bastion_name", bastionName, "resource_group", resourceGroupName, "tunnel_port", "22001", "target_port", "22")
+	slog.Debug("Starting Azure bastion tunnel", "bastion_name", bastionInfo.Name, "resource_group", resourceGroupName, "tunnel_port", "22001", "target_port", "22")
 	if ctx.Value("verbose") != nil && ctx.Value("verbose").(bool) {
 		slog.Debug("Verbose turned on, attaching command output to stdout and stderr")
 		p.tunnelCommand.Stdout = os.Stdout
@@ -201,6 +202,10 @@ func (p *ProxySession) Start(ctx context.Context) error {
 }
 
 func (p *ProxySession) Stop() error {
+	if p.sshKeyPath != "" {
+		os.Remove(p.sshKeyPath)
+	}
+
 	if p.isReused {
 		slog.Debug("Proxy session was reused, not stopping", "target", p.target.Name(), "local_port", p.localPort)
 		return nil
