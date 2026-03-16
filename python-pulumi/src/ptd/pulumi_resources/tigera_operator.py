@@ -10,9 +10,9 @@ class TigeraOperator(pulumi.ComponentResource):
         self,
         name: str,
         release: str,
+        *args,
         version: str = "3.29.3",
         third_party_telemetry_enabled: bool = True,
-        *args,
         **kwargs,
     ):
         super().__init__(

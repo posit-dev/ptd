@@ -350,7 +350,7 @@ class WorkloadConfig:
     sites: typing.Mapping[str, SiteConfig]
     true_name: str
     tenant_name: str | None = dataclasses.field(default=None, kw_only=True)  # Human-readable name for the tenant
-    third_party_telemetry_enabled: bool = True
+    third_party_telemetry_enabled: bool = dataclasses.field(default=True, kw_only=True)
 
     @property
     def domain(self) -> str:
