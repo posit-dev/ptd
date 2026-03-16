@@ -19,6 +19,7 @@ import ptd.aws_iam
 import ptd.junkdrawer
 import ptd.oidc
 import ptd.paths
+import ptd.pulumi_resources.lib
 import ptd.secrecy
 
 
@@ -43,6 +44,12 @@ class ServiceAccount:
 
 class AWSEKSCluster(pulumi.ComponentResource):
     """
+    BUILDER PATTERN: __init__() sets up initial state, then call with_*() methods in sequence.
+    Each with_*() method returns self for chaining.
+
+    CRITICAL: Method ordering matters. See ordering dependencies below.
+    CRITICAL: register_outputs({}) is NOT called in this class — caller must handle it.
+
     Create an EKS cluster. Other useful methods:
       - with_node_role()
       - with_node_group()
@@ -121,6 +128,18 @@ class AWSEKSCluster(pulumi.ComponentResource):
         self.iam_permissions_boundary = iam_permissions_boundary
         self.tailscale_enabled = tailscale_enabled
         self.customer_managed_bastion_id = customer_managed_bastion_id
+
+        # ──────────────────────────────────────────────────────────────────────
+        # Method Ordering Dependencies (for with_*() methods):
+        # 1. __init__() creates self.eks (the cluster resource)
+        # 2. with_oidc_provider() requires self.eks
+        # 3. with_node_role() sets self.default_node_role
+        # 4. with_node_group() requires self.default_node_role (from with_node_role())
+        # 5. with_ebs_csi_driver() sets self.ebs_csi_addon
+        # 6. with_encrypted_ebs_storage_class() requires self.ebs_csi_addon
+        # 7. with_aws_lbc() requires self.oidc_provider (from with_oidc_provider())
+        # 8. with_grafana() and with_mimir() require namespace and OIDC provider
+        # ──────────────────────────────────────────────────────────────────────
 
         # optional variables added later
         self.default_node_role = None
@@ -251,6 +270,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
             pulumi.log.info(f"Creating new cluster {name} with API_AND_CONFIG_MAP authentication mode")
 
         # Create or update the cluster
+        # PULUMI STATE NAME — changing 'name' here will destroy and recreate the EKS cluster
         self.eks = aws.eks.Cluster(
             name,
             **cluster_args,
@@ -441,6 +461,8 @@ class AWSEKSCluster(pulumi.ComponentResource):
         Create the default node role for the EKS cluster.
         This is a minimal node role for EKS cluster nodes to function.
 
+        Sets self.default_node_role, which is required by with_node_group().
+
         :param role: Optional. The role that should be used by default for node groups. No policies are created if a
         role is provided. Default is a role with minimal policies for proper EKS function.
         :param opts: Optional. Resource options.
@@ -538,7 +560,9 @@ class AWSEKSCluster(pulumi.ComponentResource):
         # TODO: what typing should we have for subnets? Consistency?
         """
         Add a node group to the EKS cluster
-        Node groups are tracked in the `node_groups` dict on the
+        Node groups are tracked in the `node_groups` dict on the cluster.
+
+        Requires self.default_node_role to be set (via with_node_role()) if node_role is not provided.
 
         :param name: The name of the nodegroup. Should be consistent to avoid unexpected node group deletion.
         :param launch_template: A Pulumi LaunchTemplate object or RStudio ec2.LaunchTemplate
@@ -586,6 +610,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
             msg = "node role is None (somehow)"
             raise ValueError(msg)
 
+        # PULUMI STATE NAME — changing 'name' here will destroy and recreate the node group
         node_group = aws.eks.NodeGroup(
             name,
             cluster_name=self.eks.name,
@@ -621,6 +646,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         use_eks_access_entries: bool = False,
         additional_access_entries: list[dict] | None = None,
         include_poweruser: bool = False,
+        admin_role_arn: str | None = None,
     ):
         """
         Add IAM roles to EKS cluster using either aws-auth ConfigMap or EKS Access Entries.
@@ -644,6 +670,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 node_role=node_role,
                 additional_access_entries=additional_access_entries,
                 include_poweruser=include_poweruser,
+                admin_role_arn=admin_role_arn,
             )
 
         # Use the legacy aws-auth ConfigMap approach
@@ -669,7 +696,8 @@ class AWSEKSCluster(pulumi.ComponentResource):
         # as suggested by this blogger (how they determine this is unclear):
         #  https://www.powerupcloud.com/aws-eks-authentication-and-authorization-using-aws-single-signon/#:%7E:text=ensure%20to%20remove,role_arn
         poweruser_arn = f"arn:aws:iam::{account_id}:role/{ptd.aws_iam.get_role_name_for_permission_set('PowerUser')}"
-        adminrole_arn = f"arn:aws:iam::{account_id}:role/admin.posit.team"
+        if admin_role_arn is None:
+            admin_role_arn = f"arn:aws:iam::{account_id}:role/admin.posit.team"
 
         if additional_users is None:
             additional_users = []
@@ -682,7 +710,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
                         ["system:bootstrappers", "system:nodes"],
                     ),
                     ptd.aws_auth_user.AWSAuthUser(poweruser_arn, "admin", ["system:masters"]),
-                    ptd.aws_auth_user.AWSAuthUser(adminrole_arn, "admin", ["system:masters"]),
+                    ptd.aws_auth_user.AWSAuthUser(admin_role_arn, "admin", ["system:masters"]),
                     *additional_users,
                 ]
             )
@@ -746,6 +774,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         additional_access_entries: list[dict] | None = None,
         *,
         include_poweruser: bool = False,
+        admin_role_arn: str | None = None,
     ):
         """
         Add IAM roles to EKS cluster using Access Entries (modern approach).
@@ -798,8 +827,9 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 raise ValueError(msg)
 
         # Get the ARNs for Admin (and PowerUser if needed)
-        account_id = aws.get_caller_identity().account_id
-        adminrole_arn = f"arn:aws:iam::{account_id}:role/admin.posit.team"
+        if admin_role_arn is None:
+            account_id = aws.get_caller_identity().account_id
+            admin_role_arn = f"arn:aws:iam::{account_id}:role/admin.posit.team"
 
         # Check which Access Entries already exist in AWS (for import decisions)
         # AWS auto-migrates some entries when changing auth mode to API_AND_CONFIG_MAP
@@ -840,30 +870,30 @@ class AWSEKSCluster(pulumi.ComponentResource):
 
         # --- Admin Role Access Entry (always created) ---
         admin_existing_policies = (
-            self._get_associated_policies(adminrole_arn) if adminrole_arn in existing_entries else set()
+            self._get_associated_policies(admin_role_arn) if admin_role_arn in existing_entries else set()
         )
         admin_policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 
-        admin_import = access_entry_import_id(adminrole_arn)
+        admin_import = access_entry_import_id(admin_role_arn)
         if admin_import:
-            pulumi.log.debug(f"Setting import flag for Admin Access Entry: {adminrole_arn}")
+            pulumi.log.debug(f"Setting import flag for Admin Access Entry: {admin_role_arn}")
 
         aws.eks.AccessEntry(
             f"{self.name}-admin-access-entry",
             cluster_name=self.eks.name,
-            principal_arn=adminrole_arn,
+            principal_arn=admin_role_arn,
             type="STANDARD",
             opts=pulumi.ResourceOptions(parent=self.eks, import_=admin_import),
         )
 
-        admin_policy_import = policy_association_import_id(adminrole_arn, admin_policy_arn, admin_existing_policies)
+        admin_policy_import = policy_association_import_id(admin_role_arn, admin_policy_arn, admin_existing_policies)
         if admin_policy_import:
-            pulumi.log.debug(f"Setting import flag for Admin Policy Association: {adminrole_arn}")
+            pulumi.log.debug(f"Setting import flag for Admin Policy Association: {admin_role_arn}")
 
         aws.eks.AccessPolicyAssociation(
             f"{self.name}-admin-policy-association",
             cluster_name=self.eks.name,
-            principal_arn=adminrole_arn,
+            principal_arn=admin_role_arn,
             policy_arn=admin_policy_arn,
             access_scope=aws.eks.AccessPolicyAssociationAccessScopeArgs(
                 type="cluster",
@@ -1017,6 +1047,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 cluster_name=self.eks.name,
                 principal_arn=principal_arn,
                 type=entry_type,
+                kubernetes_groups=entry.get("kubernetesGroups"),
                 opts=pulumi.ResourceOptions(parent=self.eks, import_=entry_import),
             )
 
@@ -1120,7 +1151,10 @@ class AWSEKSCluster(pulumi.ComponentResource):
 
     def with_oidc_provider(self):
         """
-        Create an oidc provider
+        Create an OIDC provider for the EKS cluster.
+
+        Requires self.eks to be created (happens in __init__).
+        Sets self.oidc_provider, which is required by with_aws_lbc() and other service account methods.
 
         :param opts: Optional. Resource options
         :return: self
@@ -1158,7 +1192,9 @@ class AWSEKSCluster(pulumi.ComponentResource):
         depends_on: list[pulumi.Resource] | None = None,
     ) -> typing.Self:
         """
-        Add the aws-ebs-csi-driver eks addon
+        Add the aws-ebs-csi-driver eks addon.
+
+        Sets self.ebs_csi_addon, which is required by with_encrypted_ebs_storage_class().
 
         :param version: Optional, String, version of the aws-ebs-csi-driver addon to install, default: None
             By setting this to None, the latest version will be installed on first run, to upgrade versions later, you
@@ -1955,6 +1991,9 @@ class AWSEKSCluster(pulumi.ComponentResource):
         # Create alert configmaps for all YAML files in the alerts directory
         self._create_alert_configmaps(grafana_ns)
 
+        # Create dashboard configmaps for all JSON files in the dashboards directory
+        self._create_dashboard_configmaps(grafana_ns)
+
         # TODO: auth.proxy should be configurable, prod grafana auth will need tighter controls than letting anyone in as an Editor
         k8s.helm.v3.Release(
             f"{self.name}-grafana",
@@ -2078,7 +2117,12 @@ class AWSEKSCluster(pulumi.ComponentResource):
                         "alerts": {
                             "enabled": True,
                             "searchNamespace": "grafana",
-                        }
+                        },
+                        "dashboards": {
+                            "enabled": True,
+                            "searchNamespace": "grafana",
+                            "label": "grafana_dashboard",
+                        },
                     },
                 },
             ),
@@ -2505,7 +2549,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         alerts_dir = ptd.paths.alerts()
 
         for alert_file in sorted(alerts_dir.glob("*.yaml")):
-            alert_name = alert_file.stem
+            alert_name = alert_file.stem.replace("_", "-")
             with open(alert_file) as f:
                 alert_yaml = f.read()
 
@@ -2517,6 +2561,53 @@ class AWSEKSCluster(pulumi.ComponentResource):
                     "labels": {"grafana_alert": "1"},
                 },
                 data={"alerts.yaml": alert_yaml},
+                opts=pulumi.ResourceOptions(parent=self, provider=self.provider, depends_on=ns),
+            )
+
+    def _create_dashboard_configmaps(self, ns: k8s.core.v1.Namespace):
+        """
+        Create ConfigMaps for Grafana dashboard provisioning.
+
+        Reads all JSON files from grafana_dashboards/ directory and creates
+        Kubernetes ConfigMaps with the grafana_dashboard label. The Grafana
+        sidecar watches for this label and provisions dashboards automatically.
+
+        Dashboard UIDs are enforced to match the filename (without .json extension)
+        to ensure idempotent updates and prevent duplicate dashboards.
+        """
+
+        dashboards_dir = ptd.paths.dashboards()
+
+        for dashboard_file in sorted(dashboards_dir.glob("*.json")):
+            dashboard_name = dashboard_file.stem
+
+            # Sanitize name for Kubernetes RFC 1123 compliance
+            k8s_safe_name = ptd.pulumi_resources.lib.sanitize_k8s_name(dashboard_name)
+
+            # Read and parse JSON
+            try:
+                with open(dashboard_file) as f:
+                    dashboard_json = json.load(f)
+            except json.JSONDecodeError as e:
+                msg = f"Invalid JSON in {dashboard_file}: {e}"
+                raise ValueError(msg) from e
+
+            # Enforce UID = filename for idempotency
+            # Set id to null (Grafana provisioning ignores it)
+            dashboard_json["uid"] = dashboard_name
+            dashboard_json["id"] = None
+
+            # Convert back to JSON string
+            dashboard_content = json.dumps(dashboard_json, indent=2)
+
+            k8s.core.v1.ConfigMap(
+                f"{self.name}-grafana-{k8s_safe_name}-dashboard",
+                metadata={
+                    "name": f"grafana-{k8s_safe_name}-dashboard",
+                    "namespace": "grafana",
+                    "labels": {"grafana_dashboard": "1"},
+                },
+                data={f"{dashboard_name}.json": dashboard_content},
                 opts=pulumi.ResourceOptions(parent=self, provider=self.provider, depends_on=ns),
             )
 

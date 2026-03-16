@@ -1,0 +1,161 @@
+# To delete these alerts, simply removing the configMap that uses this method will not work.
+# Replace file contents with the following and apply in order to delete the alerts
+# (repeat the deleteRules entry for each uid listed below):
+# apiVersion: 1
+# deleteRules:
+#   - orgId: 1
+#     uid: azure_storage_availability_low
+#   - orgId: 1
+#     uid: azure_storage_latency_high
+#
+# See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+#
+# Note: alert annotations reference {{$labels.cluster}}. For Azure Monitor-sourced metrics,
+# this label is injected by the prometheus.relabel.default block in grafana_alloy.py.
+# If Alloy is not running or relabeling is misconfigured, the label will be absent and
+# the annotation will render as "in cluster " (blank).
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: Azure Storage
+      folder: Posit Alerts
+      interval: 5m
+      rules:
+        - uid: azure_storage_availability_low
+          title: Azure Storage Availability Low
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: azure_microsoft_storage_storageaccounts_availability_average_percent{job="integrations/azure"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 99.9
+                        type: lt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            summary: "🔴 CRITICAL: Azure Storage Availability Low"
+            description: |
+              Storage account availability is below 99.9%
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.resource }}
+              Location:    {{ $labels.location }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Availability
+              Current:     < 99.9%
+              Threshold:   99.9%
+              Duration:    5 minutes
+
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: azure_storage_latency_high
+          title: Azure Storage Latency High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: azure_microsoft_storage_storageaccounts_successe2elatency_average_milliseconds{job="integrations/azure"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 1000  # 1000ms = 1 second
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData  # Performance metric; silent suppression on scrape outage is acceptable
+          execErrState: Error
+          for: 10m
+          annotations:
+            summary: "🟡 WARNING: Azure Storage Latency High"
+            description: |
+              Storage account end-to-end latency is above 1000ms
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.resource }}
+              Location:    {{ $labels.location }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      End-to-End Latency
+              Current:     > 1000ms (1 second)
+              Threshold:   1000ms
+              Duration:    10 minutes
+
+          labels:
+            opsgenie: "1"
+          isPaused: false

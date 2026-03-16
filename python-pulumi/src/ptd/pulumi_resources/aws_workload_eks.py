@@ -135,6 +135,7 @@ class AWSWorkloadEKS(pulumi.ComponentResource):
             use_eks_access_entries=cluster_cfg.eks_access_entries.enabled,
             additional_access_entries=cluster_cfg.eks_access_entries.additional_entries,
             include_poweruser=cluster_cfg.eks_access_entries.include_same_account_poweruser,
+            admin_role_arn=self.workload.cfg.custom_role.role_arn if self.workload.cfg.custom_role else None,
         )
         eks_cluster.with_ebs_csi_driver(
             role_name=f"{full_name}-ebs-csi-driver.posit.team",

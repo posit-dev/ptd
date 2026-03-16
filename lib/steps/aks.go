@@ -155,9 +155,7 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 					EnableSecureBoot: pulumi.Bool(false),
 					EnableVTPM:       pulumi.Bool(false),
 				},
-				Tags: pulumi.StringMap{
-					"Owner": pulumi.String("ptd"),
-				},
+				Tags: buildResourceTags(config.ResourceTags),
 				Type: pulumi.String(containerservice.AgentPoolTypeVirtualMachineScaleSets),
 				UpgradeSettings: &containerservice.AgentPoolUpgradeSettingsArgs{
 					MaxSurge: pulumi.String("10%"),
@@ -288,9 +286,7 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 			},
 			SupportPlan:     pulumi.String("KubernetesOfficial"),
 			UpgradeSettings: upgradeSettings,
-			Tags: pulumi.StringMap{
-				"Owner": pulumi.String("ptd"),
-			},
+			Tags:        buildResourceTags(config.ResourceTags),
 		}, clusterOpts...)
 		if err != nil {
 			return err
@@ -346,10 +342,8 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 					OsSKU:               pulumi.String(containerservice.OSSKUUbuntu),
 					OsType:              pulumi.String(containerservice.OSTypeLinux),
 					ScaleDownMode:       pulumi.String(containerservice.ScaleDownModeDelete),
-					Tags: pulumi.StringMap{
-						"Owner": pulumi.String("ptd"),
-					},
-					Type: pulumi.String(containerservice.AgentPoolTypeVirtualMachineScaleSets),
+					Tags:                buildResourceTags(config.ResourceTags),
+					Type:                pulumi.String(containerservice.AgentPoolTypeVirtualMachineScaleSets),
 					UpgradeSettings: &containerservice.AgentPoolUpgradeSettingsArgs{
 						MaxSurge: pulumi.String("10%"),
 					},
@@ -418,6 +412,16 @@ func toPulumiStringMap(m map[string]string) pulumi.StringMap {
 	return result
 }
 
+func buildResourceTags(resourceTags map[string]string) pulumi.StringMap {
+	tags := pulumi.StringMap{
+		"Owner": pulumi.String("ptd"),
+	}
+	for k, v := range resourceTags {
+		tags[k] = pulumi.String(v)
+	}
+	return tags
+}
+
 func getPersistentStackOutputs(ctx context.Context, target types.Target) (auto.OutputMap, error) {
 	creds, err := target.Credentials(ctx)
 	if err != nil {
@@ -430,8 +434,8 @@ func getPersistentStackOutputs(ctx context.Context, target types.Target) (auto.O
 	}
 	persistentStack, err := ptdpulumi.NewPythonPulumiStack(
 		ctx,
-		"azure",
-		"workload",
+		string(target.CloudProvider()),
+		string(target.Type()),
 		"persistent",
 		target.Name(),
 		target.Region(),

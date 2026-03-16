@@ -1,0 +1,237 @@
+# To delete these alerts, simply removing the configMap that uses this method will not work.
+# Replace file contents with the following and apply in order to delete the alerts
+# (repeat the deleteRules entry for each uid listed below):
+# apiVersion: 1
+# deleteRules:
+#   - orgId: 1
+#     uid: azure_netapp_capacity_high
+#   - orgId: 1
+#     uid: azure_netapp_read_latency_high
+#   - orgId: 1
+#     uid: azure_netapp_write_latency_high
+#
+# See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+#
+# Note: alert annotations reference {{$labels.cluster}}. For Azure Monitor-sourced metrics,
+# this label is injected by the prometheus.relabel.default block in grafana_alloy.py.
+# If Alloy is not running or relabeling is misconfigured, the label will be absent and
+# the annotation will render as "in cluster " (blank).
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: Azure NetApp Files
+      folder: Posit Alerts
+      interval: 5m
+      rules:
+        - uid: azure_netapp_capacity_high
+          title: Azure NetApp Files Capacity High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 80
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: Alerting  # Storage exhaustion is latent; alert even when scraping stops so we don't silently miss a full volume
+          execErrState: Error
+          for: 10m
+          annotations:
+            summary: "🟡 WARNING: Azure NetApp Files Capacity High"
+            description: |
+              NetApp Files volume capacity utilization is above 80%
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.resource }}
+              Location:    {{ $labels.location }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Volume Capacity
+              Current:     > 80%
+              Threshold:   80%
+              Duration:    10 minutes
+
+              Note: On new deployments, noDataState=Alerting may produce
+              a false positive during Azure Monitor initialization (first 10m)
+
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: azure_netapp_read_latency_high
+          title: Azure NetApp Files Read Latency High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagereadlatency_average_milliseconds{job="integrations/azure"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 10  # 10ms threshold; Azure NetApp Files typically has sub-millisecond latency
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData  # Performance metric; silent suppression on scrape outage is acceptable
+          execErrState: Error
+          for: 10m
+          annotations:
+            summary: "🟡 WARNING: Azure NetApp Files Read Latency High"
+            description: |
+              NetApp Files volume read latency is above 10ms
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.resource }}
+              Location:    {{ $labels.location }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Read Latency
+              Current:     > 10ms
+              Threshold:   10ms
+              Duration:    10 minutes
+              Baseline:    Sub-millisecond typical
+
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: azure_netapp_write_latency_high
+          title: Azure NetApp Files Write Latency High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagewritelatency_average_milliseconds{job="integrations/azure"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 10  # 10ms threshold; Azure NetApp Files typically has sub-millisecond latency
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData  # Performance metric; silent suppression on scrape outage is acceptable
+          execErrState: Error
+          for: 10m
+          annotations:
+            summary: "🟡 WARNING: Azure NetApp Files Write Latency High"
+            description: |
+              NetApp Files volume write latency is above 10ms
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.resource }}
+              Location:    {{ $labels.location }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Write Latency
+              Current:     > 10ms
+              Threshold:   10ms
+              Duration:    10 minutes
+              Baseline:    Sub-millisecond typical
+
+          labels:
+            opsgenie: "1"
+          isPaused: false
