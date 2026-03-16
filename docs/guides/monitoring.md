@@ -578,9 +578,27 @@ Component:   [affected component]
 
 | Alert | Threshold | Duration | Description |
 |-------|-----------|----------|-------------|
-| **FSx Capacity** | > 80% used | 5m | FSx storage instance has less than 20% capacity remaining |
-| **EC2 Network Out High** | > 300 MiB/s | 5m | EC2 instance has sustained high network outbound traffic |
-| **EC2 Network Packets Out High** | > 400,000 packets/s | 5m | EC2 instance has unusually high packet transmission rate |
+| **FSx Capacity Warning** | > 80% used | 5m | FSx storage instance has less than 20% capacity remaining |
+| **FSx Capacity Critical** | > 90% used | 5m | FSx storage instance has less than 10% capacity remaining |
+
+### RDS Alerts (AWS)
+
+| Alert | Threshold | Duration | Description |
+|-------|-----------|----------|-------------|
+| **RDS CPU Utilization High** | > 80% | 10m | RDS instance CPU utilization is elevated |
+| **RDS Free Storage Low (Warning)** | < 10 GiB | 5m | RDS instance storage capacity is running low |
+| **RDS Free Storage Low (Critical)** | < 5 GiB | 5m | RDS instance storage capacity is critically low |
+| **RDS Freeable Memory Low** | < 256 MiB | 10m | RDS instance freeable memory is low |
+| **RDS Database Connections High** | > 80 connections | 5m | RDS instance has high number of database connections |
+
+### Load Balancer Alerts (AWS)
+
+| Alert | Threshold | Duration | Description |
+|-------|-----------|----------|-------------|
+| **ALB Target 5XX Errors High** | > 10 errors | 5m | Application Load Balancer has elevated 5XX errors from targets |
+| **ALB Unhealthy Targets** | > 0 unhealthy | 5m | Application Load Balancer has unhealthy targets |
+| **NLB Unhealthy Targets** | > 0 unhealthy | 5m | Network Load Balancer has unhealthy targets |
+| **ALB Response Latency High** | > 2 seconds | 10m | Application Load Balancer target response time is elevated |
 
 ### Health Check Alerts
 
@@ -607,9 +625,6 @@ Component:   [affected component]
 | Alert | Threshold | Duration | Description |
 |-------|-----------|----------|-------------|
 | **CrashLoopBackOff** | Any container in CrashLoopBackOff | 5m | Container is repeatedly crashing and restarting |
-| **Pod Error** | Container terminated (reason != Completed) | 5m | Pod container terminated with an error (excludes user session pods) |
-| **Pod Not Healthy** | Phase = Pending/Unknown/Failed | 15m | Pod has been in non-running state (excludes user session pods) |
-| **Pod Restarts** | > 5 restarts in 15m | 15m | Pod has restarted excessively |
 | **Deployment Replicas Mismatch** | Desired != Available | 15m | Deployment does not have the expected number of available replicas |
 | **StatefulSet Replicas Mismatch** | Ready != Desired | 15m | StatefulSet does not have the expected number of ready replicas |
 
@@ -631,7 +646,7 @@ Pod-related alerts are filtered to only monitor PTD-managed namespaces to preven
 ```
 
 **Example Failure Cascade**:
-- Calico CNI pod crashes → Network connectivity breaks for application pods → Application pods become unhealthy → `PodNotHealthy` alert fires in `posit-team` namespace
+- Calico CNI pod crashes → Network connectivity breaks for application pods → Application pods become unhealthy → `CrashLoopBackOff` or `DeploymentReplicaMismatch` alert fires in `posit-team` namespace
 - Traefik ingress pod crashes → Ingress routing breaks → HTTP health checks fail → `Healthchecks` alert fires
 - Alloy pod crashes → Metrics/logs stop flowing → No alerts fire (blind) → **Must alert on Alloy pod failures directly**
 
@@ -640,11 +655,13 @@ Pod-related alerts are filtered to only monitor PTD-managed namespaces to preven
 To add or modify alerts, edit the YAML files in `python-pulumi/src/ptd/grafana_alerts/`. Each file contains alerts grouped by category:
 
 - `applications.yaml` - Application-specific alerts (Loki, etc.)
-- `cloudwatch.yaml` - AWS CloudWatch metric alerts
+- `cloudwatch.yaml` - AWS CloudWatch metric alerts (FSx)
 - `healthchecks.yaml` - HTTP health check alerts
+- `loadbalancer.yaml` - AWS load balancer alerts (ALB, NLB)
 - `mimir.yaml` - Metrics pipeline alerts
 - `nodes.yaml` - Kubernetes node alerts
 - `pods.yaml` - Kubernetes pod and workload alerts
+- `rds.yaml` - AWS RDS database alerts
 
 To delete an alert, follow the instructions in the file header comments regarding the `deleteRules` syntax.
 

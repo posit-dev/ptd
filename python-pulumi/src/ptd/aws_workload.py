@@ -275,6 +275,21 @@ class AWSWorkloadClusterComponentConfig(ptd.WorkloadClusterComponentConfig):
 
 
 class AWSWorkload(ptd.workload.AbstractWorkload):
+    """
+    AWS-specific workload configuration loader.
+    Inherits from AbstractWorkload, loads AWS-specific config from YAML.
+
+    Key methods:
+    - load_unique_config(): Parses ptd.yaml into AWSWorkloadConfig dataclass
+    - Resource naming methods (e.g., packagemanager_bucket_name(), loki_role_name()):
+      Return physical AWS resource names. Changing these affects running infrastructure.
+
+    Naming conventions:
+    - IAM roles: f"{purpose}.{compound_name}.posit.team"
+    - S3 buckets: f"{compound_name}-{purpose}"
+    - EKS clusters: f"default_{compound_name}-control-plane"
+    """
+
     cfg: AWSWorkloadConfig
 
     @property
@@ -282,6 +297,18 @@ class AWSWorkload(ptd.workload.AbstractWorkload):
         return hasattr(self, "cfg") and self.cfg.account_id is not None and self.cfg.account_id.strip() != ""
 
     def load_unique_config(self) -> None:
+        """
+        Load AWS workload configuration from ptd.yaml.
+
+        Parses YAML spec into AWSWorkloadConfig dataclass. Key transformations:
+        - Converts YAML keys from kebab-case to snake_case (key.replace("-", "_"))
+        - Parses clusters into WorkloadClusterConfig objects
+        - Parses sites into AWSSiteConfig objects
+        - Converts external_id string to UUID
+        - Converts network_trust string to NetworkTrust enum
+
+        This method is called by AbstractWorkload.__init__().
+        """
         cfg_dict = yaml.safe_load(self.ptd_yaml.read_text())
         if cfg_dict["kind"] != AWSWorkloadConfig.__name__ or cfg_dict["apiVersion"] != "posit.team/v1":
             msg = (
@@ -412,8 +439,10 @@ class AWSWorkload(ptd.workload.AbstractWorkload):
         for key in list(cluster_spec.keys()):
             cluster_spec[key.replace("-", "_")] = cluster_spec.pop(key)
 
-        team_operator_image = cluster_spec.pop("team_operator_image", "latest").strip().lower()
-        cluster_spec["team_operator_image"] = {"": "latest"}.get(team_operator_image, team_operator_image)
+        team_operator_image = cluster_spec.pop("team_operator_image", None)
+        if team_operator_image is not None:
+            team_operator_image = team_operator_image.strip().lower() or None
+        cluster_spec["team_operator_image"] = team_operator_image
 
         ptd_controller_image = cluster_spec.pop("ptd_controller_image", "latest").strip().lower()
 
@@ -489,6 +518,14 @@ class AWSWorkload(ptd.workload.AbstractWorkload):
 
     def chronicle_read_only_s3_bucket_policy_name(self, release: str, site: str) -> str:
         return f"chronicle-s3-bucket-read-only.{release}.{site}.{self.compound_name}.posit.team"
+
+    # ──────────────────────────────────────────────────────────────────────
+    # AWS Resource Naming Conventions
+    # These methods define physical names for AWS resources.
+    # Changing a name affects running infrastructure and may require manual migration.
+    # Pattern: f"{purpose}.{compound_name}.posit.team" for IAM roles/policies
+    # Pattern: f"{compound_name}-{purpose}" for S3 buckets
+    # ──────────────────────────────────────────────────────────────────────
 
     @property
     def external_dns_role_name(self) -> str:
