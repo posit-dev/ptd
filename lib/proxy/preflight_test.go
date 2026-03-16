@@ -75,7 +75,7 @@ func TestPreflightWithDualPids(t *testing.T) {
 
 			// Check results
 			assert.Equal(t, tc.expectActive, active)
-			
+
 			if tc.expectError {
 				require.Error(t, err)
 				if tc.errorSubstring != "" {
