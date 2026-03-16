@@ -25,11 +25,11 @@ repos:
         entry: just test-cmd
         language: system
         pass_filenames: false
-        files: ^cmd/.*\.go$
+        files: ^(cmd/.*\.go|cmd/go\.(mod|sum)|lib/go\.(mod|sum))$
 
       - id: test-lib
         name: Test lib
         entry: just test-lib
         language: system
         pass_filenames: false
-        files: ^lib/.*\.go$
+        files: ^lib/(.*\.go|go\.(mod|sum))$

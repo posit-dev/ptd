@@ -7,7 +7,7 @@ check: check-python-pulumi
 
 # Format all
 [group('format')]
-format: format-python-pulumi
+format: format-python-pulumi format-go
 
 alias fmt := format
 
@@ -186,3 +186,9 @@ validate-config-sync:
 [group('format')]
 format-python-pulumi:
   cd {{ justfile_directory() }}/python-pulumi && just format
+
+# Format Go code
+[group('format')]
+format-go:
+  cd {{ justfile_directory() }}/lib && go fmt ./...
+  cd {{ justfile_directory() }}/cmd && go fmt ./...

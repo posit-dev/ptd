@@ -110,6 +110,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         protect_persistent_resources: bool = True,
         eks_role_name: str = "",
         iam_permissions_boundary: str = "",
+        force_update_version: bool = False,
         **kwargs,
     ):
         if version is None:
@@ -239,6 +240,10 @@ class AWSEKSCluster(pulumi.ComponentResource):
             "version": version,
             "tags": {"Name": name} | tags,
         }
+
+        # ForceUpdateVersion overrides upgrade-blocking readiness checks (EKS Insights validations)
+        if force_update_version:
+            cluster_args["force_update_version"] = True
 
         # Configure cluster options based on whether it exists and its auth mode
         cluster_opts = pulumi.ResourceOptions(parent=self)

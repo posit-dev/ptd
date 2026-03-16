@@ -107,6 +107,10 @@ class AzureWorkloadClusterConfig(ptd.WorkloadClusterConfig):
 
     use_lets_encrypt: bool = False
 
+    # Optional: When true, enables AKS ForceUpgrade which bypasses PDB constraints during cluster upgrades.
+    # Use during maintenance windows when you accept disruption to workloads protected by PDBs.
+    force_maintenance: bool = False
+
 
 @dataclasses.dataclass(frozen=True)
 class AzureWorkloadClusterComponentConfig(ptd.WorkloadClusterComponentConfig):
