@@ -187,8 +187,8 @@ validate-config-sync:
 format-python-pulumi:
   cd {{ justfile_directory() }}/python-pulumi && just format
 
-# Format Go modules (tidy dependencies)
+# Format Go code
 [group('format')]
 format-go:
-  cd {{ justfile_directory() }}/lib && go mod tidy
-  cd {{ justfile_directory() }}/cmd && go mod tidy
+  cd {{ justfile_directory() }}/lib && go fmt ./...
+  cd {{ justfile_directory() }}/cmd && go fmt ./...

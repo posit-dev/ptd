@@ -286,7 +286,7 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 			},
 			SupportPlan:     pulumi.String("KubernetesOfficial"),
 			UpgradeSettings: upgradeSettings,
-			Tags:        buildResourceTags(config.ResourceTags),
+			Tags:            buildResourceTags(config.ResourceTags),
 		}, clusterOpts...)
 		if err != nil {
 			return err
