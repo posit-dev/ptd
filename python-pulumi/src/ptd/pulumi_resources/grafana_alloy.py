@@ -229,6 +229,7 @@ class AlloyConfig(pulumi.ComponentResource):
 
         subscription_id = self.workload.cfg.subscription_id
         resource_group_name = self.workload.resource_group_name
+        cluster_resource_group_name = self.workload.cluster_resource_group_name(self.release)
 
         # Base exporters that are always included
         config = textwrap.dedent(f"""
@@ -266,7 +267,7 @@ class AlloyConfig(pulumi.ComponentResource):
             prometheus.exporter.azure "loadbalancer" {{
                 subscriptions    = ["{subscription_id}"]
                 resource_type    = "Microsoft.Network/loadBalancers"
-                resource_graph_query_filter = "where resourceGroup == '{resource_group_name}'"
+                resource_graph_query_filter = "where resourceGroup == '{cluster_resource_group_name}'"
                 metrics          = ["DipAvailability", "VipAvailability", "UsedSnatPorts", "AllocatedSnatPorts", "SnatConnectionCount"]
             }}
 

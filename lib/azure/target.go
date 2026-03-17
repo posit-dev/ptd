@@ -123,6 +123,11 @@ func (t Target) ResourceGroupName() string {
 	return fmt.Sprintf("rsg-ptd-%s", t.sanitizedName())
 }
 
+func (t Target) ClusterResourceGroupName(release string) string {
+	clusterName := fmt.Sprintf("%s-%s", t.sanitizedName(), release)
+	return fmt.Sprintf("MC_%s_%s_%s", t.ResourceGroupName(), clusterName, t.Region())
+}
+
 func (t Target) VnetRsgName() string {
 	return t.vnetRsgName
 }
