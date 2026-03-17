@@ -128,6 +128,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         self.iam_permissions_boundary = iam_permissions_boundary
         self.tailscale_enabled = tailscale_enabled
         self.customer_managed_bastion_id = customer_managed_bastion_id
+        self.force_update_version = force_update_version
 
         # ──────────────────────────────────────────────────────────────────────
         # Method Ordering Dependencies (for with_*() methods):
@@ -240,10 +241,6 @@ class AWSEKSCluster(pulumi.ComponentResource):
             "version": version,
             "tags": {"Name": name} | tags,
         }
-
-        # ForceUpdateVersion overrides upgrade-blocking readiness checks (EKS Insights validations)
-        if force_update_version:
-            cluster_args["force_update_version"] = True
 
         # Configure cluster options based on whether it exists and its auth mode
         cluster_opts = pulumi.ResourceOptions(parent=self)
