@@ -61,7 +61,11 @@ class AzureWorkloadConfig(ptd.WorkloadConfig):
     resource_tags: dict[str, str] | None = None
     protect_persistent_resources: bool = True
     admin_group_id: str | None = None
+    automated_volume_provisioning: bool = False
     bastion_instance_type: str = "Standard_B1s"
+    netapp_volume_connect_capacity: int = 50  # GiB (Azure NetApp Files minimum)
+    netapp_volume_workbench_capacity: int = 50  # GiB (Azure NetApp Files minimum)
+    netapp_volume_workbench_shared_capacity: int = 50  # GiB (Azure NetApp Files minimum)
     ppm_file_share_size_gib: int = 100  # Minimum size for PPM Azure File Share in GiB
 
 
@@ -425,6 +429,15 @@ class AzureWorkload(ptd.workload.AbstractWorkload):
     @property
     def azure_files_csi_storage_class_name(self) -> str:
         return f"{self.compound_name}-azure-files-csi"
+
+    def netapp_volume_name(self, site: str, product: str) -> str:
+        """NetApp volume name following the nav-ptd-{site}-{product} convention.
+
+        Args:
+            site: Site name (e.g., "main", "dev").
+            product: Product name, one of "connect", "workbench", or "workbench-shared".
+        """
+        return f"nav-ptd-{site}-{product}"
 
     def fully_qualified_name(self, release: str = ptd.ZERO) -> str:
         if release == ptd.ZERO:

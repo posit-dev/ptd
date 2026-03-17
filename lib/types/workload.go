@@ -111,23 +111,27 @@ type AWSProvisionedVpc struct {
 }
 
 type AzureWorkloadConfig struct {
-	Clusters                   map[string]AzureWorkloadClusterConfig `yaml:"clusters"`
-	ControlRoomAccountID       string                                `json:"control_room_account_id" yaml:"control_room_account_id"`
-	ControlRoomClusterName     string                                `json:"control_room_cluster_name" yaml:"control_room_cluster_name"`
-	ControlRoomDomain          string                                `json:"control_room_domain" yaml:"control_room_domain"`
-	ControlRoomRegion          string                                `json:"control_room_region" yaml:"control_room_region"`
-	Region                     string                                `yaml:"region"`
-	SubscriptionID             string                                `yaml:"subscription_id"`
-	TenantID                   string                                `yaml:"tenant_id"`
-	AdminGroupID               string                                `yaml:"admin_group_id"`
-	BastionInstanceType        string                                `yaml:"bastion_instance_type"`
-	ResourceTags               map[string]string                     `yaml:"resource_tags"`
-	Sites                      map[string]SiteConfig                 `json:"sites" yaml:"sites"` // didn't find this on the python side.
-	ProtectPersistentResources bool                                  `yaml:"protect_persistent_resources"`
-	ThirdPartyTelemetryEnabled bool                                  `yaml:"third_party_telemetry_enabled"`
-	Network                    NetworkConfig                         `yaml:"network"`
-	NetworkTrust               string                                `yaml:"network_trust"`
-	PpmFileShareSizeGib        int                                   `yaml:"ppm_file_share_size_gib"`
+	Clusters                            map[string]AzureWorkloadClusterConfig `yaml:"clusters"`
+	ControlRoomAccountID                string                                `json:"control_room_account_id" yaml:"control_room_account_id"`
+	ControlRoomClusterName              string                                `json:"control_room_cluster_name" yaml:"control_room_cluster_name"`
+	ControlRoomDomain                   string                                `json:"control_room_domain" yaml:"control_room_domain"`
+	ControlRoomRegion                   string                                `json:"control_room_region" yaml:"control_room_region"`
+	Region                              string                                `yaml:"region"`
+	SubscriptionID                      string                                `yaml:"subscription_id"`
+	TenantID                            string                                `yaml:"tenant_id"`
+	AdminGroupID                        string                                `yaml:"admin_group_id"`
+	AutomatedVolumeProvisioning         bool                                  `yaml:"automated_volume_provisioning"`
+	BastionInstanceType                 string                                `yaml:"bastion_instance_type"`
+	NetappVolumeConnectCapacity         int                                   `yaml:"netapp_volume_connect_capacity"`
+	NetappVolumeWorkbenchCapacity       int                                   `yaml:"netapp_volume_workbench_capacity"`
+	NetappVolumeWorkbenchSharedCapacity int                                   `yaml:"netapp_volume_workbench_shared_capacity"`
+	ResourceTags                        map[string]string                     `yaml:"resource_tags"`
+	Sites                               map[string]SiteConfig                 `json:"sites" yaml:"sites"` // didn't find this on the python side.
+	ProtectPersistentResources          bool                                  `yaml:"protect_persistent_resources"`
+	ThirdPartyTelemetryEnabled          bool                                  `yaml:"third_party_telemetry_enabled"`
+	Network                             NetworkConfig                         `yaml:"network"`
+	NetworkTrust                        string                                `yaml:"network_trust"`
+	PpmFileShareSizeGib                 int                                   `yaml:"ppm_file_share_size_gib"`
 }
 
 type NetworkConfig struct {
