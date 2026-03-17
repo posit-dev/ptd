@@ -378,6 +378,10 @@ class AzureWorkload(ptd.workload.AbstractWorkload):
         name = re.sub(r"[^a-z0-9-]", "-", name)
         return f"rsg-ptd-{name}"
 
+    # Replicates ClusterResourceGroupName logic from azure/target.go
+    def cluster_resource_group_name(self, release: str) -> str:
+        return f"MC_{self.resource_group_name}_{self.cluster_name(release)}_{self.cfg.region}"
+
     @property
     def secrets_provider_url(self) -> str:
         return f"azurekeyvault://{self.key_vault_name}.vault.azure.net/keys/{ptd.MGMT_AZ_KEY_NAME}"

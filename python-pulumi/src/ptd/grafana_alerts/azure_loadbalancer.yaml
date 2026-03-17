@@ -34,7 +34,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: azure_microsoft_network_loadbalancers_dipavailability{job="integrations/azure"}
+                expr: avg_over_time(azure_microsoft_network_loadbalancers_dipavailability{job="integrations/azure"}[5m])
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -73,8 +73,22 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: Azure Load Balancer backend health probe availability is below 100% for over 5 minutes, indicating unhealthy backend instances. This is a critical issue that requires immediate attention.
-            summary: Health probe down on Azure Load Balancer {{$labels.resource}} in cluster {{$labels.cluster}}
+            summary: "🔴 CRITICAL: Azure Load Balancer Health Probe Down"
+            description: |
+              Load balancer backend health probe availability is below 100%
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.resourceName }}
+              Location:    {{ $labels.location }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Health Probe Availability
+              Current:     < 100%
+              Threshold:   100%
+              Duration:    5 minutes
+
           labels:
             opsgenie: "1"
           isPaused: false
@@ -89,7 +103,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: azure_microsoft_network_loadbalancers_vipavailability{job="integrations/azure"}
+                expr: avg_over_time(azure_microsoft_network_loadbalancers_vipavailability{job="integrations/azure"}[5m])
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -128,8 +142,22 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: Azure Load Balancer data path availability is below 100% for over 5 minutes, indicating the load balancer frontend is not responding to health probes. This is a critical issue that requires immediate attention.
-            summary: Data path down on Azure Load Balancer {{$labels.resource}} in cluster {{$labels.cluster}}
+            summary: "🔴 CRITICAL: Azure Load Balancer Data Path Down"
+            description: |
+              Load balancer frontend is not responding to health probes
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.resourceName }}
+              Location:    {{ $labels.location }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Data Path Availability
+              Current:     < 100%
+              Threshold:   100%
+              Duration:    5 minutes
+
           labels:
             opsgenie: "1"
           isPaused: false
@@ -145,9 +173,9 @@ groups:
               model:
                 editorMode: code
                 expr: |
-                  (azure_microsoft_network_loadbalancers_usedsnatports{job="integrations/azure"}
+                  (avg_over_time(azure_microsoft_network_loadbalancers_usedsnatports{job="integrations/azure"}[5m])
                   /
-                  azure_microsoft_network_loadbalancers_allocatedsnatports{job="integrations/azure"}) * 100
+                  avg_over_time(azure_microsoft_network_loadbalancers_allocatedsnatports{job="integrations/azure"}[5m])) * 100
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -186,8 +214,23 @@ groups:
           execErrState: Error
           for: 5m
           annotations:
-            description: Azure Load Balancer is using more than 80% of allocated SNAT ports for over 5 minutes. SNAT port exhaustion can cause outbound connection failures and may require increasing the number of backend instances or using a NAT Gateway.
-            summary: SNAT port exhaustion on Azure Load Balancer {{$labels.resource}} in cluster {{$labels.cluster}}
+            summary: "🟡 WARNING: Azure Load Balancer SNAT Port Exhaustion"
+            description: |
+              Load balancer is using more than 80% of allocated SNAT ports
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.resourceName }}
+              Location:    {{ $labels.location }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      SNAT Port Utilization
+              Current:     > 80%
+              Threshold:   80%
+              Duration:    5 minutes
+              Impact:      May cause outbound connection failures
+
           labels:
             opsgenie: "1"
           isPaused: false

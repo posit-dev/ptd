@@ -34,7 +34,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"}
+                expr: last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"}[5m])
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -80,7 +80,7 @@ groups:
               ─── WHERE ───────────────────────────
               Tenant:      {{ $labels.tenant_name }}
               Cluster:     {{ $labels.cluster }}
-              Resource:    {{ $labels.resource }}
+              Resource:    {{ $labels.resourceName}}
               Location:    {{ $labels.location }}
 
               ─── DETAILS ─────────────────────────
@@ -152,7 +152,7 @@ groups:
               ─── WHERE ───────────────────────────
               Tenant:      {{ $labels.tenant_name }}
               Cluster:     {{ $labels.cluster }}
-              Resource:    {{ $labels.resource }}
+              Resource:    {{ $labels.resourceName}}
               Location:    {{ $labels.location }}
 
               ─── DETAILS ─────────────────────────
@@ -222,7 +222,7 @@ groups:
               ─── WHERE ───────────────────────────
               Tenant:      {{ $labels.tenant_name }}
               Cluster:     {{ $labels.cluster }}
-              Resource:    {{ $labels.resource }}
+              Resource:    {{ $labels.resourceName}}
               Location:    {{ $labels.location }}
 
               ─── DETAILS ─────────────────────────
