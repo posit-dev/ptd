@@ -662,6 +662,7 @@ def _make_alloy_for_azure_monitor(
     mock_cfg.network = mock_network
     mock_workload.cfg = mock_cfg
     mock_workload.resource_group_name = resource_group_name
+    mock_workload.cluster_resource_group_name = Mock(return_value="MC_test-rg_test-cluster_eastus")
 
     # Mock cloud_provider
     mock_cloud_provider = Mock()
@@ -671,6 +672,7 @@ def _make_alloy_for_azure_monitor(
     alloy.workload = mock_workload
     alloy.cloud_provider = "azure"
     alloy.region = "eastus"
+    alloy.release = "test-release"
 
     return alloy
 
