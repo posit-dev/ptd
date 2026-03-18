@@ -49,31 +49,6 @@ ptd/
 
 - [Team Operator](https://github.com/posit-dev/team-operator) - Kubernetes operator for Posit Team products
 
-## Automated Version Updates
-
-PTD automatically receives version updates from the [Team Operator](https://github.com/posit-dev/team-operator) repository when new releases are published.
-
-### How It Works
-
-1. Team Operator's release workflow triggers `.github/workflows/update-team-operator-version.yml`
-2. The workflow verifies the Helm chart exists at `oci://ghcr.io/posit-dev/charts/team-operator`
-3. Updates `DEFAULT_CHART_VERSION` in `python-pulumi/src/ptd/pulumi_resources/team_operator.py`
-4. Creates a PR for review
-
-### Manual Trigger
-
-You can also trigger the workflow manually:
-
-```bash
-gh workflow run update-team-operator-version.yml --field version=v1.16.2
-```
-
-Or via the Actions UI with the `workflow_dispatch` trigger.
-
-### Authentication
-
-The incoming dispatch is authenticated via a PAT stored in the Team Operator repository (`PTD_REPO_TOKEN` secret). See the [Team Operator README](https://github.com/posit-dev/team-operator#release-automation) for token management details.
-
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
