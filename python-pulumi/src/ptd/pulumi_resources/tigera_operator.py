@@ -29,8 +29,7 @@ class TigeraOperator(pulumi.ComponentResource):
 
         self._define_namespace()
 
-        if not self.third_party_telemetry_enabled:
-            self._adopt_felix_configuration()
+        self._adopt_felix_configuration()
 
         self._define_helm_release()
 
@@ -73,9 +72,7 @@ class TigeraOperator(pulumi.ComponentResource):
         )
 
     def _define_helm_release(self):
-        helm_depends = [self.namespace]
-        if hasattr(self, "_felix_patch"):
-            helm_depends.append(self._felix_patch)
+        helm_depends = [self.namespace, self._felix_patch]
 
         self.helm_release = k8s.helm.v3.Release(
             f"{self.name}-{self.release}-tigera-operator",
@@ -113,16 +110,11 @@ class TigeraOperator(pulumi.ComponentResource):
                     },
                     "nonPrivileged": "Enabled",
                 },
-                **(
-                    {
-                        "defaultFelixConfiguration": {
-                            "enabled": True,
-                            "usageReportingEnabled": False,
-                        },
-                    }
-                    if not self.third_party_telemetry_enabled
-                    else {}
-                ),
+                "defaultFelixConfiguration": {
+                    "enabled": True,
+                    "iptablesBackend": "NFT",
+                    **({"usageReportingEnabled": False} if not self.third_party_telemetry_enabled else {}),
+                },
             },
             opts=pulumi.ResourceOptions(parent=self, depends_on=helm_depends),
         )
