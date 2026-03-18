@@ -1,13 +1,11 @@
 # Update Team Operator Version
 #
-# Triggered by repository_dispatch from team-operator releases.
+# Triggered by team-operator releases via workflow_dispatch.
 # Creates a PR to update the default chart version.
 
 name: Update Team Operator Version
 
 on:
-  repository_dispatch:
-    types: [team-operator-release]
   workflow_dispatch:
     inputs:
       version:
@@ -29,13 +27,17 @@ jobs:
       - name: Get version
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            VERSION="${{ github.event.client_payload.version }}"
-          else
-            VERSION="${{ inputs.version }}"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Updating to version: $VERSION"
+          echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          echo "Updating to version: ${{ inputs.version }}"
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Verify Helm chart exists
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Verifying chart exists at oci://ghcr.io/posit-dev/charts/team-operator:${VERSION}"
+          helm show chart oci://ghcr.io/posit-dev/charts/team-operator --version "${VERSION}"
 
       - name: Update DEFAULT_CHART_VERSION
         run: |
