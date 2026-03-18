@@ -106,7 +106,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagereadlatency_average_milliseconds{job="integrations/azure"}
+                expr: last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagereadlatency_average_milliseconds{job="integrations/azure"}[5m])
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -122,7 +122,7 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            - 10  # 10ms threshold; Azure NetApp Files typically has sub-millisecond latency
+                            - 50 # 50ms threshold
                         type: gt
                       operator:
                         type: and
@@ -147,7 +147,7 @@ groups:
           annotations:
             summary: "🟡 WARNING: Azure NetApp Files Read Latency High"
             description: |
-              NetApp Files volume read latency is above 10ms
+              NetApp Files volume read latency is above 50ms
 
               ─── WHERE ───────────────────────────
               Tenant:      {{ $labels.tenant_name }}
@@ -157,8 +157,8 @@ groups:
 
               ─── DETAILS ─────────────────────────
               Metric:      Read Latency
-              Current:     > 10ms
-              Threshold:   10ms
+              Current:     > 50ms
+              Threshold:   50ms
               Duration:    10 minutes
               Baseline:    Sub-millisecond typical
 
@@ -176,7 +176,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagewritelatency_average_milliseconds{job="integrations/azure"}
+                expr: last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagewritelatency_average_milliseconds{job="integrations/azure"}[5m])
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -192,7 +192,7 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            - 10  # 10ms threshold; Azure NetApp Files typically has sub-millisecond latency
+                            - 50 # 50ms threshold
                         type: gt
                       operator:
                         type: and
@@ -217,7 +217,7 @@ groups:
           annotations:
             summary: "🟡 WARNING: Azure NetApp Files Write Latency High"
             description: |
-              NetApp Files volume write latency is above 10ms
+              NetApp Files volume write latency is above 50ms
 
               ─── WHERE ───────────────────────────
               Tenant:      {{ $labels.tenant_name }}
@@ -227,8 +227,8 @@ groups:
 
               ─── DETAILS ─────────────────────────
               Metric:      Write Latency
-              Current:     > 10ms
-              Threshold:   10ms
+              Current:     > 50ms
+              Threshold:   50ms
               Duration:    10 minutes
               Baseline:    Sub-millisecond typical
 
