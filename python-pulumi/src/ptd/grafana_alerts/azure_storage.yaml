@@ -78,7 +78,7 @@ groups:
               ─── WHERE ───────────────────────────
               Tenant:      {{ $labels.tenant_name }}
               Cluster:     {{ $labels.cluster }}
-              Resource:    {{ $labels.resource }}
+              Resource:    {{ $labels.resourceName }}
               Location:    {{ $labels.location }}
 
               ─── DETAILS ─────────────────────────
@@ -147,7 +147,7 @@ groups:
               ─── WHERE ───────────────────────────
               Tenant:      {{ $labels.tenant_name }}
               Cluster:     {{ $labels.cluster }}
-              Resource:    {{ $labels.resource }}
+              Resource:    {{ $labels.resourceName }}
               Location:    {{ $labels.location }}
 
               ─── DETAILS ─────────────────────────
