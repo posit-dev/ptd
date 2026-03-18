@@ -373,7 +373,7 @@ class WorkloadClusterComponentConfig:
     mimir_version: str | None = "5.2.1"
     mimir_replicas: int = 2
     secret_store_csi_driver_version: str | None = "1.3.4"  # noqa: S105
-    tigera_operator_version: str | None = "3.29.3"
+    tigera_operator_version: str | None = "3.31.4"
     traefik_forward_auth_version: str | None = None
     traefik_version: str | None = "37.1.2"
 

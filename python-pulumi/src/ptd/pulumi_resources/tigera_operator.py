@@ -11,7 +11,7 @@ class TigeraOperator(pulumi.ComponentResource):
         name: str,
         release: str,
         *args,
-        version: str = "3.29.3",
+        version: str = "3.31.4",
         third_party_telemetry_enabled: bool = True,
         **kwargs,
     ):
@@ -100,7 +100,7 @@ class TigeraOperator(pulumi.ComponentResource):
                                 "nodeSelector": "all()",
                             }
                         ],
-                        "linuxDataplane": "Iptables",
+                        "linuxDataplane": "Nftables",
                         "multiInterfaceMode": "None",
                         "nodeAddressAutodetectionV4": {"firstFound": True},
                     },
@@ -108,11 +108,11 @@ class TigeraOperator(pulumi.ComponentResource):
                         "ipam": {"type": "Calico"},
                         "type": "Calico",
                     },
-                    "nonPrivileged": "Enabled",
                 },
+                "goldmane": {"enabled": False},
+                "whisker": {"enabled": False},
                 "defaultFelixConfiguration": {
                     "enabled": True,
-                    "iptablesBackend": "NFT",
                     **({"usageReportingEnabled": False} if not self.third_party_telemetry_enabled else {}),
                 },
             },
