@@ -155,17 +155,16 @@ func generateAWSPersistentProse(cfg *InfraConfig) string {
 			"Integration with customer-provisioned VPC (`%s`, CIDR `%s`) and %d private subnets",
 			cfg.ProvisionedVpcID, cfg.ProvisionedCidr, len(cfg.PrivateSubnets)))
 	} else {
-		cidr := cfg.VpcCidr
-		if cidr == "" {
-			cidr = "10.0.0.0/16"
+		var vpcDesc string
+		if cfg.VpcCidr != "" && cfg.VpcAzCount > 0 {
+			vpcDesc = fmt.Sprintf("VPC with CIDR `%s` across %d availability zones, with public and private subnets, NAT gateways, and internet gateway",
+				cfg.VpcCidr, cfg.VpcAzCount)
+		} else if cfg.VpcCidr != "" {
+			vpcDesc = fmt.Sprintf("VPC with CIDR `%s`, with public and private subnets, NAT gateways, and internet gateway", cfg.VpcCidr)
+		} else {
+			vpcDesc = "PTD-managed VPC with public and private subnets, NAT gateways, and internet gateway"
 		}
-		azCount := cfg.VpcAzCount
-		if azCount == 0 {
-			azCount = 3
-		}
-		lines = append(lines, fmt.Sprintf(
-			"VPC with CIDR `%s` across %d availability zones, with public and private subnets, NAT gateways, and internet gateway",
-			cidr, azCount))
+		lines = append(lines, vpcDesc)
 	}
 
 	lines = append(lines, "RDS PostgreSQL instance with custom parameter group")
@@ -211,12 +210,11 @@ func generateAzurePersistentProse(cfg *InfraConfig) string {
 		lines = append(lines, fmt.Sprintf(
 			"Integration with customer-provisioned VNet (`%s`)", cfg.ProvisionedVnetID))
 	} else {
-		cidr := cfg.VnetCidr
-		if cidr == "" {
-			cidr = "10.0.0.0/16"
+		if cfg.VnetCidr != "" {
+			lines = append(lines, fmt.Sprintf("VNet with CIDR `%s`, with public, private, database, and NetApp subnets", cfg.VnetCidr))
+		} else {
+			lines = append(lines, "PTD-managed VNet with public, private, database, and NetApp subnets")
 		}
-		lines = append(lines, fmt.Sprintf(
-			"VNet with CIDR `%s`, with public, private, database, and NetApp subnets", cidr))
 	}
 
 	lines = append(lines, "Azure Database for PostgreSQL Flexible Server")
@@ -411,12 +409,10 @@ func GenerateProductSummary(cfg *InfraConfig, sites []SiteInfo) string {
 		var vnetClause string
 		if cfg.ProvisionedVnetID != "" {
 			vnetClause = fmt.Sprintf("deployed into the customer-provisioned VNet (`%s`)", cfg.ProvisionedVnetID)
+		} else if cfg.VnetCidr != "" {
+			vnetClause = fmt.Sprintf("deployed into a PTD-managed VNet (CIDR `%s`)", cfg.VnetCidr)
 		} else {
-			cidr := cfg.VnetCidr
-			if cidr == "" {
-				cidr = "10.0.0.0/16"
-			}
-			vnetClause = fmt.Sprintf("deployed into a PTD-managed VNet (CIDR `%s`)", cidr)
+			vnetClause = "deployed into a PTD-managed VNet"
 		}
 		return fmt.Sprintf("All products are running within a managed AKS cluster (Kubernetes %s) on %s nodes, %s.",
 			version, instanceType, vnetClause)
@@ -425,12 +421,10 @@ func GenerateProductSummary(cfg *InfraConfig, sites []SiteInfo) string {
 	var vpcClause string
 	if cfg.ProvisionedVpcID != "" {
 		vpcClause = fmt.Sprintf("deployed into the customer-provisioned VPC (`%s`, CIDR `%s`)", cfg.ProvisionedVpcID, cfg.ProvisionedCidr)
+	} else if cfg.VpcCidr != "" {
+		vpcClause = fmt.Sprintf("deployed into a PTD-managed VPC (CIDR `%s`)", cfg.VpcCidr)
 	} else {
-		cidr := cfg.VpcCidr
-		if cidr == "" {
-			cidr = "10.0.0.0/16"
-		}
-		vpcClause = fmt.Sprintf("deployed into a PTD-managed VPC (CIDR `%s`)", cidr)
+		vpcClause = "deployed into a PTD-managed VPC"
 	}
 
 	return fmt.Sprintf("All products are running within a managed EKS cluster (Kubernetes %s) on %s nodes, %s.",
