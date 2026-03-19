@@ -8,6 +8,7 @@ import (
 	"github.com/johnfercher/maroto/v2"
 	"github.com/johnfercher/maroto/v2/pkg/components/col"
 	"github.com/johnfercher/maroto/v2/pkg/components/line"
+	"github.com/johnfercher/maroto/v2/pkg/components/page"
 	"github.com/johnfercher/maroto/v2/pkg/components/row"
 	"github.com/johnfercher/maroto/v2/pkg/components/text"
 	"github.com/johnfercher/maroto/v2/pkg/config"
@@ -48,7 +49,7 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 
 	// Title
 	m.AddRows(
-		text.NewRow(16, fmt.Sprintf("Installation Attestation — %s", data.TargetName), props.Text{
+		text.NewRow(16, fmt.Sprintf("%s — %s", docTitle, data.TargetName), props.Text{
 			Size:  20,
 			Style: fontstyle.Bold,
 			Align: align.Left,
@@ -61,9 +62,14 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 	}))
 	m.AddRows(row.New(4))
 
+	cloud := "aws"
+	if data.Infra != nil && data.Infra.Cloud != "" {
+		cloud = data.Infra.Cloud
+	}
+
 	// Metadata
 	pdfMetaRow(m, "Environment", data.TargetName)
-	pdfMetaRow(m, "AWS Account", data.AccountID)
+	pdfMetaRow(m, accountLabel(cloud), data.AccountID)
 	pdfMetaRow(m, "Region", data.Region)
 	for _, site := range data.Sites {
 		pdfMetaRow(m, "Site Domain", site.Domain)
@@ -74,7 +80,7 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 
 	// Purpose
 	pdfSection(m, "Purpose")
-	pdfParagraph(m, "This document attests that the Posit Team Dedicated (PTD) platform has been installed and configured in the target AWS account as specified in the declarative configuration files maintained in version control. It provides a summary of all infrastructure and application resources provisioned, the product versions deployed, and references to the Pulumi state files that serve as the authoritative record of the installation.")
+	pdfParagraph(m, purposeTextFor(cloud))
 
 	m.AddRows(row.New(4))
 
@@ -121,7 +127,7 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 
 	// Infrastructure summary
 	pdfSection(m, "Infrastructure Summary")
-	pdfParagraph(m, "PTD provisions infrastructure through a series of ordered Pulumi stacks, each managing a distinct layer of the deployment. All stacks use the Pulumi self-managed backend with state stored in S3 and secrets encrypted via AWS KMS.")
+	pdfParagraph(m, infraSummaryTextFor(cloud))
 
 	m.AddRows(row.New(3))
 
@@ -129,8 +135,13 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 	for _, s := range data.Stacks {
 		totalResources += s.ResourceCount
 	}
-	pdfMetaRow(m, "State backend", fmt.Sprintf("s3://ptd-%s/.pulumi/stacks/", data.TargetName))
-	pdfMetaRow(m, "Encryption", fmt.Sprintf("AWS KMS key alias/posit-team-dedicated in account %s", data.AccountID))
+	if cloud == "azure" {
+		pdfMetaRow(m, "State backend", fmt.Sprintf("azblob://<container>?storage_account=%s", data.TargetName))
+		pdfMetaRow(m, "Encryption", fmt.Sprintf("Azure Key Vault posit-team-dedicated in subscription %s", data.AccountID))
+	} else {
+		pdfMetaRow(m, "State backend", fmt.Sprintf("s3://ptd-%s/.pulumi/stacks/", data.TargetName))
+		pdfMetaRow(m, "Encryption", fmt.Sprintf("AWS KMS key alias/posit-team-dedicated in account %s", data.AccountID))
+	}
 
 	m.AddRows(row.New(4))
 	pdfSubSection(m, "Stack Overview")
@@ -185,7 +196,7 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 	// Verification
 	pdfSection(m, "Verification")
 	pdfSubSection(m, "Pulumi State Files")
-	pdfParagraph(m, "The authoritative proof of installation is the set of Pulumi state files stored in the workload's S3 bucket. Each state file contains a complete inventory of every resource managed by that stack, including resource types, cloud provider IDs, configuration values, and timestamps.")
+	pdfParagraph(m, verificationTextFor(cloud))
 
 	m.AddRows(row.New(3))
 
@@ -196,21 +207,47 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 	}
 
 	m.AddRows(row.New(4))
-	pdfParagraph(m, "Sensitive values (database passwords, API keys, TLS private keys) are encrypted at rest using the AWS KMS key alias/posit-team-dedicated in the target account.")
+	pdfParagraph(m, encryptionTextFor(cloud))
 
 	// Tools
 	m.AddRows(row.New(4))
 	pdfSection(m, "Tools")
-	pdfBullet(m, "ptd CLI — github.com/posit-dev/ptd — Open-source infrastructure tool that reads configuration files and converges the target AWS account to the declared state.")
-	pdfBullet(m, "Pulumi — Infrastructure-as-code engine used by PTD to manage cloud resources declaratively. State is stored in S3 with KMS encryption.")
+	pdfBullet(m, "ptd CLI — github.com/posit-dev/ptd — Open-source infrastructure tool that reads configuration files and converges the target to the declared state.")
+	pdfBullet(m, "Pulumi — Infrastructure-as-code engine used by PTD to manage cloud resources declaratively.")
 	pdfBullet(m, "Team Operator — Kubernetes operator (github.com/posit-dev/team-operator) that manages the lifecycle of Posit products within the cluster.")
 
-	// Sign-off
-	pdfSection(m, "Sign-Off")
-	m.AddRows(pdfTableHeader([]string{"", "Name", "Date"}, []int{3, 5, 4}))
-	for _, role := range []string{"Prepared By", "Approved By"} {
-		m.AddRows(pdfSignatureRow(role))
-	}
+	// Confirmation + Sign-off on a new page to avoid orphaned headers
+	m.AddPages(page.New().Add(
+		text.NewRow(10, "Confirmation", props.Text{
+			Size:  14,
+			Style: fontstyle.Bold,
+			Align: align.Left,
+			Color: accentColor,
+		}),
+		line.NewRow(2, props.Line{
+			Color:     borderColor,
+			Thickness: 0.5,
+		}),
+		row.New(2),
+		text.NewRow(12, confirmationText, props.Text{
+			Size:  9,
+			Align: align.Left,
+		}),
+		row.New(6),
+		text.NewRow(10, "Sign-Off", props.Text{
+			Size:  14,
+			Style: fontstyle.Bold,
+			Align: align.Left,
+			Color: accentColor,
+		}),
+		line.NewRow(2, props.Line{
+			Color:     borderColor,
+			Thickness: 0.5,
+		}),
+		row.New(2),
+		pdfTableHeader([]string{"", "Name", "Date"}, []int{3, 5, 4}),
+		pdfSignatureRow("Prepared By"),
+	))
 
 	// Generate
 	doc, err := m.Generate()
@@ -374,21 +411,4 @@ func pdfSignatureRow(role string) core.Row {
 		BorderColor:     borderColor,
 		BorderThickness: 0.3,
 	})
-}
-
-func productDisplayName(name string) string {
-	switch name {
-	case "connect":
-		return "Posit Connect"
-	case "workbench":
-		return "Posit Workbench"
-	case "package-manager":
-		return "Posit Package Manager"
-	case "chronicle":
-		return "Chronicle"
-	case "chronicle-agent":
-		return "Chronicle Agent"
-	default:
-		return name
-	}
 }

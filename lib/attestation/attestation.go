@@ -11,6 +11,7 @@ import (
 	"time"
 
 	ptdaws "github.com/posit-dev/ptd/lib/aws"
+	ptdazure "github.com/posit-dev/ptd/lib/azure"
 	"github.com/posit-dev/ptd/lib/customization"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/types"
@@ -69,15 +70,25 @@ type StackSummary struct {
 	S3Key         string    `json:"s3_key"`
 }
 
-// stackPurpose returns a human-readable description for standard stack types
-var stackPurposes = map[string]string{
-	"persistent":      "VPC integration, RDS PostgreSQL, S3 buckets, FSx storage, IAM roles, TLS certificates, DNS zones, bastion host",
-	"postgres-config": "PostgreSQL database users, databases, and grants",
-	"eks":             "EKS cluster, managed node groups, OIDC provider, storage classes",
-	"aks":             "AKS cluster, node pools, managed identity, storage classes",
-	"clusters":        "Kubernetes namespaces, network policies, IAM-to-K8s role bindings, Team Operator, Traefik",
-	"helm":            "Helm chart deployments: monitoring (Loki, Grafana, Mimir, Alloy), cert-manager, Secrets Store CSI",
-	"sites":           "Posit product deployments (TeamSite CRDs), ingress resources, site-specific configuration",
+// stackPurposes returns human-readable descriptions for standard stack types, keyed by cloud
+var stackPurposes = map[string]map[string]string{
+	"aws": {
+		"persistent":      "VPC, RDS PostgreSQL, S3 buckets, FSx storage, IAM roles, TLS certificates, DNS zones, bastion host",
+		"postgres-config": "PostgreSQL database users, databases, and grants",
+		"eks":             "EKS cluster, managed node groups, OIDC provider, storage classes",
+		"clusters":        "Kubernetes namespaces, network policies, IAM-to-K8s role bindings, Team Operator, Traefik",
+		"helm":            "Helm chart deployments: monitoring (Loki, Grafana, Mimir, Alloy), cert-manager, Secrets Store CSI",
+		"sites":           "Posit product deployments (TeamSite CRDs), ingress resources, site-specific configuration",
+	},
+	"azure": {
+		"persistent":      "VNet, Azure PostgreSQL, Storage accounts, NetApp Files, Key Vault, managed identities, NSGs",
+		"postgres-config": "PostgreSQL database users, databases, and grants",
+		"aks":             "AKS cluster, node pools, managed identity, storage classes",
+		"acr-cache":       "Azure Container Registry cache rules for container image pull-through",
+		"clusters":        "Kubernetes namespaces, network policies, workload identity bindings, Team Operator, Traefik",
+		"helm":            "Helm chart deployments: monitoring (Loki, Grafana, Mimir, Alloy), cert-manager, Secrets Store CSI",
+		"sites":           "Posit product deployments (TeamSite CRDs), ingress resources, site-specific configuration",
+	},
 }
 
 // stepNameFromProject extracts the step name from a project name like "ptd-aws-workload-post-clusters"
@@ -90,8 +101,12 @@ func (s *StackSummary) stepNameFromProject() string {
 	return s.ProjectName
 }
 
-func purposeForStack(projectName string) string {
-	for suffix, purpose := range stackPurposes {
+func purposeForStack(projectName string, cloud string) string {
+	purposes, ok := stackPurposes[cloud]
+	if !ok {
+		purposes = stackPurposes["aws"]
+	}
+	for suffix, purpose := range purposes {
 		if strings.HasSuffix(projectName, suffix) {
 			return purpose
 		}
@@ -202,15 +217,29 @@ func Collect(ctx context.Context, target types.Target, workloadPath string) (*At
 	}
 
 	// Extract cluster config and profile from ptd.yaml
-	if awsConfig, ok := config.(types.AWSWorkloadConfig); ok {
-		attestation.Profile = awsConfig.Profile
-		if len(awsConfig.Clusters) > 0 {
+	switch cfg := config.(type) {
+	case types.AWSWorkloadConfig:
+		attestation.Profile = cfg.Profile
+		if len(cfg.Clusters) > 0 {
 			clustersMap := make(map[string]interface{})
-			for name, cluster := range awsConfig.Clusters {
+			for name, cluster := range cfg.Clusters {
 				clusterMap := map[string]interface{}{
 					"cluster_name":       cluster.ClusterName,
 					"node_instance_type": cluster.NodeInstanceType,
 					"k8s_version":        cluster.K8sVersion,
+				}
+				clustersMap[name] = clusterMap
+			}
+			attestation.ClusterConfig = clustersMap
+		}
+	case types.AzureWorkloadConfig:
+		attestation.AccountID = cfg.SubscriptionID
+		if len(cfg.Clusters) > 0 {
+			clustersMap := make(map[string]interface{})
+			for name, cluster := range cfg.Clusters {
+				clusterMap := map[string]interface{}{
+					"kubernetes_version":             cluster.KubernetesVersion,
+					"system_node_pool_instance_type": cluster.SystemNodePoolInstanceType,
 				}
 				clustersMap[name] = clusterMap
 			}
@@ -256,7 +285,7 @@ func Collect(ctx context.Context, target types.Target, workloadPath string) (*At
 		stepName := stacks[i].stepNameFromProject()
 		if desc, ok := customDescriptions[stepName]; ok {
 			stacks[i].Purpose = desc
-		} else if p := purposeForStack(stacks[i].ProjectName); p != "" {
+		} else if p := purposeForStack(stacks[i].ProjectName, infraCfg.Cloud); p != "" {
 			stacks[i].Purpose = p
 		}
 	}
@@ -266,6 +295,14 @@ func Collect(ctx context.Context, target types.Target, workloadPath string) (*At
 	attestation.ProductSummary = GenerateProductSummary(infraCfg, sites)
 
 	return attestation, nil
+}
+
+// defaultPrefix returns the explicit prefix if set, otherwise the default
+func defaultPrefix(explicit string, fallback string) string {
+	if explicit != "" {
+		return explicit
+	}
+	return fallback
 }
 
 // cleanVersion strips OS prefixes like "ubuntu2204-" from image version tags
@@ -283,7 +320,8 @@ func cleanVersion(image string) string {
 }
 
 // parseInfraConfigFromPtdYaml extracts infrastructure configuration from ptd.yaml
-// using a flexible YAML structure that handles the spec: nesting
+// using a flexible YAML structure that handles the spec: nesting.
+// Supports both AWS and Azure workload configs.
 func parseInfraConfigFromPtdYaml(workloadPath string) (*InfraConfig, error) {
 	ptdYamlPath := filepath.Join(workloadPath, "ptd.yaml")
 	data, err := os.ReadFile(ptdYamlPath)
@@ -291,6 +329,23 @@ func parseInfraConfigFromPtdYaml(workloadPath string) (*InfraConfig, error) {
 		return nil, err
 	}
 
+	// Detect cloud provider from kind field
+	var header struct {
+		Kind string `yaml:"kind"`
+	}
+	if err := yaml.Unmarshal(data, &header); err != nil {
+		return nil, err
+	}
+
+	switch header.Kind {
+	case "AzureWorkloadConfig":
+		return parseAzureInfraConfig(data)
+	default:
+		return parseAWSInfraConfig(data)
+	}
+}
+
+func parseAWSInfraConfig(data []byte) (*InfraConfig, error) {
 	var raw struct {
 		Spec struct {
 			ProvisionedVpc *struct {
@@ -317,10 +372,10 @@ func parseInfraConfigFromPtdYaml(workloadPath string) (*InfraConfig, error) {
 			} `yaml:"clusters"`
 			Sites map[string]struct {
 				Spec struct {
-					Domain                     string `yaml:"domain"`
-					PrivateZone                bool   `yaml:"private_zone"`
+					Domain                       string `yaml:"domain"`
+					PrivateZone                  bool   `yaml:"private_zone"`
 					CertificateValidationEnabled bool   `yaml:"certificate_validation_enabled"`
-					CertificateARN             string `yaml:"certificate_arn"`
+					CertificateARN               string `yaml:"certificate_arn"`
 				} `yaml:"spec"`
 			} `yaml:"sites"`
 		} `yaml:"spec"`
@@ -330,16 +385,17 @@ func parseInfraConfigFromPtdYaml(workloadPath string) (*InfraConfig, error) {
 	}
 
 	cfg := &InfraConfig{
-		VpcCidr:                     raw.Spec.VpcCidr,
-		VpcAzCount:                  raw.Spec.VpcAzCount,
-		FsxMultiAz:                  raw.Spec.FsxOpenzfsMultiAz,
-		KeycloakEnabled:             raw.Spec.KeycloakEnabled,
-		ExternalDNSEnabled:          raw.Spec.ExternalDNSEnabled,
-		PublicLoadBalancer:          raw.Spec.PublicLoadBalancer,
-		SecretsStoreAddonEnabled:    raw.Spec.SecretsStoreAddonEnabled,
-		CustomerManagedBastionID:    raw.Spec.CustomerManagedBastionId,
-		LoadBalancerPerSite:         raw.Spec.LoadBalancerPerSite,
-		SiteDomains:                 make(map[string]string),
+		Cloud:                    "aws",
+		VpcCidr:                  raw.Spec.VpcCidr,
+		VpcAzCount:               raw.Spec.VpcAzCount,
+		FsxMultiAz:               raw.Spec.FsxOpenzfsMultiAz,
+		KeycloakEnabled:          raw.Spec.KeycloakEnabled,
+		ExternalDNSEnabled:       raw.Spec.ExternalDNSEnabled,
+		PublicLoadBalancer:       raw.Spec.PublicLoadBalancer,
+		SecretsStoreAddonEnabled: raw.Spec.SecretsStoreAddonEnabled,
+		CustomerManagedBastionID: raw.Spec.CustomerManagedBastionId,
+		LoadBalancerPerSite:      raw.Spec.LoadBalancerPerSite,
+		SiteDomains:              make(map[string]string),
 	}
 
 	if raw.Spec.HostedZoneManagementEnabled != nil {
@@ -352,7 +408,6 @@ func parseInfraConfigFromPtdYaml(workloadPath string) (*InfraConfig, error) {
 		cfg.PrivateSubnets = raw.Spec.ProvisionedVpc.PrivateSubnets
 	}
 
-	// Use the first (usually only) cluster config
 	for _, cluster := range raw.Spec.Clusters {
 		cfg.ClusterVersion = cluster.Spec.ClusterVersion
 		cfg.InstanceType = cluster.Spec.MpInstanceType
@@ -367,6 +422,66 @@ func parseInfraConfigFromPtdYaml(workloadPath string) (*InfraConfig, error) {
 		cfg.PrivateZone = cfg.PrivateZone || site.Spec.PrivateZone
 		cfg.CertValidationEnabled = cfg.CertValidationEnabled || site.Spec.CertificateValidationEnabled
 		cfg.CertARNProvided = cfg.CertARNProvided || site.Spec.CertificateARN != ""
+	}
+
+	return cfg, nil
+}
+
+func parseAzureInfraConfig(data []byte) (*InfraConfig, error) {
+	var raw struct {
+		Spec struct {
+			SubscriptionID string `yaml:"subscription_id"`
+			TenantID       string `yaml:"tenant_id"`
+			Region         string `yaml:"region"`
+			Network        struct {
+				VnetCidr          string `yaml:"vnet_cidr"`
+				ProvisionedVnetID string `yaml:"provisioned_vnet_id"`
+				VnetRsgName       string `yaml:"vnet_rsg_name"`
+			} `yaml:"network"`
+			KeycloakEnabled          bool `yaml:"keycloak_enabled"`
+			ExternalDNSEnabled       bool `yaml:"external_dns_enabled"`
+			SecretsStoreAddonEnabled bool `yaml:"secrets_store_addon_enabled"`
+			Clusters                 map[string]struct {
+				KubernetesVersion          string `yaml:"kubernetes_version"`
+				SystemNodePoolInstanceType string `yaml:"system_node_pool_instance_type"`
+				UserNodePools              []struct {
+					VMSize string `yaml:"vm_size"`
+				} `yaml:"user_node_pools"`
+			} `yaml:"clusters"`
+			Sites map[string]struct {
+				Spec struct {
+					Domain string `yaml:"domain"`
+				} `yaml:"spec"`
+			} `yaml:"sites"`
+		} `yaml:"spec"`
+	}
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return nil, err
+	}
+
+	cfg := &InfraConfig{
+		Cloud:                    "azure",
+		VnetCidr:                 raw.Spec.Network.VnetCidr,
+		ProvisionedVnetID:        raw.Spec.Network.ProvisionedVnetID,
+		KeycloakEnabled:          raw.Spec.KeycloakEnabled,
+		ExternalDNSEnabled:       raw.Spec.ExternalDNSEnabled,
+		SecretsStoreAddonEnabled: raw.Spec.SecretsStoreAddonEnabled,
+		SiteDomains:              make(map[string]string),
+	}
+
+	for _, cluster := range raw.Spec.Clusters {
+		cfg.ClusterVersion = cluster.KubernetesVersion
+		cfg.InstanceType = cluster.SystemNodePoolInstanceType
+		if len(cluster.UserNodePools) > 0 {
+			cfg.InstanceType = cluster.UserNodePools[0].VMSize
+		}
+		break
+	}
+
+	for name, site := range raw.Spec.Sites {
+		if site.Spec.Domain != "" {
+			cfg.SiteDomains[name] = site.Spec.Domain
+		}
 	}
 
 	return cfg, nil
@@ -424,7 +539,7 @@ func collectSites(workloadPath string, siteDomains map[string]string) ([]SiteInf
 				Image:        siteYAML.Spec.Connect.Image,
 				Version:      cleanVersion(siteYAML.Spec.Connect.Image),
 				Replicas:     siteYAML.Spec.Connect.Replicas,
-				DomainPrefix: siteYAML.Spec.Connect.DomainPrefix,
+				DomainPrefix: defaultPrefix(siteYAML.Spec.Connect.DomainPrefix, "pub"),
 			}
 			if siteYAML.Spec.Connect.Auth != nil {
 				p.Auth = &AuthDetail{
@@ -441,7 +556,7 @@ func collectSites(workloadPath string, siteDomains map[string]string) ([]SiteInf
 				Image:        siteYAML.Spec.Workbench.Image,
 				Version:      cleanVersion(siteYAML.Spec.Workbench.Image),
 				Replicas:     siteYAML.Spec.Workbench.Replicas,
-				DomainPrefix: siteYAML.Spec.Workbench.DomainPrefix,
+				DomainPrefix: defaultPrefix(siteYAML.Spec.Workbench.DomainPrefix, "dev"),
 			}
 			if siteYAML.Spec.Workbench.Auth != nil {
 				p.Auth = &AuthDetail{
@@ -458,7 +573,7 @@ func collectSites(workloadPath string, siteDomains map[string]string) ([]SiteInf
 				Image:        siteYAML.Spec.PackageManager.Image,
 				Version:      cleanVersion(siteYAML.Spec.PackageManager.Image),
 				Replicas:     siteYAML.Spec.PackageManager.Replicas,
-				DomainPrefix: siteYAML.Spec.PackageManager.DomainPrefix,
+				DomainPrefix: defaultPrefix(siteYAML.Spec.PackageManager.DomainPrefix, "pkg"),
 			})
 		}
 
@@ -511,21 +626,57 @@ func collectCustomSteps(workloadPath string) ([]CustomStepInfo, error) {
 	return customSteps, nil
 }
 
-// collectStackSummaries fetches Pulumi state files from S3 and extracts summaries
+// collectStackSummaries fetches Pulumi state files and extracts summaries.
+// Supports both AWS (S3) and Azure (Blob Storage) backends.
 func collectStackSummaries(ctx context.Context, creds types.Credentials, target types.Target) ([]StackSummary, error) {
-	// Only AWS is supported for now
-	awsCreds, err := ptdaws.OnlyAwsCredentials(creds)
-	if err != nil {
-		return nil, fmt.Errorf("only AWS targets are currently supported: %w", err)
-	}
+	// Determine cloud provider and list state files
+	var keys []string
+	var fetchFn func(ctx context.Context, key string) ([]byte, error)
 
-	bucketName := target.StateBucketName()
-	region := target.Region()
+	switch target.CloudProvider() {
+	case types.AWS:
+		awsCreds, err := ptdaws.OnlyAwsCredentials(creds)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get AWS credentials: %w", err)
+		}
+		bucketName := target.StateBucketName()
+		region := target.Region()
 
-	// List all state files
-	keys, err := ptdaws.ListStateFiles(ctx, awsCreds, region, bucketName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list state files: %w", err)
+		keys, err = ptdaws.ListStateFiles(ctx, awsCreds, region, bucketName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list state files: %w", err)
+		}
+		fetchFn = func(ctx context.Context, key string) ([]byte, error) {
+			return ptdaws.GetStateFile(ctx, awsCreds, region, bucketName, key)
+		}
+
+	case types.Azure:
+		azureCreds, err := ptdazure.OnlyAzureCredentials(creds)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get Azure credentials: %w", err)
+		}
+		// Azure target has StorageAccountName and BlobContainerName via StateBucketName/BlobStorageName
+		azureTarget, ok := target.(interface {
+			BlobStorageName() string
+		})
+		if !ok {
+			return nil, fmt.Errorf("Azure target does not implement BlobStorageName()")
+		}
+		reader, err := ptdazure.NewBlobStateReader(azureCreds, target.StateBucketName(), azureTarget.BlobStorageName())
+		if err != nil {
+			return nil, fmt.Errorf("failed to create blob state reader: %w", err)
+		}
+
+		keys, err = reader.ListStateFiles(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list state files: %w", err)
+		}
+		fetchFn = func(ctx context.Context, key string) ([]byte, error) {
+			return reader.GetStateFile(ctx, key)
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported cloud provider: %s", target.CloudProvider())
 	}
 
 	// Process state files in parallel
@@ -535,10 +686,15 @@ func collectStackSummaries(ctx context.Context, creds types.Credentials, target 
 
 	for i, key := range keys {
 		wg.Add(1)
-		go func(idx int, s3Key string) {
+		go func(idx int, stateKey string) {
 			defer wg.Done()
 
-			summary, err := processStateFile(ctx, awsCreds, region, bucketName, s3Key)
+			data, err := fetchFn(ctx, stateKey)
+			if err != nil {
+				errors[idx] = err
+				return
+			}
+			summary, err := parseStateFile(data, stateKey)
 			if err != nil {
 				errors[idx] = err
 				return
@@ -559,15 +715,8 @@ func collectStackSummaries(ctx context.Context, creds types.Credentials, target 
 	return summaries, nil
 }
 
-// processStateFile downloads and parses a single Pulumi state file
-func processStateFile(ctx context.Context, creds *ptdaws.Credentials, region string, bucketName string, s3Key string) (StackSummary, error) {
-	// Download the state file
-	data, err := ptdaws.GetStateFile(ctx, creds, region, bucketName, s3Key)
-	if err != nil {
-		return StackSummary{}, err
-	}
-
-	// Parse the JSON
+// parseStateFile parses a Pulumi state file from raw JSON bytes.
+func parseStateFile(data []byte, stateKey string) (StackSummary, error) {
 	var state PulumiState
 	if err := json.Unmarshal(data, &state); err != nil {
 		return StackSummary{}, fmt.Errorf("failed to parse state JSON: %w", err)
@@ -599,9 +748,9 @@ func processStateFile(ctx context.Context, creds *ptdaws.Credentials, region str
 		resourceTypes = append(resourceTypes, resourceType)
 	}
 
-	// Extract project and stack name from S3 key
+	// Extract project and stack name from state key
 	// Format: .pulumi/stacks/{project-name}/{stack-name}.json
-	parts := strings.Split(s3Key, "/")
+	parts := strings.Split(stateKey, "/")
 	projectName := "unknown"
 	stackName := "unknown"
 	if len(parts) >= 4 {
@@ -610,12 +759,12 @@ func processStateFile(ctx context.Context, creds *ptdaws.Credentials, region str
 	}
 
 	return StackSummary{
-		ProjectName:    projectName,
-		StackName:      stackName,
-		Timestamp:      timestamp,
-		PulumiVersion:  state.Checkpoint.Latest.Manifest.Version,
-		ResourceCount:  resourceCount,
-		ResourceTypes:  resourceTypes,
-		S3Key:          s3Key,
+		ProjectName:   projectName,
+		StackName:     stackName,
+		Timestamp:     timestamp,
+		PulumiVersion: state.Checkpoint.Latest.Manifest.Version,
+		ResourceCount: resourceCount,
+		ResourceTypes: resourceTypes,
+		S3Key:         stateKey,
 	}, nil
 }

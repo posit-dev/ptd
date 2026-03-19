@@ -13,23 +13,8 @@ var funcMap = template.FuncMap{
 	"formatDate": func(t time.Time) string {
 		return t.Format("2006-01-02")
 	},
-	"upper": strings.ToUpper,
-	"productName": func(name string) string {
-		switch name {
-		case "connect":
-			return "Posit Connect"
-		case "workbench":
-			return "Posit Workbench"
-		case "package-manager":
-			return "Posit Package Manager"
-		case "chronicle":
-			return "Chronicle"
-		case "chronicle-agent":
-			return "Chronicle Agent"
-		default:
-			return name
-		}
-	},
+	"upper":       strings.ToUpper,
+	"productName": productDisplayName,
 	"totalResources": func(stacks []StackSummary) int {
 		total := 0
 		for _, s := range stacks {
@@ -55,14 +40,37 @@ var funcMap = template.FuncMap{
 		stepName := stack.stepNameFromProject()
 		return GenerateStackProse(stepName, infra)
 	},
+	"purposeText":      func(cloud string) string { return purposeTextFor(cloud) },
+	"infraSummaryText": func(cloud string) string { return infraSummaryTextFor(cloud) },
+	"verificationText": func(cloud string) string { return verificationTextFor(cloud) },
+	"encryptionText":   func(cloud string) string { return encryptionTextFor(cloud) },
+	"accountLabel":     accountLabel,
+	"stateBackend": func(data *AttestationData) string {
+		if data.Infra != nil && data.Infra.Cloud == "azure" {
+			return fmt.Sprintf("azblob://<container>?storage_account=%s", data.TargetName)
+		}
+		return fmt.Sprintf("s3://ptd-%s/.pulumi/stacks/", data.TargetName)
+	},
+	"encryptionBackend": func(data *AttestationData) string {
+		if data.Infra != nil && data.Infra.Cloud == "azure" {
+			return fmt.Sprintf("Azure Key Vault `posit-team-dedicated` in subscription `%s`", data.AccountID)
+		}
+		return fmt.Sprintf("AWS KMS key `alias/posit-team-dedicated` in account `%s`", data.AccountID)
+	},
+	"cloudName": func(infra *InfraConfig) string {
+		if infra != nil && infra.Cloud == "azure" {
+			return "azure"
+		}
+		return "aws"
+	},
 }
 
-var markdownTemplate = template.Must(template.New("attestation").Funcs(funcMap).Parse(markdownTmpl))
-
-const markdownTmpl = `# Installation Attestation — {{ .TargetName }}
+var markdownTemplate = template.Must(template.New("attestation").Funcs(funcMap).Parse(
+	`{{- $cloud := cloudName .Infra -}}
+# ` + docTitle + ` — {{ .TargetName }}
 
 **Environment:** {{ .TargetName }}
-**AWS Account:** {{ .AccountID }}
+**{{ accountLabel $cloud }}:** {{ .AccountID }}
 **Region:** {{ .Region }}
 {{- range .Sites }}
 **Site Domain:** {{ .Domain }}
@@ -71,7 +79,7 @@ const markdownTmpl = `# Installation Attestation — {{ .TargetName }}
 
 ## Purpose
 
-This document attests that the Posit Team Dedicated (PTD) platform has been installed and configured in the target AWS account as specified in the declarative configuration files maintained in version control. It provides a summary of all infrastructure and application resources provisioned, the product versions deployed, and references to the Pulumi state files that serve as the authoritative record of the installation.
+{{ purposeText $cloud }}
 
 ## Installed Products
 
@@ -108,10 +116,10 @@ The following Posit products are deployed and operational at the listed versions
 
 ## Infrastructure Summary
 
-PTD provisions infrastructure through a series of ordered Pulumi stacks, each managing a distinct layer of the deployment. All stacks use the Pulumi self-managed backend with state stored in S3 and secrets encrypted via AWS KMS.
+{{ infraSummaryText $cloud }}
 
-**State backend:** ` + "`" + `s3://ptd-{{ .TargetName }}/.pulumi/stacks/` + "`" + `
-**Encryption:** AWS KMS key ` + "`" + `alias/posit-team-dedicated` + "`" + ` in account ` + "`" + `{{ .AccountID }}` + "`" + `
+**State backend:** ` + "`" + `{{ stateBackend . }}` + "`" + `
+**Encryption:** {{ encryptionBackend . }}
 
 ### Stack Overview
 
@@ -151,33 +159,17 @@ The following custom infrastructure steps are deployed in addition to the standa
 
 ### Pulumi State Files
 
-The authoritative proof of installation is the set of Pulumi state files stored in the workload's S3 bucket. Each state file contains a complete inventory of every resource managed by that stack, including resource types, cloud provider IDs, configuration values, and timestamps.
+{{ verificationText $cloud }}
 
-**Location:** ` + "`" + `s3://ptd-{{ .TargetName }}/.pulumi/stacks/` + "`" + `
-
-To retrieve the current state files:
-
-` + "```" + `bash
-{{ if .Profile -}}
-export AWS_PROFILE={{ .Profile }}
-{{ end -}}
-aws s3 ls s3://ptd-{{ .TargetName }}/.pulumi/stacks/ --recursive
-` + "```" + `
-
-To download all state files for review:
-
-` + "```" + `bash
-aws s3 cp s3://ptd-{{ .TargetName }}/.pulumi/stacks/ ./state-files/ \
-  --recursive --exclude "*.bak"
-` + "```" + `
+**Location:** ` + "`" + `{{ stateBackend . }}` + "`" + `
 
 Each state file is a JSON document with the following structure:
 
 - ` + "`" + `checkpoint.latest.manifest` + "`" + ` — Timestamp of last successful deployment and Pulumi engine version
 - ` + "`" + `checkpoint.latest.resources` + "`" + ` — Complete list of managed resources with types, provider IDs, inputs, and outputs
-- ` + "`" + `checkpoint.latest.secrets_providers` + "`" + ` — Encryption configuration (AWS KMS)
+- ` + "`" + `checkpoint.latest.secrets_providers` + "`" + ` — Encryption configuration
 
-Sensitive values (database passwords, API keys, TLS private keys) are encrypted at rest using the AWS KMS key ` + "`" + `alias/posit-team-dedicated` + "`" + ` in the target account. These values appear as ciphertext in the state files and can only be decrypted by principals with access to the KMS key.
+{{ encryptionText $cloud }} These values appear as ciphertext in the state files and can only be decrypted by principals with access to the encryption key.
 
 ### Expected State Files
 
@@ -191,7 +183,7 @@ Sensitive values (database passwords, API keys, TLS private keys) are encrypted 
 
 The declarative configuration files that define this environment are maintained in a private, version-controlled Git repository. The primary files are:
 
-- **` + "`" + `ptd.yaml` + "`" + `** — Infrastructure configuration (VPC, cluster, DNS, IAM, networking)
+- **` + "`" + `ptd.yaml` + "`" + `** — Infrastructure configuration
 {{ range .Sites -}}
 - **` + "`" + `site_{{ .SiteName }}/site.yaml` + "`" + `** — Product versions, authentication, and application settings{{ if gt (len $.Sites) 1 }} for {{ .SiteName }}{{ end }}
 {{ end }}
@@ -199,17 +191,20 @@ The Git history for the ` + "`" + `{{ .TargetName }}/` + "`" + ` directory provi
 
 ## Tools
 
-- **` + "`" + `ptd` + "`" + ` CLI** — [github.com/posit-dev/ptd](https://github.com/posit-dev/ptd) — Open-source infrastructure tool that reads the configuration files and converges the target AWS account to the declared state. The primary command is ` + "`" + `ptd ensure` + "`" + `.
-- **Pulumi** — Infrastructure-as-code engine used by PTD to manage cloud resources declaratively. State is stored in S3 with KMS encryption.
+- **` + "`" + `ptd` + "`" + ` CLI** — [github.com/posit-dev/ptd](https://github.com/posit-dev/ptd) — Open-source infrastructure tool that reads the configuration files and converges the target to the declared state. The primary command is ` + "`" + `ptd ensure` + "`" + `.
+- **Pulumi** — Infrastructure-as-code engine used by PTD to manage cloud resources declaratively.
 - **Team Operator** — Kubernetes operator ([github.com/posit-dev/team-operator](https://github.com/posit-dev/team-operator)) that manages the lifecycle of Posit products within the cluster.
+
+## Confirmation
+
+` + confirmationText + `
 
 ## Sign-Off
 
 | | Name | Date |
 |---|---|---|
 | Prepared By | | |
-| Approved By | | |
-`
+`))
 
 // RenderMarkdown writes the attestation data as a Markdown document to the given writer.
 func RenderMarkdown(w io.Writer, data *AttestationData) error {
