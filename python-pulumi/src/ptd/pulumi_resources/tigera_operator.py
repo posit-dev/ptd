@@ -33,6 +33,8 @@ class TigeraOperator(pulumi.ComponentResource):
 
         self._define_helm_release()
 
+        self._patch_installation_cni()
+
         self.register_outputs(
             {
                 "namespace": self.namespace,
@@ -69,6 +71,31 @@ class TigeraOperator(pulumi.ComponentResource):
                 },
             ),
             opts=pulumi.ResourceOptions(parent=self, depends_on=self.namespace),
+        )
+
+    def _patch_installation_cni(self):
+        """Force cni.type=Calico on the Installation CR.
+
+        The Tigera operator auto-detects EKS and defaults cni.type to AmazonVPC
+        when the field is empty. Due to a race condition during install/upgrade,
+        the operator can fill this default before Helm writes the user's value.
+        Once set, Helm's 3-way merge won't revert it. This patch ensures Calico
+        CNI is always set regardless of operator defaulting behavior.
+        """
+        self._installation_patch = k8s.apiextensions.CustomResourcePatch(
+            f"{self.name}-{self.release}-installation-cni-patch",
+            api_version="operator.tigera.io/v1",
+            kind="Installation",
+            metadata=k8s.meta.v1.ObjectMetaPatchArgs(
+                name="default",
+            ),
+            spec={
+                "cni": {
+                    "type": "Calico",
+                    "ipam": {"type": "Calico"},
+                },
+            },
+            opts=pulumi.ResourceOptions(parent=self, depends_on=[self.helm_release]),
         )
 
     def _define_helm_release(self):
