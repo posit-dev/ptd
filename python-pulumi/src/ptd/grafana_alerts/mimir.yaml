@@ -24,7 +24,109 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: up{job="prometheus.scrape.kube_state_metrics"}
+                expr: |
+                  count by (cluster, tenant_name, __tenant_id__) (
+                    up{job="prometheus.scrape.kube_state_metrics"} offset 24h
+                  )
+                  unless
+                  count by (cluster, tenant_name, __tenant_id__) (
+                    up{job="prometheus.scrape.kube_state_metrics"}
+                  )
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params: []
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - B
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                reducer: last
+                refId: B
+                type: reduce
+            - refId: C
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: B
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          # noDataState: OK is correct here - empty query results mean no workloads have disappeared (healthy state)
+          # If ALL workloads stop reporting, the separate workload_metrics_pipeline_failure alert will fire
+          noDataState: OK
+          execErrState: Error
+          for: 5m
+          annotations:
+            summary: "🔴 CRITICAL: Workload Metrics Silent"
+            description: |
+              No metrics received from workload cluster
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+
+              ─── DETAILS ─────────────────────────
+              Component:   Metrics Pipeline
+              Issue:       Workload was reporting 24h ago but is now silent
+
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: workload_metrics_pipeline_failure
+          title: Workload Metrics Pipeline Failure
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: count(up{job="prometheus.scrape.kube_state_metrics"})
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -89,20 +191,23 @@ groups:
                 type: threshold
           noDataState: Alerting
           execErrState: Error
-          for: 10m
+          for: 5m
           annotations:
-            summary: "🔴 CRITICAL: Workload Metrics Silent"
+            summary: "🔴 CRITICAL: Workload Metrics Pipeline Failure"
             description: |
-              No metrics received from workload cluster
-
-              ─── WHERE ───────────────────────────
-              Tenant:      {{ $labels.tenant_name }}
-              Cluster:     {{ $labels.cluster }}
+              Complete metrics pipeline failure - NO workloads are sending metrics to control room Mimir
 
               ─── DETAILS ─────────────────────────
               Component:   Metrics Pipeline
-              Issue:       No metrics received
-              Duration:    10 minutes
+              Issue:       Zero workload clusters reporting metrics
+              Duration:    5 minutes
+              Impact:      Complete loss of workload observability
+
+              ─── POSSIBLE CAUSES ─────────────────
+              • Control room Mimir ingestion failure
+              • Network connectivity issues affecting all workloads
+              • Alloy/remote-write configuration problem
+              • Mimir receiving endpoint down
 
           labels:
             opsgenie: "1"
