@@ -102,9 +102,10 @@ groups:
           annotations:
             summary: "🔴 CRITICAL: Workload Metrics Silent"
             description: |
-              Workload cluster has stopped sending metrics to control room Mimir
+              No metrics received from workload cluster
 
               ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
               Cluster:     {{ $labels.cluster }}
 
               ─── DETAILS ─────────────────────────
