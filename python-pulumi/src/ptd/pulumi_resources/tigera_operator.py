@@ -29,8 +29,6 @@ class TigeraOperator(pulumi.ComponentResource):
 
         self._define_namespace()
 
-        self._adopt_felix_configuration()
-
         self._define_helm_release()
 
         self._patch_installation_cni()
@@ -49,28 +47,6 @@ class TigeraOperator(pulumi.ComponentResource):
                 name="tigera-operator",
             ),
             opts=pulumi.ResourceOptions(parent=self),
-        )
-
-    def _adopt_felix_configuration(self):
-        """Add Helm ownership labels/annotations to the existing default FelixConfiguration.
-
-        The Tigera Operator creates a default FelixConfiguration on install. When we enable
-        defaultFelixConfiguration in the Helm values, Helm needs ownership metadata on the
-        existing resource to adopt it.
-        """
-        self._felix_patch = k8s.apiextensions.CustomResourcePatch(
-            f"{self.name}-{self.release}-felix-helm-adopt",
-            api_version="crd.projectcalico.org/v1",
-            kind="FelixConfiguration",
-            metadata=k8s.meta.v1.ObjectMetaPatchArgs(
-                name="default",
-                labels={"app.kubernetes.io/managed-by": "Helm"},
-                annotations={
-                    "meta.helm.sh/release-name": "tigera-operator",
-                    "meta.helm.sh/release-namespace": "tigera-operator",
-                },
-            ),
-            opts=pulumi.ResourceOptions(parent=self, depends_on=self.namespace),
         )
 
     def _patch_installation_cni(self):
@@ -99,7 +75,7 @@ class TigeraOperator(pulumi.ComponentResource):
         )
 
     def _define_helm_release(self):
-        helm_depends = [self.namespace, self._felix_patch]
+        helm_depends = [self.namespace]
 
         self.helm_release = k8s.helm.v3.Release(
             f"{self.name}-{self.release}-tigera-operator",
