@@ -1,3 +1,67 @@
+# [1.5.0](https://github.com/posit-dev/ptd/compare/v1.4.2...v1.5.0) (2026-03-20)
+
+
+### Bug Fixes
+
+* add tenant label back to metrics alert ([53dfbc2](https://github.com/posit-dev/ptd/commit/53dfbc23a5b2ce7e0ae3144bac3214ac173cff7c))
+* alloy instance duplication bug ([ab2e645](https://github.com/posit-dev/ptd/commit/ab2e645a2c48b229c5027659faed5b89284ed0f8))
+* azure load balancer metrics resource group and azure alert queries and formatting ([767acff](https://github.com/posit-dev/ptd/commit/767acffaef55e81750119a85403d3417929b84c0))
+* bump default aws alb idle connection timeout ([3440fdf](https://github.com/posit-dev/ptd/commit/3440fdf61bfe2173dd0a4fdfe13e06d39101de75))
+* change azure metric names and give better alert descriptions ([16fc658](https://github.com/posit-dev/ptd/commit/16fc6586b0c348aa3e5f0e59b6ab8c7d2b3afa08))
+* correct workload.go ([089dce8](https://github.com/posit-dev/ptd/commit/089dce822ab9b475c9fd744aa43f8c2d58318774))
+* correct worktree path in CLAUDE.md ([c28115e](https://github.com/posit-dev/ptd/commit/c28115e63a283b31be828e35aa5783c47cf06004))
+* **docs:** correct dashboard deployment documentation inaccuracies ([ab73129](https://github.com/posit-dev/ptd/commit/ab7312978d31232e961816b9b0fc916421375f62))
+* **docs:** correct dashboard UID description and add trailing newline ([2ebb899](https://github.com/posit-dev/ptd/commit/2ebb8992c80bdae5985799441d4aabf964ebef1e))
+* ensure all alerts are always created ([28ccbf2](https://github.com/posit-dev/ptd/commit/28ccbf23a0e6351ee785568659cb8e9a1c3addb7))
+* **grafana:** add missing cluster filters to unlinked panels in Posit Team Overview ([05fdccc](https://github.com/posit-dev/ptd/commit/05fdccc7d0da06d5b78a88defb1f5989ebc7e880))
+* **grafana:** apply site filter consistently and correct version in Posit Team Overview ([d477d44](https://github.com/posit-dev/ptd/commit/d477d44bdbfb87a2aa7984234c93e8706e1de9d4))
+* **grafana:** correct Connect panel titles to match query semantics ([9396999](https://github.com/posit-dev/ptd/commit/93969998026756c858d17024b4355b396638b08e))
+* **grafana:** correct dashboard provisioning settings for posit_team_overview ([1284bdc](https://github.com/posit-dev/ptd/commit/1284bdc98f052b09ed9a51e4f6d5dd2b98cf5480))
+* **grafana:** enable multi-cluster support for Kubernetes Global View dashboard ([388e320](https://github.com/posit-dev/ptd/commit/388e320e8090e6f9a4fd0eb730aeef3de54e648e))
+* **grafana:** fix Package Manager panel query and display issues ([b0d8b1f](https://github.com/posit-dev/ptd/commit/b0d8b1f7a26e57d2c9e352a47ef4e94ea8841321))
+* **grafana:** handle division by zero and fix labels in License Consumption gauge ([0337f5a](https://github.com/posit-dev/ptd/commit/0337f5aea0195aec734efa78285122fea3ab234e))
+* **grafana:** prevent automatic time unit conversion in License days left panel ([fcc0ecb](https://github.com/posit-dev/ptd/commit/fcc0ecb0d336b728b82e8e97f47fbe5afc845978))
+* **grafana:** remove inaccurate License expires panels from dashboard ([dbc436f](https://github.com/posit-dev/ptd/commit/dbc436f506ce8d0a08fd59e341c2607eb757cae4))
+* **grafana:** remove orphaned cluster references from posit-team-overview transformations ([1c588e0](https://github.com/posit-dev/ptd/commit/1c588e02bb54c4c324ba35110f42895564318b39))
+* **grafana:** standardize label ordering in by() clauses for license metrics ([63e1166](https://github.com/posit-dev/ptd/commit/63e1166676e1a32d6d5c95eb3a26c9d0f48da01a))
+* **grafana:** use max aggregation for Connect global metrics ([0263879](https://github.com/posit-dev/ptd/commit/02638796f8c613e9ed446c998e7cf3989e50203a))
+* **grafana:** use pattern match operator for site filter in Posit Team Overview ([de943c0](https://github.com/posit-dev/ptd/commit/de943c0dddcbf845631787d4ddd382021f86782e))
+* improve alerting when no metrics received from one or all workloads ([9ffa0e8](https://github.com/posit-dev/ptd/commit/9ffa0e8398c9b4975dd3c28254f1dc8ee49401ef))
+* lint ([ae55544](https://github.com/posit-dev/ptd/commit/ae555443b5b0c895deb7ff7543a310cb45320263))
+* **python-pulumi:** implement robust RFC 1123 name sanitization with validation ([91e56c0](https://github.com/posit-dev/ptd/commit/91e56c03e8a612de3937e70731c73f67f5877e06))
+* **python-pulumi:** resolve linter warnings in dashboard code ([cef03bb](https://github.com/posit-dev/ptd/commit/cef03bb400625c79d8f21934eec04435f439d10f))
+* **python-pulumi:** sanitize dashboard names for Kubernetes RFC 1123 compliance ([1008253](https://github.com/posit-dev/ptd/commit/10082536a292d5dfedd040a734e9410d2bb124d3))
+* quote descriptions in alerts with colon characters ([2423c6a](https://github.com/posit-dev/ptd/commit/2423c6aacee14025ec4867e0316ba83a263730b4))
+* remove client_id and secrets_provider_client_id from azure_workload fixture ([f6a3fb9](https://github.com/posit-dev/ptd/commit/f6a3fb912fb387393a94c6f5dc60fa9400c3bb65))
+* remove workload alert sidecar and fix azure resource graph query syntax ([6f83f76](https://github.com/posit-dev/ptd/commit/6f83f76f41fc0e84c8cc269d40aa1b436e493036))
+* replace underscores in alerts generated via file ([ebf2319](https://github.com/posit-dev/ptd/commit/ebf23196a171b5f2eb81401b8aab0d2e42d5e5e6))
+* resolve lint errors in test fixtures and conftest ([c69be20](https://github.com/posit-dev/ptd/commit/c69be2011bb8596fe03efdd5ff9c8d896ef9cac4))
+* solve intermittent no data result with netapp latency alerts and adjust thresholds based on current workloads ([65fad8f](https://github.com/posit-dev/ptd/commit/65fad8f444a30cbdadee96c444dd0997a19f44bc))
+* stop overriding team-operator image when not explicitly configured ([49f7b2c](https://github.com/posit-dev/ptd/commit/49f7b2c510fa5ab6cae59ef99f8c616fd2cc08c6))
+* undo unrelated change ([569c8b3](https://github.com/posit-dev/ptd/commit/569c8b354f29fc5183cdb45ebb6dc5d569eacfff))
+* undo unrelated change ([a7af92d](https://github.com/posit-dev/ptd/commit/a7af92d183319c8c8e7c68a1072956f27e12b5af))
+* use custom_role for EKS access entry when configured ([d1a4aee](https://github.com/posit-dev/ptd/commit/d1a4aee6f62ca8ca66b330f9df771a7c6ced4d33))
+
+
+### Features
+
+* add Go↔Python config sync validation and standardize test fixtures ([bfa9f3d](https://github.com/posit-dev/ptd/commit/bfa9f3d343ec65d4ca7c1d4f1bcae4e862721308))
+* add ppm-oidc-client-secret to site secret provisioning ([46ae5ac](https://github.com/posit-dev/ptd/commit/46ae5ace3457b775de80104f6cc79e2dc8afac7c))
+* allow force for cluster upgrades ([fb990a3](https://github.com/posit-dev/ptd/commit/fb990a3ba4b9d0bc9f891f758e1ef4b3b41d332e))
+* automatically recreate azure bastion vm with latest version ([0384239](https://github.com/posit-dev/ptd/commit/0384239007e4756f5792010083682cd162b89ee0))
+* **azure:** add configurable bastion instance type ([36bb44d](https://github.com/posit-dev/ptd/commit/36bb44d557254479dd0d6eb3f0557a1ce379fafc))
+* **grafana:** add cluster filter to all Posit Team Overview dashboard panels ([dcba6f2](https://github.com/posit-dev/ptd/commit/dcba6f22939f9621385009b061ebb85ec05de486))
+* **grafana:** add Connect row to Posit Team Overview dashboard ([1440b2c](https://github.com/posit-dev/ptd/commit/1440b2ccfcc472c935e997156c770ea9d9e83a5b))
+* **grafana:** add Package Manager row to Posit Team Overview dashboard ([03ea325](https://github.com/posit-dev/ptd/commit/03ea325430ba78e3d4acf59b61864cf60f5df5a8))
+* **grafana:** improve Running Version panel display in Posit Team Overview dashboard ([cdd1b7a](https://github.com/posit-dev/ptd/commit/cdd1b7a62f8252d45933165b09b6378b7b417ca0))
+* support per-workload custom tags on AKS resources ([e52c0c0](https://github.com/posit-dev/ptd/commit/e52c0c0ee07f79f44683788e127f99e51311eb9f))
+* support setting externally created route table on private azure subnet ([a0f3711](https://github.com/posit-dev/ptd/commit/a0f3711f7cbb21077c811fe025f5ce3d2a7c7641))
+
+
+### Reverts
+
+* undo unintended Justfile change ([4858593](https://github.com/posit-dev/ptd/commit/4858593e4f435e728a06e55bc34bcdb98bb4183e))
+
 ## [1.4.2](https://github.com/posit-dev/ptd/compare/v1.4.1...v1.4.2) (2026-02-13)
 
 
