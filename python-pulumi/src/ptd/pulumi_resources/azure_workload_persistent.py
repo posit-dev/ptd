@@ -588,6 +588,8 @@ class AzureWorkloadPersistent(pulumi.ComponentResource):
                     usage_threshold=capacity_gib * 1024 * 1024 * 1024,  # Convert GiB to bytes
                     creation_token=volume_name,  # NFS export path
                     protocol_types=["NFSv3"],
+                    network_features=netapp.NetworkFeatures.STANDARD,
+                    unix_permissions="0755",
                     export_policy=netapp.VolumePropertiesExportPolicyArgs(
                         rules=[
                             netapp.ExportPolicyRuleArgs(
@@ -595,6 +597,7 @@ class AzureWorkloadPersistent(pulumi.ComponentResource):
                                 allowed_clients="0.0.0.0/0",  # Access controlled by NSG on NetApp subnet
                                 nfsv3=True,
                                 nfsv41=False,
+                                unix_read_only=False,
                                 unix_read_write=True,
                                 has_root_access=True,
                             ),
