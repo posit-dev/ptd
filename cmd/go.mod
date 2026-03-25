@@ -1,6 +1,6 @@
 module github.com/posit-dev/ptd/cmd
 
-go 1.25.3
+go 1.25.6
 
 replace github.com/posit-dev/ptd/lib => ../lib
 
