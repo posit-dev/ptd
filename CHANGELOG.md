@@ -1,3 +1,11 @@
+## [1.5.1](https://github.com/posit-dev/ptd/compare/v1.5.0...v1.5.1) (2026-03-26)
+
+
+### Bug Fixes
+
+* bump go directive to 1.25.6 (CVE-2025-61728, CVE-2025-61726) ([d416b1a](https://github.com/posit-dev/ptd/commit/d416b1a70ee736f04d3b8af4c6599f1dd79b55a8))
+* upgrade google.golang.org/grpc to v1.79.3 (CVE-2026-33186) ([d882605](https://github.com/posit-dev/ptd/commit/d8826058e3a7ba7eee8b9924b6d1ebd912d9ffa9))
+
 # [1.5.0](https://github.com/posit-dev/ptd/compare/v1.4.2...v1.5.0) (2026-03-20)
 
 
