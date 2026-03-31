@@ -1,3 +1,10 @@
+## [1.5.2](https://github.com/posit-dev/ptd/compare/v1.5.1...v1.5.2) (2026-03-31)
+
+
+### Bug Fixes
+
+* bump default alb latency alert threshold ([fec5940](https://github.com/posit-dev/ptd/commit/fec59406a65b46ebed37b98db7089c1c3576aa68))
+
 ## [1.5.1](https://github.com/posit-dev/ptd/compare/v1.5.0...v1.5.1) (2026-03-26)
 
 
