@@ -259,7 +259,7 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            - 2  # 2 seconds
+                            - 5  # 5 seconds
                         type: gt
                       operator:
                         type: and
@@ -294,8 +294,8 @@ groups:
 
               ─── DETAILS ─────────────────────────
               Metric:      Target Response Time
-              Current:     > 2 seconds
-              Threshold:   2 seconds
+              Current:     > 5 seconds
+              Threshold:   5 seconds
               Duration:    10 minutes
 
           labels:
