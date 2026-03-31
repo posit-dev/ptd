@@ -12,3 +12,7 @@ PATH_add ".local/bin"
 
 # Python/uv configuration for Pulumi operations
 export UV_PROJECT="${PTD}/python-pulumi"
+
+# Shell prompt for ptd workon sessions (add to your ~/.bashrc or ~/.zshrc):
+#   PS1='${PTD_WORKON:+[ptd:$PTD_WORKON] }'"$PS1"      # bash
+#   PROMPT='${PTD_WORKON:+[ptd:$PTD_WORKON] }'"$PROMPT" # zsh
