@@ -110,7 +110,7 @@ workon-prompt:
     RC_FILE="$HOME/.bashrc"
     PROMPT_LINE='PS1='"'"'${PTD_WORKON:+[ptd:$PTD_WORKON] }'"'"'"$PS1"'
   else
-    echo "Error: Neither ~/.zshrc nor ~/.bashrc found"
+    printf '\033[0;31mError: Neither ~/.zshrc nor ~/.bashrc found\033[0m\n' >&2
     exit 1
   fi
 
