@@ -195,7 +195,6 @@ test-e2e URL="":
 cli:
   mkdir -p .local/bin
   goreleaser build --single-target --snapshot --clean -o .local/bin/ptd
-  -just workon-prompt
 
 #############################################################################
 # Check targets
