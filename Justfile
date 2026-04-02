@@ -97,6 +97,36 @@ check-session-manager-plugin:
 install-git-hooks:
   -uvx pre-commit install
 
+# configure shell prompt to show ptd workon target
+workon-prompt:
+  #!/usr/bin/env bash
+  set -e
+
+  # Determine which rc file to use
+  if [[ -f "$HOME/.zshrc" ]]; then
+    RC_FILE="$HOME/.zshrc"
+    PROMPT_LINE='PROMPT='"'"'${PTD_WORKON:+[ptd:$PTD_WORKON] }'"'"'"$PROMPT"'
+  elif [[ -f "$HOME/.bashrc" ]]; then
+    RC_FILE="$HOME/.bashrc"
+    PROMPT_LINE='PS1='"'"'${PTD_WORKON:+[ptd:$PTD_WORKON] }'"'"'"$PS1"'
+  else
+    printf '\033[0;31mError: Neither ~/.zshrc nor ~/.bashrc found\033[0m\n' >&2
+    exit 1
+  fi
+
+  # Check if already configured
+  if grep -q 'PTD_WORKON' "$RC_FILE"; then
+    echo "PTD_WORKON prompt already configured in $RC_FILE"
+    exit 0
+  fi
+
+  # Add the prompt configuration
+  echo "" >> "$RC_FILE"
+  echo "# ptd workon prompt indicator" >> "$RC_FILE"
+  echo "$PROMPT_LINE" >> "$RC_FILE"
+  echo "Added PTD_WORKON prompt to $RC_FILE"
+  echo "Restart your shell or run: source $RC_FILE"
+
 ############################################################################
 # Test targets
 ############################################################################

@@ -394,8 +394,23 @@ ptd workon testing01-staging helm -- pulumi stack export
 **Environment provided:**
 - Cloud provider credentials (AWS/Azure)
 - `KUBECONFIG` pointing to a configured kubeconfig file
+- `PTD_WORKON` - Target name (and step if specified, e.g., `testing01-staging` or `testing01-staging:helm`)
 - `PULUMI_STACK_NAME` (if custom step specified)
 - Working directory set to Pulumi stack (if step specified)
+
+**Shell prompt configuration:**
+
+To show the workon target in your shell prompt, add one of these to your shell config:
+
+```bash
+# Bash (~/.bashrc)
+PS1='${PTD_WORKON:+[ptd:$PTD_WORKON] }'"$PS1"
+
+# Zsh (~/.zshrc)
+PROMPT='${PTD_WORKON:+[ptd:$PTD_WORKON] }'"$PROMPT"
+```
+
+This displays `[ptd:testing01-staging]` when in a workon shell.
 
 **Exit code propagation:** In command mode, the exit code of the executed command is propagated. This enables scripting and automation.
 
