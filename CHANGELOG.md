@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/posit-dev/ptd/compare/v1.6.0...v1.7.0) (2026-04-02)
+
+
+### Features
+
+* add var to enable shell identification while using workon ([f9bf9ef](https://github.com/posit-dev/ptd/commit/f9bf9ef58933d9a63514228472c1f0d75052790d))
+
 # [1.6.0](https://github.com/posit-dev/ptd/compare/v1.5.2...v1.6.0) (2026-04-02)
 
 
