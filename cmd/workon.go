@@ -165,6 +165,12 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 		}
 	}
 
+	// Build PTD_WORKON value for prompt identification
+	workonValue := target
+	if step != "" {
+		workonValue = target + ":" + step
+	}
+
 	// Command execution mode
 	if len(execCmd) > 0 {
 		shellCommand := exec.Command(execCmd[0], execCmd[1:]...)
@@ -176,6 +182,7 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 			shellCommand.Env = append(shellCommand.Env, k+"="+v)
 		}
 		shellCommand.Env = append(shellCommand.Env, "PTD_ROOT="+ptdRoot)
+		shellCommand.Env = append(shellCommand.Env, "PTD_WORKON="+workonValue)
 		if kubeconfigPath != "" {
 			shellCommand.Env = append(shellCommand.Env, "KUBECONFIG="+kubeconfigPath)
 		}
@@ -214,6 +221,7 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 		shellCommand.Env = append(shellCommand.Env, k+"="+v)
 	}
 	shellCommand.Env = append(shellCommand.Env, "PTD_ROOT="+ptdRoot)
+	shellCommand.Env = append(shellCommand.Env, "PTD_WORKON="+workonValue)
 	if kubeconfigPath != "" {
 		shellCommand.Env = append(shellCommand.Env, "KUBECONFIG="+kubeconfigPath)
 	}
