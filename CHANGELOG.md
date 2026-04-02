@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/posit-dev/ptd/compare/v1.5.2...v1.6.0) (2026-04-02)
+
+
+### Features
+
+* new netapp throughput limit alert ([5678437](https://github.com/posit-dev/ptd/commit/56784378d0d1033e1a5929f327ea56502e9c6613))
+
 ## [1.5.2](https://github.com/posit-dev/ptd/compare/v1.5.1...v1.5.2) (2026-03-31)
 
 
