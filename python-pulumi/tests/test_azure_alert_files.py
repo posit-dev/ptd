@@ -33,14 +33,18 @@ class TestAzureAlertFiles:
         assert "groups:" in text
 
     def test_azure_loadbalancer_yaml_exists(self) -> None:
-        """Test that azure_loadbalancer.yaml exists."""
+        """Test that azure_loadbalancer.yaml exists and contains deleteRules.
+
+        Alerts are temporarily disabled pending resolution of
+        https://github.com/posit-dev/ptd/issues/197
+        """
         yaml_path = pathlib.Path(__file__).parent.parent / "src" / "ptd" / "grafana_alerts" / "azure_loadbalancer.yaml"
         assert yaml_path.exists(), f"azure_loadbalancer.yaml not found at {yaml_path}"
 
-        # Verify basic structure
+        # Verify deleteRules structure (alerts disabled, pending metrics fix)
         text = yaml_path.read_text()
         assert "apiVersion: 1" in text
-        assert "groups:" in text
+        assert "deleteRules:" in text
 
     def test_azure_storage_yaml_exists(self) -> None:
         """Test that azure_storage.yaml exists."""
@@ -57,7 +61,6 @@ class TestAzureAlertFiles:
         yaml_files = [
             "azure_postgres.yaml",
             "azure_netapp.yaml",
-            "azure_loadbalancer.yaml",
             "azure_storage.yaml",
         ]
 
@@ -96,7 +99,6 @@ class TestAzureAlertFiles:
         yaml_files = {
             "azure_postgres.yaml": "azure_microsoft_dbforpostgresql_flexibleservers",
             "azure_netapp.yaml": "azure_microsoft_netapp_netappaccounts",
-            "azure_loadbalancer.yaml": "azure_microsoft_network_loadbalancers",
             "azure_storage.yaml": "azure_microsoft_storage_storageaccounts",
         }
 
