@@ -1,3 +1,23 @@
+# [1.8.0](https://github.com/posit-dev/ptd/compare/v1.7.1...v1.8.0) (2026-04-06)
+
+
+### Bug Fixes
+
+* adopt existing FelixConfiguration before Helm manages it ([063b26e](https://github.com/posit-dev/ptd/commit/063b26e1fb7c6630c50da6f2a55b9f4ba737c6ab))
+* dataclass inheritance ordering and ruff FBT lint errors ([a496abe](https://github.com/posit-dev/ptd/commit/a496abe4a6eb2fc0ec04979bb0103fd1b1fcb4b3))
+* drop Nftables dataplane and CRD patch, stay on Iptables ([70b5d6c](https://github.com/posit-dev/ptd/commit/70b5d6c08948c4b31f4ab1154b7e266e219cfb8b))
+* force NFT iptables backend for Calico on AL2023 ([8da6d66](https://github.com/posit-dev/ptd/commit/8da6d66a8e7677003d45ff0a2c193be9e744fda4))
+* patch Installation CR to enforce Calico CNI on EKS ([5fc673e](https://github.com/posit-dev/ptd/commit/5fc673e455f414f5dab8f15d4b7a73320c04ee11))
+* remove unnecessary FelixConfiguration adoption patch ([42cef46](https://github.com/posit-dev/ptd/commit/42cef46c82d23dbea6c17b2ba44dd9c3fa7b89cf))
+* restore FelixConfiguration adoption patch with ignore_changes to prevent drift ([c56f7eb](https://github.com/posit-dev/ptd/commit/c56f7ebdc9a832286e1d48a6f94dc9927bfc52bb))
+
+
+### Features
+
+* add third_party_telemetry_enabled config to disable infra telemetry ([1135cbe](https://github.com/posit-dev/ptd/commit/1135cbe885e26fe011bf0abe77e7c317b5243dd8))
+* pre-patch Installation CRD to allow Nftables dataplane on upgrade ([cdfcfb1](https://github.com/posit-dev/ptd/commit/cdfcfb1e4b17973f71016c6ab38ea6ad34157da7))
+* upgrade Tigera Operator 3.29.3 → 3.31.4 ([cea1639](https://github.com/posit-dev/ptd/commit/cea16396e6ecbf6f1dd59487c5472819844696e8))
+
 ## [1.7.1](https://github.com/posit-dev/ptd/compare/v1.7.0...v1.7.1) (2026-04-06)
 
 
