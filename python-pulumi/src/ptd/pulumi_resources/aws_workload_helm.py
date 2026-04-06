@@ -343,6 +343,11 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                         },
                         "loki": {
                             "auth_enabled": False,
+                            **(
+                                {"analytics": {"reporting_enabled": False}}
+                                if not self.workload.cfg.third_party_telemetry_enabled
+                                else {}
+                            ),
                             "storage": {
                                 "bucketNames": {
                                     "chunks": f"{self.workload.prefix}-{self.workload.loki_s3_bucket_name}",
@@ -475,6 +480,19 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                             "users": {
                                 "auto_assign_org_role": "Editor",
                             },
+                            **(
+                                {
+                                    "analytics": {
+                                        "reporting_enabled": False,
+                                        "check_for_updates": False,
+                                    },
+                                    "plugins": {
+                                        "check_for_plugin_updates": False,
+                                    },
+                                }
+                                if not self.workload.cfg.third_party_telemetry_enabled
+                                else {}
+                            ),
                         },
                         "ingress": {
                             "enabled": True,
@@ -551,6 +569,11 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                         },
                         "mimir": {
                             "structuredConfig": {
+                                **(
+                                    {"usage_stats": {"enabled": False}}
+                                    if not self.workload.cfg.third_party_telemetry_enabled
+                                    else {}
+                                ),
                                 "blocks_storage": {
                                     "backend": "s3",
                                     "storage_prefix": "blocks",
@@ -749,6 +772,16 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                             },
                         },
                         "service": {"type": "NodePort"},
+                        **(
+                            {
+                                "globalArguments": [
+                                    "--global.checknewversion=false",
+                                    "--global.sendanonymoususage=false",
+                                ],
+                            }
+                            if not self.workload.cfg.third_party_telemetry_enabled
+                            else {}
+                        ),
                     }
                 ),
             },
@@ -1289,6 +1322,11 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                         },
                         "alloy": {
                             "clustering": {"enabled": True},
+                            **(
+                                {"reporting": {"enabled": False}}
+                                if not self.workload.cfg.third_party_telemetry_enabled
+                                else {}
+                            ),
                             "extraPorts": [
                                 {
                                     "name": "faro",
