@@ -1,3 +1,11 @@
+## [1.7.1](https://github.com/posit-dev/ptd/compare/v1.7.0...v1.7.1) (2026-04-06)
+
+
+### Bug Fixes
+
+* disable azure load balancer alerts until fixed ([2f2fe6f](https://github.com/posit-dev/ptd/commit/2f2fe6fd39d099ac390bab8ed3ef347af2a758c0))
+* update tests to reflect disabled loadbalancer alerts ([16f7a8b](https://github.com/posit-dev/ptd/commit/16f7a8b44e8451e9d1a03d97ba417531c4c88686))
+
 # [1.7.0](https://github.com/posit-dev/ptd/compare/v1.6.0...v1.7.0) (2026-04-02)
 
 
