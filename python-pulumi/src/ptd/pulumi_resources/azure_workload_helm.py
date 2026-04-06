@@ -130,6 +130,11 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                             },
                             "loki": {
                                 "auth_enabled": False,
+                                **(
+                                    {"analytics": {"reporting_enabled": False}}
+                                    if not self.workload.cfg.third_party_telemetry_enabled
+                                    else {}
+                                ),
                                 "podLabels": {
                                     "azure.workload.identity/use": "true",
                                 },
@@ -252,6 +257,11 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                             },
                             "mimir": {
                                 "structuredConfig": {
+                                    **(
+                                        {"usage_stats": {"enabled": False}}
+                                        if not self.workload.cfg.third_party_telemetry_enabled
+                                        else {}
+                                    ),
                                     "common": {
                                         "storage": {
                                             "backend": "azure",
@@ -381,6 +391,11 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                             },
                             "alloy": {
                                 "clustering": {"enabled": True},
+                                **(
+                                    {"reporting": {"enabled": False}}
+                                    if not self.workload.cfg.third_party_telemetry_enabled
+                                    else {}
+                                ),
                                 "extraPorts": [
                                     {
                                         "name": "faro",
@@ -628,6 +643,19 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                                 "url": '${{ "{" }}PTD_DATABASE_URL{{ "}" }}',  # ${PTD_DATABASE_URL} in the resulting configMap
                                 "ssl_mode": "require",
                             },
+                            **(
+                                {
+                                    "analytics": {
+                                        "reporting_enabled": False,
+                                        "check_for_updates": False,
+                                    },
+                                    "plugins": {
+                                        "check_for_plugin_updates": False,
+                                    },
+                                }
+                                if not self.workload.cfg.third_party_telemetry_enabled
+                                else {}
+                            ),
                         },
                         "ingress": {
                             "enabled": True,
