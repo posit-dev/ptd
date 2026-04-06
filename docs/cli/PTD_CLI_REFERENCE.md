@@ -267,26 +267,23 @@ Common workload steps (in order):
     - Updates workload secrets and control room mimir passwords
 
 Common control room steps (in order):
-1. `bootstrap` - Initial infrastructure setup
-   - Creates Pulumi state storage (S3 bucket or Azure blob storage)
-   - Creates encryption keys (KMS for AWS, Key Vault for Azure)
-   - Creates admin policy resources (if enabled)
-   - Initializes vault secrets for control room
-2. `workspaces` - Workspace configuration
+1. `workspaces` - Workspace configuration
    - Creates workspaces infrastructure for control room
    - Configures workspace resources via Pulumi
-3. `persistent` - Persistent resources (storage, databases)
+2. `persistent` - Persistent resources (storage, databases)
    - Creates RDS/Azure Database instances
    - Creates file systems and storage resources
    - Outputs: Database URLs and connection information
-4. `postgres_config` - PostgreSQL database configuration
+3. `postgres_config` - PostgreSQL database configuration
    - Configures PostgreSQL databases and users for control room
    - Requires: Database endpoints from persistent step
    - Requires: Proxy connection (if Tailscale not enabled)
-5. `cluster` - Cluster setup
+4. `cluster` - Cluster setup
    - Creates and configures control room Kubernetes cluster
    - Deploys cluster infrastructure and Helm charts
    - Requires: Proxy connection
+
+> **Note:** Control rooms do not have a `bootstrap` step. The `bootstrap` step only applies to workloads.
 
 **Examples:**
 
@@ -619,6 +616,50 @@ aws cloudformation create-stack \
 
 ---
 
+### IAM Permissions for `admin.posit.team`
+
+The `admin.posit.team` IAM role is used by PTD to manage infrastructure in each AWS account. This role must exist in every AWS account that PTD manages (both control room and workload accounts). The role name is hardcoded — PTD always assumes `admin.posit.team` unless a `custom_role` is configured in the workload's `ptd.yaml`.
+
+**Setup steps:**
+
+1. Generate the CloudFormation template:
+   ```bash
+   ptd admin generate-role <control-room-target> > template.yaml
+   ```
+2. **Review the generated template.** The exact permissions are defined in code (`lib/aws/iam.go`) and may change between PTD versions. Always inspect the template before deploying.
+3. Deploy to each AWS account that PTD will manage (control room and workload accounts):
+   ```bash
+   aws cloudformation create-stack \
+     --stack-name ptd-admin-role \
+     --template-body file://template.yaml \
+     --capabilities CAPABILITY_NAMED_IAM \
+     --parameters ParameterKey=TrustedPrincipals,ParameterValue="<principal-arns>"
+   ```
+4. Add the deploying principals to `trusted_principals` in the control room's `ptd.yaml`.
+
+**What the template creates:**
+
+- **`PositTeamDedicatedAdminPolicy`** — a managed policy granting permissions across AWS services used by PTD (EC2, EKS, S3, RDS, Route 53, IAM, KMS, Secrets Manager, ACM, SSM, ECR, and others). The policy is self-constraining:
+  - IAM operations are scoped to resources matching `*.posit.team` naming patterns
+  - S3 operations are scoped to buckets prefixed with `posit-*` or `ptd-*`
+  - The role cannot modify the `PositTeamDedicatedAdminPolicy` itself (prevents privilege escalation)
+  - All IAM roles PTD creates during deployment must use this policy as a permissions boundary
+- **`admin.posit.team`** — an IAM role with the above policy attached and set as its permissions boundary. The trust policy allows assumption by the principals specified in the `TrustedPrincipals` parameter.
+
+**Custom roles:**
+
+If your organization cannot use the standard `admin.posit.team` role, you can configure an alternative via `custom_role` in the workload's `ptd.yaml`:
+
+```yaml
+custom_role:
+  role_arn: "arn:aws:iam::123456789012:role/my-custom-role"
+  external_id: "optional-external-id"
+```
+
+The custom role must have equivalent permissions to `PositTeamDedicatedAdminPolicy`. Generate the template and use it as a reference when building your custom policy.
+
+---
+
 ## Target Auto-Completion
 
 Many commands support auto-completion for `<target>` arguments. This is powered by the `ValidTargetArgs` function which reads available targets from `ptd.yaml` files.
@@ -704,7 +745,7 @@ Azure: Uses Azure Bastion proxy connection (`az network bastion tunnel`)
 ### Building
 
 ```bash
-just build-cmd
+just cli
 ```
 
 ### Testing
