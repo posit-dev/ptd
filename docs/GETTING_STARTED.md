@@ -21,6 +21,8 @@ This guide walks you through setting up PTD to deploy Posit Team products on AWS
 - [AWS CLI](https://aws.amazon.com/cli/) v2
 - [AWS Session Manager Plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html)
 - AWS credentials configured (via `aws configure` or environment variables)
+- **Route 53 hosted zone** for your deployment domain (e.g., `example.posit.team`). PTD uses ExternalDNS to manage DNS records automatically, and it requires an existing hosted zone in the target AWS account. Create one in the [Route 53 console](https://console.aws.amazon.com/route53/) before running `ptd ensure`.
+- **`admin.posit.team` IAM role** deployed to each AWS account PTD will manage. See [`ptd admin generate-role`](cli/PTD_CLI_REFERENCE.md#ptd-admin-generate-role) and [IAM Permissions](cli/PTD_CLI_REFERENCE.md#iam-permissions-for-adminpositteam) for details.
 
 **For Azure:**
 - [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
@@ -49,7 +51,7 @@ This installs:
 ### 3. Build the CLI
 
 ```bash
-just build-cmd
+just cli
 ```
 
 The CLI binary is created at `.local/bin/ptd`.
@@ -130,6 +132,8 @@ ptd ensure my-control-room
 # Then deploy the workload
 ptd ensure my-workload
 ```
+
+> **Note:** For workloads, the first step (`bootstrap`) creates the Pulumi state backend (S3 bucket and KMS key on AWS, storage account on Azure) and initializes secrets. If you use `--start-at-step` or `--only-steps` to skip bootstrap on a fresh deployment, subsequent steps will fail because the state backend does not exist. Use `-v` (verbose) to see the expected resource names if you encounter state backend errors. See [Ensure Command Flow](cli/ensure-flow.md) for details on each step.
 
 ## Architecture Overview
 

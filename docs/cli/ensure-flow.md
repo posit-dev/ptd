@@ -110,6 +110,10 @@ Workloads host the Posit Team products (Connect, Workbench, Package Manager) for
 - Create storage account and blob container
 - Initialize site secrets in Key Vault (one secret per field)
 
+> **Important:** The bootstrap step **must** complete successfully before subsequent steps can run. Later steps (starting with `persistent`) use the Pulumi state backend created by bootstrap (S3 bucket on AWS, storage account on Azure). If you skip bootstrap or it fails, subsequent steps will error because the state backend does not exist.
+>
+> If you encounter an error stating that the S3 bucket or storage account is unavailable, run `ptd ensure <target> --only-steps bootstrap` first, or re-run `ptd ensure <target>` without `--start-at-step` to ensure bootstrap runs. Use the `-v` (verbose) flag to surface the expected bucket or storage account name in the error output.
+
 ### 2. persistent
 
 **Purpose**: Create persistent infrastructure resources
