@@ -71,11 +71,13 @@ symlink-binaries:
   binlocal="{{ justfile_directory() }}/.local/bin"
   mkdir -p $binlocal
 
-  # Create symlinks only if they don't already exist
+  # Create wrapper scripts instead of symlinks. Symlinks to shell scripts that use
+  # $BASH_SOURCE[0] for self-location (e.g. /usr/bin/az) break when invoked via a
+  # symlink path, because bash receives the symlink path instead of the real script path.
   for binary in aws az pulumi; do
-    if [ ! -e "$binlocal/$binary" ]; then
-      ln -sf "$(which $binary)" "$binlocal/$binary"
-    fi
+    target="$(which $binary)"
+    printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$target" > "$binlocal/$binary"
+    chmod +x "$binlocal/$binary"
   done
 
 install-thumbprint:

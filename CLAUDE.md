@@ -2,6 +2,8 @@
 
 ## Project Structure
 
+@../ptd-main/legacy/CLAUDE.md
+
 The project is organized into several key components:
 
 - **`./cmd`**: Contains the main CLI tool (Go implementation)
