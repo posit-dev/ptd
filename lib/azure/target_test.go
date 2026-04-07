@@ -16,10 +16,10 @@ func TestNewTarget(t *testing.T) {
 	tenantID := "98765432-9876-9876-9876-987654321098"
 	region := "westus"
 	sites := map[string]types.SiteConfig{
-		"main": {
+		"main": {Spec: types.SiteConfigSpec{
 			Domain: "example.com",
 			ZoneID: "zone1",
-		},
+		}},
 	}
 
 	// Create a new target
@@ -51,10 +51,10 @@ func TestTargetAccessors(t *testing.T) {
 	tenantID := "98765432-9876-9876-9876-987654321098"
 	region := "westus"
 	sites := map[string]types.SiteConfig{
-		"main": {
+		"main": {Spec: types.SiteConfigSpec{
 			Domain: "example.com",
 			ZoneID: "zone1",
-		},
+		}},
 	}
 
 	target := NewTarget(targetName, subscriptionID, tenantID, region, sites, "", "", nil)

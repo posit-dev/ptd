@@ -10,10 +10,12 @@ import (
 
 func TestSiteConfigSerialization(t *testing.T) {
 	site := SiteConfig{
-		ZoneID:                "Z123456789",
-		Domain:                "example.com",
-		DomainType:            "public",
-		UseTraefikForwardAuth: true,
+		Spec: SiteConfigSpec{
+			ZoneID:                "Z123456789",
+			Domain:                "example.com",
+			DomainType:            "public",
+			UseTraefikForwardAuth: true,
+		},
 	}
 
 	// Marshal to YAML
@@ -26,10 +28,10 @@ func TestSiteConfigSerialization(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify fields match
-	assert.Equal(t, site.ZoneID, unmarshaledSite.ZoneID)
-	assert.Equal(t, site.Domain, unmarshaledSite.Domain)
-	assert.Equal(t, site.DomainType, unmarshaledSite.DomainType)
-	assert.Equal(t, site.UseTraefikForwardAuth, unmarshaledSite.UseTraefikForwardAuth)
+	assert.Equal(t, site.Spec.ZoneID, unmarshaledSite.Spec.ZoneID)
+	assert.Equal(t, site.Spec.Domain, unmarshaledSite.Spec.Domain)
+	assert.Equal(t, site.Spec.DomainType, unmarshaledSite.Spec.DomainType)
+	assert.Equal(t, site.Spec.UseTraefikForwardAuth, unmarshaledSite.Spec.UseTraefikForwardAuth)
 }
 
 func TestAWSWorkloadConfigSerialization(t *testing.T) {
@@ -51,15 +53,15 @@ func TestAWSWorkloadConfigSerialization(t *testing.T) {
 			"Owner":       "team",
 		},
 		Sites: map[string]SiteConfig{
-			"main": {
+			"main": {Spec: SiteConfigSpec{
 				ZoneID:                "Z123456789",
 				Domain:                "example.com",
 				DomainType:            "public",
 				UseTraefikForwardAuth: true,
-			},
+			}},
 		},
 		Clusters: map[string]AWSWorkloadClusterConfig{
-			"main": {
+			"main": {Spec: AWSWorkloadClusterSpec{
 				ClusterName:      "test-cluster",
 				NodeGroupName:    "test-node-group",
 				NodeInstanceType: "t3.medium",
@@ -67,7 +69,7 @@ func TestAWSWorkloadConfigSerialization(t *testing.T) {
 				NodeGroupMinSize: 1,
 				NodeGroupMaxSize: 3,
 				SubnetIDs:        []string{"subnet-1", "subnet-2"},
-			},
+			}},
 		},
 	}
 
@@ -88,9 +90,9 @@ func TestAWSWorkloadConfigSerialization(t *testing.T) {
 	assert.Equal(t, config.KeycloakEnabled, unmarshaledConfig.KeycloakEnabled)
 
 	// Check nested structures
-	assert.Equal(t, config.Sites["main"].Domain, unmarshaledConfig.Sites["main"].Domain)
-	assert.Equal(t, config.Clusters["main"].ClusterName, unmarshaledConfig.Clusters["main"].ClusterName)
-	assert.Equal(t, config.Clusters["main"].NodeInstanceType, unmarshaledConfig.Clusters["main"].NodeInstanceType)
+	assert.Equal(t, config.Sites["main"].Spec.Domain, unmarshaledConfig.Sites["main"].Spec.Domain)
+	assert.Equal(t, config.Clusters["main"].Spec.ClusterName, unmarshaledConfig.Clusters["main"].Spec.ClusterName)
+	assert.Equal(t, config.Clusters["main"].Spec.NodeInstanceType, unmarshaledConfig.Clusters["main"].Spec.NodeInstanceType)
 }
 
 func TestAzureWorkloadConfigSerialization(t *testing.T) {
@@ -104,12 +106,12 @@ func TestAzureWorkloadConfigSerialization(t *testing.T) {
 			"Owner":       "team",
 		},
 		Sites: map[string]SiteConfig{
-			"main": {
+			"main": {Spec: SiteConfigSpec{
 				ZoneID:                "Z123456789",
 				Domain:                "example.com",
 				DomainType:            "public",
 				UseTraefikForwardAuth: true,
-			},
+			}},
 		},
 		Clusters: map[string]AzureWorkloadClusterConfig{
 			"main": {
@@ -137,7 +139,7 @@ func TestAzureWorkloadConfigSerialization(t *testing.T) {
 	assert.Equal(t, config.Region, unmarshaledConfig.Region)
 
 	// Check nested structures
-	assert.Equal(t, config.Sites["main"].Domain, unmarshaledConfig.Sites["main"].Domain)
+	assert.Equal(t, config.Sites["main"].Spec.Domain, unmarshaledConfig.Sites["main"].Spec.Domain)
 	assert.Equal(t, config.Clusters["main"].KubernetesVersion, unmarshaledConfig.Clusters["main"].KubernetesVersion)
 	assert.Equal(t, config.Clusters["main"].Components.SecretStoreCsiDriverAzureProviderVersion,
 		unmarshaledConfig.Clusters["main"].Components.SecretStoreCsiDriverAzureProviderVersion)

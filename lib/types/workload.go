@@ -7,22 +7,47 @@ import (
 )
 
 type AWSWorkloadClusterConfig struct {
-	ClusterName             string   `json:"cluster_name" yaml:"cluster_name"`
-	NodeGroupName           string   `json:"node_group_name" yaml:"node_group_name"`
-	NodeInstanceType        string   `json:"node_instance_type" yaml:"node_instance_type"`
-	NodeGroupMinSize        int      `json:"node_group_min_size" yaml:"node_group_min_size"`
-	NodeGroupMaxSize        int      `json:"node_group_max_size" yaml:"node_group_max_size"`
-	NodeGroupDesiredSize    int      `json:"node_group_desired_size" yaml:"node_group_desired_size"`
-	K8sVersion              string   `json:"k8s_version" yaml:"k8s_version"`
-	VpcID                   string   `json:"vpc_id" yaml:"vpc_id"`
-	SubnetIDs               []string `json:"subnet_ids" yaml:"subnet_ids"`
-	SecurityGroupIDs        []string `json:"security_group_ids" yaml:"security_group_ids"`
-	IAMRoleARN              string   `json:"iam_role_arn" yaml:"iam_role_arn"`
-	ClusterEndpoint         string   `json:"cluster_endpoint" yaml:"cluster_endpoint"`
-	ClusterCA               string   `json:"cluster_ca" yaml:"cluster_ca"`
-	ClusterOIDCIssuerURL    string   `json:"cluster_oidc_issuer_url" yaml:"cluster_oidc_issuer_url"`
-	ClusterOIDCClientID     string   `json:"cluster_oidc_client_id" yaml:"cluster_oidc_client_id"`
-	ClusterOIDCClientSecret string   `json:"cluster_oidc_client_secret" yaml:"cluster_oidc_client_secret"`
+	Spec AWSWorkloadClusterSpec `json:"spec" yaml:"spec"`
+}
+
+// AWSWorkloadClusterSpec holds the actual cluster configuration fields,
+// nested under "spec" in the ptd.yaml cluster entries.
+type AWSWorkloadClusterSpec struct {
+	ClusterName             string           `json:"cluster_name" yaml:"cluster_name"`
+	NodeGroupName           string           `json:"node_group_name" yaml:"node_group_name"`
+	NodeInstanceType        string           `json:"node_instance_type" yaml:"node_instance_type"`
+	NodeGroupMinSize        int              `json:"node_group_min_size" yaml:"node_group_min_size"`
+	NodeGroupMaxSize        int              `json:"node_group_max_size" yaml:"node_group_max_size"`
+	NodeGroupDesiredSize    int              `json:"node_group_desired_size" yaml:"node_group_desired_size"`
+	K8sVersion              string           `json:"k8s_version" yaml:"k8s_version"`
+	VpcID                   string           `json:"vpc_id" yaml:"vpc_id"`
+	SubnetIDs               []string         `json:"subnet_ids" yaml:"subnet_ids"`
+	SecurityGroupIDs        []string         `json:"security_group_ids" yaml:"security_group_ids"`
+	IAMRoleARN              string           `json:"iam_role_arn" yaml:"iam_role_arn"`
+	ClusterEndpoint         string           `json:"cluster_endpoint" yaml:"cluster_endpoint"`
+	ClusterCA               string           `json:"cluster_ca" yaml:"cluster_ca"`
+	ClusterOIDCIssuerURL    string           `json:"cluster_oidc_issuer_url" yaml:"cluster_oidc_issuer_url"`
+	ClusterOIDCClientID     string           `json:"cluster_oidc_client_id" yaml:"cluster_oidc_client_id"`
+	ClusterOIDCClientSecret string           `json:"cluster_oidc_client_secret" yaml:"cluster_oidc_client_secret"`
+	EnableEfsCsiDriver      bool             `json:"enable_efs_csi_driver" yaml:"enable_efs_csi_driver"`
+	EfsConfig               *EFSConfig       `json:"efs_config" yaml:"efs_config"`
+	KarpenterConfig         *KarpenterConfig `json:"karpenter_config" yaml:"karpenter_config"`
+}
+
+// EFSConfig holds the EFS configuration for a workload cluster.
+type EFSConfig struct {
+	FileSystemID  string `json:"file_system_id" yaml:"file_system_id"`
+	AccessPointID string `json:"access_point_id" yaml:"access_point_id"`
+}
+
+// KarpenterConfig holds the Karpenter node pool configuration for a workload cluster.
+type KarpenterConfig struct {
+	NodePools []KarpenterNodePool `json:"node_pools" yaml:"node_pools"`
+}
+
+// KarpenterNodePool holds configuration for a single Karpenter node pool.
+type KarpenterNodePool struct {
+	SessionTaints bool `json:"session_taints" yaml:"session_taints"`
 }
 
 type CustomRoleConfig struct {
@@ -76,6 +101,7 @@ type AWSWorkloadConfig struct {
 	VpcAzCount                              int                                 `json:"vpc_az_count" yaml:"vpc_az_count"`
 	VpcCidr                                 string                              `json:"vpc_cidr" yaml:"vpc_cidr"`
 	ThirdPartyTelemetryEnabled              bool                                `json:"third_party_telemetry_enabled" yaml:"third_party_telemetry_enabled"`
+	NetworkTrust                            string                              `json:"network_trust" yaml:"network_trust"`
 }
 
 type AWSProvisionedVpc struct {
@@ -100,6 +126,8 @@ type AzureWorkloadConfig struct {
 	ProtectPersistentResources bool                                  `yaml:"protect_persistent_resources"`
 	ThirdPartyTelemetryEnabled bool                                  `yaml:"third_party_telemetry_enabled"`
 	Network                    NetworkConfig                         `yaml:"network"`
+	NetworkTrust               string                                `yaml:"network_trust"`
+	PpmFileShareSizeGib        int                                   `yaml:"ppm_file_share_size_gib"`
 }
 
 type NetworkConfig struct {
@@ -151,6 +179,12 @@ type AzureWorkloadClusterComponentConfig struct {
 }
 
 type SiteConfig struct {
+	Spec SiteConfigSpec `json:"spec" yaml:"spec"`
+}
+
+// SiteConfigSpec holds the actual site configuration fields,
+// nested under "spec" in the ptd.yaml sites entries.
+type SiteConfigSpec struct {
 	ZoneID                string `json:"zone_id" yaml:"zone_id"`
 	CertificateARN        string `json:"certificate_arn" yaml:"certificate_arn"`
 	Domain                string `json:"domain" yaml:"domain"`
@@ -163,6 +197,20 @@ var ValidOutboundTypes = map[string]bool{
 	"UserDefinedRouting": true,
 	"ManagedNatGateway":  true,
 	"AssignedNatGateway": true,
+}
+
+// NetworkTrustValue converts a NetworkTrust string (as stored in ptd.yaml) to its
+// integer value expected by the Site CRD spec. Values: ZERO=0, SAMESITE=50, FULL=100.
+// Defaults to FULL (100) when unset, matching the Python workload default.
+func NetworkTrustValue(s string) int {
+	switch s {
+	case "ZERO":
+		return 0
+	case "SAMESITE":
+		return 50
+	default:
+		return 100
+	}
 }
 
 func (c *AzureWorkloadClusterConfig) ValidateOutboundType() error {
