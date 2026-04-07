@@ -35,6 +35,18 @@ func (m *sitesMocks) NewResource(args pulumi.MockResourceArgs) (string, resource
 }
 
 func (m *sitesMocks) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
+	// Handle rds.LookupInstance invocations.
+	if args.Token == "aws:rds/getInstance:getInstance" {
+		return resource.PropertyMap{
+			"masterUserSecrets": resource.NewArrayProperty([]resource.PropertyValue{
+				resource.NewObjectProperty(resource.PropertyMap{
+					"kmsKeyId":     resource.NewStringProperty(""),
+					"secretArn":    resource.NewStringProperty("arn:aws:secretsmanager:us-east-1:123456789012:secret:db"),
+					"secretStatus": resource.NewStringProperty("active"),
+				}),
+			}),
+		}, nil
+	}
 	return resource.PropertyMap{}, nil
 }
 
@@ -66,7 +78,7 @@ func minimalAWSSiteParams(compoundName string, releases []string, siteNames []st
 		chronicleBucket:      "chronicle-bucket",
 		packageManagerBucket: "ppm-bucket",
 		fsDnsName:            "fs.example.com",
-		mainDBSecretARN:      "arn:aws:secretsmanager:us-east-1:123456789012:secret:db",
+		mainDBInstanceID:     "my-test-db",
 		networkTrust:         0,
 		kubeconfigsByRelease: kubeconfigsByRelease,
 		clusters:             clusters,
@@ -87,9 +99,10 @@ func TestAWSSitesDeployOneReleaseOneSite(t *testing.T) {
 
 	require.NoError(t, err)
 
-	// 1 kubernetes provider + 1 Site CRD = 2 resources
-	assert.Len(t, mocks.resources, 2)
+	// 1 AWS provider + 1 kubernetes provider + 1 Site CRD = 3 resources
+	assert.Len(t, mocks.resources, 3)
 	names := sitesResourceNames(mocks.resources)
+	assert.Contains(t, names, "aws")
 	assert.Contains(t, names, "myworkload-20250101-k8s")
 	assert.Contains(t, names, "20250101-main")
 }
@@ -104,9 +117,10 @@ func TestAWSSitesDeployTwoReleasesOneSite(t *testing.T) {
 
 	require.NoError(t, err)
 
-	// 2 providers + 2 sites = 4 resources
-	assert.Len(t, mocks.resources, 4)
+	// 1 AWS provider + 2 kubernetes providers + 2 sites = 5 resources
+	assert.Len(t, mocks.resources, 5)
 	names := sitesResourceNames(mocks.resources)
+	assert.Contains(t, names, "aws")
 	assert.Contains(t, names, "myworkload-20250101-k8s")
 	assert.Contains(t, names, "myworkload-20250201-k8s")
 	assert.Contains(t, names, "20250101-main")
@@ -123,9 +137,10 @@ func TestAWSSitesDeployOneReleaseTwoSites(t *testing.T) {
 
 	require.NoError(t, err)
 
-	// 1 provider + 2 sites = 3 resources
-	assert.Len(t, mocks.resources, 3)
+	// 1 AWS provider + 1 kubernetes provider + 2 sites = 4 resources
+	assert.Len(t, mocks.resources, 4)
 	names := sitesResourceNames(mocks.resources)
+	assert.Contains(t, names, "aws")
 	assert.Contains(t, names, "myworkload-20250101-k8s")
 	assert.Contains(t, names, "20250101-main")
 	assert.Contains(t, names, "20250101-beta")
@@ -140,7 +155,7 @@ func TestBuildAWSSiteSpecBasic(t *testing.T) {
 	clusterCfg := types.AWSWorkloadClusterSpec{}
 	siteConfig := types.SiteConfigSpec{Domain: "main.example.com"}
 
-	spec := buildAWSSiteSpec(params, "20250101", "main", siteConfig, clusterCfg)
+	spec := buildAWSSiteSpec(params, "arn:aws:secretsmanager:us-east-1:123456789012:secret:db", "20250101", "main", siteConfig, clusterCfg)
 
 	assert.Equal(t, "123456789012", spec["awsAccountId"])
 	assert.Equal(t, "20250101", spec["clusterDate"])
@@ -182,7 +197,7 @@ func TestBuildAWSSiteSpecEfsEnabledFlag(t *testing.T) {
 	params.vpcCidr = "10.0.0.0/16"
 
 	clusterCfg := types.AWSWorkloadClusterSpec{EnableEfsCsiDriver: true}
-	spec := buildAWSSiteSpec(params, "20250101", "main", types.SiteConfigSpec{Domain: "d.example.com"}, clusterCfg)
+	spec := buildAWSSiteSpec(params, "arn:aws:secretsmanager:us-east-1:123456789012:secret:db", "20250101", "main", types.SiteConfigSpec{Domain: "d.example.com"}, clusterCfg)
 
 	assert.Equal(t, true, spec["efsEnabled"])
 	assert.Equal(t, "10.0.0.0/16", spec["vpcCIDR"])
@@ -195,7 +210,7 @@ func TestBuildAWSSiteSpecEfsConfigNotNil(t *testing.T) {
 	clusterCfg := types.AWSWorkloadClusterSpec{
 		EfsConfig: &types.EFSConfig{FileSystemID: "fs-abc123"},
 	}
-	spec := buildAWSSiteSpec(params, "20250101", "main", types.SiteConfigSpec{Domain: "d.example.com"}, clusterCfg)
+	spec := buildAWSSiteSpec(params, "arn:aws:secretsmanager:us-east-1:123456789012:secret:db", "20250101", "main", types.SiteConfigSpec{Domain: "d.example.com"}, clusterCfg)
 
 	assert.Equal(t, true, spec["efsEnabled"])
 	assert.Equal(t, "10.0.0.0/16", spec["vpcCIDR"])
@@ -206,7 +221,7 @@ func TestBuildAWSSiteSpecEfsNoVpcCidr(t *testing.T) {
 	params.vpcCidr = ""
 
 	clusterCfg := types.AWSWorkloadClusterSpec{EnableEfsCsiDriver: true}
-	spec := buildAWSSiteSpec(params, "20250101", "main", types.SiteConfigSpec{Domain: "d.example.com"}, clusterCfg)
+	spec := buildAWSSiteSpec(params, "arn:aws:secretsmanager:us-east-1:123456789012:secret:db", "20250101", "main", types.SiteConfigSpec{Domain: "d.example.com"}, clusterCfg)
 
 	assert.Equal(t, true, spec["efsEnabled"])
 	_, hasVpcCidr := spec["vpcCIDR"]
@@ -221,7 +236,7 @@ func TestBuildAWSSiteSpecSessionTolerations(t *testing.T) {
 			NodePools: []types.KarpenterNodePool{{SessionTaints: true}},
 		},
 	}
-	spec := buildAWSSiteSpec(params, "20250101", "main", types.SiteConfigSpec{Domain: "d.example.com"}, clusterCfg)
+	spec := buildAWSSiteSpec(params, "arn:aws:secretsmanager:us-east-1:123456789012:secret:db", "20250101", "main", types.SiteConfigSpec{Domain: "d.example.com"}, clusterCfg)
 
 	workbench := spec["workbench"].(map[string]interface{})
 	tolerations := workbench["sessionTolerations"].([]map[string]interface{})

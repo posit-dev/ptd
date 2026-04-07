@@ -16,6 +16,8 @@ import (
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/kube"
 	"github.com/posit-dev/ptd/lib/types"
+	pulumiaws "github.com/pulumi/pulumi-aws/sdk/v6/go/aws"
+	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/rds"
 	kubernetes "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes"
 	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apiextensions"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
@@ -78,7 +80,7 @@ type awsSiteParams struct {
 	chronicleBucket      string
 	packageManagerBucket string
 	fsDnsName            string
-	mainDBSecretARN      string
+	mainDBInstanceID     string
 	networkTrust         int
 	vpcCidr              string
 	tailscaleEnabled     bool
@@ -114,16 +116,6 @@ func (s *SitesStep) runAWSInlineGo(ctx context.Context, creds types.Credentials,
 		return fmt.Errorf("sites: failed to parse workload secret: %w", err)
 	}
 
-	// Get RDS master user secret ARN.
-	mainDBSecretARN := ""
-	if mainDBID := secrets["main-database-id"]; mainDBID != "" {
-		dbInfo, err := aws.DescribeDBInstance(ctx, awsCreds, s.DstTarget.Region(), mainDBID)
-		if err != nil {
-			return fmt.Errorf("sites: failed to describe DB instance: %w", err)
-		}
-		mainDBSecretARN = dbInfo.MasterUserSecretARN
-	}
-
 	// Build kubeconfig string per release.
 	kubeconfigsByRelease := make(map[string]string, len(cfg.Clusters))
 	for release := range cfg.Clusters {
@@ -154,7 +146,7 @@ func (s *SitesStep) runAWSInlineGo(ctx context.Context, creds types.Credentials,
 		chronicleBucket:      secrets["chronicle-bucket"],
 		packageManagerBucket: secrets["packagemanager-bucket"],
 		fsDnsName:            secrets["fs-dns-name"],
-		mainDBSecretARN:      mainDBSecretARN,
+		mainDBInstanceID:     secrets["main-database-id"],
 		networkTrust:         types.NetworkTrustValue(cfg.NetworkTrust),
 		vpcCidr:              cfg.VpcCidr,
 		tailscaleEnabled:     cfg.TailscaleEnabled,
@@ -174,6 +166,27 @@ func (s *SitesStep) runAWSInlineGo(ctx context.Context, creds types.Credentials,
 }
 
 func awsSitesDeploy(ctx *pulumi.Context, _ types.Target, params awsSiteParams) error {
+	// Look up the RDS master user secret ARN via Pulumi data source.
+	mainDBSecretARN := ""
+	if params.mainDBInstanceID != "" {
+		awsProvider, err := pulumiaws.NewProvider(ctx, "aws", &pulumiaws.ProviderArgs{
+			Region: pulumi.String(params.region),
+		})
+		if err != nil {
+			return err
+		}
+
+		dbInstance, err := rds.LookupInstance(ctx, &rds.LookupInstanceArgs{
+			DbInstanceIdentifier: &params.mainDBInstanceID,
+		}, pulumi.Provider(awsProvider))
+		if err != nil {
+			return fmt.Errorf("sites: failed to look up DB instance %s: %w", params.mainDBInstanceID, err)
+		}
+		if len(dbInstance.MasterUserSecrets) > 0 {
+			mainDBSecretARN = dbInstance.MasterUserSecrets[0].SecretArn
+		}
+	}
+
 	for _, release := range helpers.SortedKeys(params.kubeconfigsByRelease) {
 		kubeconfig := params.kubeconfigsByRelease[release]
 		providerName := params.compoundName + "-" + release + "-k8s"
@@ -190,7 +203,7 @@ func awsSitesDeploy(ctx *pulumi.Context, _ types.Target, params awsSiteParams) e
 		for _, siteName := range helpers.SortedKeys(params.sites) {
 			siteConfig := params.sites[siteName].Spec
 
-			spec := buildAWSSiteSpec(params, release, siteName, siteConfig, clusterCfg)
+			spec := buildAWSSiteSpec(params, mainDBSecretARN, release, siteName, siteConfig, clusterCfg)
 
 			spec, err = applySiteOverrides(spec, params.compoundName, siteName)
 			if err != nil {
@@ -227,6 +240,7 @@ func awsSitesDeploy(ctx *pulumi.Context, _ types.Target, params awsSiteParams) e
 
 func buildAWSSiteSpec(
 	params awsSiteParams,
+	mainDBSecretARN string,
 	release, siteName string,
 	siteConfig types.SiteConfigSpec,
 	clusterCfg types.AWSWorkloadClusterSpec,
@@ -243,7 +257,7 @@ func buildAWSSiteSpec(
 		"domain":      siteConfig.Domain,
 		"mainDatabaseCredentialSecret": map[string]interface{}{
 			"type":      "aws",
-			"vaultName": params.mainDBSecretARN,
+			"vaultName": mainDBSecretARN,
 		},
 		"networkTrust": params.networkTrust,
 		"packageManager": map[string]interface{}{
