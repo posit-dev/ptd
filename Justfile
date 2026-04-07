@@ -74,10 +74,23 @@ symlink-binaries:
   # Create wrapper scripts instead of symlinks. Symlinks to shell scripts that use
   # $BASH_SOURCE[0] for self-location (e.g. /usr/bin/az) break when invoked via a
   # symlink path, because bash receives the symlink path instead of the real script path.
+  #
+  # For az specifically, we extract the Python interpreter path and create a direct wrapper,
+  # bypassing /usr/bin/az entirely. This avoids both the $BASH_SOURCE[0] issue and any
+  # broken relative paths in the az wrapper script itself.
   for binary in aws az pulumi; do
+    rm -f "$binlocal/$binary"  # Remove first so `which` doesn't find our own wrapper
     target="$(which $binary)" || { echo "warning: $binary not found in PATH, skipping"; continue; }
-    rm -f "$binlocal/$binary"
-    printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$target" > "$binlocal/$binary"
+    if [ "$binary" = "az" ]; then
+      python_bin="$(grep -oE '/[^ ]+python[0-9.]*' "$target" | head -1)"
+      if [ -n "$python_bin" ] && [ -x "$python_bin" ]; then
+        printf '#!/usr/bin/env bash\nAZ_INSTALLER=DEB %s -Im azure.cli "$@"\n' "$python_bin" > "$binlocal/$binary"
+      else
+        printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$target" > "$binlocal/$binary"
+      fi
+    else
+      printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$target" > "$binlocal/$binary"
+    fi
     chmod +x "$binlocal/$binary"
   done
 
