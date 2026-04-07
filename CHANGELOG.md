@@ -1,3 +1,11 @@
+## [1.8.2](https://github.com/posit-dev/ptd/compare/v1.8.1...v1.8.2) (2026-04-07)
+
+
+### Bug Fixes
+
+* update uv.lock for pulumi-aws 6.78.0 ([805771a](https://github.com/posit-dev/ptd/commit/805771a4301ca2468fef2a539cdf4dc0bdc64e89))
+* upgrade pulumi-aws and pass force_update_version to both Cluster and NodeGroup ([128f232](https://github.com/posit-dev/ptd/commit/128f232f7f236e5346ff90a85d59f72e32fb6097))
+
 ## [1.8.1](https://github.com/posit-dev/ptd/compare/v1.8.0...v1.8.1) (2026-04-07)
 
 
