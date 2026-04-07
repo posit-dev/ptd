@@ -75,7 +75,8 @@ symlink-binaries:
   # $BASH_SOURCE[0] for self-location (e.g. /usr/bin/az) break when invoked via a
   # symlink path, because bash receives the symlink path instead of the real script path.
   for binary in aws az pulumi; do
-    target="$(which $binary)"
+    target="$(which $binary)" || { echo "warning: $binary not found in PATH, skipping"; continue; }
+    rm -f "$binlocal/$binary"
     printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$target" > "$binlocal/$binary"
     chmod +x "$binlocal/$binary"
   done
