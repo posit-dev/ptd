@@ -1,3 +1,10 @@
+## [1.8.1](https://github.com/posit-dev/ptd/compare/v1.8.0...v1.8.1) (2026-04-07)
+
+
+### Bug Fixes
+
+* use runtime.Caller instead of git rev-parse in test setup ([69edc7a](https://github.com/posit-dev/ptd/commit/69edc7abbd19f46b6fc996352d810e1a8e4d6915))
+
 # [1.8.0](https://github.com/posit-dev/ptd/compare/v1.7.1...v1.8.0) (2026-04-06)
 
 
