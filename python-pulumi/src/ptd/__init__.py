@@ -462,6 +462,13 @@ class WorkloadClusterConfig:
     # existing CRDs with Helm ownership labels without risk of accidental deletion.
     # After migration, set to False to let Helm manage CRDs going forward.
     team_operator_skip_crds: bool = False
+    # Enable the session group label controller for OpenCost/Infracost cost attribution.
+    # When True, the operator watches Workbench session pods and writes one numbered
+    # label per Entra group found in --container-user-groups, e.g.:
+    #   user-group-1: entra_research_team
+    #   user-group-2: entra_data_science
+    # This replaces the standalone pod-labeler Deployment previously used for the same purpose.
+    team_operator_session_group_labels_enabled: bool = False
 
 
 def load_workload_cluster_site_dict(

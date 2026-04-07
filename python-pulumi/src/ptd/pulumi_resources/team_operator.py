@@ -308,6 +308,12 @@ echo "Migration complete - Helm will now create fresh resources"
                 "enable": not self.cluster_cfg.team_operator_skip_crds,
                 "keep": True,
             },
+            # Session group label controller — disabled by default.
+            # Reads _entra_ groups from Workbench session pod args and writes one
+            # numbered label per group for OpenCost/Infracost cost attribution.
+            "sessionGroupLabels": {
+                "enable": self.cluster_cfg.team_operator_session_group_labels_enabled,
+            },
         }
 
         # OCI Helm chart from public repository
