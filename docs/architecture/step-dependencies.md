@@ -171,12 +171,11 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 
 ---
 
-### Step 7: sites (Python) {#sites}
+### Step 7: sites (Go) {#sites}
 **Implementation:**
-- AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_sites.py`
-- Azure: `python-pulumi/src/ptd/pulumi_resources/azure_workload_sites.py`
+- `lib/steps/sites.go`
 
-**Language:** Python/Pulumi
+**Language:** Go/Pulumi (inline)
 **Proxy Required:** Yes (creates Kubernetes CRDs)
 
 **Creates:**
