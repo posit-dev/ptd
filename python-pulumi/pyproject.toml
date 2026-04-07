@@ -25,7 +25,7 @@ dependencies = [
   # NOTE: The pulumi dependencies are pinned to exact versions so that the plugins used in
   # each pulumi stack state remain stable.
   "pulumi==3.187.0",
-  "pulumi_aws==6.65.0",
+  "pulumi_aws==6.78.0",
   "pulumi-azuread==6.2.0",
   "pulumi_azure_native==3.8.0",
   "pulumi_command==1.0.1",
