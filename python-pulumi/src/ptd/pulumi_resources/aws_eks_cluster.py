@@ -128,6 +128,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         self.iam_permissions_boundary = iam_permissions_boundary
         self.tailscale_enabled = tailscale_enabled
         self.customer_managed_bastion_id = customer_managed_bastion_id
+        self.force_update_version = force_update_version
 
         # ──────────────────────────────────────────────────────────────────────
         # Method Ordering Dependencies (for with_*() methods):
@@ -630,6 +631,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 version=launch_template.latest_version,  # type: ignore
             ),
             update_config=aws.eks.NodeGroupUpdateConfigArgs(max_unavailable=max_unavailable),
+            force_update_version=self.force_update_version,
             taints=taints,
             opts=pulumi.ResourceOptions(parent=self.eks, depends_on=depends_on),
         )
