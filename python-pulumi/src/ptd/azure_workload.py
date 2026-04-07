@@ -63,9 +63,9 @@ class AzureWorkloadConfig(ptd.WorkloadConfig):
     admin_group_id: str | None = None
     automated_volume_provisioning: bool = False
     bastion_instance_type: str = "Standard_B1s"
-    netapp_volume_connect_capacity: int = 50  # GiB (Azure NetApp Files minimum)
-    netapp_volume_workbench_capacity: int = 50  # GiB (Azure NetApp Files minimum)
-    netapp_volume_workbench_shared_capacity: int = 50  # GiB (Azure NetApp Files minimum)
+    netapp_volume_connect_capacity: int = 200  # GiB
+    netapp_volume_workbench_capacity: int = 200  # GiB
+    netapp_volume_workbench_shared_capacity: int = 200  # GiB
     ppm_file_share_size_gib: int = 100  # Minimum size for PPM Azure File Share in GiB
 
 
