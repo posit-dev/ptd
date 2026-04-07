@@ -1,21 +1,22 @@
 package testdata
 
 import (
-	"os/exec"
 	"path/filepath"
-	"strings"
+	"runtime"
 	"testing"
 
 	"github.com/spf13/viper"
 )
 
 func Setup(_ *testing.T) (func(), error) {
-	top, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
-	if err != nil {
-		return func() {}, err
-	}
+	// Use runtime.Caller to locate this file's directory, which is the
+	// testdata directory itself. This is reliable regardless of working
+	// directory, environment variables, or git hook context (where
+	// git rev-parse --show-toplevel can return incorrect results).
+	_, thisFile, _, _ := runtime.Caller(0)
+	testdataDir := filepath.Dir(thisFile)
 
-	viper.SetDefault("TOP", filepath.Join(strings.TrimSpace(string(top)), "lib", "testdata"))
+	viper.Set("TOP", testdataDir)
 
 	return func() {}, nil
 }
