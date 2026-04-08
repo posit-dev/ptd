@@ -2,6 +2,7 @@ package steps
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
@@ -51,10 +52,13 @@ func TestParseDBSecretField(t *testing.T) {
 
 // postgresConfigMocks implements pulumi.MockResourceMonitor for testing the deploy function.
 type postgresConfigMocks struct {
+	mu        sync.Mutex
 	resources []pulumi.MockResourceArgs
 }
 
 func (m *postgresConfigMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.resources = append(m.resources, args)
 	return args.Name + "_id", args.Inputs, nil
 }
