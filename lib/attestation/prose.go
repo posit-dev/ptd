@@ -190,7 +190,6 @@ func generateAWSPersistentProse(cfg *InfraConfig) string {
 		} else if cfg.HostedZoneManagementEnabled {
 			lines = append(lines, fmt.Sprintf("Route 53 hosted zone for `%s`", domain))
 		}
-		break
 	}
 
 	lines = append(lines, "IAM roles and policies for all service components")

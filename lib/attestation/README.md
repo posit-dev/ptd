@@ -7,7 +7,7 @@ The attestation package provides functionality to collect comprehensive metadata
 This package collects deployment information from multiple sources:
 
 - **Site Configurations**: Product images, replicas, domains, and authentication settings from `site.yaml` files
-- **Pulumi Stack State**: Resource counts, types, versions, and timestamps from Pulumi state files in S3
+- **Pulumi Stack State**: Resource counts, types, versions, and timestamps from Pulumi state files in S3 (AWS) or Azure Blob Storage (Azure)
 - **Custom Steps**: Custom deployment steps from `customizations/manifest.yaml`
 - **Cluster Configuration**: Kubernetes cluster settings from `ptd.yaml`
 
@@ -62,8 +62,6 @@ The `AttestationData` struct contains:
 
 ## Current Limitations
 
-- **AWS Only**: Currently supports AWS workloads. Azure support planned for future releases.
-- **S3 State Backend**: Assumes Pulumi state is stored in S3 (the standard PTD configuration).
 - **Read-Only**: This package only reads deployment state; it does not modify any infrastructure.
 
 ## Thread Safety

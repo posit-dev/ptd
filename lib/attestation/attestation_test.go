@@ -136,8 +136,8 @@ func TestParseStateFile(t *testing.T) {
 			if tt.wantVersion != "" && summary.PulumiVersion != tt.wantVersion {
 				t.Errorf("PulumiVersion = %q, want %q", summary.PulumiVersion, tt.wantVersion)
 			}
-			if summary.S3Key != tt.key {
-				t.Errorf("S3Key = %q, want %q", summary.S3Key, tt.key)
+			if summary.StateKey != tt.key {
+				t.Errorf("StateKey = %q, want %q", summary.StateKey, tt.key)
 			}
 		})
 	}
