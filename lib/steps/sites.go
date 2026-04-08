@@ -466,6 +466,11 @@ func buildAzureSiteSpec(
 			"vaultName": siteSecretName,
 		},
 		"secretType": "kubernetes",
+		// TODO: When the Team Operator CRD supports per-volume NFS mount
+		// info (server + path) under volumeSource, inject it here for each
+		// site when automated_volume_provisioning is enabled. Until then,
+		// volumes are provisioned in the persistent step but the Site spec
+		// keeps volumeSource.type = "azure-netapp".
 		"volumeSource": map[string]interface{}{
 			"type": "azure-netapp",
 		},
