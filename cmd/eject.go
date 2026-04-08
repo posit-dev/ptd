@@ -19,7 +19,7 @@ var ejectOutputDir string
 func init() {
 	rootCmd.AddCommand(ejectCmd)
 	ejectCmd.Flags().BoolVar(&ejectDryRun, "dry-run", true, "Generate artifacts only; change nothing")
-	ejectCmd.Flags().StringVar(&ejectOutputDir, "output-dir", "", "Output directory for eject artifacts (default: ./eject-<target>/)")
+	ejectCmd.Flags().StringVar(&ejectOutputDir, "output-dir", "", "Output directory for eject artifacts (default: .eject/<target>/)")
 }
 
 var ejectCmd = &cobra.Command{
@@ -58,7 +58,7 @@ func runEject(cmd *cobra.Command, targetName string) {
 	// Determine output directory
 	outputDir := ejectOutputDir
 	if outputDir == "" {
-		outputDir = fmt.Sprintf("./eject-%s/", targetName)
+		outputDir = fmt.Sprintf(".eject/%s/", targetName)
 	}
 
 	// Safety confirmation for non-dry-run mode
