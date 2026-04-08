@@ -176,7 +176,7 @@ Each state file is a JSON document with the following structure:
 | File Path | Stack |
 |---|---|
 {{ range .Stacks -}}
-| ` + "`" + `{{ .S3Key }}` + "`" + ` | {{ .ProjectName }} |
+| ` + "`" + `{{ .StateKey }}` + "`" + ` | {{ .ProjectName }} |
 {{ end }}
 
 ### Configuration Source

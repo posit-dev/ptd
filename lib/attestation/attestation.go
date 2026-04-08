@@ -67,7 +67,7 @@ type StackSummary struct {
 	PulumiVersion string    `json:"pulumi_version"`
 	ResourceCount int       `json:"resource_count"`
 	ResourceTypes []string  `json:"resource_types"`
-	S3Key         string    `json:"s3_key"`
+	StateKey      string    `json:"state_key"`
 }
 
 // stackPurposes returns human-readable descriptions for standard stack types, keyed by cloud
@@ -412,7 +412,6 @@ func parseAWSInfraConfig(data []byte) (*InfraConfig, error) {
 		cfg.ClusterVersion = cluster.Spec.ClusterVersion
 		cfg.InstanceType = cluster.Spec.MpInstanceType
 		cfg.RootDiskSize = cluster.Spec.RootDiskSize
-		break
 	}
 
 	for name, site := range raw.Spec.Sites {
@@ -475,7 +474,6 @@ func parseAzureInfraConfig(data []byte) (*InfraConfig, error) {
 		if len(cluster.UserNodePools) > 0 {
 			cfg.InstanceType = cluster.UserNodePools[0].VMSize
 		}
-		break
 	}
 
 	for name, site := range raw.Spec.Sites {
@@ -765,6 +763,6 @@ func parseStateFile(data []byte, stateKey string) (StackSummary, error) {
 		PulumiVersion: state.Checkpoint.Latest.Manifest.Version,
 		ResourceCount: resourceCount,
 		ResourceTypes: resourceTypes,
-		S3Key:         stateKey,
+		StateKey:      stateKey,
 	}, nil
 }

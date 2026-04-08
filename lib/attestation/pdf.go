@@ -203,7 +203,7 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 	pdfSubSection(m, "Expected State Files")
 	m.AddRows(pdfTableHeader([]string{"File Path", "Stack"}, []int{7, 5}))
 	for _, stack := range data.Stacks {
-		m.AddRows(pdfTableRow([]string{stack.S3Key, stack.ProjectName}, []int{7, 5}))
+		m.AddRows(pdfTableRow([]string{stack.StateKey, stack.ProjectName}, []int{7, 5}))
 	}
 
 	m.AddRows(row.New(4))
