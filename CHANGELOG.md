@@ -1,3 +1,10 @@
+## [1.8.5](https://github.com/posit-dev/ptd/compare/v1.8.4...v1.8.5) (2026-04-08)
+
+
+### Bug Fixes
+
+* add mutex to postgres config test mock to prevent data race ([4e32dc3](https://github.com/posit-dev/ptd/commit/4e32dc3e9a38d3c7b4de7a7422eb24b3be086392))
+
 ## [1.8.4](https://github.com/posit-dev/ptd/compare/v1.8.3...v1.8.4) (2026-04-08)
 
 
