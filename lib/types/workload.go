@@ -200,15 +200,19 @@ var ValidOutboundTypes = map[string]bool{
 }
 
 // NetworkTrustValue converts a NetworkTrust string (as stored in ptd.yaml) to its
-// integer value expected by the Site CRD spec. Values: ZERO=0, SAMESITE=50, FULL=100.
-// Defaults to FULL (100) when unset, matching the Python workload default.
+// integer value expected by the Site CRD spec. Valid values: ZERO=0, SAMESITE=50, FULL=100.
+// Empty string defaults to FULL (100), matching the Python workload default.
+// Unrecognized values also default to FULL.
 func NetworkTrustValue(s string) int {
 	switch s {
 	case "ZERO":
 		return 0
 	case "SAMESITE":
 		return 50
+	case "", "FULL":
+		return 100
 	default:
+		// Unrecognized values default to FULL to match Python behavior.
 		return 100
 	}
 }
