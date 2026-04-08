@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/posit-dev/ptd/lib/attestation"
 )
 
 type ResourceInventoryEntry struct {
@@ -15,36 +17,8 @@ type ResourceInventoryEntry struct {
 	Purpose    string `json:"purpose"`
 }
 
-// Pulumi state structures — richer than attestation's, includes id/outputs/provider
-type pulumiState struct {
-	Version    int              `json:"version"`
-	Checkpoint pulumiCheckpoint `json:"checkpoint"`
-}
-
-type pulumiCheckpoint struct {
-	Latest pulumiLatest `json:"latest"`
-}
-
-type pulumiLatest struct {
-	Manifest  pulumiManifest  `json:"manifest"`
-	Resources []pulumiFullRes `json:"resources"`
-}
-
-type pulumiManifest struct {
-	Time    string `json:"time"`
-	Version string `json:"version"`
-}
-
-type pulumiFullRes struct {
-	Type     string                 `json:"type"`
-	URN      string                 `json:"urn"`
-	ID       string                 `json:"id"`
-	Provider string                 `json:"provider"`
-	Outputs  map[string]interface{} `json:"outputs"`
-}
-
 func ParseResourceInventory(data []byte, stateKey string) ([]ResourceInventoryEntry, error) {
-	var state pulumiState
+	var state attestation.PulumiState
 	if err := json.Unmarshal(data, &state); err != nil {
 		return nil, fmt.Errorf("failed to parse state JSON: %w", err)
 	}
@@ -59,13 +33,11 @@ func ParseResourceInventory(data []byte, stateKey string) ([]ResourceInventoryEn
 			continue
 		}
 
-		physicalID := resolvePhysicalID(res)
-
 		entries = append(entries, ResourceInventoryEntry{
 			URN:        res.URN,
 			Type:       res.Type,
 			Provider:   providerName(res.Provider),
-			PhysicalID: physicalID,
+			PhysicalID: resolvePhysicalID(res),
 			Stack:      stack,
 			Purpose:    purpose,
 		})
@@ -74,9 +46,8 @@ func ParseResourceInventory(data []byte, stateKey string) ([]ResourceInventoryEn
 	return entries, nil
 }
 
-// resolvePhysicalID picks the best physical identifier for a resource.
 // Prefers outputs.arn (AWS) or outputs.id, falls back to the top-level id field.
-func resolvePhysicalID(res pulumiFullRes) string {
+func resolvePhysicalID(res attestation.PulumiResource) string {
 	if arn, ok := res.Outputs["arn"].(string); ok && arn != "" {
 		return arn
 	}
@@ -86,7 +57,6 @@ func resolvePhysicalID(res pulumiFullRes) string {
 	return res.ID
 }
 
-// providerName extracts a short provider name from a Pulumi provider URN.
 // e.g. "urn:pulumi:prod::proj::pulumi:providers:aws::default::id" → "aws"
 func providerName(providerURN string) string {
 	parts := strings.Split(providerURN, "::")
@@ -98,7 +68,7 @@ func providerName(providerURN string) string {
 	return ""
 }
 
-// stackNameFromKey extracts "project/stack" from ".pulumi/stacks/project/stack.json"
+// e.g. ".pulumi/stacks/project/stack.json" → "project/stack"
 func stackNameFromKey(key string) string {
 	parts := strings.Split(key, "/")
 	if len(parts) >= 4 {
@@ -107,7 +77,6 @@ func stackNameFromKey(key string) string {
 	return key
 }
 
-// purposeFromKey extracts the step name from the project portion of the key.
 // e.g. ".pulumi/stacks/ptd-aws-workload-persistent/prod.json" → "persistent"
 func purposeFromKey(key string) string {
 	parts := strings.Split(key, "/")
@@ -116,7 +85,7 @@ func purposeFromKey(key string) string {
 	}
 	project := parts[2]
 	projectParts := strings.Split(project, "-")
-	// ptd-{cloud}-{target_type}-{step...} — step is everything after the 3rd dash
+	// step name is everything after ptd-{cloud}-{target_type}-
 	if len(projectParts) >= 4 {
 		return strings.Join(projectParts[3:], "-")
 	}

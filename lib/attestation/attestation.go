@@ -185,8 +185,11 @@ type PulumiManifest struct {
 
 // PulumiResource represents a single resource in Pulumi state
 type PulumiResource struct {
-	Type string `json:"type"`
-	URN  string `json:"urn"`
+	Type     string                 `json:"type"`
+	URN      string                 `json:"urn"`
+	ID       string                 `json:"id"`
+	Provider string                 `json:"provider"`
+	Outputs  map[string]interface{} `json:"outputs"`
 }
 
 // Collect gathers attestation data for a given target and workload path
