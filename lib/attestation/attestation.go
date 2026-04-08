@@ -224,9 +224,9 @@ func Collect(ctx context.Context, target types.Target, workloadPath string) (*At
 			clustersMap := make(map[string]interface{})
 			for name, cluster := range cfg.Clusters {
 				clusterMap := map[string]interface{}{
-					"cluster_name":       cluster.ClusterName,
-					"node_instance_type": cluster.NodeInstanceType,
-					"k8s_version":        cluster.K8sVersion,
+					"cluster_name":       cluster.Spec.ClusterName,
+					"node_instance_type": cluster.Spec.NodeInstanceType,
+					"k8s_version":        cluster.Spec.K8sVersion,
 				}
 				clustersMap[name] = clusterMap
 			}
