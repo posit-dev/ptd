@@ -25,8 +25,10 @@ func init() {
 var attestationCmd = &cobra.Command{
 	Use:   "attestation <target>",
 	Short: "Generate an installation attestation document",
-	Long:  `Generate an installation attestation document for a workload, including product versions, infrastructure resources, and Pulumi state references.`,
-	Args:  cobra.ExactArgs(1),
+	Long: `Generate an installation attestation document for a workload, including product versions, infrastructure resources, and Pulumi state references.
+
+NOTE: This command is experimental. Output format and content are subject to change.`,
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		target := args[0]
 		runAttestation(cmd, target)
