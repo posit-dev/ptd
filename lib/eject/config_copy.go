@@ -60,17 +60,23 @@ func copySiteYamls(workloadPath string, configDir string) error {
 		return err
 	}
 
+	cleanBase := filepath.Clean(workloadPath)
 	for _, entry := range entries {
 		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "site_") {
 			continue
 		}
 
-		siteYaml := filepath.Join(workloadPath, entry.Name(), "site.yaml")
+		siteDir := filepath.Clean(filepath.Join(workloadPath, entry.Name()))
+		if !strings.HasPrefix(siteDir, cleanBase+string(os.PathSeparator)) {
+			continue
+		}
+
+		siteYaml := filepath.Join(siteDir, "site.yaml")
 		if _, err := os.Stat(siteYaml); os.IsNotExist(err) {
 			continue
 		}
 
-		destDir := filepath.Join(configDir, entry.Name())
+		destDir := filepath.Join(configDir, filepath.Base(siteDir))
 		if err := os.MkdirAll(destDir, 0755); err != nil {
 			return err
 		}
@@ -94,13 +100,13 @@ func copyCustomizations(workloadPath string, configDir string) error {
 }
 
 func copyFile(src, dst string) error {
-	in, err := os.Open(src)
+	in, err := os.Open(filepath.Clean(src))
 	if err != nil {
 		return err
 	}
 	defer in.Close()
 
-	out, err := os.Create(dst)
+	out, err := os.Create(filepath.Clean(dst))
 	if err != nil {
 		return err
 	}
