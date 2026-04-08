@@ -462,7 +462,7 @@ class WorkloadClusterConfig:
     # existing CRDs with Helm ownership labels without risk of accidental deletion.
     # After migration, set to False to let Helm manage CRDs going forward.
     team_operator_skip_crds: bool = False
-    # Deploy the session group label controller for OpenCost/Infracost cost attribution.
+    # Deploy the session group label controller for Workbench session pods.
     # When True, the controller runs cluster-wide; per-site enablement and all
     # configuration (sourceField, sourceKey, searchRegex, etc.) are set in site.yaml
     # under workbench.sessionLabels. Omitting sessionLabels from a site disables the
