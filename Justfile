@@ -71,11 +71,14 @@ symlink-binaries:
   binlocal="{{ justfile_directory() }}/.local/bin"
   mkdir -p $binlocal
 
-  # Create symlinks only if they don't already exist
+  # Create or update symlinks, skipping binaries in our own .local/bin to avoid circular references
   for binary in aws az pulumi; do
-    if [ ! -e "$binlocal/$binary" ]; then
-      ln -sf "$(which $binary)" "$binlocal/$binary"
+    target="$(PATH="${PATH//$binlocal:/}" which "$binary" 2>/dev/null)"
+    if [ -z "$target" ]; then
+      printf 'WARNING: %s not found in PATH (excluding %s), skipping\n' "$binary" "$binlocal" >&2
+      continue
     fi
+    ln -sf "$target" "$binlocal/$binary"
   done
 
 install-thumbprint:

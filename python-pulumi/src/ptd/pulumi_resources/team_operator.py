@@ -309,8 +309,8 @@ echo "Migration complete - Helm will now create fresh resources"
                 "keep": True,
             },
             # Session group label controller — disabled by default.
-            # Reads _entra_ groups from Workbench session pod args and writes one
-            # numbered label per group for OpenCost/Infracost cost attribution.
+            # Per-site config (sourceField, sourceKey, searchRegex, etc.) lives in
+            # site.yaml under workbench.sessionLabels and flows through the Workbench CRD.
             "sessionGroupLabels": {
                 "enable": self.cluster_cfg.team_operator_session_group_labels_enabled,
             },
