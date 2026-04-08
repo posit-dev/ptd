@@ -21,7 +21,7 @@ from typing import Dict, Set
 TYPE_MAPPINGS = {
     "AWSWorkloadConfig": ("AWSWorkloadConfig", "python-pulumi/src/ptd/aws_workload.py", "WorkloadConfig"),
     "AWSProvisionedVpc": ("AWSProvisionedVPC", "python-pulumi/src/ptd/aws_workload.py", None),
-    "SiteConfig": ("AWSSiteConfig", "python-pulumi/src/ptd/aws_workload.py", "SiteConfig"),
+    "SiteConfigSpec": ("AWSSiteConfig", "python-pulumi/src/ptd/aws_workload.py", "SiteConfig"),
     "AzureWorkloadConfig": ("AzureWorkloadConfig", "python-pulumi/src/ptd/azure_workload.py", "WorkloadConfig"),
     "NetworkConfig": ("NetworkConfig", "python-pulumi/src/ptd/azure_workload.py", None),
 }
