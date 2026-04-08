@@ -22,7 +22,7 @@ import (
 	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apiextensions"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	yaml "gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v3"
 )
 
 const (
@@ -297,8 +297,9 @@ func buildAWSSiteSpec(
 	return spec
 }
 
-// sessionTolerations returns a deduplicated slice of session toleration objects
-// for node pools that have session_taints=true.
+// sessionTolerations returns a slice of session toleration objects for the first
+// node pool that has session_taints=true. Multiple pools with different taint keys
+// are not supported — this matches the existing Python behavior.
 func sessionTolerations(kc *types.KarpenterConfig) []map[string]interface{} {
 	if kc == nil {
 		return nil
@@ -527,55 +528,21 @@ func applySiteOverrides(spec map[string]interface{}, workloadName, siteName stri
 		return nil, fmt.Errorf("sites: failed to read site override %s: %w", siteYamlPath, err)
 	}
 
+	// yaml.v3 unmarshals nested mappings as map[string]interface{} natively,
+	// so no type conversion is needed before passing to mergo.
 	var overrides map[string]interface{}
 	if err := yaml.Unmarshal(data, &overrides); err != nil {
 		return nil, fmt.Errorf("sites: failed to parse site override %s: %w", siteYamlPath, err)
 	}
 
-	overrideSpec, ok := overrides["spec"].(map[interface{}]interface{})
+	overrideSpec, ok := overrides["spec"].(map[string]interface{})
 	if !ok {
 		return spec, nil
 	}
 
-	// Convert yaml's map[interface{}]interface{} to map[string]interface{} for mergo.
-	converted := yamlMapToStringMap(overrideSpec)
-
-	if err := mergo.Merge(&spec, converted, mergo.WithOverride); err != nil {
+	if err := mergo.Merge(&spec, overrideSpec, mergo.WithOverride); err != nil {
 		return nil, fmt.Errorf("sites: failed to merge site overrides for %s: %w", siteName, err)
 	}
 
 	return spec, nil
-}
-
-// yamlMapToStringMap recursively converts map[interface{}]interface{} (from gopkg.in/yaml.v2)
-// to map[string]interface{} so it can be used with mergo and serialized to JSON.
-func yamlMapToStringMap(m map[interface{}]interface{}) map[string]interface{} {
-	out := make(map[string]interface{}, len(m))
-	for k, v := range m {
-		key := fmt.Sprintf("%v", k)
-		switch val := v.(type) {
-		case map[interface{}]interface{}:
-			out[key] = yamlMapToStringMap(val)
-		case []interface{}:
-			out[key] = yamlSliceConvert(val)
-		default:
-			out[key] = val
-		}
-	}
-	return out
-}
-
-func yamlSliceConvert(s []interface{}) []interface{} {
-	out := make([]interface{}, len(s))
-	for i, v := range s {
-		switch val := v.(type) {
-		case map[interface{}]interface{}:
-			out[i] = yamlMapToStringMap(val)
-		case []interface{}:
-			out[i] = yamlSliceConvert(val)
-		default:
-			out[i] = val
-		}
-	}
-	return out
 }

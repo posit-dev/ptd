@@ -544,30 +544,3 @@ spec:
 	assert.Equal(t, "custom:latest", workbench["image"], "override field should be present")
 	assert.NotNil(t, workbench["sessionTolerations"], "base field should be preserved")
 }
-
-func TestYamlMapToStringMapNested(t *testing.T) {
-	input := map[interface{}]interface{}{
-		"top": map[interface{}]interface{}{
-			"nested": "value",
-			"deep": map[interface{}]interface{}{
-				"leaf": 42,
-			},
-		},
-		"list": []interface{}{
-			map[interface{}]interface{}{"a": 1},
-			"plain",
-		},
-	}
-
-	result := yamlMapToStringMap(input)
-
-	top := result["top"].(map[string]interface{})
-	assert.Equal(t, "value", top["nested"])
-	deep := top["deep"].(map[string]interface{})
-	assert.Equal(t, 42, deep["leaf"])
-
-	list := result["list"].([]interface{})
-	listMap := list[0].(map[string]interface{})
-	assert.Equal(t, 1, listMap["a"])
-	assert.Equal(t, "plain", list[1])
-}
