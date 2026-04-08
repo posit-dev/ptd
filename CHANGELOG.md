@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/posit-dev/ptd/compare/v1.10.0...v1.11.0) (2026-04-08)
+
+
+### Features
+
+* extract resource physical IDs from Pulumi state ([0bb4e32](https://github.com/posit-dev/ptd/commit/0bb4e32cbb96821bcb18597aad7843592139eb80)), closes [#212](https://github.com/posit-dev/ptd/issues/212)
+
 # [1.10.0](https://github.com/posit-dev/ptd/compare/v1.9.0...v1.10.0) (2026-04-08)
 
 
