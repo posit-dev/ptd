@@ -2,6 +2,7 @@ import typing
 
 import pulumi
 import pulumi_kubernetes as kubernetes
+import yaml
 
 import ptd
 import ptd.workload
@@ -245,6 +246,17 @@ kubectl delete clusterrole,clusterrolebinding \\
 echo "Migration complete - Helm will now create fresh resources"
 """
 
+    def _any_site_has_session_labels(self) -> bool:
+        """Return True if any site.yaml in this workload has workbench.sessionLabels set."""
+        for site_name in self.workload.cfg.sites:
+            site_yaml_path = self.workload.site_yaml(site_name)
+            if not site_yaml_path.exists():
+                continue
+            site_dict = yaml.safe_load(site_yaml_path.read_text())
+            if site_dict.get("spec", {}).get("workbench", {}).get("sessionLabels"):
+                return True
+        return False
+
     def _define_helm_release(self):
         # Parse self.image (from _define_image) into repository and tag
         # Format is either "repo@sha256:digest" or "repo:tag"
@@ -308,11 +320,10 @@ echo "Migration complete - Helm will now create fresh resources"
                 "enable": not self.cluster_cfg.team_operator_skip_crds,
                 "keep": True,
             },
-            # Session group label controller — disabled by default.
-            # Per-site config (sourceField, sourceKey, searchRegex, etc.) lives in
-            # site.yaml under workbench.sessionLabels and flows through the Workbench CRD.
+            # Enable the session group label controller only if at least one site
+            # has workbench.sessionLabels configured in its site.yaml.
             "sessionGroupLabels": {
-                "enable": self.cluster_cfg.team_operator_session_group_labels_enabled,
+                "enable": self._any_site_has_session_labels(),
             },
         }
 
