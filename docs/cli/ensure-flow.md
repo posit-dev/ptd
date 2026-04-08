@@ -241,7 +241,7 @@ Helm releases are deployed with values configured from the target's `ptd.yaml` a
 
 **Purpose**: Create site-specific resources
 **Proxy Required**: Yes
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_workload_sites.py`)
+**Implementation**: Inline Go Pulumi (`lib/steps/sites.go`)
 
 Deploys resources for each Posit Team site:
 - Creates `TeamSite` custom resources (managed by Team Operator)

@@ -104,19 +104,31 @@ func WriteKubeConfig(config KubeConfig, filePath string) error {
 
 // AddProxyToKubeConfig reads existing kubeconfig, adds proxy-url to all clusters, writes back
 func AddProxyToKubeConfig(filePath string, proxyURL string) error {
-	// Read the existing kubeconfig
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to read kubeconfig: %w", err)
 	}
 
-	// Parse the YAML using generic map to preserve any additional fields
-	var config map[string]interface{}
-	if err := yaml.Unmarshal(content, &config); err != nil {
-		return fmt.Errorf("failed to parse kubeconfig YAML: %w", err)
+	modified, err := AddProxyToKubeConfigBytes(content, proxyURL)
+	if err != nil {
+		return err
 	}
 
-	// Add proxy-url to all clusters
+	if err := os.WriteFile(filePath, modified, 0600); err != nil {
+		return fmt.Errorf("failed to write modified kubeconfig: %w", err)
+	}
+
+	return nil
+}
+
+// AddProxyToKubeConfigBytes injects a proxy-url into every cluster entry
+// in the given kubeconfig YAML bytes.
+func AddProxyToKubeConfigBytes(data []byte, proxyURL string) ([]byte, error) {
+	var config map[string]interface{}
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse kubeconfig YAML: %w", err)
+	}
+
 	if clusters, ok := config["clusters"].([]interface{}); ok {
 		for _, cluster := range clusters {
 			if clusterMap, ok := cluster.(map[interface{}]interface{}); ok {
@@ -127,15 +139,10 @@ func AddProxyToKubeConfig(filePath string, proxyURL string) error {
 		}
 	}
 
-	// Write the modified kubeconfig back
-	modifiedContent, err := yaml.Marshal(config)
+	modified, err := yaml.Marshal(config)
 	if err != nil {
-		return fmt.Errorf("failed to marshal modified kubeconfig: %w", err)
+		return nil, fmt.Errorf("failed to marshal modified kubeconfig: %w", err)
 	}
 
-	if err := os.WriteFile(filePath, modifiedContent, 0600); err != nil {
-		return fmt.Errorf("failed to write modified kubeconfig: %w", err)
-	}
-
-	return nil
+	return modified, nil
 }
