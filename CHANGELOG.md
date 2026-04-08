@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/posit-dev/ptd/compare/v1.8.5...v1.9.0) (2026-04-08)
+
+
+### Features
+
+* scaffold ptd eject command ([b4584ae](https://github.com/posit-dev/ptd/commit/b4584ae011d8e2bdea05bdc48b7ad34b76814751)), closes [#210](https://github.com/posit-dev/ptd/issues/210)
+
 ## [1.8.5](https://github.com/posit-dev/ptd/compare/v1.8.4...v1.8.5) (2026-04-08)
 
 
