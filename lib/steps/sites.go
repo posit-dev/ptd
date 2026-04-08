@@ -191,9 +191,13 @@ func awsSitesDeploy(ctx *pulumi.Context, _ types.Target, params awsSiteParams) e
 		kubeconfig := params.kubeconfigsByRelease[release]
 		providerName := params.compoundName + "-" + release + "-k8s"
 
+		// IgnoreChanges on kubeconfig prevents dirty diffs on every run caused by EKS
+		// token rotation — STS tokens expire after 15 minutes, so the token embedded
+		// in the kubeconfig will always differ from the one stored in Pulumi state.
+		// The provider is still initialized with a fresh token on each run.
 		provider, err := kubernetes.NewProvider(ctx, providerName, &kubernetes.ProviderArgs{
 			Kubeconfig: pulumi.String(kubeconfig),
-		})
+		}, pulumi.IgnoreChanges([]string{"kubeconfig"}))
 		if err != nil {
 			return err
 		}
