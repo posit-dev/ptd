@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/posit-dev/ptd/compare/v1.9.0...v1.10.0) (2026-04-08)
+
+
+### Features
+
+* collect control room connection details for eject ([74f8d30](https://github.com/posit-dev/ptd/commit/74f8d30906d38f4e7074d969ae38bd687ee5aae9)), closes [#211](https://github.com/posit-dev/ptd/issues/211)
+
 # [1.9.0](https://github.com/posit-dev/ptd/compare/v1.8.5...v1.9.0) (2026-04-08)
 
 
