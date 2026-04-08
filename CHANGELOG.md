@@ -1,3 +1,10 @@
+## [1.8.4](https://github.com/posit-dev/ptd/compare/v1.8.3...v1.8.4) (2026-04-08)
+
+
+### Bug Fixes
+
+* pin bastion AMI regex to kernel-6.18 variant ([57a7902](https://github.com/posit-dev/ptd/commit/57a79026aa240dfbcec55828c52dfa80facfce58))
+
 ## [1.8.3](https://github.com/posit-dev/ptd/compare/v1.8.2...v1.8.3) (2026-04-08)
 
 
