@@ -14,6 +14,7 @@ import (
 	ptdazure "github.com/posit-dev/ptd/lib/azure"
 	"github.com/posit-dev/ptd/lib/customization"
 	"github.com/posit-dev/ptd/lib/helpers"
+	"github.com/posit-dev/ptd/lib/pulumistate"
 	"github.com/posit-dev/ptd/lib/types"
 	"gopkg.in/yaml.v3"
 )
@@ -158,38 +159,6 @@ type AuthConfig struct {
 type ChronicleConfig struct {
 	Image      string `yaml:"image"`
 	AgentImage string `yaml:"agentImage,omitempty"`
-}
-
-// PulumiState represents the structure of a Pulumi state JSON file
-type PulumiState struct {
-	Version    int              `json:"version"`
-	Checkpoint PulumiCheckpoint `json:"checkpoint"`
-}
-
-// PulumiCheckpoint contains the checkpoint section of Pulumi state
-type PulumiCheckpoint struct {
-	Latest PulumiLatest `json:"latest"`
-}
-
-// PulumiLatest contains the latest deployment information
-type PulumiLatest struct {
-	Manifest  PulumiManifest   `json:"manifest"`
-	Resources []PulumiResource `json:"resources"`
-}
-
-// PulumiManifest contains Pulumi version and timestamp information
-type PulumiManifest struct {
-	Time    string `json:"time"`
-	Version string `json:"version"`
-}
-
-// PulumiResource represents a single resource in Pulumi state
-type PulumiResource struct {
-	Type     string                 `json:"type"`
-	URN      string                 `json:"urn"`
-	ID       string                 `json:"id"`
-	Provider string                 `json:"provider"`
-	Outputs  map[string]interface{} `json:"outputs"`
 }
 
 // Collect gathers attestation data for a given target and workload path
@@ -718,7 +687,7 @@ func collectStackSummaries(ctx context.Context, creds types.Credentials, target 
 
 // parseStateFile parses a Pulumi state file from raw JSON bytes.
 func parseStateFile(data []byte, stateKey string) (StackSummary, error) {
-	var state PulumiState
+	var state pulumistate.PulumiState
 	if err := json.Unmarshal(data, &state); err != nil {
 		return StackSummary{}, fmt.Errorf("failed to parse state JSON: %w", err)
 	}
@@ -734,9 +703,7 @@ func parseStateFile(data []byte, stateKey string) (StackSummary, error) {
 	resourceCount := 0
 	resourceTypeSet := make(map[string]bool)
 	for _, resource := range state.Checkpoint.Latest.Resources {
-		// Skip pulumi internal resources
-		if strings.HasPrefix(resource.Type, "pulumi:pulumi:") ||
-			strings.HasPrefix(resource.Type, "pulumi:providers:") {
+		if pulumistate.IsInternalResource(resource.Type) {
 			continue
 		}
 		resourceCount++

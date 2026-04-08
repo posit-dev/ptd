@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/posit-dev/ptd/lib/attestation"
+	"github.com/posit-dev/ptd/lib/pulumistate"
 )
 
 type ResourceInventoryEntry struct {
@@ -18,7 +18,7 @@ type ResourceInventoryEntry struct {
 }
 
 func ParseResourceInventory(data []byte, stateKey string) ([]ResourceInventoryEntry, error) {
-	var state attestation.PulumiState
+	var state pulumistate.PulumiState
 	if err := json.Unmarshal(data, &state); err != nil {
 		return nil, fmt.Errorf("failed to parse state JSON: %w", err)
 	}
@@ -28,8 +28,7 @@ func ParseResourceInventory(data []byte, stateKey string) ([]ResourceInventoryEn
 	var entries []ResourceInventoryEntry
 
 	for _, res := range state.Checkpoint.Latest.Resources {
-		if strings.HasPrefix(res.Type, "pulumi:pulumi:") ||
-			strings.HasPrefix(res.Type, "pulumi:providers:") {
+		if pulumistate.IsInternalResource(res.Type) {
 			continue
 		}
 
@@ -47,7 +46,7 @@ func ParseResourceInventory(data []byte, stateKey string) ([]ResourceInventoryEn
 }
 
 // Prefers outputs.arn (AWS) or outputs.id, falls back to the top-level id field.
-func resolvePhysicalID(res attestation.PulumiResource) string {
+func resolvePhysicalID(res pulumistate.PulumiResource) string {
 	if arn, ok := res.Outputs["arn"].(string); ok && arn != "" {
 		return arn
 	}
