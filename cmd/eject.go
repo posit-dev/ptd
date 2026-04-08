@@ -42,26 +42,22 @@ without modifying any infrastructure. Use --dry-run=false to proceed with contro
 func runEject(cmd *cobra.Command, targetName string) {
 	ctx := cmd.Context()
 
-	// Load target
 	t, err := legacy.TargetFromName(targetName)
 	if err != nil {
 		slog.Error("Could not load target", "error", err)
 		return
 	}
 
-	// Reject control room targets — eject only applies to workloads
 	if t.Type() == types.TargetTypeControlRoom {
 		slog.Error("Cannot eject a control room target; eject only applies to workloads", "target", targetName)
 		return
 	}
 
-	// Determine output directory
 	outputDir := ejectOutputDir
 	if outputDir == "" {
 		outputDir = fmt.Sprintf(".eject/%s/", targetName)
 	}
 
-	// Safety confirmation for non-dry-run mode
 	if !ejectDryRun {
 		fmt.Printf("WARNING: Running eject with --dry-run=false will proceed with control room severance.\n")
 		fmt.Printf("Type the full target name (%s) to confirm: ", targetName)
