@@ -169,6 +169,33 @@ spec:
     positronConfig:
       sessionTimeoutKillHours: 4
 
+    # Session label injection — presence of this block enables the feature.
+    # The controller reads a field from each session pod, matches entries against
+    # searchRegex, and writes one numbered label per match (user-group-1, user-group-2, …).
+    # See docs/team-operator/README.md for full details.
+    sessionLabels:
+      # Dot-path into the pod spec identifying the field with the comma-separated group list.
+      # Supports array index notation. Default: "spec.containers[0].args"
+      sourceField: "spec.containers[0].args"
+
+      # Sub-key used to extract the value from the resolved field:
+      #   args slice   → flag name whose next element is the value
+      #   map field    → map key to look up (e.g. annotation or label key)
+      #   string field → ignored; field value used directly
+      # Default: "--container-user-groups"
+      sourceKey: "--container-user-groups"
+
+      # Regex applied to each comma-separated entry. Only matching entries become labels.
+      # Default: "_entra_[^ ,]+"
+      searchRegex: "_entra_[^ ,]+"
+
+      # Prefix stripped from the start of each matched entry before it becomes the label value.
+      # Default: "_"
+      trimPrefix: "_"
+
+      # Prefix for generated label keys. Default "user-group-" produces user-group-1, user-group-2, …
+      labelKeyPrefix: "user-group-"
+
   # Posit Connect (Publishing)
   connect:
     replicas: 2

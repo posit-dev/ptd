@@ -66,6 +66,53 @@ kubectl edit site main -n posit-team
 kubectl logs -n posit-team deploy/team-operator
 ```
 
+## Session Label Injection
+
+The session label controller watches Workbench session pods and injects numbered labels from a configurable pod field. Labels can be consumed by any downstream tooling that reads pod metadata.
+
+### How it works
+
+1. When a session pod starts, the controller reads the field specified by `sourceField` (default: `spec.containers[0].args`).
+2. It extracts the value at `sourceKey` from that field (default: the `--container-user-groups` flag value).
+3. Each comma-separated entry is matched against `searchRegex`. Non-matching entries are skipped.
+4. Matching entries are sanitized to valid Kubernetes label values and written as `user-group-1`, `user-group-2`, etc.
+5. A `posit.co/session-group-labels-injected: "true"` marker is set on the pod so it is never processed twice.
+
+### Enabling
+
+Add a `sessionLabels` block to `workbench:` in `site.yaml`. Its presence enables the feature for that site; omitting it disables it. PTD automatically enables the controller in the Helm chart when any site in the workload has this block configured.
+
+```yaml
+# site.yaml
+workbench:
+  sessionLabels:
+    sourceField: "spec.containers[0].args"
+    sourceKey: "--container-user-groups"
+    searchRegex: "_entra_[^ ,]+"
+```
+
+All fields are optional — defaults cover the standard Workbench + Entra ID setup. See [Configuration Reference](../CONFIGURATION.md) for the full schema.
+
+### Result
+
+A session pod will have labels added for each matching entry found:
+
+```
+user-group-1: entra_research_team
+user-group-2: entra_data_science
+posit.co/session-group-labels-injected: "true"
+```
+
+### Custom sources
+
+`sourceField` accepts any dot-path into the pod spec, including array index notation:
+
+| Source | `sourceField` | `sourceKey` |
+|---|---|---|
+| Container args (default) | `spec.containers[0].args` | `--container-user-groups` |
+| Pod annotation | `metadata.annotations` | `posit.co/user-groups` |
+| Pod label | `metadata.labels` | `posit.co/group` |
+
 ## Related Documentation
 
 - [Site Management Guide](../guides/product-team-site-management.md) - For product teams
