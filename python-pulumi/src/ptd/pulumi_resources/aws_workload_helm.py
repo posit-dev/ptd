@@ -701,7 +701,7 @@ class AWSWorkloadHelm(pulumi.ComponentResource):
                 "valuesContent": yaml.dump(
                     {
                         "metricLabelsAllowlist": [
-                            "pods=[launcher-instance-id]",
+                            "pods=[launcher-instance-id,user-group-*]",
                         ]
                     }
                 ),
