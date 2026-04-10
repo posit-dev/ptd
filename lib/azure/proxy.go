@@ -145,7 +145,13 @@ func (p *ProxySession) Start(ctx context.Context) error {
 		"-i", p.sshKeyPath)
 
 	// set the environment variables for the command
-	// add each az env var to command
+	// HOME is required by the az CLI (Python) to locate ~/.azure config and cache directories.
+	// Without it, Python's os.environ.get("HOME") returns None, which gets stringified
+	// into a literal "None/" directory in the working directory.
+	if home, ok := os.LookupEnv("HOME"); ok {
+		p.tunnelCommand.Env = append(p.tunnelCommand.Env, "HOME="+home)
+		p.socksCommand.Env = append(p.socksCommand.Env, "HOME="+home)
+	}
 	for k, v := range azCreds.EnvVars() {
 		p.tunnelCommand.Env = append(p.tunnelCommand.Env, fmt.Sprintf("%s=%s", k, v))
 		p.socksCommand.Env = append(p.socksCommand.Env, fmt.Sprintf("%s=%s", k, v))
