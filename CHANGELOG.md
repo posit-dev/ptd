@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/posit-dev/ptd/compare/v1.11.0...v1.12.0) (2026-04-13)
+
+
+### Features
+
+* enable Pulumi debug logging when -v flag is set ([f165a01](https://github.com/posit-dev/ptd/commit/f165a01878e75b6bc79dd4eeebec17e7b847d468))
+
 # [1.11.0](https://github.com/posit-dev/ptd/compare/v1.10.0...v1.11.0) (2026-04-08)
 
 
