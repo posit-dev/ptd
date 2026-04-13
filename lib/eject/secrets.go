@@ -68,16 +68,6 @@ func enumerateAWSSecrets(workloadName string, siteNames []string) []SecretRefere
 			CreatedBy: "bootstrap (empty), manual (SSH keys per Git host)",
 		})
 
-		refs = append(refs, SecretReference{
-			Name:      fmt.Sprintf("okta-oidc-client-creds.%s-%s.posit.team", workloadName, site),
-			Purpose:   "Traefik forward auth OIDC credentials (only if OIDC auth is configured)",
-			CreatedBy: "external (manual)",
-			Fields: []SecretField{
-				{Name: "oidcClientId", Description: "OIDC client ID"},
-				{Name: "oidcClientSecret", Description: "OIDC client secret"},
-				{Name: "signingSecret", Description: "Traefik forward auth signing secret"},
-			},
-		})
 	}
 
 	return refs

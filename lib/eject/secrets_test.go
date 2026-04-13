@@ -29,8 +29,8 @@ func TestEnumerateSecrets_AWS_SingleSite(t *testing.T) {
 	target := awsTarget("myworkload", map[string]types.SiteConfig{"main": {}})
 	refs := EnumerateSecrets(target)
 
-	// 1 workload + 4 per site (site, session, ssh-vault, oidc)
-	require.Len(t, refs, 5)
+	// 1 workload + 3 per site (site, session, ssh-vault)
+	require.Len(t, refs, 4)
 
 	assert.Equal(t, "myworkload.posit.team", refs[0].Name)
 	assert.Len(t, refs[0].Fields, 6)
@@ -42,22 +42,18 @@ func TestEnumerateSecrets_AWS_SingleSite(t *testing.T) {
 	assert.Empty(t, refs[2].Fields)
 
 	assert.Equal(t, "myworkload-main-ssh-ppm-keys.posit.team", refs[3].Name)
-
-	assert.Equal(t, "okta-oidc-client-creds.myworkload-main.posit.team", refs[4].Name)
-	assert.Len(t, refs[4].Fields, 3)
 }
 
 func TestEnumerateSecrets_AWS_MultipleSites(t *testing.T) {
 	target := awsTarget("wl", map[string]types.SiteConfig{"main": {}, "secondary": {}})
 	refs := EnumerateSecrets(target)
 
-	// 1 workload + 4 per site × 2 sites = 9
-	assert.Len(t, refs, 9)
+	// 1 workload + 3 per site × 2 sites = 7
+	assert.Len(t, refs, 7)
 
 	assert.Equal(t, "wl.posit.team", refs[0].Name)
-	// Sites are sorted, so "main" comes before "secondary"
 	assert.Equal(t, "wl-main.posit.team", refs[1].Name)
-	assert.Equal(t, "wl-secondary.posit.team", refs[5].Name)
+	assert.Equal(t, "wl-secondary.posit.team", refs[4].Name)
 }
 
 func TestEnumerateSecrets_AWS_NoSites(t *testing.T) {
