@@ -114,8 +114,6 @@ class TeamOperator(pulumi.ComponentResource):
             "controllerManager": {
                 "replicas": 1,
                 "container": container_config,
-                # Use default serviceAccountName from chart (team-operator-controller-manager)
-                # to match existing kustomize resources for seamless migration
                 "serviceAccount": {
                     "annotations": self.service_account_annotations,
                 },
