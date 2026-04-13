@@ -43,7 +43,7 @@ func enumerateAWSSecrets(workloadName string, siteNames []string) []SecretRefere
 
 	refs = append(refs, SecretReference{
 		Name:      fmt.Sprintf("%s.posit.team", workloadName),
-		Purpose:   "Workload infrastructure references (DB URL, FSx DNS, S3 buckets, mimir password)",
+		Purpose:   "Workload infrastructure references (DB URL, FSx DNS, S3 buckets)",
 		CreatedBy: "bootstrap + persistent step",
 		Fields:    awsWorkloadSecretFields(),
 	})
@@ -92,8 +92,9 @@ func enumerateAzureSecrets(workloadName string, siteNames []string) []SecretRefe
 		CreatedBy: "persistent step",
 	})
 
+	fields := siteSecretFields()
 	for _, site := range siteNames {
-		for _, f := range siteSecretFields() {
+		for _, f := range fields {
 			refs = append(refs, SecretReference{
 				Name:      fmt.Sprintf("%s-%s", site, f.Name),
 				Purpose:   f.Description,
