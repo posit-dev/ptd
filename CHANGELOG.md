@@ -1,3 +1,16 @@
+# [1.13.0](https://github.com/posit-dev/ptd/compare/v1.12.0...v1.13.0) (2026-04-13)
+
+
+### Bug Fixes
+
+* check out.Close() error in copyFile to catch flush failures ([ebd45c6](https://github.com/posit-dev/ptd/commit/ebd45c6c115738894c938eefe911a6b53d12d59e))
+* sanitize file paths in config copy to resolve Snyk findings ([65d075f](https://github.com/posit-dev/ptd/commit/65d075f7a8eeee8da96c3073a25d76813b81db2c))
+
+
+### Features
+
+* copy workload config files to eject bundle ([7b69dc6](https://github.com/posit-dev/ptd/commit/7b69dc6c2397e7418a0199d288fa362f28ffa07d)), closes [#214](https://github.com/posit-dev/ptd/issues/214)
+
 # [1.12.0](https://github.com/posit-dev/ptd/compare/v1.11.0...v1.12.0) (2026-04-13)
 
 
