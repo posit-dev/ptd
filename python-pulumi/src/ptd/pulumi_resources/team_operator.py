@@ -6,22 +6,6 @@ import pulumi_kubernetes as kubernetes
 import ptd
 import ptd.workload
 
-# CRDs that need Helm ownership metadata (names are standard, not transformed)
-KUSTOMIZE_CRDS = [
-    "chronicles.core.posit.team",
-    "connects.core.posit.team",
-    "flightdecks.core.posit.team",
-    "packagemanagers.core.posit.team",
-    "postgresdatabases.core.posit.team",
-    "sites.core.posit.team",
-    "workbenches.core.posit.team",
-]
-
-# Label used by the old kustomize deployment to identify resources
-# The old code used: str(ptd.TagKeys.POSIT_TEAM_MANAGED_BY): __name__
-# Which translates to: posit.team/managed-by: ptd.pulumi_resources.team_operator
-KUSTOMIZE_MANAGED_BY_LABEL = "posit.team/managed-by=ptd.pulumi_resources.team_operator"
-
 # Default Helm chart version (OCI charts require explicit version, no "latest")
 DEFAULT_CHART_VERSION = "v1.16.2"
 
@@ -36,7 +20,6 @@ class TeamOperator(pulumi.ComponentResource):
 
     posit_team_namespace: kubernetes.core.v1.Namespace
     helm_release: kubernetes.helm.v3.Release
-    migration_job: kubernetes.batch.v1.Job | None
 
     def __init__(
         self,
@@ -62,12 +45,10 @@ class TeamOperator(pulumi.ComponentResource):
             msg = f"missing config for cluster {release!r}"
             raise ValueError(msg)
 
-        # Helm release name must be predictable for the migration job
         self.helm_release_name = "team-operator"
 
         self._define_image()
         self._define_posit_team_namespace()
-        self._define_migration_resources()
         self._define_helm_release()
 
     def _define_image(self):
@@ -90,160 +71,9 @@ class TeamOperator(pulumi.ComponentResource):
             metadata={"name": ptd.POSIT_TEAM_NAMESPACE},
             opts=pulumi.ResourceOptions(
                 parent=self,
-                retain_on_delete=True,  # Don't delete namespace during migration
+                retain_on_delete=True,
             ),
         )
-
-    def _define_migration_resources(self):
-        """Create resources to migrate from kustomize to Helm.
-
-        This creates a Job that patches existing kustomize-managed resources
-        with Helm ownership labels/annotations so Helm can adopt them.
-        """
-        namespace = ptd.POSIT_TEAM_SYSTEM_NAMESPACE
-        resource_prefix = f"{self.workload.compound_name}-{self.release}"
-
-        # Service account for the migration job
-        migration_sa = kubernetes.core.v1.ServiceAccount(
-            f"{resource_prefix}-helm-migration-sa",
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name="helm-migration",
-                namespace=namespace,
-            ),
-            opts=pulumi.ResourceOptions(parent=self),
-        )
-
-        # ClusterRole with permissions to patch CRDs and delete old resources
-        migration_role = kubernetes.rbac.v1.ClusterRole(
-            f"{resource_prefix}-helm-migration-role",
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name=f"{resource_prefix}-helm-migration",
-            ),
-            rules=[
-                kubernetes.rbac.v1.PolicyRuleArgs(
-                    api_groups=[""],
-                    resources=["serviceaccounts", "services"],
-                    verbs=["get", "list", "delete"],
-                ),
-                kubernetes.rbac.v1.PolicyRuleArgs(
-                    api_groups=["apps"],
-                    resources=["deployments"],
-                    verbs=["get", "list", "delete"],
-                ),
-                kubernetes.rbac.v1.PolicyRuleArgs(
-                    api_groups=["rbac.authorization.k8s.io"],
-                    resources=["roles", "rolebindings", "clusterroles", "clusterrolebindings"],
-                    verbs=["get", "list", "delete"],
-                ),
-                kubernetes.rbac.v1.PolicyRuleArgs(
-                    api_groups=["apiextensions.k8s.io"],
-                    resources=["customresourcedefinitions"],
-                    verbs=["get", "list", "patch"],
-                ),
-            ],
-            opts=pulumi.ResourceOptions(parent=self),
-        )
-
-        # ClusterRoleBinding
-        migration_binding = kubernetes.rbac.v1.ClusterRoleBinding(
-            f"{resource_prefix}-helm-migration-binding",
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name=f"{resource_prefix}-helm-migration",
-            ),
-            role_ref=kubernetes.rbac.v1.RoleRefArgs(
-                api_group="rbac.authorization.k8s.io",
-                kind="ClusterRole",
-                name=f"{resource_prefix}-helm-migration",
-            ),
-            subjects=[
-                kubernetes.rbac.v1.SubjectArgs(
-                    kind="ServiceAccount",
-                    name="helm-migration",
-                    namespace=namespace,
-                ),
-            ],
-            opts=pulumi.ResourceOptions(parent=self, depends_on=[migration_role]),
-        )
-
-        # Build the migration script
-        script = self._build_migration_script(namespace)
-
-        # Migration Job
-        self.migration_job = kubernetes.batch.v1.Job(
-            f"{resource_prefix}-helm-migration-job",
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                name="helm-migration",
-                namespace=namespace,
-            ),
-            spec=kubernetes.batch.v1.JobSpecArgs(
-                ttl_seconds_after_finished=300,
-                template=kubernetes.core.v1.PodTemplateSpecArgs(
-                    spec=kubernetes.core.v1.PodSpecArgs(
-                        service_account_name="helm-migration",
-                        restart_policy="Never",
-                        # Tolerate all taints - migration job is ephemeral and just needs to run
-                        tolerations=[
-                            kubernetes.core.v1.TolerationArgs(
-                                operator="Exists",
-                            ),
-                        ],
-                        containers=[
-                            kubernetes.core.v1.ContainerArgs(
-                                name="migrate",
-                                image="bitnami/kubectl:latest",
-                                command=["/bin/sh", "-c", script],
-                            ),
-                        ],
-                    ),
-                ),
-            ),
-            opts=pulumi.ResourceOptions(
-                parent=self,
-                depends_on=[migration_sa, migration_binding],
-                delete_before_replace=True,  # Job may be deleted by TTL controller
-            ),
-        )
-
-    def _build_migration_script(self, namespace: str) -> str:
-        """Build the shell script to migrate from kustomize to Helm.
-
-        The old kustomize deployment used transformations that renamed resources,
-        so we can't predict the exact names. Instead:
-        1. Patch CRDs with Helm ownership (CRD names are standard)
-        2. Delete other resources by label (the old code added posit.team/managed-by label)
-        """
-        release_name = self.helm_release_name
-        release_namespace = namespace
-
-        # Build patch commands for CRDs (names are standard, not transformed)
-        crd_commands = [
-            f'kubectl patch crd {crd} --type=merge -p \'{{"metadata":{{"labels":{{"app.kubernetes.io/managed-by":"Helm"}},"annotations":{{"meta.helm.sh/release-name":"{release_name}","meta.helm.sh/release-namespace":"{release_namespace}","helm.sh/resource-policy":"keep"}}}}}}\' 2>/dev/null || echo "  {crd} not found or already adopted"'
-            for crd in KUSTOMIZE_CRDS
-        ]
-
-        return f"""
-set -e
-echo "Migrating team-operator from kustomize to Helm..."
-
-echo "Step 1: Patching CRDs with Helm ownership..."
-{chr(10).join(crd_commands)}
-
-echo "Step 2: Deleting old kustomize-managed resources (by label)..."
-echo "  Label selector: {KUSTOMIZE_MANAGED_BY_LABEL}"
-
-# Delete namespace-scoped resources in posit-team-system
-kubectl delete deployment,serviceaccount,service,role,rolebinding \\
-    -n {release_namespace} \\
-    -l {KUSTOMIZE_MANAGED_BY_LABEL} \\
-    --ignore-not-found=true || echo "  No namespaced resources found"
-
-# Delete cluster-scoped resources
-kubectl delete clusterrole,clusterrolebinding \\
-    -l {KUSTOMIZE_MANAGED_BY_LABEL} \\
-    --ignore-not-found=true || echo "  No cluster-scoped resources found"
-
-echo "Migration complete - Helm will now create fresh resources"
-"""
 
     def _define_helm_release(self):
         # Parse self.image (from _define_image) into repository and tag
@@ -299,10 +129,8 @@ echo "Migration complete - Helm will now create fresh resources"
                     for t in self.cluster_cfg.team_operator_tolerations
                 ],
             },
-            # CRD configuration for safe migration from kustomize to Helm.
-            # When skip_crds=True: crd.enable=False prevents Helm from rendering CRD templates,
-            # allowing migration job to patch existing CRDs without risk of deletion.
-            # When skip_crds=False (default): Helm manages CRDs normally.
+            # CRD configuration: when team_operator_skip_crds=True, crd.enable=False prevents
+            # Helm from rendering CRD templates. When False (default): Helm manages CRDs normally.
             # crd.keep=True adds helm.sh/resource-policy: keep as defense-in-depth.
             "crd": {
                 "enable": not self.cluster_cfg.team_operator_skip_crds,
@@ -318,8 +146,6 @@ echo "Migration complete - Helm will now create fresh resources"
 
         # Dependencies for the Helm release
         depends = [self.posit_team_namespace]
-        if self.migration_job:
-            depends.append(self.migration_job)
 
         release_args = kubernetes.helm.v3.ReleaseArgs(
             name=self.helm_release_name,
@@ -329,8 +155,8 @@ echo "Migration complete - Helm will now create fresh resources"
             create_namespace=True,
             values=helm_values,
             # Skip CRDs at Helm level (belt-and-suspenders with crd.enable in values).
-            # This tells Helm CLI to skip the crds/ directory if the chart ever moves
-            # CRDs there. Combined with crd.enable=False, provides complete CRD skip.
+            # This tells Helm CLI to skip the crds/ directory. Combined with
+            # crd.enable=False, provides complete CRD skip when skip_crds is set.
             skip_crds=self.cluster_cfg.team_operator_skip_crds,
         )
 
