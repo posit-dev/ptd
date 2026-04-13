@@ -39,6 +39,8 @@ clusters:
 	require.NoError(t, os.WriteFile(filepath.Join(customDir, "manifest.yaml"), []byte("version: 1\n"), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(customDir, "my-step", "main.py"), []byte("print('hello')\n"), 0644))
 
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "README.md"), []byte("# My Workload\n"), 0644))
+
 	return dir
 }
 
@@ -55,6 +57,7 @@ func TestCopyWorkloadConfig(t *testing.T) {
 	assert.FileExists(t, filepath.Join(configDir, "site_secondary", "site.yaml"))
 	assert.FileExists(t, filepath.Join(configDir, "customizations", "manifest.yaml"))
 	assert.FileExists(t, filepath.Join(configDir, "customizations", "my-step", "main.py"))
+	assert.FileExists(t, filepath.Join(configDir, "README.md"))
 }
 
 func TestCopyWorkloadConfig_AnnotatesPtdYaml(t *testing.T) {
