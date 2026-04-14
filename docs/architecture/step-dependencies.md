@@ -114,10 +114,10 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 
 ### Step 5: clusters (Go) {#clusters}
 **Implementation:**
-- AWS: `lib/steps/clusters.go` (`runAWSInlineGo`)
-- Azure: `lib/steps/clusters.go` (`runAzureInlineGo`) + `python-pulumi/src/ptd/pulumi_resources/azure_workload_clusters.py`
+- AWS: `lib/steps/clusters_aws.go` (`runAWSInlineGo`)
+- Azure: `lib/steps/clusters_azure.go` (`runAzureInlineGo`)
 
-**Language:** Go/Pulumi (AWS); Azure still uses Python Pulumi for some resources
+**Language:** Go/Pulumi (both AWS and Azure)
 **Proxy Required:** Yes (creates Kubernetes resources)
 
 **Creates:**
