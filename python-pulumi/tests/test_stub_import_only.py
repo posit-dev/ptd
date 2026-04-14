@@ -17,16 +17,10 @@ import ptd.pulumi_resources.aws_control_room_persistent
 import ptd.pulumi_resources.aws_eks_cluster
 import ptd.pulumi_resources.aws_fsx_openzfs_multi
 import ptd.pulumi_resources.aws_vpc
-import ptd.pulumi_resources.aws_workload_clusters
 import ptd.pulumi_resources.aws_workload_persistent
-import ptd.pulumi_resources.external_dns
 import ptd.pulumi_resources.grafana_alloy
-import ptd.pulumi_resources.keycloak_operator
-import ptd.pulumi_resources.kubernetes_role
-import ptd.pulumi_resources.network_policies
 import ptd.pulumi_resources.team_operator
 import ptd.pulumi_resources.traefik
-import ptd.pulumi_resources.traefik_forward_auth
 import ptd.secrecy
 import ptd.shext
 
@@ -51,15 +45,9 @@ def test_import_only() -> None:
     assert ptd.pulumi_resources.aws_eks_cluster is not None
     assert ptd.pulumi_resources.aws_fsx_openzfs_multi is not None
     assert ptd.pulumi_resources.aws_vpc is not None
-    assert ptd.pulumi_resources.aws_workload_clusters is not None
     assert ptd.pulumi_resources.aws_workload_persistent is not None
-    assert ptd.pulumi_resources.external_dns is not None
     assert ptd.pulumi_resources.grafana_alloy is not None
-    assert ptd.pulumi_resources.keycloak_operator is not None
-    assert ptd.pulumi_resources.kubernetes_role is not None
-    assert ptd.pulumi_resources.network_policies is not None
     assert ptd.pulumi_resources.team_operator is not None
     assert ptd.pulumi_resources.traefik is not None
-    assert ptd.pulumi_resources.traefik_forward_auth is not None
     assert ptd.secrecy is not None
     assert ptd.shext is not None
