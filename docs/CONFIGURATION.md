@@ -196,6 +196,11 @@ spec:
       # Prefix for generated label keys. Default "user-group-" produces user-group-1, user-group-2, …
       labelKeyPrefix: "user-group-"
 
+      # When true, forces re-labeling of all existing session pods for this site.
+      # Use after changing searchRegex or trimPrefix to update already-processed pods.
+      # Set back to false (or omit) once done. Default: false
+      reprocess: false
+
   # Posit Connect (Publishing)
   connect:
     replicas: 2
