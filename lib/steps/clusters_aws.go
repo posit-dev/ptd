@@ -60,6 +60,8 @@ type awsClustersParams struct {
 	// grafanaDBAddress and grafanaDBPW are fetched from persistent + postgres_config stack outputs
 	grafanaDBAddress string
 	grafanaDBPW      string
+	// workloadDir is the path to the workload's config directory (contains ptd.yaml, custom_k8s_resources/, etc.)
+	workloadDir string
 }
 
 func (s *ClustersStep) runAWSInlineGo(ctx context.Context, creds types.Credentials, envVars map[string]string) error {
@@ -176,6 +178,7 @@ func (s *ClustersStep) runAWSInlineGo(ctx context.Context, creds types.Credentia
 		tailscaleEnabled:          cfg.TailscaleEnabled,
 		grafanaDBAddress:          grafanaDBAddress,
 		grafanaDBPW:               grafanaDBPW,
+		workloadDir:               filepath.Join(helpers.GetTargetsConfigPath(), helpers.WorkDir, s.DstTarget.Name()),
 	}
 
 	stack, err := createStack(ctx, s.Name(), s.DstTarget, func(pctx *pulumi.Context, target types.Target) error {
@@ -1042,6 +1045,12 @@ func awsClustersDeploy(ctx *pulumi.Context, _ types.Target, params awsClustersPa
 
 		_ = withSubComponentAlias // used above via closure
 		_ = networkTrustInt       // used in createCalicoNetworkPolicies
+
+		// ── Custom K8s resources (optional, per-cluster) ─────────────────────────
+		if err := createCustomK8sResources(ctx, params.workloadDir, release,
+			params.clusters[release].Spec.CustomK8sResources, k8sProviderOpt, withAlias()); err != nil {
+			return err
+		}
 	}
 
 	// ── Karpenter (optional, spans all clusters) ─────────────────────────────

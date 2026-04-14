@@ -3,6 +3,7 @@ package steps
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -43,6 +44,8 @@ type azureClustersParams struct {
 	certManagerDomains []string
 	// thirdPartyTelemetryEnabled controls whether Traefik telemetry arguments are suppressed.
 	thirdPartyTelemetryEnabled bool
+	// workloadDir is the path to the workload's config directory (contains ptd.yaml, custom_k8s_resources/, etc.)
+	workloadDir string
 }
 
 func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credentials, envVars map[string]string) error {
@@ -123,6 +126,7 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 		clusterIdentityByCluster:     clusterIdentityByCluster,
 		certManagerDomains:           certManagerDomains,
 		thirdPartyTelemetryEnabled:   cfg.ThirdPartyTelemetryEnabled == nil || *cfg.ThirdPartyTelemetryEnabled,
+		workloadDir:                  filepath.Join(helpers.GetTargetsConfigPath(), helpers.WorkDir, s.DstTarget.Name()),
 	}
 
 	stack, err := createStack(ctx, s.Name(), s.DstTarget, func(pctx *pulumi.Context, target types.Target) error {
@@ -1044,6 +1048,12 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 		}
 
 		_ = withSubComponentAlias // suppress unused warning; used throughout above
+
+		// ── Custom K8s resources (optional, per-cluster) ─────────────────────────
+		if err := createCustomK8sResources(ctx, params.workloadDir, release,
+			params.clusters[release].CustomK8sResources, k8sProviderOpt, withAlias()); err != nil {
+			return err
+		}
 	}
 
 	return nil

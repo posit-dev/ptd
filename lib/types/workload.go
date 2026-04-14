@@ -35,6 +35,9 @@ type AWSWorkloadClusterSpec struct {
 	EksAccessEntries        *EKSAccessEntriesConfig       `json:"eks_access_entries" yaml:"eks_access_entries"`
 	Components              *AWSWorkloadClusterComponents `json:"components" yaml:"components"`
 	TeamOperatorTolerations []TeamOperatorToleration      `json:"team_operator_tolerations" yaml:"team_operator_tolerations"`
+	// CustomK8sResources lists subfolder names under custom_k8s_resources/ in the workload directory.
+	// Each subfolder's YAML files are applied to this cluster in alphabetical order.
+	CustomK8sResources []string `json:"custom_k8s_resources" yaml:"custom_k8s_resources"`
 }
 
 // AWSWorkloadClusterComponents holds optional component version overrides for a cluster.
@@ -205,6 +208,9 @@ type AzureWorkloadClusterConfig struct {
 	// Optional: When true, enables AKS ForceUpgrade which bypasses PDB constraints during cluster upgrades.
 	// Use during maintenance windows when you accept disruption to workloads protected by PDBs.
 	ForceMaintenance bool `yaml:"force_maintenance,omitempty"`
+	// CustomK8sResources lists subfolder names under custom_k8s_resources/ in the workload directory.
+	// Each subfolder's YAML files are applied to this cluster in alphabetical order.
+	CustomK8sResources []string `yaml:"custom_k8s_resources"`
 }
 
 type AzureWorkloadClusterComponentConfig struct {
