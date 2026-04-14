@@ -45,10 +45,10 @@ type awsClustersParams struct {
 	chronicleBucketName       string
 	ppmBucketName             string
 	oidcURLTails              []string
-	// oidcIssuerURLsByRelease holds the OIDC issuer URL fetched from the live EKS cluster for each release.
+	// oidcIssuerURLsByCluster holds the OIDC issuer URL fetched from the live EKS cluster, keyed by cluster.
 	// Used by Karpenter to determine if the controller IAM role should be created.
-	oidcIssuerURLsByRelease map[string]string
-	kubeconfigsByRelease    map[string]string
+	oidcIssuerURLsByCluster map[string]string
+	kubeconfigsByCluster    map[string]string
 	clusters                map[string]types.AWSWorkloadClusterConfig
 	sites                   map[string]types.SiteConfig
 	resourceTags            map[string]string
@@ -90,8 +90,8 @@ func (s *ClustersStep) runAWSInlineGo(ctx context.Context, creds types.Credentia
 
 	// Build per-cluster kubeconfigs and collect OIDC URL tails
 	var oidcURLTails []string
-	kubeconfigsByRelease := make(map[string]string, len(cfg.Clusters))
-	oidcIssuerURLsByRelease := make(map[string]string, len(cfg.Clusters))
+	kubeconfigsByCluster := make(map[string]string, len(cfg.Clusters))
+	oidcIssuerURLsByCluster := make(map[string]string, len(cfg.Clusters))
 	for release, clusterCfg := range cfg.Clusters {
 		clusterName := s.DstTarget.Name() + "-" + release
 		endpoint, caCert, liveOIDCIssuerURL, clusterErr := aws.GetClusterInfo(ctx, awsCreds, s.DstTarget.Region(), clusterName)
@@ -110,16 +110,16 @@ func (s *ClustersStep) runAWSInlineGo(ctx context.Context, creds types.Credentia
 		if marshalErr != nil {
 			return fmt.Errorf("clusters: failed to marshal kubeconfig for %s: %w", clusterName, marshalErr)
 		}
-		kubeconfigsByRelease[release] = string(data)
+		kubeconfigsByCluster[release] = string(data)
 
-		// Store the live OIDC issuer URL for this release (used by Karpenter controller role creation).
+		// Store the live OIDC issuer URL for this cluster (used by Karpenter controller role creation).
 		// Prefer the live URL from the cluster over the one in the config.
 		oidcURL := liveOIDCIssuerURL
 		if oidcURL == "" {
 			oidcURL = clusterCfg.Spec.ClusterOIDCIssuerURL
 		}
 		if oidcURL != "" {
-			oidcIssuerURLsByRelease[release] = oidcURL
+			oidcIssuerURLsByCluster[release] = oidcURL
 			// Collect OIDC URL tail for IRSA trust policies.
 			tail := strings.TrimPrefix(oidcURL, "https://")
 			tail = strings.TrimPrefix(tail, "http://")
@@ -164,8 +164,8 @@ func (s *ClustersStep) runAWSInlineGo(ctx context.Context, creds types.Credentia
 		chronicleBucketName:       secrets["chronicle-bucket"],
 		ppmBucketName:             secrets["packagemanager-bucket"],
 		oidcURLTails:              oidcURLTails,
-		oidcIssuerURLsByRelease:   oidcIssuerURLsByRelease,
-		kubeconfigsByRelease:      kubeconfigsByRelease,
+		oidcIssuerURLsByCluster:   oidcIssuerURLsByCluster,
+		kubeconfigsByCluster:      kubeconfigsByCluster,
 		clusters:                  cfg.Clusters,
 		sites:                     cfg.Sites,
 		resourceTags:              cfg.ResourceTags,
@@ -277,7 +277,7 @@ func awsClustersDeploy(ctx *pulumi.Context, _ types.Target, params awsClustersPa
 		// ── K8s provider ──────────────────────────────────────────────────────
 		k8sProviderName := name + "-" + release + "-k8s"
 		k8sProvider, err := kubernetes.NewProvider(ctx, k8sProviderName, &kubernetes.ProviderArgs{
-			Kubeconfig: pulumi.String(params.kubeconfigsByRelease[release]),
+			Kubeconfig: pulumi.String(params.kubeconfigsByCluster[release]),
 		}, withAlias(), pulumi.IgnoreChanges([]string{"kubeconfig"}))
 		if err != nil {
 			return fmt.Errorf("clusters: failed to create K8s provider for %s: %w", release, err)
@@ -1044,8 +1044,8 @@ func awsClustersDeploy(ctx *pulumi.Context, _ types.Target, params awsClustersPa
 		_ = networkTrustInt       // used in createCalicoNetworkPolicies
 	}
 
-	// ── Karpenter (optional, spans all releases) ─────────────────────────────
-	// AWSKarpenter is instantiated once across all releases, not per-release.
+	// ── Karpenter (optional, spans all clusters) ─────────────────────────────
+	// AWSKarpenter is instantiated once across all clusters, not per-cluster.
 	if params.autoscalingEnabled {
 		if err := createKarpenter(ctx, name, releases, params.clusters, params, withAlias); err != nil {
 			return err
@@ -1902,7 +1902,7 @@ func pythonJSONSeparators(b []byte) string {
 }
 
 // createKarpenter creates the AWSKarpenter component resources.
-// Unlike most components, AWSKarpenter spans ALL releases (not per-release).
+// Unlike most components, AWSKarpenter spans ALL clusters (not per-cluster).
 // The component logical name is "{compound_name}-karpenter".
 // IAM node/instance profile resources are direct children of ptd:AWSKarpenter.
 // IAM controller roles are direct children of ptd:AWSWorkloadClusters (via withAlias).
@@ -2116,10 +2116,10 @@ func createKarpenter(
 		// Karpenter controller IAM role — created via standard createAWSIAMRole.
 		// In Python this was called via _define_k8s_iam_role_func which places it as a
 		// direct child of ptd:AWSWorkloadClusters (withAlias), not of ptd:AWSKarpenter.
-		// Use the OIDC URL from the live cluster (stored in params.oidcIssuerURLsByRelease) to
+		// Use the OIDC URL from the live cluster (stored in params.oidcIssuerURLsByCluster) to
 		// determine if the controller role should be created — matching Python's ptd.get_oidc_url().
 		clusterSpec := clusters[release].Spec
-		if _, hasOIDC := params.oidcIssuerURLsByRelease[release]; hasOIDC {
+		if _, hasOIDC := params.oidcIssuerURLsByCluster[release]; hasOIDC {
 			controllerRoleName := fmt.Sprintf("KarpenterControllerRole-%s.posit.team", clusterName)
 			controllerPolicyJSON := buildKarpenterControllerPolicy(
 				clusterName, params.accountID, params.region, queueName,

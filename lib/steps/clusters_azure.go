@@ -32,12 +32,12 @@ type azureClustersParams struct {
 	region                       string
 	resourceGroupName            string
 	clusters                     map[string]types.AzureWorkloadClusterConfig
-	kubeconfigsByRelease         map[string]string
+	kubeconfigsByCluster         map[string]string
 	dnsForwardDomains            []types.DNSForwardDomainConfig
 	resourceTags                 map[string]string
 	azureFilesStorageAccountName string
-	// clusterIdentityByRelease holds per-cluster identity info (principal IDs, OIDC URL, VNet subnet ID).
-	clusterIdentityByRelease map[string]*azure.ClusterIdentityInfo
+	// clusterIdentityByCluster holds per-cluster identity info (principal IDs, OIDC URL, VNet subnet ID).
+	clusterIdentityByCluster map[string]*azure.ClusterIdentityInfo
 	// certManagerDomains is the list of domains used for Let's Encrypt CertManager ClusterIssuers.
 	// Mirrors Python: root_domain if set, else all site domains.
 	certManagerDomains []string
@@ -65,9 +65,9 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 		return err
 	}
 
-	// Build per-release kubeconfigs and fetch cluster identity info
-	kubeconfigsByRelease := make(map[string]string, len(cfg.Clusters))
-	clusterIdentityByRelease := make(map[string]*azure.ClusterIdentityInfo, len(cfg.Clusters))
+	// Build per-cluster kubeconfigs and fetch cluster identity info
+	kubeconfigsByCluster := make(map[string]string, len(cfg.Clusters))
+	clusterIdentityByCluster := make(map[string]*azure.ClusterIdentityInfo, len(cfg.Clusters))
 	for release := range cfg.Clusters {
 		clusterName := s.DstTarget.Name() + "-" + release
 		kubeconfigBytes, err := azure.GetKubeCredentials(
@@ -82,7 +82,7 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 				return fmt.Errorf("clusters: failed to add proxy to kubeconfig for %s: %w", clusterName, err)
 			}
 		}
-		kubeconfigsByRelease[release] = string(kubeconfigBytes)
+		kubeconfigsByCluster[release] = string(kubeconfigBytes)
 
 		identityInfo, err := azure.GetClusterIdentityInfo(
 			ctx, azCreds, azTarget.SubscriptionID(), azTarget.ResourceGroupName(), clusterName,
@@ -90,7 +90,7 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 		if err != nil {
 			return fmt.Errorf("clusters: failed to get cluster identity info for %s: %w", clusterName, err)
 		}
-		clusterIdentityByRelease[release] = identityInfo
+		clusterIdentityByCluster[release] = identityInfo
 	}
 
 	// Build cert manager domains: use root_domain if set, else all site domains.
@@ -116,11 +116,11 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 		region:                       s.DstTarget.Region(),
 		resourceGroupName:            azTarget.ResourceGroupName(),
 		clusters:                     cfg.Clusters,
-		kubeconfigsByRelease:         kubeconfigsByRelease,
+		kubeconfigsByCluster:         kubeconfigsByCluster,
 		dnsForwardDomains:            cfg.Network.DnsForwardDomains,
 		resourceTags:                 cfg.ResourceTags,
 		azureFilesStorageAccountName: azureFilesStorageAccountName,
-		clusterIdentityByRelease:     clusterIdentityByRelease,
+		clusterIdentityByCluster:     clusterIdentityByCluster,
 		certManagerDomains:           certManagerDomains,
 		thirdPartyTelemetryEnabled:   cfg.ThirdPartyTelemetryEnabled == nil || *cfg.ThirdPartyTelemetryEnabled,
 	}
@@ -173,12 +173,12 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 
 	for _, release := range releases {
 		clusterCfg := params.clusters[release]
-		identityInfo := params.clusterIdentityByRelease[release]
+		identityInfo := params.clusterIdentityByCluster[release]
 
 		// ── K8s provider ──────────────────────────────────────────────────────
 		k8sProviderName := name + "-" + release
 		k8sProvider, err := kubernetes.NewProvider(ctx, k8sProviderName, &kubernetes.ProviderArgs{
-			Kubeconfig: pulumi.String(params.kubeconfigsByRelease[release]),
+			Kubeconfig: pulumi.String(params.kubeconfigsByCluster[release]),
 		}, withAlias(), pulumi.IgnoreChanges([]string{"kubeconfig"}))
 		if err != nil {
 			return fmt.Errorf("clusters: failed to create K8s provider for %s: %w", release, err)
