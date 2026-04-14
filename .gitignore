@@ -36,3 +36,6 @@ dist/
 
 # build artifacts
 /.local/
+
+# eject output
+.eject/

@@ -111,7 +111,7 @@ class AwsBastion(pulumi.ComponentResource):
         )
         ami = aws.ec2.get_ami(
             most_recent=True,
-            name_regex="al2023-ami-202*",
+            name_regex="al2023-ami-2023.*-kernel-6\\.18-arm64",
             filters=[
                 aws.ec2.GetAmiFilterArgs(
                     name="owner-id",

@@ -25,7 +25,6 @@ import ptd.pulumi_resources.keycloak_operator
 import ptd.pulumi_resources.kubernetes_role
 import ptd.pulumi_resources.network_policies
 import ptd.pulumi_resources.team_operator
-import ptd.pulumi_resources.team_site
 import ptd.pulumi_resources.traefik
 import ptd.pulumi_resources.traefik_forward_auth
 import ptd.secrecy
@@ -60,7 +59,6 @@ def test_import_only() -> None:
     assert ptd.pulumi_resources.kubernetes_role is not None
     assert ptd.pulumi_resources.network_policies is not None
     assert ptd.pulumi_resources.team_operator is not None
-    assert ptd.pulumi_resources.team_site is not None
     assert ptd.pulumi_resources.traefik is not None
     assert ptd.pulumi_resources.traefik_forward_auth is not None
     assert ptd.secrecy is not None

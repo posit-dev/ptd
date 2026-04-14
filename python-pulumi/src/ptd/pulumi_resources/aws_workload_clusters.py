@@ -21,7 +21,6 @@ import ptd.pulumi_resources.keycloak_operator
 import ptd.pulumi_resources.kubernetes_role
 import ptd.pulumi_resources.network_policies
 import ptd.pulumi_resources.team_operator
-import ptd.pulumi_resources.team_site
 import ptd.pulumi_resources.traefik_forward_auth
 import ptd.pulumi_resources.traefik_forward_auth_aws
 import ptd.secrecy
@@ -56,7 +55,6 @@ class AWSWorkloadClusters(pulumi.ComponentResource):
     keycloak_operators: dict[str, ptd.pulumi_resources.keycloak_operator.KeycloakOperator]
     network_policies: dict[str, ptd.pulumi_resources.network_policies.NetworkPolicies]
     team_operators: dict[str, ptd.pulumi_resources.team_operator.TeamOperator]
-    team_sites: dict[str, ptd.pulumi_resources.team_site.TeamSite]
     traefik_forward_auths: dict[str, ptd.pulumi_resources.traefik_forward_auth_aws.TraefikForwardAuthAWS]
 
     @classmethod
