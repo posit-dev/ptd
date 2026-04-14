@@ -92,8 +92,8 @@ var stackPurposes = map[string]map[string]string{
 	},
 }
 
-// stepNameFromProject extracts the step name from a project name like "ptd-aws-workload-post-clusters"
-func (s *StackSummary) stepNameFromProject() string {
+// StepNameFromProject extracts the step name from a project name like "ptd-aws-workload-post-clusters"
+func (s *StackSummary) StepNameFromProject() string {
 	// Strip "ptd-{cloud}-{type}-" prefix to get the step name
 	parts := strings.SplitN(s.ProjectName, "-", 4)
 	if len(parts) >= 4 {
@@ -254,7 +254,7 @@ func Collect(ctx context.Context, target types.Target, workloadPath string) (*At
 		customDescriptions[cs.Name] = cs.Description
 	}
 	for i := range stacks {
-		stepName := stacks[i].stepNameFromProject()
+		stepName := stacks[i].StepNameFromProject()
 		if desc, ok := customDescriptions[stepName]; ok {
 			stacks[i].Purpose = desc
 		} else if p := purposeForStack(stacks[i].ProjectName, infraCfg.Cloud); p != "" {
@@ -596,10 +596,9 @@ func collectCustomSteps(workloadPath string) ([]CustomStepInfo, error) {
 	return customSteps, nil
 }
 
-// collectStackSummaries fetches Pulumi state files and extracts summaries.
-// Supports both AWS (S3) and Azure (Blob Storage) backends.
-func collectStackSummaries(ctx context.Context, creds types.Credentials, target types.Target) ([]StackSummary, error) {
-	// Determine cloud provider and list state files
+// DownloadStateFiles retrieves all Pulumi state files for a target from cloud storage.
+// Returns a map of state key to raw JSON bytes.
+func DownloadStateFiles(ctx context.Context, creds types.Credentials, target types.Target) (map[string][]byte, error) {
 	var keys []string
 	var fetchFn func(ctx context.Context, key string) ([]byte, error)
 
@@ -625,7 +624,6 @@ func collectStackSummaries(ctx context.Context, creds types.Credentials, target 
 		if err != nil {
 			return nil, fmt.Errorf("failed to get Azure credentials: %w", err)
 		}
-		// Azure target has StorageAccountName and BlobContainerName via StateBucketName/BlobStorageName
 		azureTarget, ok := target.(interface {
 			BlobStorageName() string
 		})
@@ -649,9 +647,8 @@ func collectStackSummaries(ctx context.Context, creds types.Credentials, target 
 		return nil, fmt.Errorf("unsupported cloud provider: %s", target.CloudProvider())
 	}
 
-	// Process state files in parallel
 	var wg sync.WaitGroup
-	summaries := make([]StackSummary, len(keys))
+	results := make([][]byte, len(keys))
 	errors := make([]error, len(keys))
 
 	for i, key := range keys {
@@ -664,24 +661,41 @@ func collectStackSummaries(ctx context.Context, creds types.Credentials, target 
 				errors[idx] = err
 				return
 			}
-			summary, err := parseStateFile(data, stateKey)
-			if err != nil {
-				errors[idx] = err
-				return
-			}
-			summaries[idx] = summary
+			results[idx] = data
 		}(i, key)
 	}
 
 	wg.Wait()
 
-	// Check for errors
 	for i, err := range errors {
 		if err != nil {
-			return nil, fmt.Errorf("failed to process state file %s: %w", keys[i], err)
+			return nil, fmt.Errorf("failed to download state file %s: %w", keys[i], err)
 		}
 	}
 
+	files := make(map[string][]byte, len(keys))
+	for i, key := range keys {
+		files[key] = results[i]
+	}
+	return files, nil
+}
+
+// collectStackSummaries fetches Pulumi state files and extracts summaries.
+// Supports both AWS (S3) and Azure (Blob Storage) backends.
+func collectStackSummaries(ctx context.Context, creds types.Credentials, target types.Target) ([]StackSummary, error) {
+	files, err := DownloadStateFiles(ctx, creds, target)
+	if err != nil {
+		return nil, err
+	}
+
+	var summaries []StackSummary
+	for key, data := range files {
+		summary, err := parseStateFile(data, key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to process state file %s: %w", key, err)
+		}
+		summaries = append(summaries, summary)
+	}
 	return summaries, nil
 }
 
