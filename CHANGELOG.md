@@ -1,3 +1,85 @@
+# [1.15.0](https://github.com/posit-dev/ptd/compare/v1.14.0...v1.15.0) (2026-04-14)
+
+
+### Bug Fixes
+
+* drop mimir from workload purpose string, hoist siteSecretFields ([c6a4913](https://github.com/posit-dev/ptd/commit/c6a491379a770c28cd57fb8bf132221ea95ba67a))
+* remove okta-oidc-client-creds from secret catalog ([7ad61c1](https://github.com/posit-dev/ptd/commit/7ad61c179cd4047b5d2e903fe06e24150bab32b1))
+
+
+### Features
+
+* enumerate secret references from known PTD conventions ([f75ab6c](https://github.com/posit-dev/ptd/commit/f75ab6c2c34cef3ca57b73cfe2b3190f87db916e)), closes [#215](https://github.com/posit-dev/ptd/issues/215)
+
+# [1.14.0](https://github.com/posit-dev/ptd/compare/v1.13.0...v1.14.0) (2026-04-13)
+
+
+### Features
+
+* remove automated kustomize-to-Helm migration job from TeamOperator ([e0233b5](https://github.com/posit-dev/ptd/commit/e0233b5502a063a9b972a7b9f5573fc07690a923))
+
+# [1.13.0](https://github.com/posit-dev/ptd/compare/v1.12.0...v1.13.0) (2026-04-13)
+
+
+### Bug Fixes
+
+* check out.Close() error in copyFile to catch flush failures ([ebd45c6](https://github.com/posit-dev/ptd/commit/ebd45c6c115738894c938eefe911a6b53d12d59e))
+* sanitize file paths in config copy to resolve Snyk findings ([65d075f](https://github.com/posit-dev/ptd/commit/65d075f7a8eeee8da96c3073a25d76813b81db2c))
+
+
+### Features
+
+* copy workload config files to eject bundle ([7b69dc6](https://github.com/posit-dev/ptd/commit/7b69dc6c2397e7418a0199d288fa362f28ffa07d)), closes [#214](https://github.com/posit-dev/ptd/issues/214)
+
+# [1.12.0](https://github.com/posit-dev/ptd/compare/v1.11.0...v1.12.0) (2026-04-13)
+
+
+### Features
+
+* enable Pulumi debug logging when -v flag is set ([f165a01](https://github.com/posit-dev/ptd/commit/f165a01878e75b6bc79dd4eeebec17e7b847d468))
+
+# [1.11.0](https://github.com/posit-dev/ptd/compare/v1.10.0...v1.11.0) (2026-04-08)
+
+
+### Features
+
+* extract resource physical IDs from Pulumi state ([0bb4e32](https://github.com/posit-dev/ptd/commit/0bb4e32cbb96821bcb18597aad7843592139eb80)), closes [#212](https://github.com/posit-dev/ptd/issues/212)
+
+# [1.10.0](https://github.com/posit-dev/ptd/compare/v1.9.0...v1.10.0) (2026-04-08)
+
+
+### Features
+
+* collect control room connection details for eject ([74f8d30](https://github.com/posit-dev/ptd/commit/74f8d30906d38f4e7074d969ae38bd687ee5aae9)), closes [#211](https://github.com/posit-dev/ptd/issues/211)
+
+# [1.9.0](https://github.com/posit-dev/ptd/compare/v1.8.5...v1.9.0) (2026-04-08)
+
+
+### Features
+
+* scaffold ptd eject command ([b4584ae](https://github.com/posit-dev/ptd/commit/b4584ae011d8e2bdea05bdc48b7ad34b76814751)), closes [#210](https://github.com/posit-dev/ptd/issues/210)
+
+## [1.8.5](https://github.com/posit-dev/ptd/compare/v1.8.4...v1.8.5) (2026-04-08)
+
+
+### Bug Fixes
+
+* add mutex to postgres config test mock to prevent data race ([4e32dc3](https://github.com/posit-dev/ptd/commit/4e32dc3e9a38d3c7b4de7a7422eb24b3be086392))
+
+## [1.8.4](https://github.com/posit-dev/ptd/compare/v1.8.3...v1.8.4) (2026-04-08)
+
+
+### Bug Fixes
+
+* pin bastion AMI regex to kernel-6.18 variant ([57a7902](https://github.com/posit-dev/ptd/commit/57a79026aa240dfbcec55828c52dfa80facfce58))
+
+## [1.8.3](https://github.com/posit-dev/ptd/compare/v1.8.2...v1.8.3) (2026-04-08)
+
+
+### Bug Fixes
+
+* use runtime.Caller instead of git rev-parse in test setup ([979ef52](https://github.com/posit-dev/ptd/commit/979ef52d5dd0dd5aeeba7699c59580c83a5c549a))
+
 ## [1.8.2](https://github.com/posit-dev/ptd/compare/v1.8.1...v1.8.2) (2026-04-07)
 
 

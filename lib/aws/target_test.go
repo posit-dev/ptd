@@ -158,10 +158,10 @@ func TestTarget(t *testing.T) {
 		true,  // tailscaleEnabled
 		false, // createAdminPolicyAsResource
 		map[string]types.SiteConfig{
-			"main": {
+			"main": {Spec: types.SiteConfigSpec{
 				Domain: "example.com",
 				ZoneID: "Z123456789",
-			},
+			}},
 		},
 		nil, // clusters
 	)
@@ -176,7 +176,7 @@ func TestTarget(t *testing.T) {
 
 		sites := target.Sites()
 		assert.Len(t, sites, 1)
-		assert.Equal(t, "example.com", sites["main"].Domain)
+		assert.Equal(t, "example.com", sites["main"].Spec.Domain)
 	})
 
 	// Test StateBucketName
@@ -215,9 +215,9 @@ func TestTargetWithProfile(t *testing.T) {
 		false, // tailscaleEnabled
 		false, // createAdminPolicyAsResource
 		map[string]types.SiteConfig{
-			"pharma": {
+			"pharma": {Spec: types.SiteConfigSpec{
 				Domain: "pharma.posit.team",
-			},
+			}},
 		},
 		nil, // clusters
 	)

@@ -8,21 +8,45 @@ import (
 
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
+	"github.com/pulumi/pulumi/sdk/v3/go/auto/debug"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optdestroy"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optpreview"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optrefresh"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optup"
+	"github.com/spf13/viper"
 )
 
+// pulumiDebugLogging returns a debug.LoggingOptions configured based on the
+// verbose flag. When verbose mode is enabled (ptd -v), Pulumi engine and
+// plugin logs are streamed to stderr at verbosity level 3.
+func pulumiDebugLogging() *debug.LoggingOptions {
+	if !viper.GetBool("verbose") {
+		return nil
+	}
+	logLevel := uint(3)
+	return &debug.LoggingOptions{
+		LogLevel:      &logLevel,
+		LogToStdErr:   true,
+		FlowToPlugins: true,
+		Debug:         true,
+	}
+}
+
 func RefreshStack(ctx context.Context, stack auto.Stack) (refreshResult auto.RefreshResult, err error) {
-	refreshResult, err = stack.Refresh(ctx,
+	refreshOpts := []optrefresh.Option{
 		optrefresh.Color("always"),
 		optrefresh.ErrorProgressStreams(os.Stderr),
 		optrefresh.ProgressStreams(os.Stderr),
 		optrefresh.SuppressOutputs(),
 		optrefresh.Diff(),
 		optrefresh.ClearPendingCreates(),
-	)
+	}
+
+	if debugOpts := pulumiDebugLogging(); debugOpts != nil {
+		refreshOpts = append(refreshOpts, optrefresh.DebugLogging(*debugOpts))
+	}
+
+	refreshResult, err = stack.Refresh(ctx, refreshOpts...)
 	if err != nil {
 		// don't return the full error, it's already printed to stderr.
 		return refreshResult, fmt.Errorf("failed to refresh stack, error above")
@@ -91,6 +115,10 @@ func UpStack(ctx context.Context, stack auto.Stack, preview bool, dryRun bool, a
 		optup.Diff(),
 	}
 
+	if debugOpts := pulumiDebugLogging(); debugOpts != nil {
+		upOptions = append(upOptions, optup.DebugLogging(*debugOpts))
+	}
+
 	if len(excludedResources) > 0 {
 		slog.Info("Excluding resources from up", "excluded_resources", excludedResources)
 		upOptions = append(upOptions, optup.Exclude(excludedResources))
@@ -153,6 +181,10 @@ func DestroyStack(ctx context.Context, stack auto.Stack, preview bool, dryRun bo
 		optdestroy.SuppressOutputs(),
 	}
 
+	if debugOpts := pulumiDebugLogging(); debugOpts != nil {
+		destroyOptions = append(destroyOptions, optdestroy.DebugLogging(*debugOpts))
+	}
+
 	if len(excludedResources) > 0 {
 		slog.Info("Excluding resources from destroy", "excluded_resources", excludedResources)
 		destroyOptions = append(destroyOptions, optdestroy.Exclude(excludedResources))
@@ -201,6 +233,10 @@ func previewStack(ctx context.Context, excludedResources []string, targetResourc
 		optpreview.ProgressStreams(os.Stderr),
 		optpreview.SuppressOutputs(),
 		optpreview.Diff(),
+	}
+
+	if debugOpts := pulumiDebugLogging(); debugOpts != nil {
+		previewOptions = append(previewOptions, optpreview.DebugLogging(*debugOpts))
 	}
 
 	if len(excludedResources) > 0 {

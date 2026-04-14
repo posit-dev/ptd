@@ -1,4 +1,5 @@
 import json
+import typing
 
 import pulumi
 import pulumi_azure_native as pulumi_az
@@ -96,6 +97,7 @@ class AzureWorkloadPersistent(pulumi.ComponentResource):
 
         self._define_vnet()
         self._define_file_storage()
+        self._define_netapp_volumes()
         self._define_postgres()
         self._define_container_registry()
 
@@ -550,6 +552,66 @@ class AzureWorkloadPersistent(pulumi.ComponentResource):
                 protect=self.workload.cfg.protect_persistent_resources,
             ),
         )
+
+    _NETAPP_VOLUME_PRODUCTS: typing.ClassVar[dict[str, str]] = {
+        "connect": "netapp_volume_connect_capacity",
+        "workbench": "netapp_volume_workbench_capacity",
+        "workbench-shared": "netapp_volume_workbench_shared_capacity",
+    }
+
+    def _define_netapp_volumes(self):
+        """Create Azure NetApp Files volumes for each site x product combination.
+
+        Guarded by the automated_volume_provisioning config flag.
+        Creates volumes under the existing capacity pool with NFS export policies
+        allowing VNet-wide access (matching AWS FSx pattern).
+        """
+        self.netapp_volumes: dict[str, netapp.CapacityPoolVolume] = {}
+
+        if not self.workload.cfg.automated_volume_provisioning:
+            return
+
+        for site_name in sorted(self.workload.cfg.sites.keys()):
+            for product, capacity_field in self._NETAPP_VOLUME_PRODUCTS.items():
+                volume_name = self.workload.netapp_volume_name(site_name, product)
+                capacity_gib = getattr(self.workload.cfg, capacity_field)
+
+                volume = netapp.CapacityPoolVolume(
+                    volume_name,
+                    volume_name=volume_name,
+                    resource_group_name=self.workload.resource_group_name,
+                    account_name=self.workload.netapp_account_name,
+                    pool_name=self.workload.netapp_pool_name,
+                    location=self.workload.cfg.region,
+                    service_level=netapp.ServiceLevel.PREMIUM,
+                    subnet_id=self.netapp_subnet.id,
+                    usage_threshold=capacity_gib * 1024 * 1024 * 1024,  # Convert GiB to bytes
+                    creation_token=volume_name,  # NFS export path
+                    protocol_types=["NFSv3"],
+                    network_features=netapp.NetworkFeatures.STANDARD,
+                    unix_permissions="0755",
+                    export_policy=netapp.VolumePropertiesExportPolicyArgs(
+                        rules=[
+                            netapp.ExportPolicyRuleArgs(
+                                rule_index=1,
+                                allowed_clients="0.0.0.0/0",  # Access controlled by NSG on NetApp subnet
+                                nfsv3=True,
+                                nfsv41=False,
+                                unix_read_only=False,
+                                unix_read_write=True,
+                                has_root_access=True,
+                            ),
+                        ],
+                    ),
+                    tags=self.required_tags,
+                    opts=pulumi.ResourceOptions(
+                        parent=self.capacity_pool,
+                        protect=self.workload.cfg.protect_persistent_resources,
+                        depends_on=[self.netapp_subnet, self.capacity_pool],
+                    ),
+                )
+
+                self.netapp_volumes[f"{site_name}-{product}"] = volume
 
     def _define_postgres(self):
         self.postgres = self._define_database_resources(

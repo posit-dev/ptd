@@ -19,7 +19,6 @@ from ptd.pulumi_resources import (
     azure_traefik,
     cert_manager,
     team_operator,
-    trident_operator,
 )
 
 
@@ -34,7 +33,6 @@ class AzureWorkloadClusters(pulumi.ComponentResource):
     team_operators: dict[str, team_operator.TeamOperator]
     team_operator_identity: pulumi_az.managedidentity.UserAssignedIdentity
     traefiks: dict[str, azure_traefik.AzureTraefik]
-    trident_operators: dict[str, trident_operator.TridentOperator]
     azure_files_csi_classes: dict[str, azure_files_csi.AzureFilesCSI]
 
     @classmethod
@@ -80,7 +78,6 @@ class AzureWorkloadClusters(pulumi.ComponentResource):
         self._define_cert_manager()
         self._apply_custom_k8s_resources()
         self._define_team_operator()
-        # self._define_trident_operator()
         self._define_traefik()
         self._define_bastion_access()
         self._define_coredns()
@@ -109,18 +106,6 @@ class AzureWorkloadClusters(pulumi.ComponentResource):
             kube_providers=self.kube_providers,
             parent=self,
         )
-
-    def _define_trident_operator(self):
-        self.trident_operators = {}
-        for release in self.managed_clusters_by_release:
-            self.trident_operators[release] = trident_operator.TridentOperator(
-                workload=self.workload,
-                release=release,
-                opts=pulumi.ResourceOptions(
-                    parent=self,
-                    providers=[self.kube_providers[release]],
-                ),
-            )
 
     def _define_traefik(self):
         self.traefiks = {}
