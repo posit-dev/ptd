@@ -84,14 +84,28 @@ Add a `sessionLabels` block to `workbench:` in `site.yaml`. Its presence enables
 
 ```yaml
 # site.yaml
-workbench:
-  sessionLabels:
-    sourceField: "spec.containers[0].args"
-    sourceKey: "--container-user-groups"
-    searchRegex: "_entra_[^ ,]+"
+spec:
+  workbench:
+    sessionLabels:
+      sourceField: "spec.containers[0].args"
+      sourceKey: "--container-user-groups"
+      searchRegex: "_entra_[^ ,]+"
 ```
 
 All fields are optional — defaults cover the standard Workbench + Entra ID setup. See [Configuration Reference](../CONFIGURATION.md) for the full schema.
+
+### Reprocessing existing pods
+
+By default, already-processed pods are skipped (the marker label prevents re-reconciliation). To force re-labeling of existing session pods — e.g. after changing `searchRegex` or `trimPrefix` — set `reprocess: true`:
+
+```yaml
+spec:
+  workbench:
+    sessionLabels:
+      reprocess: true
+```
+
+The controller will re-enqueue all existing session pods for the site immediately, clearing stale labels before applying the new set. Set back to `false` (or omit it) once done.
 
 ### Result
 
