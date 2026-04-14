@@ -14,7 +14,7 @@ var funcMap = template.FuncMap{
 		return t.Format("2006-01-02")
 	},
 	"upper":       strings.ToUpper,
-	"productName": productDisplayName,
+	"productName": ProductDisplayName,
 	"totalResources": func(stacks []StackSummary) int {
 		total := 0
 		for _, s := range stacks {
@@ -37,14 +37,14 @@ var funcMap = template.FuncMap{
 		return false
 	},
 	"stackProse": func(stack StackSummary, infra *InfraConfig) string {
-		stepName := stack.stepNameFromProject()
+		stepName := stack.StepNameFromProject()
 		return GenerateStackProse(stepName, infra)
 	},
 	"purposeText":      func(cloud string) string { return purposeTextFor(cloud) },
 	"infraSummaryText": func(cloud string) string { return infraSummaryTextFor(cloud) },
 	"verificationText": func(cloud string) string { return verificationTextFor(cloud) },
 	"encryptionText":   func(cloud string) string { return encryptionTextFor(cloud) },
-	"accountLabel":     accountLabel,
+	"accountLabel":     AccountLabel,
 	"stateBackend": func(data *AttestationData) string {
 		if data.Infra != nil && data.Infra.Cloud == "azure" {
 			return fmt.Sprintf("azblob://<container>?storage_account=%s", data.TargetName)
@@ -209,14 +209,14 @@ The Git history for the ` + "`" + `{{ .TargetName }}/` + "`" + ` directory provi
 // RenderMarkdown writes the attestation data as a Markdown document to the given writer.
 func RenderMarkdown(w io.Writer, data *AttestationData) error {
 	sort.Slice(data.Stacks, func(i, j int) bool {
-		return stackOrder(data.Stacks[i].ProjectName) < stackOrder(data.Stacks[j].ProjectName)
+		return StackOrder(data.Stacks[i].ProjectName) < StackOrder(data.Stacks[j].ProjectName)
 	})
 
 	return markdownTemplate.Execute(w, data)
 }
 
-// stackOrder returns a sort key for known stack names to present them in deployment order
-func stackOrder(name string) int {
+// StackOrder returns a sort key for known stack names to present them in deployment order.
+func StackOrder(name string) int {
 	order := map[string]int{
 		"persistent":      1,
 		"postgres-config": 2,

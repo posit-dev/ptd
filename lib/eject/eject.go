@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 
+	"github.com/posit-dev/ptd/lib/attestation"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/types"
 )
@@ -16,6 +18,7 @@ type Options struct {
 	TargetName   string
 	OutputDir    string
 	DryRun       bool
+	WorkloadPath string
 	ConfigLoader ConfigLoaderFunc // nil defaults to helpers.ConfigForTarget
 }
 
@@ -55,6 +58,81 @@ func Run(ctx context.Context, t types.Target, opts Options) error {
 		"connections", len(crDetails.Connections),
 	)
 
+	if err := collectAndRenderHandoff(ctx, t, opts, crDetails); err != nil {
+		return err
+	}
+
 	slog.Info("Eject bundle generated", "path", opts.OutputDir)
+	return nil
+}
+
+func collectAndRenderHandoff(ctx context.Context, t types.Target, opts Options, crDetails *ControlRoomDetails) error {
+	if opts.WorkloadPath == "" {
+		slog.Warn("WorkloadPath not set, skipping handoff document generation")
+		return nil
+	}
+
+	slog.Info("Collecting infrastructure data")
+	attData, err := attestation.Collect(ctx, t, opts.WorkloadPath)
+	if err != nil {
+		return fmt.Errorf("failed to collect infrastructure data: %w", err)
+	}
+	slog.Info("Collected infrastructure data",
+		"sites", len(attData.Sites),
+		"stacks", len(attData.Stacks),
+	)
+
+	slog.Info("Building resource inventory")
+	creds, err := t.Credentials(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get credentials for resource inventory: %w", err)
+	}
+
+	stateFiles, err := attestation.DownloadStateFiles(ctx, creds, t)
+	if err != nil {
+		return fmt.Errorf("failed to download state files: %w", err)
+	}
+
+	var allResources []ResourceInventoryEntry
+	for key, data := range stateFiles {
+		entries, err := ParseResourceInventory(data, key)
+		if err != nil {
+			slog.Warn("Failed to parse resource inventory for state file", "key", key, "error", err)
+			continue
+		}
+		allResources = append(allResources, entries...)
+	}
+	slog.Info("Built resource inventory", "resources", len(allResources))
+
+	secrets := EnumerateSecrets(t)
+	slog.Info("Enumerated secret references", "secrets", len(secrets))
+
+	handoff := &HandoffData{
+		AttestationData: attData,
+		ControlRoom:     crDetails,
+		Resources:       allResources,
+		Secrets:         secrets,
+		DryRun:          opts.DryRun,
+	}
+
+	pdfPath := filepath.Join(opts.OutputDir, "README.pdf")
+	mdPath := filepath.Join(opts.OutputDir, "README.md")
+
+	slog.Info("Rendering handoff PDF", "path", pdfPath)
+	if err := RenderHandoffPDF(pdfPath, handoff); err != nil {
+		return fmt.Errorf("failed to render handoff PDF: %w", err)
+	}
+
+	slog.Info("Rendering handoff markdown", "path", mdPath)
+	mdFile, err := os.Create(mdPath)
+	if err != nil {
+		return fmt.Errorf("failed to create markdown file: %w", err)
+	}
+	defer mdFile.Close()
+
+	if err := RenderHandoffMarkdown(mdFile, handoff); err != nil {
+		return fmt.Errorf("failed to render handoff markdown: %w", err)
+	}
+
 	return nil
 }

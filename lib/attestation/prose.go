@@ -67,7 +67,8 @@ func encryptionTextFor(cloud string) string {
 		"alias/posit-team-dedicated in the target account."
 }
 
-func productDisplayName(name string) string {
+// ProductDisplayName returns a human-readable name for a product identifier.
+func ProductDisplayName(name string) string {
 	switch name {
 	case "connect":
 		return "Posit Connect"
@@ -84,7 +85,8 @@ func productDisplayName(name string) string {
 	}
 }
 
-func accountLabel(cloud string) string {
+// AccountLabel returns the appropriate label for the cloud account identifier.
+func AccountLabel(cloud string) string {
 	if cloud == "azure" {
 		return "Subscription"
 	}
@@ -199,7 +201,7 @@ func generateAWSPersistentProse(cfg *InfraConfig) string {
 		lines = append(lines, "Integration with customer-managed bastion host for cluster access")
 	}
 
-	return "Provisions the foundational infrastructure layer:\n\n" + bulletList(lines)
+	return "Provisions the foundational infrastructure layer:\n\n" + BulletList(lines)
 }
 
 func generateAzurePersistentProse(cfg *InfraConfig) string {
@@ -223,7 +225,7 @@ func generateAzurePersistentProse(cfg *InfraConfig) string {
 	lines = append(lines, "Managed identities for all service components")
 	lines = append(lines, "Network security groups for database, AKS, and internal communication")
 
-	return "Provisions the foundational infrastructure layer:\n\n" + bulletList(lines)
+	return "Provisions the foundational infrastructure layer:\n\n" + BulletList(lines)
 }
 
 // generatePostgresConfigProse generates narrative text for the postgres-config stack
@@ -236,7 +238,7 @@ func generatePostgresConfigProse(cfg *InfraConfig) string {
 	}
 
 	return fmt.Sprintf("Configures the %s instance with application-specific databases and credentials:\n\n", dbType) +
-		bulletList([]string{
+		BulletList([]string{
 			"Database users for Grafana and internal services",
 			"Dedicated databases with appropriate grants",
 			secretsNote,
@@ -272,7 +274,7 @@ func generateEKSProse(cfg *InfraConfig) string {
 	lines = append(lines, "GP3 default storage class")
 	lines = append(lines, "IAM access entries for cluster administration")
 
-	return "Provisions the Kubernetes control plane and compute:\n\n" + bulletList(lines)
+	return "Provisions the Kubernetes control plane and compute:\n\n" + BulletList(lines)
 }
 
 func generateAKSProse(cfg *InfraConfig) string {
@@ -293,7 +295,7 @@ func generateAKSProse(cfg *InfraConfig) string {
 	lines = append(lines, "Azure Disk CSI driver for persistent volumes")
 	lines = append(lines, "Managed identity access entries for cluster administration")
 
-	return "Provisions the Kubernetes control plane and compute:\n\n" + bulletList(lines)
+	return "Provisions the Kubernetes control plane and compute:\n\n" + BulletList(lines)
 }
 
 // generateClustersProse generates narrative text for the clusters stack
@@ -330,7 +332,7 @@ func generateClustersProse(cfg *InfraConfig) string {
 		lines = append(lines, "Keycloak operator for identity management")
 	}
 
-	return "Configures the Kubernetes cluster with the required namespaces, operators, and network policies:\n\n" + bulletList(lines)
+	return "Configures the Kubernetes cluster with the required namespaces, operators, and network policies:\n\n" + BulletList(lines)
 }
 
 // generateHelmProse generates narrative text for the helm stack
@@ -349,7 +351,7 @@ func generateHelmProse(cfg *InfraConfig) string {
 		}
 	}
 
-	return "Deploys supporting services as Helm charts:\n\n" + bulletList(lines)
+	return "Deploys supporting services as Helm charts:\n\n" + BulletList(lines)
 }
 
 // generateSitesProse generates narrative text for the sites stack
@@ -368,7 +370,7 @@ func generateSitesProse(cfg *InfraConfig) string {
 		lines = append(lines, "DNS records in the hosted zone for each product subdomain")
 	}
 
-	return "Deploys the Posit products into the cluster:\n\n" + bulletList(lines)
+	return "Deploys the Posit products into the cluster:\n\n" + BulletList(lines)
 }
 
 // GenerateStackProse generates prose for a stack given its step name and the infrastructure config
@@ -430,7 +432,8 @@ func GenerateProductSummary(cfg *InfraConfig, sites []SiteInfo) string {
 		version, instanceType, vpcClause)
 }
 
-func bulletList(items []string) string {
+// BulletList formats a slice of strings as a markdown bullet list.
+func BulletList(items []string) string {
 	var sb strings.Builder
 	for _, item := range items {
 		sb.WriteString("- ")
