@@ -61,12 +61,12 @@ func clustersResourceNames(resources []pulumi.MockResourceArgs) []string {
 // minimalAWSClustersParams builds a minimal awsClustersParams for testing.
 func minimalAWSClustersParams(compoundName string, releases []string, siteNames []string) awsClustersParams {
 	clusters := make(map[string]types.AWSWorkloadClusterConfig, len(releases))
-	kubeconfigsByRelease := make(map[string]string, len(releases))
+	kubeconfigsByCluster := make(map[string]string, len(releases))
 	for _, r := range releases {
 		clusters[r] = types.AWSWorkloadClusterConfig{Spec: types.AWSWorkloadClusterSpec{
 			ClusterOIDCIssuerURL: "https://oidc.eks.us-east-1.amazonaws.com/id/EXAMPLEID",
 		}}
-		kubeconfigsByRelease[r] = "apiVersion: v1\nkind: Config\n"
+		kubeconfigsByCluster[r] = "apiVersion: v1\nkind: Config\n"
 	}
 	sites := make(map[string]types.SiteConfig, len(siteNames))
 	for _, s := range siteNames {
@@ -81,7 +81,7 @@ func minimalAWSClustersParams(compoundName string, releases []string, siteNames 
 		chronicleBucketName:       "chronicle-bucket-" + compoundName,
 		ppmBucketName:             "ppm-bucket-" + compoundName,
 		oidcURLTails:              []string{"oidc.eks.us-east-1.amazonaws.com/id/EXAMPLEID"},
-		kubeconfigsByRelease:      kubeconfigsByRelease,
+		kubeconfigsByCluster:      kubeconfigsByCluster,
 		clusters:                  clusters,
 		sites:                     sites,
 		resourceTags:              map[string]string{},
@@ -98,10 +98,10 @@ func minimalAWSClustersParams(compoundName string, releases []string, siteNames 
 // minimalAzureClustersParams builds a minimal azureClustersParams for testing.
 func minimalAzureClustersParams(compoundName string, releases []string) azureClustersParams {
 	clusters := make(map[string]types.AzureWorkloadClusterConfig, len(releases))
-	kubeconfigsByRelease := make(map[string]string, len(releases))
+	kubeconfigsByCluster := make(map[string]string, len(releases))
 	for _, r := range releases {
 		clusters[r] = types.AzureWorkloadClusterConfig{}
-		kubeconfigsByRelease[r] = "apiVersion: v1\nkind: Config\n"
+		kubeconfigsByCluster[r] = "apiVersion: v1\nkind: Config\n"
 	}
 	sanitized := compoundName
 	for i := 0; i < len(sanitized); {
@@ -120,7 +120,7 @@ func minimalAzureClustersParams(compoundName string, releases []string) azureClu
 		region:                       "eastus",
 		resourceGroupName:            "rsg-ptd-" + compoundName,
 		clusters:                     clusters,
-		kubeconfigsByRelease:         kubeconfigsByRelease,
+		kubeconfigsByCluster:         kubeconfigsByCluster,
 		dnsForwardDomains:            nil,
 		resourceTags:                 map[string]string{},
 		azureFilesStorageAccountName: "stptdfiles" + sanitized,
