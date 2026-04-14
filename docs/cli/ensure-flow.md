@@ -210,7 +210,7 @@ Creates AKS clusters:
 
 **Proxy Required**: Yes
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_workload_clusters.py`)
+**Implementation**: Go inline Pulumi (`lib/steps/clusters.go`)
 
 Configures the Kubernetes cluster created in the previous step:
 - Deploys cluster-wide Kubernetes resources
