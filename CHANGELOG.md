@@ -1,3 +1,16 @@
+# [1.15.0](https://github.com/posit-dev/ptd/compare/v1.14.0...v1.15.0) (2026-04-14)
+
+
+### Bug Fixes
+
+* drop mimir from workload purpose string, hoist siteSecretFields ([c6a4913](https://github.com/posit-dev/ptd/commit/c6a491379a770c28cd57fb8bf132221ea95ba67a))
+* remove okta-oidc-client-creds from secret catalog ([7ad61c1](https://github.com/posit-dev/ptd/commit/7ad61c179cd4047b5d2e903fe06e24150bab32b1))
+
+
+### Features
+
+* enumerate secret references from known PTD conventions ([f75ab6c](https://github.com/posit-dev/ptd/commit/f75ab6c2c34cef3ca57b73cfe2b3190f87db916e)), closes [#215](https://github.com/posit-dev/ptd/issues/215)
+
 # [1.14.0](https://github.com/posit-dev/ptd/compare/v1.13.0...v1.14.0) (2026-04-13)
 
 
