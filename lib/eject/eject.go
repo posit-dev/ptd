@@ -115,8 +115,9 @@ func collectAndRenderHandoff(ctx context.Context, t types.Target, opts Options, 
 		DryRun:          opts.DryRun,
 	}
 
-	pdfPath := filepath.Join(opts.OutputDir, "README.pdf")
-	mdPath := filepath.Join(opts.OutputDir, "README.md")
+	baseName := fmt.Sprintf("%s_handoff", opts.TargetName)
+	pdfPath := filepath.Join(opts.OutputDir, baseName+".pdf")
+	mdPath := filepath.Join(opts.OutputDir, baseName+".md")
 
 	slog.Info("Rendering handoff PDF", "path", pdfPath)
 	if err := RenderHandoffPDF(pdfPath, handoff); err != nil {
