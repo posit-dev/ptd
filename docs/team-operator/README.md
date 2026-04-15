@@ -66,6 +66,10 @@ kubectl edit site main -n posit-team
 kubectl logs -n posit-team deploy/team-operator
 ```
 
+## Session Label Injection
+
+See [posit-dev/team-operator#123](https://github.com/posit-dev/team-operator/pull/123) for full details. Configuration schema is in [CONFIGURATION.md](../CONFIGURATION.md).
+
 ## Related Documentation
 
 - [Site Management Guide](../guides/product-team-site-management.md) - For product teams

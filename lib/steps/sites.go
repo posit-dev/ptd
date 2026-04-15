@@ -116,7 +116,10 @@ func (s *SitesStep) runAWSInlineGo(ctx context.Context, creds types.Credentials,
 		return fmt.Errorf("sites: failed to parse workload secret: %w", err)
 	}
 
-	// Build kubeconfig string per release.
+	// Build kubeconfig per release using the exec credential plugin so no token
+	// is embedded. The kubeconfig is stable across runs — no Pulumi state diff
+	// on token rotation. The AWS_ACCESS_KEY_ID/SECRET/SESSION_TOKEN env vars
+	// set by prepareEnvVarsForPulumi are inherited by the aws subprocess.
 	kubeconfigsByRelease := make(map[string]string, len(cfg.Clusters))
 	for release := range cfg.Clusters {
 		clusterName := s.DstTarget.Name() + "-" + release
@@ -124,11 +127,7 @@ func (s *SitesStep) runAWSInlineGo(ctx context.Context, creds types.Credentials,
 		if err != nil {
 			return fmt.Errorf("sites: failed to get cluster info for %s: %w", clusterName, err)
 		}
-		token, err := aws.GetEKSToken(ctx, awsCreds, s.DstTarget.Region(), clusterName)
-		if err != nil {
-			return fmt.Errorf("sites: failed to get EKS token for %s: %w", clusterName, err)
-		}
-		config := kube.BuildEKSKubeConfig(endpoint, caCert, token, clusterName)
+		config := kube.BuildEKSKubeConfigWithExec(endpoint, caCert, clusterName, s.DstTarget.Region())
 		if !cfg.TailscaleEnabled {
 			config.Clusters[0].Cluster.ProxyURL = "socks5://localhost:1080"
 		}
@@ -191,13 +190,9 @@ func awsSitesDeploy(ctx *pulumi.Context, _ types.Target, params awsSiteParams) e
 		kubeconfig := params.kubeconfigsByRelease[release]
 		providerName := params.compoundName + "-" + release + "-k8s"
 
-		// IgnoreChanges on kubeconfig prevents dirty diffs on every run caused by EKS
-		// token rotation — STS tokens expire after 15 minutes, so the token embedded
-		// in the kubeconfig will always differ from the one stored in Pulumi state.
-		// The provider is still initialized with a fresh token on each run.
 		provider, err := kubernetes.NewProvider(ctx, providerName, &kubernetes.ProviderArgs{
 			Kubeconfig: pulumi.String(kubeconfig),
-		}, pulumi.IgnoreChanges([]string{"kubeconfig"}))
+		})
 		if err != nil {
 			return err
 		}

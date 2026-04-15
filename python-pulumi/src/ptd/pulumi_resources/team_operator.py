@@ -2,6 +2,7 @@ import typing
 
 import pulumi
 import pulumi_kubernetes as kubernetes
+import yaml
 
 import ptd
 import ptd.workload
@@ -75,6 +76,17 @@ class TeamOperator(pulumi.ComponentResource):
             ),
         )
 
+    def _any_site_has_session_labels(self) -> bool:
+        """Return True if any site.yaml in this workload has workbench.sessionLabels set."""
+        for site_name in self.workload.cfg.sites:
+            site_yaml_path = self.workload.site_yaml(site_name)
+            if not site_yaml_path.exists():
+                continue
+            site_dict = yaml.safe_load(site_yaml_path.read_text())
+            if site_dict.get("spec", {}).get("workbench", {}).get("sessionLabels"):
+                return True
+        return False
+
     def _define_helm_release(self):
         # Parse self.image (from _define_image) into repository and tag
         # Format is either "repo@sha256:digest" or "repo:tag"
@@ -133,6 +145,11 @@ class TeamOperator(pulumi.ComponentResource):
             "crd": {
                 "enable": not self.cluster_cfg.team_operator_skip_crds,
                 "keep": True,
+            },
+            # Enable the session group label controller only if at least one site
+            # has workbench.sessionLabels configured in its site.yaml.
+            "sessionGroupLabels": {
+                "enable": self._any_site_has_session_labels(),
             },
         }
 
