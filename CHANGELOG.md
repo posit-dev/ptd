@@ -1,3 +1,16 @@
+# [1.16.0](https://github.com/posit-dev/ptd/compare/v1.15.0...v1.16.0) (2026-04-15)
+
+
+### Bug Fixes
+
+* **justfile:** make codesign conditional on macOS to fix Linux CI ([3520692](https://github.com/posit-dev/ptd/commit/352069291c63034d0c5c05be7131e130fa8bd376))
+* **sites:** use exec plugin kubeconfig to eliminate token-rotation state diffs ([6a815e3](https://github.com/posit-dev/ptd/commit/6a815e3124ae47154cc4a4c103eec2cc67f8eb21))
+
+
+### Features
+
+* add Claude auto-review and PR assistant workflows ([ac2d4b7](https://github.com/posit-dev/ptd/commit/ac2d4b7cb6151baca1c3ac104507608403a49f49))
+
 # [1.15.0](https://github.com/posit-dev/ptd/compare/v1.14.0...v1.15.0) (2026-04-14)
 
 
