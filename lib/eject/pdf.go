@@ -150,6 +150,11 @@ func RenderHandoffPDF(outputPath string, data *HandoffData) error {
 		m.AddRows(row.New(4))
 	}
 
+	// Team Operator
+	att.PdfSection(m, "Team Operator")
+	pdfMultilineParagraph(m, teamOperatorText())
+	m.AddRows(row.New(4))
+
 	// Stack Details
 	att.PdfSection(m, "Stack Details")
 	for _, stack := range data.Stacks {

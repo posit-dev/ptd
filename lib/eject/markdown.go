@@ -50,6 +50,7 @@ var handoffFuncMap = template.FuncMap{
 	"pulumiImportText":       func() string { return pulumiImportText() },
 	"terraformMigrationText": func() string { return terraformMigrationText() },
 	"ptdCommandDescription":  ptdCommandDescription,
+	"teamOperatorText":       func() string { return teamOperatorText() },
 	"arnReconstructionNote":  arnReconstructionNote,
 	"categorizeResources":    ResourcesByCategory,
 	"categoryOrder": func() []string {
@@ -146,6 +147,10 @@ The [PTD CLI](https://github.com/posit-dev/ptd) reads the ptd.yaml and site.yaml
 {{ if .ProductSummary -}}
 {{ .ProductSummary }}
 {{ end }}
+## Team Operator
+
+{{ teamOperatorText }}
+
 ## Stack Details
 {{ range .Stacks }}
 ### {{ .ProjectName }}
