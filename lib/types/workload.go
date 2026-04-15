@@ -35,6 +35,19 @@ type AWSWorkloadClusterSpec struct {
 	EksAccessEntries        *EKSAccessEntriesConfig       `json:"eks_access_entries" yaml:"eks_access_entries"`
 	Components              *AWSWorkloadClusterComponents `json:"components" yaml:"components"`
 	TeamOperatorTolerations []TeamOperatorToleration      `json:"team_operator_tolerations" yaml:"team_operator_tolerations"`
+	// TeamOperatorImage overrides the team-operator container image (repository:tag or repository@digest).
+	// If both TeamOperatorImage and AdhocTeamOperatorImage are set, AdhocTeamOperatorImage takes precedence.
+	// If neither is set, the Helm chart uses its default appVersion.
+	TeamOperatorImage *string `json:"team_operator_image" yaml:"team_operator_image"`
+	// AdhocTeamOperatorImage sets a one-off team-operator image for testing PR builds.
+	// Takes precedence over TeamOperatorImage when set.
+	AdhocTeamOperatorImage *string `json:"adhoc_team_operator_image" yaml:"adhoc_team_operator_image"`
+	// TeamOperatorChartVersion pins the team-operator Helm chart version.
+	// Defaults to clustersDefaultTeamOperatorChartVersion when not set.
+	TeamOperatorChartVersion *string `json:"team_operator_chart_version" yaml:"team_operator_chart_version"`
+	// TeamOperatorSkipCRDs skips CRD installation for the team-operator Helm release.
+	// When true, sets crd.enable=false in Helm values and passes --skip-crds to Helm.
+	TeamOperatorSkipCRDs bool `json:"team_operator_skip_crds" yaml:"team_operator_skip_crds"`
 	// CustomK8sResources lists subfolder names under custom_k8s_resources/ in the workload directory.
 	// Each subfolder's YAML files are applied to this cluster in alphabetical order.
 	CustomK8sResources []string `json:"custom_k8s_resources" yaml:"custom_k8s_resources"`
@@ -155,6 +168,9 @@ type AzureWorkloadConfig struct {
 	Network                             NetworkConfig                         `yaml:"network"`
 	NetworkTrust                        string                                `yaml:"network_trust"`
 	PpmFileShareSizeGib                 int                                   `yaml:"ppm_file_share_size_gib"`
+	// RootDomain, when set, is used as the sole cert-manager domain instead of per-site domains.
+	// Mirrors Python: AzureWorkloadConfig.root_domain (via WorkloadConfig.domains fallback).
+	RootDomain *string `yaml:"root_domain"`
 }
 
 type NetworkConfig struct {
@@ -208,6 +224,19 @@ type AzureWorkloadClusterConfig struct {
 	// Optional: When true, enables AKS ForceUpgrade which bypasses PDB constraints during cluster upgrades.
 	// Use during maintenance windows when you accept disruption to workloads protected by PDBs.
 	ForceMaintenance bool `yaml:"force_maintenance,omitempty"`
+	// TeamOperatorImage overrides the team-operator container image (repository:tag or repository@digest).
+	// If both TeamOperatorImage and AdhocTeamOperatorImage are set, AdhocTeamOperatorImage takes precedence.
+	// If neither is set, the Helm chart uses its default appVersion.
+	TeamOperatorImage *string `yaml:"team_operator_image"`
+	// AdhocTeamOperatorImage sets a one-off team-operator image for testing PR builds.
+	// Takes precedence over TeamOperatorImage when set.
+	AdhocTeamOperatorImage *string `yaml:"adhoc_team_operator_image"`
+	// TeamOperatorChartVersion pins the team-operator Helm chart version.
+	// Defaults to clustersDefaultTeamOperatorChartVersion when not set.
+	TeamOperatorChartVersion *string `yaml:"team_operator_chart_version"`
+	// TeamOperatorSkipCRDs skips CRD installation for the team-operator Helm release.
+	// When true, sets crd.enable=false in Helm values and passes --skip-crds to Helm.
+	TeamOperatorSkipCRDs bool `yaml:"team_operator_skip_crds"`
 	// CustomK8sResources lists subfolder names under custom_k8s_resources/ in the workload directory.
 	// Each subfolder's YAML files are applied to this cluster in alphabetical order.
 	CustomK8sResources []string `yaml:"custom_k8s_resources"`

@@ -555,22 +555,36 @@ func awsClustersDeploy(ctx *pulumi.Context, _ types.Target, params awsClustersPa
 			teamOpTolerations = append(teamOpTolerations, tMap)
 		}
 
-		// Team operator Helm release
+		// Team operator Helm release.
+		// Resolve per-cluster overrides: adhoc image takes precedence over regular image.
+		teamOpChartVersion := clustersDefaultTeamOperatorChartVersion
+		if clusterCfg.TeamOperatorChartVersion != nil && *clusterCfg.TeamOperatorChartVersion != "" {
+			teamOpChartVersion = *clusterCfg.TeamOperatorChartVersion
+		}
+		teamOpImgRepo, teamOpImgTag := resolveTeamOperatorImage(clusterCfg.AdhocTeamOperatorImage, clusterCfg.TeamOperatorImage)
+		teamOpContainerCfg := pulumi.Map{
+			"env": pulumi.Map{
+				"WATCH_NAMESPACES": pulumi.String(clustersPositTeamNamespace),
+				"AWS_REGION":       pulumi.String(params.region),
+			},
+		}
+		if teamOpImgRepo != "" {
+			teamOpContainerCfg["image"] = pulumi.Map{
+				"repository": pulumi.String(teamOpImgRepo),
+				"tag":        pulumi.String(teamOpImgTag),
+			}
+		}
 		_, err = helmv3.NewRelease(ctx, fmt.Sprintf("%s-%s-team-operator", name, release), &helmv3.ReleaseArgs{
 			Name:            pulumi.String("team-operator"),
 			Chart:           pulumi.String("oci://ghcr.io/posit-dev/charts/team-operator"),
-			Version:         pulumi.String(clustersDefaultTeamOperatorChartVersion),
+			Version:         pulumi.String(teamOpChartVersion),
 			Namespace:       pulumi.String(clustersPositTeamSystemNamespace),
 			CreateNamespace: pulumi.Bool(true),
+			SkipCrds:        pulumi.Bool(clusterCfg.TeamOperatorSkipCRDs),
 			Values: pulumi.Map{
 				"controllerManager": pulumi.Map{
-					"replicas": pulumi.Int(1),
-					"container": pulumi.Map{
-						"env": pulumi.Map{
-							"WATCH_NAMESPACES": pulumi.String(clustersPositTeamNamespace),
-							"AWS_REGION":       pulumi.String(params.region),
-						},
-					},
+					"replicas":  pulumi.Int(1),
+					"container": teamOpContainerCfg,
 					"serviceAccount": pulumi.Map{
 						"annotations": pulumi.Map{
 							"eks.amazonaws.com/role-arn": teamOperatorRole.Arn,
@@ -579,7 +593,7 @@ func awsClustersDeploy(ctx *pulumi.Context, _ types.Target, params awsClustersPa
 					"tolerations": teamOpTolerations,
 				},
 				"crd": pulumi.Map{
-					"enable": pulumi.Bool(true),
+					"enable": pulumi.Bool(!clusterCfg.TeamOperatorSkipCRDs),
 					"keep":   pulumi.Bool(true),
 				},
 			},
@@ -607,189 +621,14 @@ func awsClustersDeploy(ctx *pulumi.Context, _ types.Target, params awsClustersPa
 
 		// HelmController CRDs — use untyped resource to include full openAPIV3Schema,
 		// which the Kubernetes API server requires (typed structs omitted the schema).
+		// Schemas are defined in clusters_helpers.go (shared with Azure).
 		_, err = apiextensions.NewCustomResource(ctx, fmt.Sprintf("%s-%s-helmcharts-crd", name, release), &apiextensions.CustomResourceArgs{
 			ApiVersion: pulumi.String("apiextensions.k8s.io/v1"),
 			Kind:       pulumi.String("CustomResourceDefinition"),
 			Metadata: &metav1.ObjectMetaArgs{
 				Name: pulumi.String("helmcharts.helm.cattle.io"),
 			},
-			OtherFields: kubernetes.UntypedArgs{
-				"spec": map[string]interface{}{
-					"group":                 "helm.cattle.io",
-					"preserveUnknownFields": false,
-					"scope":                 "Namespaced",
-					"names": map[string]interface{}{
-						"kind":     "HelmChart",
-						"plural":   "helmcharts",
-						"singular": "helmchart",
-					},
-					"versions": []interface{}{
-						map[string]interface{}{
-							"name":    "v1",
-							"served":  true,
-							"storage": true,
-							"subresources": map[string]interface{}{
-								"status": map[string]interface{}{},
-							},
-							"additionalPrinterColumns": []interface{}{
-								map[string]interface{}{"jsonPath": ".status.jobName", "name": "Job", "type": "string"},
-								map[string]interface{}{"jsonPath": ".spec.chart", "name": "Chart", "type": "string"},
-								map[string]interface{}{"jsonPath": ".spec.targetNamespace", "name": "TargetNamespace", "type": "string"},
-								map[string]interface{}{"jsonPath": ".spec.version", "name": "Version", "type": "string"},
-								map[string]interface{}{"jsonPath": ".spec.repo", "name": "Repo", "type": "string"},
-								map[string]interface{}{"jsonPath": ".spec.helmVersion", "name": "HelmVersion", "type": "string"},
-								map[string]interface{}{"jsonPath": ".spec.bootstrap", "name": "Bootstrap", "type": "string"},
-							},
-							"schema": map[string]interface{}{
-								"openAPIV3Schema": map[string]interface{}{
-									"type": "object",
-									"properties": map[string]interface{}{
-										"spec": map[string]interface{}{
-											"type": "object",
-											"properties": map[string]interface{}{
-												"authPassCredentials":   map[string]interface{}{"type": "boolean"},
-												"authSecret":            map[string]interface{}{"nullable": true, "type": "object", "properties": map[string]interface{}{"name": map[string]interface{}{"nullable": true, "type": "string"}}},
-												"backOffLimit":          map[string]interface{}{"nullable": true, "type": "integer"},
-												"bootstrap":             map[string]interface{}{"type": "boolean"},
-												"chart":                 map[string]interface{}{"nullable": true, "type": "string"},
-												"chartContent":          map[string]interface{}{"nullable": true, "type": "string"},
-												"createNamespace":       map[string]interface{}{"type": "boolean"},
-												"dockerRegistrySecret":  map[string]interface{}{"nullable": true, "type": "object", "properties": map[string]interface{}{"name": map[string]interface{}{"nullable": true, "type": "string"}}},
-												"failurePolicy":         map[string]interface{}{"nullable": true, "type": "string"},
-												"helmVersion":           map[string]interface{}{"nullable": true, "type": "string"},
-												"insecureSkipTLSVerify": map[string]interface{}{"type": "boolean"},
-												"jobImage":              map[string]interface{}{"nullable": true, "type": "string"},
-												"plainHTTP":             map[string]interface{}{"type": "boolean"},
-												"podSecurityContext": map[string]interface{}{
-													"nullable": true,
-													"type":     "object",
-													"properties": map[string]interface{}{
-														"fsGroup":             map[string]interface{}{"nullable": true, "type": "integer"},
-														"fsGroupChangePolicy": map[string]interface{}{"nullable": true, "type": "string"},
-														"runAsGroup":          map[string]interface{}{"nullable": true, "type": "integer"},
-														"runAsNonRoot":        map[string]interface{}{"nullable": true, "type": "boolean"},
-														"runAsUser":           map[string]interface{}{"nullable": true, "type": "integer"},
-														"seLinuxOptions": map[string]interface{}{
-															"nullable": true, "type": "object",
-															"properties": map[string]interface{}{
-																"level": map[string]interface{}{"nullable": true, "type": "string"},
-																"role":  map[string]interface{}{"nullable": true, "type": "string"},
-																"type":  map[string]interface{}{"nullable": true, "type": "string"},
-																"user":  map[string]interface{}{"nullable": true, "type": "string"},
-															},
-														},
-														"seccompProfile": map[string]interface{}{
-															"nullable": true, "type": "object",
-															"properties": map[string]interface{}{
-																"localhostProfile": map[string]interface{}{"nullable": true, "type": "string"},
-																"type":             map[string]interface{}{"nullable": true, "type": "string"},
-															},
-														},
-														"supplementalGroups": map[string]interface{}{
-															"nullable": true, "type": "array",
-															"items": map[string]interface{}{"type": "integer"},
-														},
-														"sysctls": map[string]interface{}{
-															"nullable": true, "type": "array",
-															"items": map[string]interface{}{
-																"type": "object",
-																"properties": map[string]interface{}{
-																	"name":  map[string]interface{}{"nullable": true, "type": "string"},
-																	"value": map[string]interface{}{"nullable": true, "type": "string"},
-																},
-															},
-														},
-														"windowsOptions": map[string]interface{}{
-															"nullable": true, "type": "object",
-															"properties": map[string]interface{}{
-																"gmsaCredentialSpec":     map[string]interface{}{"nullable": true, "type": "string"},
-																"gmsaCredentialSpecName": map[string]interface{}{"nullable": true, "type": "string"},
-																"hostProcess":            map[string]interface{}{"nullable": true, "type": "boolean"},
-																"runAsUserName":          map[string]interface{}{"nullable": true, "type": "string"},
-															},
-														},
-													},
-												},
-												"repo":            map[string]interface{}{"nullable": true, "type": "string"},
-												"repoCA":          map[string]interface{}{"nullable": true, "type": "string"},
-												"repoCAConfigMap": map[string]interface{}{"nullable": true, "type": "object", "properties": map[string]interface{}{"name": map[string]interface{}{"nullable": true, "type": "string"}}},
-												"securityContext": map[string]interface{}{
-													"nullable": true,
-													"type":     "object",
-													"properties": map[string]interface{}{
-														"allowPrivilegeEscalation": map[string]interface{}{"nullable": true, "type": "boolean"},
-														"capabilities": map[string]interface{}{
-															"nullable": true, "type": "object",
-															"properties": map[string]interface{}{
-																"add":  map[string]interface{}{"nullable": true, "type": "array", "items": map[string]interface{}{"nullable": true, "type": "string"}},
-																"drop": map[string]interface{}{"nullable": true, "type": "array", "items": map[string]interface{}{"nullable": true, "type": "string"}},
-															},
-														},
-														"privileged":             map[string]interface{}{"nullable": true, "type": "boolean"},
-														"procMount":              map[string]interface{}{"nullable": true, "type": "string"},
-														"readOnlyRootFilesystem": map[string]interface{}{"nullable": true, "type": "boolean"},
-														"runAsGroup":             map[string]interface{}{"nullable": true, "type": "integer"},
-														"runAsNonRoot":           map[string]interface{}{"nullable": true, "type": "boolean"},
-														"runAsUser":              map[string]interface{}{"nullable": true, "type": "integer"},
-														"seLinuxOptions": map[string]interface{}{
-															"nullable": true, "type": "object",
-															"properties": map[string]interface{}{
-																"level": map[string]interface{}{"nullable": true, "type": "string"},
-																"role":  map[string]interface{}{"nullable": true, "type": "string"},
-																"type":  map[string]interface{}{"nullable": true, "type": "string"},
-																"user":  map[string]interface{}{"nullable": true, "type": "string"},
-															},
-														},
-														"seccompProfile": map[string]interface{}{
-															"nullable": true, "type": "object",
-															"properties": map[string]interface{}{
-																"localhostProfile": map[string]interface{}{"nullable": true, "type": "string"},
-																"type":             map[string]interface{}{"nullable": true, "type": "string"},
-															},
-														},
-														"windowsOptions": map[string]interface{}{
-															"nullable": true, "type": "object",
-															"properties": map[string]interface{}{
-																"gmsaCredentialSpec":     map[string]interface{}{"nullable": true, "type": "string"},
-																"gmsaCredentialSpecName": map[string]interface{}{"nullable": true, "type": "string"},
-																"hostProcess":            map[string]interface{}{"nullable": true, "type": "boolean"},
-																"runAsUserName":          map[string]interface{}{"nullable": true, "type": "string"},
-															},
-														},
-													},
-												},
-												"set":             map[string]interface{}{"nullable": true, "type": "object", "additionalProperties": map[string]interface{}{"x-kubernetes-int-or-string": true}},
-												"targetNamespace": map[string]interface{}{"nullable": true, "type": "string"},
-												"timeout":         map[string]interface{}{"nullable": true, "type": "string"},
-												"valuesContent":   map[string]interface{}{"nullable": true, "type": "string"},
-												"version":         map[string]interface{}{"nullable": true, "type": "string"},
-											},
-										},
-										"status": map[string]interface{}{
-											"type": "object",
-											"properties": map[string]interface{}{
-												"conditions": map[string]interface{}{
-													"nullable": true, "type": "array",
-													"items": map[string]interface{}{
-														"type": "object",
-														"properties": map[string]interface{}{
-															"message": map[string]interface{}{"nullable": true, "type": "string"},
-															"reason":  map[string]interface{}{"nullable": true, "type": "string"},
-															"status":  map[string]interface{}{"nullable": true, "type": "string"},
-															"type":    map[string]interface{}{"nullable": true, "type": "string"},
-														},
-													},
-												},
-												"jobName": map[string]interface{}{"nullable": true, "type": "string"},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			OtherFields: kubernetes.UntypedArgs{"spec": helmChartsCRDSpec},
 		}, k8sProviderOpt, withHelmCtrlAlias())
 		if err != nil {
 			return fmt.Errorf("clusters: failed to create helmcharts CRD for %s: %w", release, err)
@@ -801,39 +640,7 @@ func awsClustersDeploy(ctx *pulumi.Context, _ types.Target, params awsClustersPa
 			Metadata: &metav1.ObjectMetaArgs{
 				Name: pulumi.String("helmchartconfigs.helm.cattle.io"),
 			},
-			OtherFields: kubernetes.UntypedArgs{
-				"spec": map[string]interface{}{
-					"group":                 "helm.cattle.io",
-					"preserveUnknownFields": false,
-					"scope":                 "Namespaced",
-					"names": map[string]interface{}{
-						"kind":     "HelmChartConfig",
-						"plural":   "helmchartconfigs",
-						"singular": "helmchartconfig",
-					},
-					"versions": []interface{}{
-						map[string]interface{}{
-							"name":    "v1",
-							"served":  true,
-							"storage": true,
-							"schema": map[string]interface{}{
-								"openAPIV3Schema": map[string]interface{}{
-									"type": "object",
-									"properties": map[string]interface{}{
-										"spec": map[string]interface{}{
-											"type": "object",
-											"properties": map[string]interface{}{
-												"failurePolicy": map[string]interface{}{"nullable": true, "type": "string"},
-												"valuesContent": map[string]interface{}{"nullable": true, "type": "string"},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			OtherFields: kubernetes.UntypedArgs{"spec": helmChartConfigsCRDSpec},
 		}, k8sProviderOpt, withHelmCtrlAlias())
 		if err != nil {
 			return fmt.Errorf("clusters: failed to create helmchartconfigs CRD for %s: %w", release, err)
