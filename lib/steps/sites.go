@@ -123,7 +123,7 @@ func (s *SitesStep) runAWSInlineGo(ctx context.Context, creds types.Credentials,
 	kubeconfigsByRelease := make(map[string]string, len(cfg.Clusters))
 	for release := range cfg.Clusters {
 		clusterName := s.DstTarget.Name() + "-" + release
-		endpoint, caCert, err := aws.GetClusterInfo(ctx, awsCreds, s.DstTarget.Region(), clusterName)
+		endpoint, caCert, _, err := aws.GetClusterInfo(ctx, awsCreds, s.DstTarget.Region(), clusterName)
 		if err != nil {
 			return fmt.Errorf("sites: failed to get cluster info for %s: %w", clusterName, err)
 		}

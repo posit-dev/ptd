@@ -29,8 +29,8 @@ func GetClusterEndpoint(ctx context.Context, c *Credentials, region string, clus
 	return *output.Cluster.Endpoint, nil
 }
 
-// GetClusterInfo retrieves the endpoint and certificate authority data for an EKS cluster
-func GetClusterInfo(ctx context.Context, c *Credentials, region string, clusterName string) (endpoint string, caCert string, err error) {
+// GetClusterInfo retrieves the endpoint, certificate authority data, and OIDC issuer URL for an EKS cluster.
+func GetClusterInfo(ctx context.Context, c *Credentials, region string, clusterName string) (endpoint string, caCert string, oidcIssuerURL string, err error) {
 	client := eks.New(eks.Options{
 		Region:      region,
 		Credentials: c.credentialsProvider,
@@ -40,12 +40,12 @@ func GetClusterInfo(ctx context.Context, c *Credentials, region string, clusterN
 		Name: aws.String(clusterName),
 	})
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	// Handle nil pointer dereference if CertificateAuthority is nil
 	if output.Cluster == nil || output.Cluster.CertificateAuthority == nil {
-		return "", "", nil
+		return "", "", "", nil
 	}
 
 	endpoint = ""
@@ -58,7 +58,12 @@ func GetClusterInfo(ctx context.Context, c *Credentials, region string, clusterN
 		caCert = *output.Cluster.CertificateAuthority.Data
 	}
 
-	return endpoint, caCert, nil
+	oidcIssuerURL = ""
+	if output.Cluster.Identity != nil && output.Cluster.Identity.Oidc != nil && output.Cluster.Identity.Oidc.Issuer != nil {
+		oidcIssuerURL = *output.Cluster.Identity.Oidc.Issuer
+	}
+
+	return endpoint, caCert, oidcIssuerURL, nil
 }
 
 // GetEKSToken generates an EKS-compatible token using STS presigned URLs
