@@ -1,3 +1,15 @@
+# [1.17.0](https://github.com/posit-dev/ptd/compare/v1.16.0...v1.17.0) (2026-04-15)
+
+
+### Bug Fixes
+
+* **clusters:** address PR review — feature gaps and deduplication ([619227e](https://github.com/posit-dev/ptd/commit/619227ec573e883864cf23aaea0628518c628800))
+
+
+### Features
+
+* rewrite clusters step in Go, retire Python implementation ([1da055e](https://github.com/posit-dev/ptd/commit/1da055e22d17fb592aaf6ba2369ae33949b9b52d))
+
 # [1.16.0](https://github.com/posit-dev/ptd/compare/v1.15.0...v1.16.0) (2026-04-15)
 
 
