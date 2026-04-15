@@ -198,7 +198,7 @@ test-e2e URL="":
 cli:
   mkdir -p .local/bin
   goreleaser build --single-target --snapshot --clean -o .local/bin/ptd
-  @codesign --force --sign - .local/bin/ptd 2>/dev/null
+  {{ if os() == "macos" { "codesign --force --sign - .local/bin/ptd 2>/dev/null" } else { "true" } }}
 
 #############################################################################
 # Check targets
