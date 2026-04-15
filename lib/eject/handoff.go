@@ -45,17 +45,17 @@ var OrderedCategories = []struct {
 func CategorizeResource(resourceType string) string {
 	lower := strings.ToLower(resourceType)
 
-	// Network
-	for _, keyword := range []string{"vpc", "subnet", "securitygroup", "loadbalancer", "natgateway", "internetgateway", "routetable", "eip", "networkinterface", "vnet", "nsg", "publicip"} {
-		if strings.Contains(lower, keyword) {
-			return CategoryNetwork
-		}
-	}
-
-	// Database
+	// Database (checked before Network so "rds/subnetGroup" matches "rds" not "subnet")
 	for _, keyword := range []string{"rds", "dbinstance", "dbcluster", "dbsubnetgroup", "dbparametergroup", "postgresql", "flexibleserver"} {
 		if strings.Contains(lower, keyword) {
 			return CategoryDatabase
+		}
+	}
+
+	// Network
+	for _, keyword := range []string{"vpc", "virtualnetwork", "subnet", "securitygroup", "loadbalancer", "natgateway", "internetgateway", "routetable", "eip", "networkinterface", "vnet", "nsg", "publicip"} {
+		if strings.Contains(lower, keyword) {
+			return CategoryNetwork
 		}
 	}
 
