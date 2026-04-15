@@ -50,7 +50,16 @@ type NamedUser struct {
 
 // User represents user configuration
 type User struct {
-	Token string `yaml:"token"`
+	Token string      `yaml:"token,omitempty"`
+	Exec  *ExecConfig `yaml:"exec,omitempty"`
+}
+
+// ExecConfig represents a client-go exec credential plugin
+type ExecConfig struct {
+	APIVersion      string   `yaml:"apiVersion"`
+	Command         string   `yaml:"command"`
+	Args            []string `yaml:"args,omitempty"`
+	InteractiveMode string   `yaml:"interactiveMode,omitempty"`
 }
 
 // BuildEKSKubeConfig builds a KubeConfig for an EKS cluster
@@ -82,6 +91,49 @@ func BuildEKSKubeConfig(endpoint, caCert, token, clusterName string) KubeConfig 
 				Name: clusterName,
 				User: User{
 					Token: token,
+				},
+			},
+		},
+	}
+}
+
+// BuildEKSKubeConfigWithExec builds a KubeConfig that uses the AWS CLI exec
+// credential plugin to obtain fresh tokens on every API call. The resulting
+// kubeconfig contains no embedded token, so it is stable across runs and
+// produces no Pulumi state diff on token rotation.
+func BuildEKSKubeConfigWithExec(endpoint, caCert, clusterName, region string) KubeConfig {
+	return KubeConfig{
+		APIVersion: "v1",
+		Kind:       "Config",
+		Clusters: []NamedCluster{
+			{
+				Name: clusterName,
+				Cluster: Cluster{
+					Server:                   endpoint,
+					CertificateAuthorityData: caCert,
+				},
+			},
+		},
+		Contexts: []NamedContext{
+			{
+				Name: clusterName,
+				Context: Context{
+					Cluster: clusterName,
+					User:    clusterName,
+				},
+			},
+		},
+		CurrentContext: clusterName,
+		Users: []NamedUser{
+			{
+				Name: clusterName,
+				User: User{
+					Exec: &ExecConfig{
+						APIVersion:      "client.authentication.k8s.io/v1beta1",
+						Command:         "aws",
+						Args:            []string{"--region", region, "eks", "get-token", "--cluster-name", clusterName},
+						InteractiveMode: "Never",
+					},
 				},
 			},
 		},
