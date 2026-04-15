@@ -43,26 +43,27 @@ func severancePlanLiveText() string {
 }
 
 func pulumiOwnershipText(cloud string, targetName string) string {
+	backend := StateBackendURL(cloud, targetName)
 	if cloud == "azure" {
 		return fmt.Sprintf("Pulumi state is stored in Azure Blob Storage (storage account %s). "+
 			"To manage stacks directly:\n\n"+
 			"1. Install the Pulumi CLI: https://www.pulumi.com/docs/install/\n"+
-			"2. Set the backend: `pulumi login azblob://<container>?storage_account=%s`\n"+
+			"2. Set the backend: `pulumi login %s`\n"+
 			"3. Select a stack: `pulumi stack select <project>/<stack>`\n"+
 			"4. View resources: `pulumi stack export | jq '.deployment.resources | length'`\n\n"+
-			"Secrets in state are encrypted with Azure Key Vault key **posit-team-dedicated**. "+
+			"Secrets in state are encrypted with Azure Key Vault key **"+AzureKeyVaultName+"**. "+
 			"Access to the Key Vault is required to read or modify encrypted values.",
-			targetName, targetName)
+			targetName, backend)
 	}
-	return fmt.Sprintf("Pulumi state is stored in S3 at s3://ptd-%s/.pulumi/stacks/. "+
+	return fmt.Sprintf("Pulumi state is stored in S3 at %s/.pulumi/stacks/. "+
 		"To manage stacks directly:\n\n"+
 		"1. Install the Pulumi CLI: https://www.pulumi.com/docs/install/\n"+
-		"2. Set the backend: `pulumi login s3://ptd-%s`\n"+
+		"2. Set the backend: `pulumi login %s`\n"+
 		"3. Select a stack: `pulumi stack select <project>/<stack>`\n"+
 		"4. View resources: `pulumi stack export | jq '.deployment.resources | length'`\n\n"+
-		"Secrets in state are encrypted with AWS KMS key **alias/posit-team-dedicated**. "+
+		"Secrets in state are encrypted with AWS KMS key **"+AWSKMSKeyAlias+"**. "+
 		"IAM access to the KMS key is required to read or modify encrypted values.",
-		targetName, targetName)
+		backend, backend)
 }
 
 func pulumiImportText() string {
@@ -113,6 +114,8 @@ func arnReconstructionNote(cloud string, accountID string, region string) string
 		region, accountID)
 }
 
+// ptdCommandDescription returns a human-readable description of what a PTD step does.
+// When adding a new standard step to lib/steps/, add a case here too.
 func ptdCommandDescription(stepName string) string {
 	switch stepName {
 	case "persistent":

@@ -1,6 +1,7 @@
 package eject
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/posit-dev/ptd/lib/attestation"
@@ -25,6 +26,20 @@ const (
 	CategoryIAM      = "IAM"
 	CategoryOther    = "Other"
 )
+
+// OrderedCategories defines the display order and titles for resource categories.
+// Both the PDF and markdown renderers consume this list.
+var OrderedCategories = []struct {
+	Category string
+	Title    string
+}{
+	{CategoryNetwork, "Network Topology"},
+	{CategoryDatabase, "Database"},
+	{CategoryStorage, "Storage"},
+	{CategoryDNS, "DNS"},
+	{CategoryIAM, "IAM"},
+	{CategoryOther, "Other"},
+}
 
 // CategorizeResource maps a Pulumi resource type to a handoff document category.
 func CategorizeResource(resourceType string) string {
@@ -66,6 +81,19 @@ func CategorizeResource(resourceType string) string {
 	}
 
 	return CategoryOther
+}
+
+const (
+	AWSKMSKeyAlias    = "alias/posit-team-dedicated"
+	AzureKeyVaultName = "posit-team-dedicated"
+)
+
+// StateBackendURL returns the Pulumi state backend URL for a given cloud and target.
+func StateBackendURL(cloud, targetName string) string {
+	if cloud == "azure" {
+		return fmt.Sprintf("azblob://<container>?storage_account=%s", targetName)
+	}
+	return fmt.Sprintf("s3://ptd-%s", targetName)
 }
 
 // ResourcesByCategory groups resource inventory entries by their document category.

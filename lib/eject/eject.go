@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/posit-dev/ptd/lib/attestation"
 	"github.com/posit-dev/ptd/lib/helpers"
@@ -83,18 +84,8 @@ func collectAndRenderHandoff(ctx context.Context, t types.Target, opts Options, 
 	)
 
 	slog.Info("Building resource inventory")
-	creds, err := t.Credentials(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get credentials for resource inventory: %w", err)
-	}
-
-	stateFiles, err := attestation.DownloadStateFiles(ctx, creds, t)
-	if err != nil {
-		return fmt.Errorf("failed to download state files: %w", err)
-	}
-
 	var allResources []ResourceInventoryEntry
-	for key, data := range stateFiles {
+	for key, data := range attData.RawStateFiles {
 		entries, err := ParseResourceInventory(data, key)
 		if err != nil {
 			slog.Warn("Failed to parse resource inventory for state file", "key", key, "error", err)
@@ -114,6 +105,10 @@ func collectAndRenderHandoff(ctx context.Context, t types.Target, opts Options, 
 		Secrets:         secrets,
 		DryRun:          opts.DryRun,
 	}
+
+	sort.Slice(handoff.Stacks, func(i, j int) bool {
+		return attestation.StackOrder(handoff.Stacks[i].ProjectName) < attestation.StackOrder(handoff.Stacks[j].ProjectName)
+	})
 
 	baseName := fmt.Sprintf("%s_handoff", opts.TargetName)
 	pdfPath := filepath.Join(opts.OutputDir, baseName+".pdf")
