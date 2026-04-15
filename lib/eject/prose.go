@@ -114,6 +114,27 @@ func arnReconstructionNote(cloud string, accountID string, region string) string
 		region, accountID)
 }
 
+func teamOperatorText() string {
+	return "Posit products on this cluster are managed by the Team Operator, " +
+		"an open-source Kubernetes operator maintained by Posit " +
+		"(https://github.com/posit-dev/team-operator). PTD installs " +
+		"the operator via its Helm chart during the clusters step, and " +
+		"the sites step applies a Site custom resource that declares " +
+		"which products to run, their versions, domains, and authentication " +
+		"configuration.\n\n" +
+		"The Team Operator watches the Site resource and reconciles it " +
+		"into the underlying Kubernetes objects — Deployments, Services, " +
+		"ConfigMaps, Secrets, and Ingress routes — for each enabled product. " +
+		"It also handles database provisioning, shared storage, and credential " +
+		"management. Changes to product configuration flow through the Site " +
+		"custom resource: updating the Site spec triggers the operator to " +
+		"converge the cluster to the new desired state.\n\n" +
+		"Post-handoff, the Team Operator continues to run in the cluster. " +
+		"Product configuration changes can be made by editing the Site " +
+		"resource directly with kubectl, or by updating the site.yaml and " +
+		"re-running the sites step."
+}
+
 // ptdCommandDescription returns a human-readable description of what a PTD step does.
 // When adding a new standard step to lib/steps/, add a case here too.
 func ptdCommandDescription(stepName string) string {
