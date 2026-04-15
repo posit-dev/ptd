@@ -8,7 +8,7 @@ import ptd
 import ptd.workload
 
 # Default Helm chart version (OCI charts require explicit version, no "latest")
-DEFAULT_CHART_VERSION = "v1.16.2"
+DEFAULT_CHART_VERSION = "v1.23.1"
 
 
 class TeamOperator(pulumi.ComponentResource):
