@@ -33,6 +33,7 @@ type AttestationData struct {
 	ClusterConfig  map[string]interface{} `json:"cluster_config"`
 	Infra          *InfraConfig           `json:"infra"`
 	ProductSummary string                 `json:"product_summary"`
+	RawStateFiles  map[string][]byte      `json:"-"`
 }
 
 // SiteInfo contains information extracted from a site.yaml file
@@ -92,14 +93,18 @@ var stackPurposes = map[string]map[string]string{
 	},
 }
 
-// StepNameFromProject extracts the step name from a project name like "ptd-aws-workload-post-clusters"
-func (s *StackSummary) StepNameFromProject() string {
-	// Strip "ptd-{cloud}-{type}-" prefix to get the step name
-	parts := strings.SplitN(s.ProjectName, "-", 4)
+// StepNameFromProjectName extracts the step name from a Pulumi project name like "ptd-aws-workload-persistent".
+func StepNameFromProjectName(projectName string) string {
+	parts := strings.SplitN(projectName, "-", 4)
 	if len(parts) >= 4 {
 		return parts[3]
 	}
-	return s.ProjectName
+	return projectName
+}
+
+// StepNameFromProject extracts the step name from this stack's project name.
+func (s *StackSummary) StepNameFromProject() string {
+	return StepNameFromProjectName(s.ProjectName)
 }
 
 func purposeForStack(projectName string, cloud string) string {
@@ -244,10 +249,11 @@ func Collect(ctx context.Context, target types.Target, workloadPath string) (*At
 	}
 
 	// List and download Pulumi state files from S3
-	stacks, err := collectStackSummaries(ctx, creds, target)
+	stacks, rawStateFiles, err := collectStackSummaries(ctx, creds, target)
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect stack summaries: %w", err)
 	}
+	attestation.RawStateFiles = rawStateFiles
 	// Set purpose descriptions: custom step descriptions take priority
 	customDescriptions := make(map[string]string)
 	for _, cs := range attestation.CustomSteps {
@@ -682,21 +688,21 @@ func DownloadStateFiles(ctx context.Context, creds types.Credentials, target typ
 
 // collectStackSummaries fetches Pulumi state files and extracts summaries.
 // Supports both AWS (S3) and Azure (Blob Storage) backends.
-func collectStackSummaries(ctx context.Context, creds types.Credentials, target types.Target) ([]StackSummary, error) {
+func collectStackSummaries(ctx context.Context, creds types.Credentials, target types.Target) ([]StackSummary, map[string][]byte, error) {
 	files, err := DownloadStateFiles(ctx, creds, target)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var summaries []StackSummary
 	for key, data := range files {
 		summary, err := parseStateFile(data, key)
 		if err != nil {
-			return nil, fmt.Errorf("failed to process state file %s: %w", key, err)
+			return nil, nil, fmt.Errorf("failed to process state file %s: %w", key, err)
 		}
 		summaries = append(summaries, summary)
 	}
-	return summaries, nil
+	return summaries, files, nil
 }
 
 // parseStateFile parses a Pulumi state file from raw JSON bytes.

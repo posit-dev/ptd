@@ -3,7 +3,6 @@ package eject
 import (
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 	"text/template"
 	"time"
@@ -37,23 +36,11 @@ var handoffFuncMap = template.FuncMap{
 		}
 		return false
 	},
-	"shortType": func(pulumiType string) string {
-		parts := strings.SplitN(pulumiType, ":", 2)
-		if len(parts) == 2 {
-			return parts[1]
-		}
-		return pulumiType
-	},
+	"shortType": shortType,
 	"compactID": compactPhysicalID,
 	"stackProse": func(stack att.StackSummary, infra *att.InfraConfig) string {
 		stepName := stack.StepNameFromProject()
 		return att.GenerateStackProse(stepName, infra)
-	},
-	"stateBackend": func(cloud string, targetName string) string {
-		if cloud == "azure" {
-			return fmt.Sprintf("azblob://<container>?storage_account=%s", targetName)
-		}
-		return fmt.Sprintf("s3://ptd-%s/.pulumi/stacks/", targetName)
 	},
 	"overviewText":           overviewText,
 	"ownershipOptionsText":   func() string { return ownershipOptionsText() },
@@ -66,19 +53,17 @@ var handoffFuncMap = template.FuncMap{
 	"arnReconstructionNote":  arnReconstructionNote,
 	"categorizeResources":    ResourcesByCategory,
 	"categoryOrder": func() []string {
-		return []string{CategoryNetwork, CategoryDatabase, CategoryStorage, CategoryDNS, CategoryIAM, CategoryOther}
+		cats := make([]string, len(OrderedCategories))
+		for i, c := range OrderedCategories {
+			cats[i] = c.Category
+		}
+		return cats
 	},
 	"categoryTitle": func(cat string) string {
-		titles := map[string]string{
-			CategoryNetwork:  "Network Topology",
-			CategoryDatabase: "Database",
-			CategoryStorage:  "Storage",
-			CategoryDNS:      "DNS",
-			CategoryIAM:      "IAM",
-			CategoryOther:    "Other",
-		}
-		if t, ok := titles[cat]; ok {
-			return t
+		for _, c := range OrderedCategories {
+			if c.Category == cat {
+				return c.Title
+			}
 		}
 		return cat
 	},
@@ -129,7 +114,7 @@ var handoffTemplate = template.Must(template.New("handoff").Funcs(handoffFuncMap
 
 ### Continuing with the PTD CLI
 
-The PTD CLI reads the ptd.yaml and site.yaml configuration files included in this bundle and converges infrastructure to match the declared state. Each infrastructure layer corresponds to a Pulumi step that can be run independently:
+The [PTD CLI](https://github.com/posit-dev/ptd) reads the ptd.yaml and site.yaml configuration files included in this bundle and converges infrastructure to match the declared state. Use ` + "`--help`" + ` on any command to see available options and usage details. Each infrastructure layer corresponds to a Pulumi step that can be run independently:
 
 | Command | Description |
 |---|---|
@@ -242,10 +227,6 @@ This inventory is a snapshot taken at the time of the eject operation. For an ac
 
 // RenderHandoffMarkdown writes the eject handoff data as a Markdown document to the given writer.
 func RenderHandoffMarkdown(w io.Writer, data *HandoffData) error {
-	sort.Slice(data.Stacks, func(i, j int) bool {
-		return att.StackOrder(data.Stacks[i].ProjectName) < att.StackOrder(data.Stacks[j].ProjectName)
-	})
-
 	return handoffTemplate.Execute(w, data)
 }
 

@@ -2,7 +2,6 @@ package eject
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/johnfercher/maroto/v2"
@@ -22,10 +21,6 @@ import (
 
 // RenderHandoffPDF generates the eject handoff PDF and writes it to the given path.
 func RenderHandoffPDF(outputPath string, data *HandoffData) error {
-	sort.Slice(data.Stacks, func(i, j int) bool {
-		return att.StackOrder(data.Stacks[i].ProjectName) < att.StackOrder(data.Stacks[j].ProjectName)
-	})
-
 	cfg := config.NewBuilder().
 		WithPageNumber(props.PageNumber{
 			Pattern: "Page {current} of {total}",
@@ -105,7 +100,7 @@ func RenderHandoffPDF(outputPath string, data *HandoffData) error {
 
 	// Continuing with the PTD CLI
 	att.PdfSubSection(m, "Continuing with the PTD CLI")
-	att.PdfParagraph(m, "The PTD CLI reads the ptd.yaml and site.yaml configuration files included in this bundle and converges infrastructure to match the declared state. Each infrastructure layer corresponds to a Pulumi step that can be run independently:")
+	att.PdfParagraph(m, "The PTD CLI (https://github.com/posit-dev/ptd) reads the ptd.yaml and site.yaml configuration files included in this bundle and converges infrastructure to match the declared state. Use --help on any command to see available options and usage details. Each infrastructure layer corresponds to a Pulumi step that can be run independently:")
 	m.AddRows(row.New(3))
 
 	m.AddRows(wrappingTableHeader([]string{"Command", "Description"}, []int{5, 7}))
@@ -234,23 +229,12 @@ func RenderHandoffPDF(outputPath string, data *HandoffData) error {
 		m.AddRows(row.New(4))
 
 		categorized := ResourcesByCategory(data.Resources)
-		categoryOrder := []struct {
-			category string
-			title    string
-		}{
-			{CategoryNetwork, "Network Topology"},
-			{CategoryDatabase, "Database"},
-			{CategoryStorage, "Storage"},
-			{CategoryDNS, "DNS"},
-			{CategoryIAM, "IAM"},
-			{CategoryOther, "Other"},
-		}
-		for _, cat := range categoryOrder {
-			resources := categorized[cat.category]
+		for _, cat := range OrderedCategories {
+			resources := categorized[cat.Category]
 			if len(resources) == 0 {
 				continue
 			}
-			att.PdfSubSection(m, cat.title)
+			att.PdfSubSection(m, cat.Title)
 			m.AddRows(wrappingTableHeader([]string{"Type", "Physical ID", "Stack"}, []int{3, 7, 2}))
 			for _, r := range resources {
 				m.AddRows(wrappingTableRow([]string{shortType(r.Type), compactPhysicalID(r.PhysicalID), r.Purpose}, []int{3, 7, 2}))
