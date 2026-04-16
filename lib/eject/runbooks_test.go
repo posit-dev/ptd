@@ -129,7 +129,7 @@ func TestRunbook_DisasterRecovery_AWS_Content(t *testing.T) {
 	assert.Contains(t, dr, "ptd-acme-prod")
 	assert.Contains(t, dr, "aws rds restore-db-instance-to-point-in-time")
 	assert.Contains(t, dr, "aws fsx describe-backups")
-	assert.Contains(t, dr, "aws s3api list-object-versions")
+	assert.Contains(t, dr, "S3 data buckets have no versioning")
 	assert.Contains(t, dr, "ptd ensure acme-prod --only-steps eks")
 }
 
@@ -141,7 +141,7 @@ func TestRunbook_DisasterRecovery_Azure_Content(t *testing.T) {
 
 	assert.Contains(t, dr, "Azure Blob Storage")
 	assert.Contains(t, dr, "az postgres flexible-server restore")
-	assert.Contains(t, dr, "az snapshot list")
+	assert.Contains(t, dr, "Azure storage has no versioning or soft delete")
 	assert.Contains(t, dr, "rsg-ptd-contoso-staging")
 	assert.Contains(t, dr, "ptd ensure contoso-staging --only-steps aks")
 }
@@ -156,7 +156,7 @@ func TestRunbook_DisasterRecovery_AWS_SitesRendered(t *testing.T) {
 	assert.Contains(t, dr, "dig dev.acme.com")
 }
 
-func TestRunbooks_NoAutoApply(t *testing.T) {
+func TestRunbooks_NoBannedFlags(t *testing.T) {
 	for _, cloud := range []string{"aws", "azure"} {
 		t.Run(cloud, func(t *testing.T) {
 			data := &RunbookData{
@@ -175,6 +175,8 @@ func TestRunbooks_NoAutoApply(t *testing.T) {
 			for filename, content := range results {
 				assert.NotContains(t, content, "--auto-apply",
 					"%s for %s should not contain --auto-apply", filename, cloud)
+				assert.NotContains(t, content, "--dry-run",
+					"%s for %s should not contain --dry-run", filename, cloud)
 			}
 		})
 	}
@@ -258,32 +260,18 @@ func TestRunbook_DayToDayOps_PtdWorkonCommands(t *testing.T) {
 	assert.Contains(t, ops, "ptd workon acme-prod --")
 }
 
-func TestRunbook_DisasterRecovery_FullRebuildOrder(t *testing.T) {
+func TestRunbook_DisasterRecovery_FullRebuild(t *testing.T) {
 	results, err := GenerateRunbooks(awsRunbookData())
 	require.NoError(t, err)
 
 	dr := results["disaster-recovery.md"]
 
-	// Extract only the Full Environment Rebuild section to avoid matching
-	// commands that appear earlier in the document.
 	rebuildStart := strings.Index(dr, "## Full Environment Rebuild")
 	require.Greater(t, rebuildStart, 0, "should contain Full Environment Rebuild section")
 	rebuild := dr[rebuildStart:]
 
-	bootstrapIdx := strings.Index(rebuild, "ptd ensure acme-prod --only-steps bootstrap\n")
-	persistentIdx := strings.Index(rebuild, "ptd ensure acme-prod --only-steps persistent\n")
-	postgresIdx := strings.Index(rebuild, "ptd ensure acme-prod --only-steps postgres_config\n")
-	eksIdx := strings.Index(rebuild, "ptd ensure acme-prod --only-steps eks\n")
-	clustersIdx := strings.Index(rebuild, "ptd ensure acme-prod --only-steps clusters\n")
-	helmIdx := strings.Index(rebuild, "ptd ensure acme-prod --only-steps helm\n")
-	sitesIdx := strings.Index(rebuild, "ptd ensure acme-prod --only-steps sites\n")
-
-	assert.Greater(t, persistentIdx, bootstrapIdx, "persistent should come after bootstrap")
-	assert.Greater(t, postgresIdx, persistentIdx, "postgres_config should come after persistent")
-	assert.Greater(t, eksIdx, postgresIdx, "eks should come after postgres_config")
-	assert.Greater(t, clustersIdx, eksIdx, "clusters should come after eks")
-	assert.Greater(t, helmIdx, clustersIdx, "helm should come after clusters")
-	assert.Greater(t, sitesIdx, helmIdx, "sites should come after helm")
+	assert.Contains(t, rebuild, "ptd ensure acme-prod\n")
+	assert.NotContains(t, rebuild, "--only-steps", "full rebuild should run all steps, not individual ones")
 }
 
 func TestRunbook_AWS_ClusterNameRendered(t *testing.T) {
