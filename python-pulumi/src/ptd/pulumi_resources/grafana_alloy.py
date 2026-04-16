@@ -519,7 +519,10 @@ class AlloyConfig(pulumi.ComponentResource):
         name: str,
         namespace: str,
     ):
-        control_room_url = f"https://mimir.{self.workload.cfg.control_room_domain}/api/v1/push"
+        has_control_room = bool(self.workload.cfg.control_room_domain)
+        control_room_url = (
+            f"https://mimir.{self.workload.cfg.control_room_domain}/api/v1/push" if has_control_room else None
+        )
         workload_url = "http://mimir-gateway.mimir.svc.cluster.local/api/v1/push"
         loki_url = "http://loki-gateway.loki.svc.cluster.local/loki/api/v1/push"
 
@@ -558,6 +561,24 @@ class AlloyConfig(pulumi.ComponentResource):
                     path = "{self.journal_path}"
                 }}
             """)
+
+        control_room_remote_write = ""
+        if has_control_room:
+            control_room_remote_write = f"""prometheus.remote_write "control_room" {{
+                    external_labels = {{
+                        tenant_name = "{tenant_name}",
+                    }}
+                    endpoint {{
+                        url = "{control_room_url}"
+                        basic_auth {{
+                            username = "{self.workload.compound_name}"
+                            password_file = "/etc/mimir/password"
+                        }}
+                        headers = {{
+                            "X-Scope-OrgID" = "{account_id}",
+                        }}
+                    }}
+                }}"""
 
         alloy_config = textwrap.dedent(
             f"""
@@ -679,7 +700,7 @@ class AlloyConfig(pulumi.ComponentResource):
 
                 prometheus.relabel "default" {{
                     forward_to = [
-                        prometheus.remote_write.control_room.receiver,
+                        {"prometheus.remote_write.control_room.receiver," if has_control_room else ""}
                         prometheus.remote_write.workload.receiver,
                     ]
 
@@ -690,22 +711,7 @@ class AlloyConfig(pulumi.ComponentResource):
                     }}
                 }}
 
-                prometheus.remote_write "control_room" {{
-                    external_labels = {{
-                        tenant_name = "{tenant_name}",
-                    }}
-                    endpoint {{
-                        url = "{control_room_url}"
-                        basic_auth {{
-                            username = "{self.workload.compound_name}"
-                            password_file = "/etc/mimir/password"
-                        }}
-                        headers = {{
-                            "X-Scope-OrgID" = "{account_id}",
-                        }}
-                    }}
-                }}
-
+                {control_room_remote_write}
                 prometheus.remote_write "workload" {{
                     external_labels = {{
                         tenant_name = "{tenant_name}",
