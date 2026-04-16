@@ -167,6 +167,7 @@ type AzureWorkloadConfig struct {
 	ThirdPartyTelemetryEnabled          *bool                                 `yaml:"third_party_telemetry_enabled,omitempty"`
 	Network                             NetworkConfig                         `yaml:"network"`
 	NetworkTrust                        string                                `yaml:"network_trust"`
+	NvidiaGpuEnabled                    bool                                  `yaml:"nvidia_gpu_enabled"`
 	PpmFileShareSizeGib                 int                                   `yaml:"ppm_file_share_size_gib"`
 	// RootDomain, when set, is used as the sole cert-manager domain instead of per-site domains.
 	// Mirrors Python: AzureWorkloadConfig.root_domain (via WorkloadConfig.domains fallback).
@@ -244,6 +245,7 @@ type AzureWorkloadClusterConfig struct {
 
 type AzureWorkloadClusterComponentConfig struct {
 	SecretStoreCsiDriverAzureProviderVersion string `yaml:"secret_store_csi_driver_azure_provider_version"`
+	NvidiaDevicePluginVersion                string `yaml:"nvidia_device_plugin_version"`
 }
 
 type SiteConfig struct {
