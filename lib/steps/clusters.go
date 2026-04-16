@@ -16,7 +16,7 @@ const (
 	// clustersTeamOperatorServiceAccount is the Helm chart default service account name.
 	clustersTeamOperatorServiceAccount = "team-operator-controller-manager"
 	// clustersDefaultTeamOperatorChartVersion is used when no chart version is configured.
-	clustersDefaultTeamOperatorChartVersion = "v1.23.0"
+	clustersDefaultTeamOperatorChartVersion = "v1.23.1"
 	// clustersTraefikForwardAuthSA matches the Python Roles.TRAEFIK_FORWARD_AUTH value.
 	clustersTraefikForwardAuthSA = "traefik-forward-auth.posit.team"
 
