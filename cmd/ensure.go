@@ -136,9 +136,13 @@ func runEnsure(ctx context.Context, target string) {
 			slog.Error("Could not load relevant ptd.yaml file", "error", err)
 			return
 		}
+		if controlRoomTarget == nil {
+			slog.Info("No control room configured for workload, skipping control room operations")
+		}
 	}
 
 	// set options on each step before checking if proxy is required
+	// controlRoomTarget may be nil for ejected workloads — steps must tolerate this
 	for _, step := range stepsToRun {
 		step.Set(t, controlRoomTarget, steps.StepOptions{
 			DryRun:            DryRun,
