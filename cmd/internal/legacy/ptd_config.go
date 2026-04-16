@@ -164,26 +164,34 @@ func ControlRoomTargetFromName(target string) (t types.Target, err error) {
 	case types.AWSControlRoomConfig:
 		return nil, fmt.Errorf("cannot create control room target from control room config")
 	case types.AzureWorkloadConfig:
+		c := conf.(types.AzureWorkloadConfig)
+		if c.ControlRoomClusterName == "" {
+			return nil, nil
+		}
 		return aws.NewTarget(
-			conf.(types.AzureWorkloadConfig).ControlRoomClusterName,
-			conf.(types.AzureWorkloadConfig).ControlRoomAccountID,
+			c.ControlRoomClusterName,
+			c.ControlRoomAccountID,
 			"",  // profile is not relevant for control room targets
 			nil, // customRole is not relevant for control room targets
-			conf.(types.AzureWorkloadConfig).ControlRoomRegion,
+			c.ControlRoomRegion,
 			true,  // isControlRoom
 			false, // tailscaleEnabled isn't relevant for control room.
 			false, // createAdminPolicyAsResource is not relevant for control room targets
 			nil,
 			nil), nil
 	case types.AWSWorkloadConfig:
+		c := conf.(types.AWSWorkloadConfig)
+		if c.ControlRoomClusterName == "" {
+			return nil, nil
+		}
 		return aws.NewTarget(
-			conf.(types.AWSWorkloadConfig).ControlRoomClusterName,
-			conf.(types.AWSWorkloadConfig).ControlRoomAccountID,
+			c.ControlRoomClusterName,
+			c.ControlRoomAccountID,
 			"",  // profile is not used for control room targets
 			nil, // customRole is not used for control room targets
-			conf.(types.AWSWorkloadConfig).ControlRoomRegion,
+			c.ControlRoomRegion,
 			true, // isControlRoom
-			conf.(types.AWSWorkloadConfig).TailscaleEnabled,
+			c.TailscaleEnabled,
 			false, // createAdminPolicyAsResource is not relevant for control room targets
 			nil,
 			nil), nil
