@@ -40,6 +40,7 @@ func Run(ctx context.Context, t types.Target, opts Options) error {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
+	// TODO: serialize bundle to disk once all steps (inventory, secrets, state export) are wired
 	bundle := &Bundle{}
 
 	config, err := opts.configLoader()(t)
@@ -65,13 +66,17 @@ func Run(ctx context.Context, t types.Target, opts Options) error {
 		slog.Info("Copied workload config", "from", opts.WorkloadPath)
 	}
 
-	metadata := CollectMetadata(config, opts, time.Now())
+	metadata, err := CollectMetadata(config, opts, time.Now())
+	if err != nil {
+		return fmt.Errorf("failed to collect metadata: %w", err)
+	}
 	if err := WriteMetadata(metadata, opts.OutputDir); err != nil {
 		return fmt.Errorf("failed to write metadata: %w", err)
 	}
 	slog.Info("Wrote metadata.json")
 
-	if err := WriteReadme(metadata, opts.OutputDir); err != nil {
+	hasConfig := opts.WorkloadPath != ""
+	if err := WriteReadme(metadata, hasConfig, opts.OutputDir); err != nil {
 		return fmt.Errorf("failed to write README: %w", err)
 	}
 	slog.Info("Wrote README.md")

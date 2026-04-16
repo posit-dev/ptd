@@ -6,17 +6,26 @@ import (
 	"path/filepath"
 )
 
-func WriteReadme(metadata *Metadata, outputDir string) error {
-	content := generateReadme(metadata)
+func WriteReadme(metadata *Metadata, hasConfig bool, outputDir string) error {
+	content := generateReadme(metadata, hasConfig)
 	return os.WriteFile(filepath.Join(outputDir, "README.md"), []byte(content), 0644)
 }
 
-func generateReadme(m *Metadata) string {
+func generateReadme(m *Metadata, hasConfig bool) string {
 	dryRunNote := ""
 	if m.DryRun {
 		dryRunNote = `
 > **Dry-run mode**: This bundle was generated without modifying any infrastructure.
 > No control room connections were severed.
+`
+	}
+
+	configRows := ""
+	if hasConfig {
+		configRows = `| config/ | Workload configuration files |
+| config/ptd.yaml | Main workload configuration (control_room fields annotated for severance) |
+| config/site_*/site.yaml | Per-site product configuration |
+| config/customizations/ | Custom Pulumi steps (source + manifest) |
 `
 	}
 
@@ -30,9 +39,5 @@ Generated on %s by PTD CLI %s.
 |------|-------------|
 | README.md | This file |
 | metadata.json | Machine-readable context about this eject run |
-| config/ | Workload configuration files |
-| config/ptd.yaml | Main workload configuration (control_room fields annotated for severance) |
-| config/site_*/site.yaml | Per-site product configuration |
-| config/customizations/ | Custom Pulumi steps (source + manifest) |
-`, m.TargetName, dryRunNote, m.EjectTimestamp, m.CLIVersion)
+%s`, m.TargetName, dryRunNote, m.EjectTimestamp, m.CLIVersion, configRows)
 }

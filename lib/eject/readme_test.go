@@ -21,7 +21,7 @@ func TestWriteReadme(t *testing.T) {
 		DryRun:         true,
 	}
 
-	err := WriteReadme(metadata, outputDir)
+	err := WriteReadme(metadata, true, outputDir)
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(filepath.Join(outputDir, "README.md"))
@@ -44,7 +44,7 @@ func TestGenerateReadme_ContainsDirectoryLayout(t *testing.T) {
 		DryRun:         false,
 	}
 
-	content := generateReadme(m)
+	content := generateReadme(m, true)
 
 	assert.Contains(t, content, "config/ptd.yaml")
 	assert.Contains(t, content, "config/site_*/site.yaml")
@@ -52,10 +52,23 @@ func TestGenerateReadme_ContainsDirectoryLayout(t *testing.T) {
 	assert.Contains(t, content, "metadata.json")
 }
 
+func TestGenerateReadme_NoConfigRows(t *testing.T) {
+	m := &Metadata{
+		TargetName:     "test-workload",
+		EjectTimestamp: "2026-04-15T14:30:00Z",
+		CLIVersion:     "1.0.0",
+	}
+
+	content := generateReadme(m, false)
+
+	assert.NotContains(t, content, "config/")
+	assert.Contains(t, content, "metadata.json")
+}
+
 func TestGenerateReadme_DryRunNote(t *testing.T) {
 	dryRun := &Metadata{DryRun: true}
 	notDryRun := &Metadata{DryRun: false}
 
-	assert.Contains(t, generateReadme(dryRun), "Dry-run mode")
-	assert.NotContains(t, generateReadme(notDryRun), "Dry-run mode")
+	assert.Contains(t, generateReadme(dryRun, false), "Dry-run mode")
+	assert.NotContains(t, generateReadme(notDryRun, false), "Dry-run mode")
 }
