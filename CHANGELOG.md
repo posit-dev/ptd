@@ -1,3 +1,15 @@
+# [1.21.0](https://github.com/posit-dev/ptd/compare/v1.20.0...v1.21.0) (2026-04-16)
+
+
+### Bug Fixes
+
+* code review suggestions ([e21cb06](https://github.com/posit-dev/ptd/commit/e21cb06ef6b5015e4624b47b692f82629abc091d))
+
+
+### Features
+
+* **eject:** add metadata.json, README, and config copy to bundle ([9d495b5](https://github.com/posit-dev/ptd/commit/9d495b58f4bf5c9a7506d930c67910acabfda483)), closes [#219](https://github.com/posit-dev/ptd/issues/219)
+
 # [1.20.0](https://github.com/posit-dev/ptd/compare/v1.19.0...v1.20.0) (2026-04-16)
 
 
