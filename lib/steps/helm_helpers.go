@@ -52,7 +52,11 @@ var alloyComponents = []ptdComponentForAlloy{
 // buildAlloyConfig generates the Alloy River configuration string.
 // Ported from python-pulumi/src/ptd/pulumi_resources/grafana_alloy.py AlloyConfig._define_config_map.
 func buildAlloyConfig(params alloyConfigParams) string {
-	controlRoomURL := fmt.Sprintf("https://mimir.%s/api/v1/push", params.controlRoomDomain)
+	hasControlRoom := params.controlRoomDomain != ""
+	controlRoomURL := ""
+	if hasControlRoom {
+		controlRoomURL = fmt.Sprintf("https://mimir.%s/api/v1/push", params.controlRoomDomain)
+	}
 	workloadURL := "http://mimir-gateway.mimir.svc.cluster.local/api/v1/push"
 	lokiURL := "http://loki-gateway.loki.svc.cluster.local/loki/api/v1/push"
 
@@ -93,6 +97,29 @@ func buildAlloyConfig(params alloyConfigParams) string {
 
 	blackboxTargets := buildBlackboxTargets(params)
 	blackboxConfig := buildBlackboxConfig()
+
+	// Conditional control room remote_write — omitted when no control_room_domain is set.
+	controlRoomForwardTo := ""
+	controlRoomBlock := ""
+	if hasControlRoom {
+		controlRoomForwardTo = "prometheus.remote_write.control_room.receiver,"
+		controlRoomBlock = fmt.Sprintf(`prometheus.remote_write "control_room" {
+    external_labels = {
+        tenant_name = "%s",
+    }
+    endpoint {
+        url = "%s"
+        basic_auth {
+            username = "%s"
+            password_file = "/etc/mimir/password"
+        }
+        headers = {
+            "X-Scope-OrgID" = "%s",
+        }
+    }
+}
+`, tenantName, controlRoomURL, params.compoundName, params.accountIDOrTenantID)
+	}
 
 	config := fmt.Sprintf(`
 logging {
@@ -209,7 +236,7 @@ prometheus.scrape "nodes" {
 
 prometheus.relabel "default" {
     forward_to = [
-        prometheus.remote_write.control_room.receiver,
+        %s
         prometheus.remote_write.workload.receiver,
     ]
 
@@ -220,22 +247,7 @@ prometheus.relabel "default" {
     }
 }
 
-prometheus.remote_write "control_room" {
-    external_labels = {
-        tenant_name = "%s",
-    }
-    endpoint {
-        url = "%s"
-        basic_auth {
-            username = "%s"
-            password_file = "/etc/mimir/password"
-        }
-        headers = {
-            "X-Scope-OrgID" = "%s",
-        }
-    }
-}
-
+%s
 prometheus.remote_write "workload" {
     external_labels = {
         tenant_name = "%s",
@@ -413,13 +425,11 @@ loki.write "local" {
 		// cloud-specific scrapers
 		cloudwatchConfig,
 		azureMonitorConfig,
-		// prometheus.relabel "default" cluster label
+		// prometheus.relabel "default": conditional control_room receiver + cluster label
+		controlRoomForwardTo,
 		params.clusterName,
-		// prometheus.remote_write "control_room"
-		tenantName,
-		controlRoomURL,
-		params.compoundName,
-		params.accountIDOrTenantID,
+		// conditional prometheus.remote_write "control_room" block (empty when no control room)
+		controlRoomBlock,
 		// prometheus.remote_write "workload"
 		tenantName,
 		workloadURL,
