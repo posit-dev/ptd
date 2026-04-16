@@ -111,23 +111,23 @@ cluster_name = f"default_{self.workload.compound_name}-control-plane"
 ##### Helm releases
 **Pattern:** `f"{compound_name}-{release}-{component}"`
 
-```python
-# Example from aws_workload_helm.py
-k8s.apiextensions.CustomResource(
-    f"{self.workload.compound_name}-{release}-aws-fsx-openzfs-csi-helm-release",
-    metadata=k8s.meta.v1.ObjectMetaArgs(
-        name="aws-fsx-openzfs-csi",  # Physical name (what appears in K8s)
+```go
+// Example from lib/steps/helm_aws.go
+apiextensions.NewCustomResource(ctx,
+    compoundName+"-"+release+"-aws-fsx-openzfs-csi-helm-release", // logical name
+    &apiextensions.CustomResourceArgs{
+        Metadata: metav1.ObjectMetaArgs{
+            Name: pulumi.String("aws-fsx-openzfs-csi"), // physical name (what appears in K8s)
+        },
         ...
-    ),
-    ...
-)
+    }, ...)
 
-# Logical name: "myworkload-staging-r1-aws-fsx-openzfs-csi-helm-release"
-# Physical name: "aws-fsx-openzfs-csi"
+// Logical name: "myworkload-staging-r1-aws-fsx-openzfs-csi-helm-release"
+// Physical name: "aws-fsx-openzfs-csi"
 ```
 
 **Usage locations:**
-- `python-pulumi/src/ptd/pulumi_resources/aws_workload_helm.py`
+- `lib/steps/helm_aws.go`
 
 ---
 
