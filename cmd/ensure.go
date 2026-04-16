@@ -142,6 +142,7 @@ func runEnsure(ctx context.Context, target string) {
 	}
 
 	// set options on each step before checking if proxy is required
+	// controlRoomTarget may be nil for ejected workloads — steps must tolerate this
 	for _, step := range stepsToRun {
 		step.Set(t, controlRoomTarget, steps.StepOptions{
 			DryRun:            DryRun,
