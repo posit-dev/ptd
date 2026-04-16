@@ -224,7 +224,7 @@ ptd workon {{.WorkloadName}} -- kubectl get ingressroute -n posit-team
 {{- if eq .Cloud "aws"}}
 
 ` + "```" + `bash
-aws eks update-kubeconfig --name <cluster-name> --region {{.Region}}
+aws eks update-kubeconfig --name {{.ClusterName}} --region {{.Region}}
 kubectl get pods -n posit-team
 kubectl get pods -n posit-team-system
 kubectl get ingressroute -n posit-team
@@ -233,7 +233,7 @@ kubectl get ingressroute -n posit-team
 {{- else}}
 
 ` + "```" + `bash
-az aks get-credentials --resource-group {{.ResourceGroup}} --name <cluster-name>
+az aks get-credentials --resource-group {{.ResourceGroup}} --name {{.ClusterName}}
 kubectl get pods -n posit-team
 kubectl get pods -n posit-team-system
 kubectl get ingressroute -n posit-team
