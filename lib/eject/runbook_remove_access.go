@@ -7,7 +7,7 @@ import (
 	"text/template"
 )
 
-var removeAccessTemplate = template.Must(template.New("remove-access").Parse(
+var removeAccessAWSTemplate = template.Must(template.New("remove-access-aws").Parse(
 	"# Removing Posit Access to {{ .TargetName }}\n" +
 		"\n" +
 		"This runbook describes how to remove Posit's ability to access the AWS account\n" +
@@ -18,66 +18,85 @@ var removeAccessTemplate = template.Must(template.New("remove-access").Parse(
 		"**This is a one-way operation.** Re-adopting the workload later will require\n" +
 		"re-establishing this trust. Contact Posit if you need to reverse this.\n" +
 		"\n" +
-		"## What to Remove\n" +
+		"## What to Change\n" +
 		"\n" +
-		"The PTD control room (AWS account {{ .AccountID }}) has cross-account access to\n" +
-		"your workload account via an IAM role trust policy. The role is named:\n" +
+		"The PTD CLI authenticates to your workload account by assuming an IAM role named\n" +
+		"admin.posit.team. This role's trust policy lists individual Posit engineers from\n" +
+		"the control room account ({{ .AccountID }}) as trusted principals. The entries\n" +
+		"look like:\n" +
 		"\n" +
-		"    admin.posit.team\n" +
+		"    arn:aws:sts::{{ .AccountID }}:assumed-role/AWSReservedSSO_PowerUser_.../engineer@posit.co\n" +
 		"\n" +
-		"This role's trust policy contains an entry allowing the control room account\n" +
-		"({{ .AccountID }}) to assume it.\n" +
+		"To revoke Posit's access, remove all principal entries referencing account\n" +
+		"{{ .AccountID }} from the trust policy. Do **not** delete the role itself — the\n" +
+		"PTD CLI uses admin.posit.team to authenticate all operations, so removing the\n" +
+		"role would prevent you from running ptd ensure.\n" +
 		"\n" +
-		"## Procedure\n" +
+		"## Step 1: Add your own trusted principals\n" +
 		"\n" +
-		"### Option A: Remove the trust policy entry (recommended)\n" +
+		"Before removing Posit's access, ensure you have your own principals in the trust\n" +
+		"policy so you can continue to assume the role. For example, if your team uses\n" +
+		"AWS SSO, add your SSO role as a trusted principal:\n" +
 		"\n" +
-		"This removes Posit's access while keeping the role intact for other uses.\n" +
+		"    arn:aws:iam::YOUR-WORKLOAD-ACCOUNT-ID:role/aws-reserved/sso.amazonaws.com/REGION/AWSReservedSSO_PowerUser_YOUR-SSO-ID\n" +
+		"\n" +
+		"Or any other IAM role or user that should have access.\n" +
+		"\n" +
+		"## Step 2: Remove Posit's trusted principals\n" +
+		"\n" +
+		"### Via the AWS Console\n" +
 		"\n" +
 		"1. Open the AWS IAM Console in the workload account\n" +
 		"2. Navigate to **Roles** and find admin.posit.team\n" +
 		"3. Select the **Trust relationships** tab\n" +
 		"4. Click **Edit trust policy**\n" +
-		"5. Find and remove the statement that references account {{ .AccountID }}\n" +
-		"6. Save the updated policy\n" +
+		"5. Remove all principal entries containing account {{ .AccountID }} (these are the Posit engineer entries)\n" +
+		"6. Verify your own principal entries are present\n" +
+		"7. Save the updated policy\n"))
+
+var removeAccessAzureTemplate = template.Must(template.New("remove-access-azure").Parse(
+	"# Removing Posit Access to {{ .TargetName }}\n" +
 		"\n" +
-		"Or via CLI:\n" +
+		"This runbook describes how to remove Posit's ability to access the Azure\n" +
+		"subscription hosting the {{ .TargetName }} workload. This is the final step in a\n" +
+		"full severance — after the automated eject has disconnected Mimir and Alloy, this\n" +
+		"removes the RBAC role assignments that grant Posit engineers access to your\n" +
+		"subscription.\n" +
 		"\n" +
-		"    aws iam get-role --role-name admin.posit.team --query 'Role.AssumeRolePolicyDocument'\n" +
+		"**This is a one-way operation.** Re-adopting the workload later will require\n" +
+		"re-establishing these role assignments. Contact Posit if you need to reverse this.\n" +
 		"\n" +
-		"Review the output, remove the statement referencing arn:aws:iam::{{ .AccountID }}:root (or\n" +
-		"the specific role ARN), then update:\n" +
+		"## What to Remove\n" +
 		"\n" +
-		"    aws iam update-assume-role-policy --role-name admin.posit.team --policy-document file://updated-trust-policy.json\n" +
+		"Posit engineers have access to your Azure subscription via RBAC role assignments\n" +
+		"granted to Posit service principals during onboarding. These assignments allow\n" +
+		"Posit to manage infrastructure and deploy updates to your workload.\n" +
 		"\n" +
-		"### Option B: Delete the role entirely\n" +
+		"## Procedure\n" +
 		"\n" +
-		"If the admin.posit.team role is only used for Posit access:\n" +
+		"The specific principal IDs and role assignments vary by workload and were\n" +
+		"configured during onboarding. Work with your Posit engineer to identify and\n" +
+		"remove the correct role assignments.\n" +
 		"\n" +
-		"    aws iam delete-role --role-name admin.posit.team\n" +
+		"The general approach is:\n" +
 		"\n" +
-		"**Warning:** Ensure no other services or users depend on this role before deleting.\n" +
+		"1. List role assignments on the subscription or resource group scoped to Posit principals\n" +
+		"2. Remove each assignment using the Azure Portal or CLI:\n" +
 		"\n" +
-		"## Verification\n" +
+		"        az role assignment list --scope /subscriptions/YOUR-SUBSCRIPTION-ID --query \"[?contains(principalName, 'posit')]\"\n" +
+		"        az role assignment delete --ids <assignment-id>\n" +
 		"\n" +
-		"After removing access, verify that the control room can no longer assume the role:\n" +
+		"3. Verify that Posit principals can no longer access resources in the subscription\n" +
 		"\n" +
-		"    aws sts assume-role --role-arn arn:aws:iam::<your-account-id>:role/admin.posit.team --role-session-name test\n" +
-		"\n" +
-		"This should fail with an \"AccessDenied\" error if the trust was removed correctly.\n" +
-		"\n" +
-		"## Azure\n" +
-		"\n" +
-		"If this is an Azure workload, the equivalent operation is removing Posit's RBAC\n" +
-		"role assignments from the Azure subscription. Contact Posit for the specific\n" +
-		"principal IDs to remove if they were not documented during onboarding.\n"))
+		"Your Posit engineer can confirm which principals to remove and verify the\n" +
+		"removal was successful.\n"))
 
 type removeAccessData struct {
 	TargetName string
 	AccountID  string
 }
 
-func WriteRemoveAccessRunbook(outputDir string, details *ControlRoomDetails, targetName string) error {
+func WriteRemoveAccessRunbook(outputDir string, details *ControlRoomDetails, targetName string, cloudProvider string) error {
 	runbooksDir := filepath.Join(outputDir, "runbooks")
 	if err := os.MkdirAll(runbooksDir, 0755); err != nil {
 		return fmt.Errorf("failed to create runbooks directory: %w", err)
@@ -95,7 +114,12 @@ func WriteRemoveAccessRunbook(outputDir string, details *ControlRoomDetails, tar
 		AccountID:  details.AccountID,
 	}
 
-	if err := removeAccessTemplate.Execute(f, data); err != nil {
+	tmpl := removeAccessAWSTemplate
+	if cloudProvider == "azure" {
+		tmpl = removeAccessAzureTemplate
+	}
+
+	if err := tmpl.Execute(f, data); err != nil {
 		return fmt.Errorf("failed to render runbook template: %w", err)
 	}
 
