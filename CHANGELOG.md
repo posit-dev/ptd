@@ -1,3 +1,14 @@
+# [1.18.0](https://github.com/posit-dev/ptd/compare/v1.17.0...v1.18.0) (2026-04-16)
+
+
+### Features
+
+* add IAM trust removal runbook for eject bundle ([09fd47e](https://github.com/posit-dev/ptd/commit/09fd47ecb2d62c0ec2772563dfa1b99849f7f66c))
+* add re-adopt runbook generator for eject bundle ([9986433](https://github.com/posit-dev/ptd/commit/99864332054da0185dfa0ebc3922078ddea29280))
+* add RemoveWorkloadMimirPassword for eject severance ([5cafed5](https://github.com/posit-dev/ptd/commit/5cafed59643084cebb315f820696e3a2832e0242))
+* cloud-specific access removal runbooks, wire into eject ([e544235](https://github.com/posit-dev/ptd/commit/e544235431e3bacc43a2aaf78ee84dc6ad794d05))
+* tolerate nil control room target in ensure steps ([bc3e99a](https://github.com/posit-dev/ptd/commit/bc3e99af1d0b07acacd953f964bac65fa3bb104d))
+
 # [1.17.0](https://github.com/posit-dev/ptd/compare/v1.16.0...v1.17.0) (2026-04-15)
 
 
