@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/types"
@@ -16,6 +17,8 @@ type Options struct {
 	TargetName   string
 	OutputDir    string
 	DryRun       bool
+	CLIVersion   string
+	WorkloadPath string
 	ConfigLoader ConfigLoaderFunc // nil defaults to helpers.ConfigForTarget
 }
 
@@ -54,6 +57,24 @@ func Run(ctx context.Context, t types.Target, opts Options) error {
 		"domain", crDetails.Domain,
 		"connections", len(crDetails.Connections),
 	)
+
+	if opts.WorkloadPath != "" {
+		if err := CopyWorkloadConfig(opts.WorkloadPath, opts.OutputDir); err != nil {
+			return fmt.Errorf("failed to copy workload config: %w", err)
+		}
+		slog.Info("Copied workload config", "from", opts.WorkloadPath)
+	}
+
+	metadata := CollectMetadata(config, opts, time.Now())
+	if err := WriteMetadata(metadata, opts.OutputDir); err != nil {
+		return fmt.Errorf("failed to write metadata: %w", err)
+	}
+	slog.Info("Wrote metadata.json")
+
+	if err := WriteReadme(metadata, opts.OutputDir); err != nil {
+		return fmt.Errorf("failed to write README: %w", err)
+	}
+	slog.Info("Wrote README.md")
 
 	slog.Info("Eject bundle generated", "path", opts.OutputDir)
 	return nil
