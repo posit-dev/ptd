@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/posit-dev/ptd/lib/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -283,4 +284,87 @@ func TestRunbook_DisasterRecovery_FullRebuildOrder(t *testing.T) {
 	assert.Greater(t, clustersIdx, eksIdx, "clusters should come after eks")
 	assert.Greater(t, helmIdx, clustersIdx, "helm should come after clusters")
 	assert.Greater(t, sitesIdx, helmIdx, "sites should come after helm")
+}
+
+func TestRunbook_AWS_ClusterNameRendered(t *testing.T) {
+	results, err := GenerateRunbooks(awsRunbookData())
+	require.NoError(t, err)
+
+	ops := results["day-to-day-ops.md"]
+	assert.Contains(t, ops, "aws eks update-kubeconfig --name default_acme-prod-control-plane --region us-east-1")
+}
+
+func TestRunbook_Azure_ClusterNameRendered(t *testing.T) {
+	results, err := GenerateRunbooks(azureRunbookData())
+	require.NoError(t, err)
+
+	ops := results["day-to-day-ops.md"]
+	assert.Contains(t, ops, "az aks get-credentials --resource-group rsg-ptd-contoso-staging --name aks-ptd-contoso")
+}
+
+func TestBuildRunbookData_AWS_SortsSites(t *testing.T) {
+	config := types.AWSWorkloadConfig{
+		Region: "us-east-1",
+		Sites: map[string]types.SiteConfig{
+			"zebra":  {Spec: types.SiteConfigSpec{Domain: "z.example.com"}},
+			"alpha":  {Spec: types.SiteConfigSpec{Domain: "a.example.com"}},
+			"middle": {Spec: types.SiteConfigSpec{Domain: "m.example.com"}},
+		},
+		Clusters: map[string]types.AWSWorkloadClusterConfig{
+			"20240101": {},
+		},
+	}
+
+	data, err := buildRunbookData(config, "test-workload")
+	require.NoError(t, err)
+
+	require.Len(t, data.Sites, 3)
+	assert.Equal(t, "alpha", data.Sites[0].Name)
+	assert.Equal(t, "middle", data.Sites[1].Name)
+	assert.Equal(t, "zebra", data.Sites[2].Name)
+}
+
+func TestBuildRunbookData_Azure_SanitizesResourceGroup(t *testing.T) {
+	config := types.AzureWorkloadConfig{
+		Region: "eastus",
+		Sites: map[string]types.SiteConfig{
+			"main": {Spec: types.SiteConfigSpec{Domain: "test.example.com"}},
+		},
+		Clusters: map[string]types.AzureWorkloadClusterConfig{
+			"20240101": {},
+		},
+	}
+
+	data, err := buildRunbookData(config, "MyWorkload_Test")
+	require.NoError(t, err)
+
+	assert.Equal(t, "rsg-ptd-myworkload-test", data.ResourceGroup)
+}
+
+func TestBuildRunbookData_AWS_ClusterName(t *testing.T) {
+	config := types.AWSWorkloadConfig{
+		Region: "us-west-2",
+		Clusters: map[string]types.AWSWorkloadClusterConfig{
+			"20240601": {},
+		},
+	}
+
+	data, err := buildRunbookData(config, "acme-prod")
+	require.NoError(t, err)
+
+	assert.Equal(t, "default_acme-prod-20240601-control-plane", data.ClusterName)
+}
+
+func TestBuildRunbookData_Azure_ClusterName(t *testing.T) {
+	config := types.AzureWorkloadConfig{
+		Region: "eastus",
+		Clusters: map[string]types.AzureWorkloadClusterConfig{
+			"20240601": {},
+		},
+	}
+
+	data, err := buildRunbookData(config, "Contoso-Staging")
+	require.NoError(t, err)
+
+	assert.Equal(t, "contoso-staging-20240601", data.ClusterName)
 }

@@ -4,8 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
+	"strings"
 
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/types"
@@ -90,19 +94,50 @@ func buildRunbookData(config interface{}, targetName string) (*RunbookData, erro
 	case types.AWSWorkloadConfig:
 		data.Cloud = "aws"
 		data.Region = cfg.Region
-		for name, site := range cfg.Sites {
-			data.Sites = append(data.Sites, SiteData{Name: name, Domain: site.Spec.Domain})
-		}
+		data.ClusterName = awsClusterName(targetName, cfg.Clusters)
+		data.Sites = sortedSites(cfg.Sites)
 	case types.AzureWorkloadConfig:
 		data.Cloud = "azure"
 		data.Region = cfg.Region
-		data.ResourceGroup = fmt.Sprintf("rsg-ptd-%s", targetName)
-		for name, site := range cfg.Sites {
-			data.Sites = append(data.Sites, SiteData{Name: name, Domain: site.Spec.Domain})
-		}
+		data.ResourceGroup = fmt.Sprintf("rsg-ptd-%s", sanitizeName(targetName))
+		data.ClusterName = azureClusterName(targetName, cfg.Clusters)
+		data.Sites = sortedSites(cfg.Sites)
 	default:
 		return nil, fmt.Errorf("unsupported config type for target %s", targetName)
 	}
 
 	return data, nil
+}
+
+func sortedSites(sites map[string]types.SiteConfig) []SiteData {
+	names := slices.Sorted(maps.Keys(sites))
+	out := make([]SiteData, 0, len(names))
+	for _, name := range names {
+		out = append(out, SiteData{Name: name, Domain: sites[name].Spec.Domain})
+	}
+	return out
+}
+
+// sanitizeName mirrors the Azure naming convention: lowercase, non-alphanumeric
+// characters replaced with hyphens.
+func sanitizeName(name string) string {
+	s := strings.ToLower(name)
+	re := regexp.MustCompile(`[^a-z0-9-]`)
+	return re.ReplaceAllString(s, "-")
+}
+
+func awsClusterName(targetName string, clusters map[string]types.AWSWorkloadClusterConfig) string {
+	releases := slices.Sorted(maps.Keys(clusters))
+	if len(releases) == 0 {
+		return fmt.Sprintf("default_%s-control-plane", targetName)
+	}
+	return fmt.Sprintf("default_%s-%s-control-plane", targetName, releases[0])
+}
+
+func azureClusterName(targetName string, clusters map[string]types.AzureWorkloadClusterConfig) string {
+	releases := slices.Sorted(maps.Keys(clusters))
+	if len(releases) == 0 {
+		return sanitizeName(targetName)
+	}
+	return fmt.Sprintf("%s-%s", sanitizeName(targetName), releases[0])
 }
