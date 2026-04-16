@@ -1,3 +1,15 @@
+# [1.20.0](https://github.com/posit-dev/ptd/compare/v1.19.0...v1.20.0) (2026-04-16)
+
+
+### Bug Fixes
+
+* make snapshot dynamic, handle numeric IDs, add edge case tests ([84768b8](https://github.com/posit-dev/ptd/commit/84768b8fb439b107558283284a5899d4c80267ad))
+
+
+### Features
+
+* add config strip and snapshot for eject severance ([9d931b0](https://github.com/posit-dev/ptd/commit/9d931b0af3e696d4bc9fca2a0a74dda11103246d))
+
 # [1.19.0](https://github.com/posit-dev/ptd/compare/v1.18.0...v1.19.0) (2026-04-16)
 
 
