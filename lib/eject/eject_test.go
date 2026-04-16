@@ -88,5 +88,6 @@ func newWorkloadTarget(name string) *typestest.MockTarget {
 	mt.On("Name").Return(name)
 	mt.On("Type").Return(types.TargetTypeWorkload)
 	mt.On("ControlRoom").Return(false)
+	mt.On("CloudProvider").Return(types.AWS)
 	return mt
 }
