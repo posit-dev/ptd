@@ -791,8 +791,31 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
-                        # AKS labels GPU nodes with accelerator=nvidia natively; NFD is not needed.
-                        "nfd": {"enabled": False},
+                        "nfd": {
+                            "enabled": True,
+                            "worker": {
+                                "tolerations": [
+                                    {
+                                        "key": "workload-type",
+                                        "operator": "Equal",
+                                        "value": "session",
+                                        "effect": "NoSchedule",
+                                    },
+                                    {
+                                        "key": "nvidia.com/gpu",
+                                        "operator": "Equal",
+                                        "value": "present",
+                                        "effect": "NoSchedule",
+                                    },
+                                    {
+                                        "key": "node-role.kubernetes.io/master",
+                                        "operator": "Equal",
+                                        "value": "",
+                                        "effect": "NoSchedule",
+                                    },
+                                ],
+                            },
+                        },
                         "migStrategy": "none",
                         "failOnInitError": True,
                         "nvidiaDriverRoot": "/",
@@ -802,6 +825,12 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                             "deviceIDStrategy": "uuid",
                         },
                         "tolerations": [
+                            {
+                                "key": "workload-type",
+                                "operator": "Equal",
+                                "value": "session",
+                                "effect": "NoSchedule",
+                            },
                             {
                                 "key": "nvidia.com/gpu",
                                 "operator": "Exists",
