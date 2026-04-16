@@ -2,11 +2,22 @@ package steps
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/posit-dev/ptd/lib/pulumi"
 	"github.com/posit-dev/ptd/lib/types"
 )
 
+const (
+	helmAlloyNamespace       = "alloy"
+	helmLokiNamespace        = "loki"
+	helmMimirNamespace       = "mimir"
+	helmGrafanaNamespace     = "grafana"
+	helmExternalDNSNamespace = "external-dns"
+	helmNvidiaNamespace      = "nvidia-device-plugin"
+	helmTraefikNamespace     = clustersTraefikNamespace
+)
+
+// HelmStep deploys Helm charts (observability stack, ingress, etc.) to workload clusters.
 type HelmStep struct {
 	SrcTarget types.Target
 	DstTarget types.Target
@@ -28,12 +39,10 @@ func (s *HelmStep) Set(t types.Target, controlRoomTarget types.Target, options S
 }
 
 func (s *HelmStep) Run(ctx context.Context) error {
-	targetType := "workload"
-	if s.DstTarget.ControlRoom() {
-		targetType = "control-room"
+	if s.DstTarget == nil {
+		return fmt.Errorf("helm step requires a destination target")
 	}
 
-	// get the credentials for the target
 	creds, err := s.DstTarget.Credentials(ctx)
 	if err != nil {
 		return err
@@ -43,26 +52,17 @@ func (s *HelmStep) Run(ctx context.Context) error {
 		return err
 	}
 
-	stack, err := pulumi.NewPythonPulumiStack(
-		ctx,
-		string(s.DstTarget.CloudProvider()), // ptd-<cloud>-<control-room/workload>-<stackname>
-		targetType,
-		"helm",
-		s.DstTarget.Name(),
-		s.DstTarget.Region(),
-		s.DstTarget.PulumiBackendUrl(),
-		s.DstTarget.PulumiSecretsProviderKey(),
-		envVars,
-		true,
-	)
-	if err != nil {
-		return err
+	// helm step always needs proxy for K8s connectivity
+	if !s.DstTarget.TailscaleEnabled() {
+		envVars["ALL_PROXY"] = "socks5://localhost:1080"
 	}
 
-	err = pulumiRefreshPreviewUpCancel(ctx, stack, s.Options)
-	if err != nil {
-		return err
+	switch s.DstTarget.CloudProvider() {
+	case types.AWS:
+		return s.runAWSInlineGo(ctx, creds, envVars)
+	case types.Azure:
+		return s.runAzureInlineGo(ctx, creds, envVars)
+	default:
+		return fmt.Errorf("unsupported cloud provider for helm: %s", s.DstTarget.CloudProvider())
 	}
-
-	return nil
 }
