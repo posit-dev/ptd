@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/posit-dev/ptd/compare/v1.18.0...v1.19.0) (2026-04-16)
+
+
+### Features
+
+* conditionally include control room remote_write in Alloy config ([9a141df](https://github.com/posit-dev/ptd/commit/9a141dfafa66525839cd578f8d67ae3ff80fc2ef))
+
 # [1.18.0](https://github.com/posit-dev/ptd/compare/v1.17.0...v1.18.0) (2026-04-16)
 
 
