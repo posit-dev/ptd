@@ -20,7 +20,7 @@ type Metadata struct {
 	DryRun         bool   `json:"dry_run"`
 }
 
-func CollectMetadata(config interface{}, opts Options, now time.Time) *Metadata {
+func CollectMetadata(config interface{}, opts Options, now time.Time) (*Metadata, error) {
 	m := &Metadata{
 		EjectTimestamp: now.UTC().Format(time.RFC3339),
 		CLIVersion:     opts.CLIVersion,
@@ -37,9 +37,11 @@ func CollectMetadata(config interface{}, opts Options, now time.Time) *Metadata 
 		m.CloudProvider = string(types.Azure)
 		m.Region = cfg.Region
 		m.AccountID = cfg.SubscriptionID
+	default:
+		return nil, fmt.Errorf("unsupported config type for metadata: %T", config)
 	}
 
-	return m
+	return m, nil
 }
 
 func WriteMetadata(metadata *Metadata, outputDir string) error {

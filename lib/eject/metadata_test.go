@@ -25,7 +25,8 @@ func TestCollectMetadata_AWSWorkload(t *testing.T) {
 		CLIVersion: "1.2.3",
 	}
 
-	m := CollectMetadata(config, opts, testTime)
+	m, err := CollectMetadata(config, opts, testTime)
+	require.NoError(t, err)
 
 	assert.Equal(t, "2026-04-15T14:30:00Z", m.EjectTimestamp)
 	assert.Equal(t, "1.2.3", m.CLIVersion)
@@ -47,7 +48,8 @@ func TestCollectMetadata_AzureWorkload(t *testing.T) {
 		CLIVersion: "2.0.0",
 	}
 
-	m := CollectMetadata(config, opts, testTime)
+	m, err := CollectMetadata(config, opts, testTime)
+	require.NoError(t, err)
 
 	assert.Equal(t, "azure", m.CloudProvider)
 	assert.Equal(t, "eastus", m.Region)
@@ -60,7 +62,8 @@ func TestCollectMetadata_TimestampIsUTC(t *testing.T) {
 	require.NoError(t, err)
 	localTime := time.Date(2026, 4, 15, 10, 30, 0, 0, eastern)
 
-	m := CollectMetadata(types.AWSWorkloadConfig{}, Options{}, localTime)
+	m, err := CollectMetadata(types.AWSWorkloadConfig{}, Options{}, localTime)
+	require.NoError(t, err)
 
 	assert.Equal(t, "2026-04-15T14:30:00Z", m.EjectTimestamp)
 }
