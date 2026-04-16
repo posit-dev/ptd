@@ -79,9 +79,11 @@ func runEject(cmd *cobra.Command, targetName string) {
 	}
 
 	opts := eject.Options{
-		TargetName: targetName,
-		OutputDir:  outputDir,
-		DryRun:     ejectDryRun,
+		TargetName:   targetName,
+		OutputDir:    outputDir,
+		DryRun:       ejectDryRun,
+		CLIVersion:   Version,
+		WorkloadPath: legacy.WorkloadPathFromTargetName(targetName),
 	}
 
 	if err := eject.Run(ctx, t, opts); err != nil {
