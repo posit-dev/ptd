@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/types"
@@ -16,6 +17,8 @@ type Options struct {
 	TargetName   string
 	OutputDir    string
 	DryRun       bool
+	CLIVersion   string
+	WorkloadPath string
 	ConfigLoader ConfigLoaderFunc // nil defaults to helpers.ConfigForTarget
 }
 
@@ -37,6 +40,7 @@ func Run(ctx context.Context, t types.Target, opts Options) error {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
+	// TODO: serialize bundle to disk once all steps (inventory, secrets, state export) are wired
 	bundle := &Bundle{}
 
 	config, err := opts.configLoader()(t)
@@ -55,10 +59,30 @@ func Run(ctx context.Context, t types.Target, opts Options) error {
 		"connections", len(crDetails.Connections),
 	)
 
+	if opts.WorkloadPath != "" {
+		if err := CopyWorkloadConfig(opts.WorkloadPath, opts.OutputDir); err != nil {
+			return fmt.Errorf("failed to copy workload config: %w", err)
+		}
+		slog.Info("Copied workload config", "from", opts.WorkloadPath)
+	}
+
+	metadata, err := CollectMetadata(config, opts, time.Now())
+	if err != nil {
+		return fmt.Errorf("failed to collect metadata: %w", err)
+	}
+	if err := WriteMetadata(metadata, opts.OutputDir); err != nil {
+		return fmt.Errorf("failed to write metadata: %w", err)
+	}
+	slog.Info("Wrote metadata.json")
+
+	hasConfig := opts.WorkloadPath != ""
+	if err := WriteReadme(metadata, hasConfig, opts.OutputDir); err != nil {
+		return fmt.Errorf("failed to write README: %w", err)
+	}
+	slog.Info("Wrote README.md")
 	if err := WriteRemoveAccessRunbook(opts.OutputDir, crDetails, opts.TargetName, string(t.CloudProvider())); err != nil {
 		return fmt.Errorf("failed to write remove-posit-access runbook: %w", err)
 	}
-
 	slog.Info("Eject bundle generated", "path", opts.OutputDir)
 	return nil
 }
