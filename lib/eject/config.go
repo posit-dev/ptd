@@ -9,16 +9,22 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ControlRoomSnapshot captures all control_room_* fields from ptd.yaml.
+// Fields are discovered dynamically so new control_room_* fields are
+// automatically included without code changes.
 type ControlRoomSnapshot struct {
-	AccountID   string `json:"account_id"`
-	ClusterName string `json:"cluster_name"`
-	Domain      string `json:"domain"`
-	Region      string `json:"region"`
+	Fields map[string]string `json:"fields"`
+}
+
+func (s *ControlRoomSnapshot) Get(key string) string {
+	return s.Fields[key]
 }
 
 type specEnvelope struct {
 	Spec yaml.Node `yaml:"spec"`
 }
+
+const controlRoomPrefix = "control_room_"
 
 func SnapshotControlRoomFields(ptdYamlPath string) (*ControlRoomSnapshot, error) {
 	data, err := os.ReadFile(ptdYamlPath)
@@ -36,21 +42,18 @@ func SnapshotControlRoomFields(ptdYamlPath string) (*ControlRoomSnapshot, error)
 		return nil, fmt.Errorf("failed to decode spec: %w", err)
 	}
 
-	getString := func(key string) string {
-		if v, ok := specMap[key]; ok {
-			return fmt.Sprintf("%v", v)
+	fields := make(map[string]string)
+	for k, v := range specMap {
+		if strings.HasPrefix(k, controlRoomPrefix) {
+			if s, ok := v.(string); ok {
+				fields[k] = s
+			} else {
+				fields[k] = fmt.Sprintf("%v", v)
+			}
 		}
-		return ""
 	}
 
-	snapshot := &ControlRoomSnapshot{
-		AccountID:   getString("control_room_account_id"),
-		ClusterName: getString("control_room_cluster_name"),
-		Domain:      getString("control_room_domain"),
-		Region:      getString("control_room_region"),
-	}
-
-	return snapshot, nil
+	return &ControlRoomSnapshot{Fields: fields}, nil
 }
 
 var controlRoomValuePattern = regexp.MustCompile(`(?m)^(\s*control_room_\w+:\s*)(.+)$`)
