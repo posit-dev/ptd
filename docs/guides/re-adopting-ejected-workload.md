@@ -5,6 +5,7 @@ After running `ptd eject` on a workload, the control room connections are severe
 This is primarily useful for:
 - Testing the eject feature and resetting state afterward
 - Reversing an eject during a transition period
+- Migrating a workload from one control room to another
 
 ## Prerequisites
 
@@ -50,6 +51,10 @@ Check that:
 - Metrics are flowing to the control room Mimir at `https://mimir.<domain>`
 - Alloy pods are running without errors related to remote_write
 - All workload pods are healthy
+
+## Migrating to a different control room
+
+The same procedure works for moving a workload from one control room to another. Run `ptd eject` against the old control room first — this cleans up the workload's Mimir password entry from the old control room's Secrets Manager and severs the Alloy metrics pipeline. Then follow the re-adopt procedure above using the *new* control room's values instead of the original ones.
 
 ## Known gotchas
 
