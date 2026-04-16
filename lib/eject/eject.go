@@ -55,6 +55,10 @@ func Run(ctx context.Context, t types.Target, opts Options) error {
 		"connections", len(crDetails.Connections),
 	)
 
+	if err := WriteRemoveAccessRunbook(opts.OutputDir, crDetails, opts.TargetName, string(t.CloudProvider())); err != nil {
+		return fmt.Errorf("failed to write remove-posit-access runbook: %w", err)
+	}
+
 	slog.Info("Eject bundle generated", "path", opts.OutputDir)
 	return nil
 }
