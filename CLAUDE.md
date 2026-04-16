@@ -276,11 +276,9 @@ These files are large and require careful context management:
 **AWS:**
 - `pulumi_resources/aws_eks_cluster.py` (~2580 lines) — EKS cluster provisioning with builder pattern
 - `pulumi_resources/aws_workload_persistent.py` (~1454 lines) — VPC, RDS, S3, IAM
-- `pulumi_resources/aws_workload_helm.py` (~1390 lines) — Helm chart deployments (AWS)
 - `__init__.py` (~1275 lines) — Base types, constants, utility functions
 - `aws_workload.py` (~815 lines) — AWS workload config and naming conventions
 
 **Azure:**
 - `pulumi_resources/azure_workload_persistent.py` (~817 lines) — VNet, Postgres, Storage, ACR
-- `pulumi_resources/azure_workload_helm.py` (~675 lines) — Helm chart deployments (Azure)
 - `azure_workload.py` (~398 lines) — Azure workload config and naming with strict char limits
