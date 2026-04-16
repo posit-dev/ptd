@@ -51,12 +51,92 @@ type AWSWorkloadClusterSpec struct {
 	// CustomK8sResources lists subfolder names under custom_k8s_resources/ in the workload directory.
 	// Each subfolder's YAML files are applied to this cluster in alphabetical order.
 	CustomK8sResources []string `json:"custom_k8s_resources" yaml:"custom_k8s_resources"`
+	// RoutingWeight is the external-dns routing weight for this cluster's ALB ingress.
+	// Defaults to "100".
+	RoutingWeight *string `json:"routing_weight" yaml:"routing_weight"`
 }
 
 // AWSWorkloadClusterComponents holds optional component version overrides for a cluster.
 type AWSWorkloadClusterComponents struct {
+	// versions (all optional; Go code provides defaults)
+	AlloyVersion *string `json:"alloy_version" yaml:"alloy_version"`
+	// AwsEbsCsiDriverVersion is not consumed by the helm step; the EBS CSI driver is installed
+	// as an EKS managed add-on in the persistent step.
+	AwsEbsCsiDriverVersion                 *string `json:"aws_ebs_csi_driver_version" yaml:"aws_ebs_csi_driver_version"`
+	AwsFsxOpenzfsCsiDriverVersion          *string `json:"aws_fsx_openzfs_csi_driver_version" yaml:"aws_fsx_openzfs_csi_driver_version"`
+	AwsLoadBalancerControllerVersion       *string `json:"aws_load_balancer_controller_version" yaml:"aws_load_balancer_controller_version"`
+	ExternalDNSVersion                     *string `json:"external_dns_version" yaml:"external_dns_version"`
+	GrafanaVersion                         *string `json:"grafana_version" yaml:"grafana_version"`
+	KarpenterVersion                       *string `json:"karpenter_version" yaml:"karpenter_version"`
+	KubeStateMetricsVersion                *string `json:"kube_state_metrics_version" yaml:"kube_state_metrics_version"`
+	LokiVersion                            *string `json:"loki_version" yaml:"loki_version"`
+	LokiReplicas                           *int    `json:"loki_replicas" yaml:"loki_replicas"`
+	MetricsServerVersion                   *string `json:"metrics_server_version" yaml:"metrics_server_version"`
+	MimirVersion                           *string `json:"mimir_version" yaml:"mimir_version"`
+	MimirReplicas                          *int    `json:"mimir_replicas" yaml:"mimir_replicas"`
+	NvidiaDevicePluginVersion              *string `json:"nvidia_device_plugin_version" yaml:"nvidia_device_plugin_version"`
+	SecretStoreCsiDriverVersion            *string `json:"secret_store_csi_driver_version" yaml:"secret_store_csi_driver_version"`
+	SecretStoreCsiDriverAwsProviderVersion *string `json:"secret_store_csi_driver_aws_provider_version" yaml:"secret_store_csi_driver_aws_provider_version"`
+	// TraefikForwardAuthVersion is not consumed by the helm step; traefik-forward-auth is
+	// deployed in the clusters step (lib/steps/clusters_aws.go).
 	TraefikForwardAuthVersion *string `json:"traefik_forward_auth_version" yaml:"traefik_forward_auth_version"`
-	ExternalDNSVersion        *string `json:"external_dns_version" yaml:"external_dns_version"`
+	TraefikVersion            *string `json:"traefik_version" yaml:"traefik_version"`
+}
+
+// ResolvedAWSComponents is the result of resolving AWSWorkloadClusterComponents with defaults applied.
+type ResolvedAWSComponents struct {
+	AlloyVersion                           string
+	AwsFsxOpenzfsCsiDriverVersion          string
+	AwsLoadBalancerControllerVersion       string
+	ExternalDNSVersion                     string
+	GrafanaVersion                         string
+	KarpenterVersion                       string
+	KubeStateMetricsVersion                string
+	LokiVersion                            string
+	LokiReplicas                           int
+	MetricsServerVersion                   string
+	MimirVersion                           string
+	MimirReplicas                          int
+	NvidiaDevicePluginVersion              string
+	SecretStoreCsiDriverVersion            string
+	SecretStoreCsiDriverAwsProviderVersion string
+	TraefikVersion                         string
+}
+
+func resolveString(ptr *string, def string) string {
+	if ptr != nil {
+		return *ptr
+	}
+	return def
+}
+
+func resolveInt(ptr *int, def int) int {
+	if ptr != nil {
+		return *ptr
+	}
+	return def
+}
+
+// ResolveAWSComponents returns the component versions with defaults applied.
+func (c *AWSWorkloadClusterComponents) ResolveAWSComponents() ResolvedAWSComponents {
+	return ResolvedAWSComponents{
+		AlloyVersion:                           resolveString(c.AlloyVersion, "0.12.6"),
+		AwsFsxOpenzfsCsiDriverVersion:          resolveString(c.AwsFsxOpenzfsCsiDriverVersion, "v1.0.0"),
+		AwsLoadBalancerControllerVersion:       resolveString(c.AwsLoadBalancerControllerVersion, "1.6.0"),
+		ExternalDNSVersion:                     resolveString(c.ExternalDNSVersion, "1.14.4"),
+		GrafanaVersion:                         resolveString(c.GrafanaVersion, "7.0.14"),
+		KarpenterVersion:                       resolveString(c.KarpenterVersion, "1.6.0"),
+		KubeStateMetricsVersion:                resolveString(c.KubeStateMetricsVersion, "5.30.1"),
+		LokiVersion:                            resolveString(c.LokiVersion, "5.42.0"),
+		LokiReplicas:                           resolveInt(c.LokiReplicas, 2),
+		MetricsServerVersion:                   resolveString(c.MetricsServerVersion, "3.11.0"),
+		MimirVersion:                           resolveString(c.MimirVersion, "5.2.1"),
+		MimirReplicas:                          resolveInt(c.MimirReplicas, 2),
+		NvidiaDevicePluginVersion:              resolveString(c.NvidiaDevicePluginVersion, "0.17.1"),
+		SecretStoreCsiDriverVersion:            resolveString(c.SecretStoreCsiDriverVersion, "1.3.4"),
+		SecretStoreCsiDriverAwsProviderVersion: resolveString(c.SecretStoreCsiDriverAwsProviderVersion, "0.3.5"),
+		TraefikVersion:                         resolveString(c.TraefikVersion, "37.1.2"),
+	}
 }
 
 // TeamOperatorToleration holds a Kubernetes toleration for the team-operator pod.
@@ -78,9 +158,43 @@ type KarpenterConfig struct {
 	NodePools []KarpenterNodePool `json:"node_pools" yaml:"node_pools"`
 }
 
+// KarpenterRequirement holds a single node selector requirement for Karpenter.
+type KarpenterRequirement struct {
+	Key      string   `json:"key" yaml:"key"`
+	Operator string   `json:"operator" yaml:"operator"`
+	Values   []string `json:"values" yaml:"values"`
+}
+
+// KarpenterTaint holds a Kubernetes taint for a Karpenter node pool.
+type KarpenterTaint struct {
+	Key    string `json:"key" yaml:"key"`
+	Value  string `json:"value" yaml:"value"`
+	Effect string `json:"effect" yaml:"effect"`
+}
+
+// KarpenterNodePoolLimits holds resource limits for a Karpenter node pool.
+type KarpenterNodePoolLimits struct {
+	CPU          *string `json:"cpu" yaml:"cpu"`
+	Memory       *string `json:"memory" yaml:"memory"`
+	NvidiaComGPU *string `json:"nvidia.com/gpu" yaml:"nvidia.com/gpu"`
+}
+
 // KarpenterNodePool holds configuration for a single Karpenter node pool.
 type KarpenterNodePool struct {
-	SessionTaints bool `json:"session_taints" yaml:"session_taints"`
+	Name                          string                   `json:"name" yaml:"name"`
+	Requirements                  []KarpenterRequirement   `json:"requirements" yaml:"requirements"`
+	Limits                        *KarpenterNodePoolLimits `json:"limits" yaml:"limits"`
+	ExpireAfter                   *string                  `json:"expire_after" yaml:"expire_after"`
+	Taints                        []KarpenterTaint         `json:"taints" yaml:"taints"`
+	Weight                        int                      `json:"weight" yaml:"weight"`
+	RootVolumeSize                string                   `json:"root_volume_size" yaml:"root_volume_size"`
+	SessionTaints                 bool                     `json:"session_taints" yaml:"session_taints"`
+	ConsolidationPolicy           string                   `json:"consolidation_policy" yaml:"consolidation_policy"`
+	ConsolidateAfter              string                   `json:"consolidate_after" yaml:"consolidate_after"`
+	OverprovisioningReplicas      int                      `json:"overprovisioning_replicas" yaml:"overprovisioning_replicas"`
+	OverprovisioningCPURequest    *string                  `json:"overprovisioning_cpu_request" yaml:"overprovisioning_cpu_request"`
+	OverprovisioningMemoryRequest *string                  `json:"overprovisioning_memory_request" yaml:"overprovisioning_memory_request"`
+	OverprovisioningNvidiaGPU     *string                  `json:"overprovisioning_nvidia_gpu_request" yaml:"overprovisioning_nvidia_gpu_request"`
 }
 
 type CustomRoleConfig struct {
@@ -138,6 +252,7 @@ type AWSWorkloadConfig struct {
 	VpcCidr                                 string             `json:"vpc_cidr" yaml:"vpc_cidr"`
 	ThirdPartyTelemetryEnabled              *bool              `json:"third_party_telemetry_enabled,omitempty" yaml:"third_party_telemetry_enabled,omitempty"`
 	NetworkTrust                            string             `json:"network_trust" yaml:"network_trust"`
+	NvidiaGpuEnabled                        bool               `json:"nvidia_gpu_enabled" yaml:"nvidia_gpu_enabled"`
 }
 
 type AWSProvisionedVpc struct {
@@ -244,8 +359,38 @@ type AzureWorkloadClusterConfig struct {
 }
 
 type AzureWorkloadClusterComponentConfig struct {
-	SecretStoreCsiDriverAzureProviderVersion string `yaml:"secret_store_csi_driver_azure_provider_version"`
-	NvidiaDevicePluginVersion                string `yaml:"nvidia_device_plugin_version"`
+	SecretStoreCsiDriverAzureProviderVersion string  `yaml:"secret_store_csi_driver_azure_provider_version"`
+	AlloyVersion                             *string `yaml:"alloy_version"`
+	ExternalDnsVersion                       *string `yaml:"external_dns_version"`
+	GrafanaVersion                           *string `yaml:"grafana_version"`
+	KubeStateMetricsVersion                  *string `yaml:"kube_state_metrics_version"`
+	LokiVersion                              *string `yaml:"loki_version"`
+	MimirVersion                             *string `yaml:"mimir_version"`
+	NvidiaDevicePluginVersion                *string `yaml:"nvidia_device_plugin_version"`
+}
+
+// ResolvedAzureComponents is the result of resolving AzureWorkloadClusterComponentConfig with defaults applied.
+type ResolvedAzureComponents struct {
+	AlloyVersion              string
+	ExternalDnsVersion        string
+	GrafanaVersion            string
+	KubeStateMetricsVersion   string
+	LokiVersion               string
+	MimirVersion              string
+	NvidiaDevicePluginVersion string
+}
+
+// ResolveAzureComponents returns the component versions with defaults applied.
+func (c *AzureWorkloadClusterComponentConfig) ResolveAzureComponents() ResolvedAzureComponents {
+	return ResolvedAzureComponents{
+		AlloyVersion:              resolveString(c.AlloyVersion, "0.12.6"),
+		ExternalDnsVersion:        resolveString(c.ExternalDnsVersion, "1.14.4"),
+		GrafanaVersion:            resolveString(c.GrafanaVersion, "7.0.14"),
+		KubeStateMetricsVersion:   resolveString(c.KubeStateMetricsVersion, "5.30.1"),
+		LokiVersion:               resolveString(c.LokiVersion, "5.42.0"),
+		MimirVersion:              resolveString(c.MimirVersion, "5.2.1"),
+		NvidiaDevicePluginVersion: resolveString(c.NvidiaDevicePluginVersion, "0.17.1"),
+	}
 }
 
 type SiteConfig struct {
