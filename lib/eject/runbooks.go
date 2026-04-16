@@ -39,7 +39,11 @@ var dayToDayOpsTemplate = template.Must(template.New("day-to-day-ops").Funcs(run
 
 ## Running PTD Ensure Steps
 
-Each infrastructure change is applied by running the relevant ` + "`ptd ensure`" + ` step. Always preview first with ` + "`--dry-run`" + `, then apply.
+Each infrastructure change is applied by running the relevant ` + "`ptd ensure`" + ` step. Each step shows a preview of planned changes and prompts for confirmation before applying.
+
+` + "```" + `bash
+ptd ensure {{.WorkloadName}} --only-steps <step>
+` + "```" + `
 
 | Step | When to Re-Run | What It Changes |
 |---|---|---|
@@ -61,18 +65,6 @@ Each infrastructure change is applied by running the relevant ` + "`ptd ensure`"
 | sites | Product deployment, ingress, or site config changes | TeamSite CRDs, ingress resources, site-specific configuration |
 {{- end}}
 
-**Preview a step (dry-run):**
-
-` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps <step> --dry-run
-` + "```" + `
-
-**Apply a step:**
-
-` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps <step>
-` + "```" + `
-
 ## Scaling Product Replicas
 
 1. Edit the product replica count in the site's ` + "`site.yaml`" + `:
@@ -83,10 +75,9 @@ spec:
     replicas: 3
 ` + "```" + `
 
-2. Preview and apply the sites step:
+2. Run the sites step:
 
 ` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps sites --dry-run
 ptd ensure {{.WorkloadName}} --only-steps sites
 ` + "```" + `
 
@@ -106,10 +97,9 @@ spec:
     image: ghcr.io/rstudio/rstudio-connect:2025.01.0
 ` + "```" + `
 
-2. Preview and apply the sites step:
+2. Run the sites step:
 
 ` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps sites --dry-run
 ptd ensure {{.WorkloadName}} --only-steps sites
 ` + "```" + `
 
@@ -131,9 +121,7 @@ ACM certificates auto-renew when DNS validation records are in place. To change 
 2. Re-run the persistent and sites steps:
 
 ` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps persistent --dry-run
 ptd ensure {{.WorkloadName}} --only-steps persistent
-ptd ensure {{.WorkloadName}} --only-steps sites --dry-run
 ptd ensure {{.WorkloadName}} --only-steps sites
 ` + "```" + `
 
@@ -145,9 +133,7 @@ Azure-managed certificates are handled by the platform. To change the certificat
 2. Re-run the persistent and sites steps:
 
 ` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps persistent --dry-run
 ptd ensure {{.WorkloadName}} --only-steps persistent
-ptd ensure {{.WorkloadName}} --only-steps sites --dry-run
 ptd ensure {{.WorkloadName}} --only-steps sites
 ` + "```" + `
 
@@ -176,7 +162,6 @@ Database passwords are stored in AWS Secrets Manager. To rotate:
 3. Re-run the persistent step to reconcile:
 
 ` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps persistent --dry-run
 ptd ensure {{.WorkloadName}} --only-steps persistent
 ` + "```" + `
 
@@ -189,7 +174,6 @@ Database passwords are stored in Azure Key Vault. To rotate:
 3. Re-run the persistent step to reconcile:
 
 ` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps persistent --dry-run
 ptd ensure {{.WorkloadName}} --only-steps persistent
 ` + "```" + `
 
@@ -279,34 +263,22 @@ var disasterRecoveryTemplate = template.Must(template.New("disaster-recovery").F
 
 **State backend:** S3 bucket ` + "`ptd-{{.WorkloadName}}`" + ` in {{.Region}}
 
-S3 versioning is enabled on the state bucket. If state is corrupted or accidentally overwritten, restore a previous version:
-
-` + "```" + `bash
-aws s3api list-object-versions --bucket ptd-{{.WorkloadName}} --prefix .pulumi/stacks/
-aws s3api get-object --bucket ptd-{{.WorkloadName}} --key <state-key> --version-id <version-id> restored-state.json
-` + "```" + `
-
 {{- else}}
 
 **State backend:** Azure Blob Storage container in storage account for {{.WorkloadName}}
 
-Blob versioning is enabled on the state container. If state is corrupted or accidentally overwritten, restore a previous version:
-
-` + "```" + `bash
-az storage blob list --container-name <container> --account-name <storage-account> --prefix .pulumi/stacks/ --include v
-az storage blob download --container-name <container> --account-name <storage-account> --name <state-key> --version-id <version-id> --file restored-state.json
-` + "```" + `
-
 {{- end}}
 
-The eject bundle contains a resource inventory that lists every managed resource and its physical ID. Use this inventory to verify state consistency.
+The state bucket does not have object versioning enabled. If Pulumi state is corrupted or lost, recovery options are:
 
-To reconcile infrastructure with state, re-run ` + "`ptd ensure`" + `:
+1. **Re-run ` + "`ptd ensure`" + `** — Pulumi will detect drift between state and actual infrastructure and reconcile. This is the primary recovery path.
+2. **Use the eject bundle resource inventory** — ` + "`state/resource-inventory.json`" + ` lists every managed resource with its physical ID. This can guide manual re-import if needed.
 
 ` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps <step> --dry-run
 ptd ensure {{.WorkloadName}} --only-steps <step>
 ` + "```" + `
+
+**Prevention:** Consider enabling versioning on the state bucket post-eject so you can recover from accidental state overwrites.
 
 ## Database Recovery
 
@@ -314,7 +286,7 @@ ptd ensure {{.WorkloadName}} --only-steps <step>
 
 ### RDS Point-in-Time Restore
 
-RDS supports point-in-time recovery within the configured backup retention window.
+RDS automated backups are enabled with a 7-day retention window. Point-in-time restore creates a new DB instance from any point within that window.
 
 ` + "```" + `bash
 aws rds restore-db-instance-to-point-in-time \
@@ -324,11 +296,21 @@ aws rds restore-db-instance-to-point-in-time \
   --region {{.Region}}
 ` + "```" + `
 
+To restore from a manual snapshot instead:
+
+` + "```" + `bash
+aws rds describe-db-snapshots --db-instance-identifier <instance-id> --region {{.Region}}
+aws rds restore-db-instance-from-db-snapshot \
+  --db-snapshot-identifier <snapshot-id> \
+  --db-instance-identifier <new-instance-id> \
+  --region {{.Region}}
+` + "```" + `
+
 {{- else}}
 
 ### Azure PostgreSQL Point-in-Time Restore
 
-Azure PostgreSQL Flexible Server supports point-in-time recovery within the configured backup retention window.
+Azure PostgreSQL Flexible Server has automated backups with the default 7-day retention window. Point-in-time restore creates a new server from any point within that window.
 
 ` + "```" + `bash
 az postgres flexible-server restore \
@@ -343,10 +325,9 @@ az postgres flexible-server restore \
 ### Post-Restore Steps
 
 1. Update the database endpoint in the secret store ({{if eq .Cloud "aws"}}Secrets Manager{{else}}Key Vault{{end}}) if the restored instance has a new hostname.
-2. Re-run the persistent step to reconcile infrastructure with the new database:
+2. Re-run the persistent step to reconcile Pulumi state with the new database:
 
 ` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps persistent --dry-run
 ptd ensure {{.WorkloadName}} --only-steps persistent
 ` + "```" + `
 
@@ -354,43 +335,37 @@ ptd ensure {{.WorkloadName}} --only-steps persistent
 
 {{- if eq .Cloud "aws"}}
 
-### FSx Backups
+### FSx OpenZFS
 
-FSx OpenZFS creates automatic daily backups. To restore from a backup:
+FSx OpenZFS has automatic daily backups with a 30-day retention window.
+
+List available backups:
 
 ` + "```" + `bash
 aws fsx describe-backups --filters Name=file-system-id,Values=<fs-id> --region {{.Region}}
+` + "```" + `
+
+Restore from a backup (creates a new filesystem):
+
+` + "```" + `bash
 aws fsx create-file-system-from-backup --backup-id <backup-id> --region {{.Region}}
 ` + "```" + `
 
-### S3 Versioning
+After restore, update the FSx DNS name in the workload secret and re-run the persistent step.
 
-S3 buckets have versioning enabled. Recover deleted or overwritten objects:
+### S3 Buckets
 
-` + "```" + `bash
-aws s3api list-object-versions --bucket <bucket-name> --prefix <key-prefix>
-aws s3api get-object --bucket <bucket-name> --key <key> --version-id <version-id> restored-file
-` + "```" + `
+S3 data buckets (chronicle, packagemanager) do not have versioning enabled. Deleted or overwritten objects cannot be recovered from S3 alone.
+
+**Prevention:** Consider enabling versioning on critical data buckets post-eject.
 
 {{- else}}
 
-### Azure Files / Managed Disk Snapshots
+### Azure Storage
 
-Restore from Azure file share or managed disk snapshots:
+Azure storage accounts (file shares, blob containers) do not have soft delete or versioning enabled by default. Deleted or overwritten data cannot be recovered from Azure Storage alone.
 
-` + "```" + `bash
-az snapshot list --resource-group {{.ResourceGroup}}
-az disk create --resource-group {{.ResourceGroup}} --name <new-disk> --source <snapshot-id>
-` + "```" + `
-
-### Blob Versioning
-
-Azure Blob Storage has versioning enabled. Recover previous versions:
-
-` + "```" + `bash
-az storage blob list --container-name <container> --account-name <storage-account> --include v
-az storage blob download --container-name <container> --account-name <storage-account> --name <key> --version-id <version-id> --file restored-file
-` + "```" + `
+**Prevention:** Consider enabling blob soft delete and versioning on critical storage accounts post-eject.
 
 {{- end}}
 
@@ -398,21 +373,16 @@ az storage blob download --container-name <container> --account-name <storage-ac
 
 ### Total Cluster Loss
 
-If the cluster is completely lost, rebuild from the eject bundle configuration:
+Persistent data (database, storage) survives cluster loss. Rebuild the cluster and redeploy:
 
 ` + "```" + `bash
 {{- if eq .Cloud "aws"}}
-ptd ensure {{.WorkloadName}} --only-steps eks --dry-run
 ptd ensure {{.WorkloadName}} --only-steps eks
 {{- else}}
-ptd ensure {{.WorkloadName}} --only-steps aks --dry-run
 ptd ensure {{.WorkloadName}} --only-steps aks
 {{- end}}
-ptd ensure {{.WorkloadName}} --only-steps clusters --dry-run
 ptd ensure {{.WorkloadName}} --only-steps clusters
-ptd ensure {{.WorkloadName}} --only-steps helm --dry-run
 ptd ensure {{.WorkloadName}} --only-steps helm
-ptd ensure {{.WorkloadName}} --only-steps sites --dry-run
 ptd ensure {{.WorkloadName}} --only-steps sites
 ` + "```" + `
 
@@ -420,33 +390,21 @@ ptd ensure {{.WorkloadName}} --only-steps sites
 
 {{- if eq .Cloud "aws"}}
 
-If a node group is unhealthy, cordon and replace it:
+If a node group is unhealthy, cordon and drain the affected nodes, then re-run the eks step:
 
 ` + "```" + `bash
 ptd workon {{.WorkloadName}} -- kubectl cordon <node>
 ptd workon {{.WorkloadName}} -- kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
-` + "```" + `
-
-Then re-run the eks step to reconcile the node group:
-
-` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps eks --dry-run
 ptd ensure {{.WorkloadName}} --only-steps eks
 ` + "```" + `
 
 {{- else}}
 
-If a node pool is unhealthy, cordon and replace it:
+If a node pool is unhealthy, cordon and drain the affected nodes, then re-run the aks step:
 
 ` + "```" + `bash
 ptd workon {{.WorkloadName}} -- kubectl cordon <node>
 ptd workon {{.WorkloadName}} -- kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
-` + "```" + `
-
-Then re-run the aks step to reconcile the node pool:
-
-` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps aks --dry-run
 ptd ensure {{.WorkloadName}} --only-steps aks
 ` + "```" + `
 
@@ -503,7 +461,6 @@ ptd workon {{.WorkloadName}} -- kubectl describe certificate -n posit-team
 5. If DNS or ingress is misconfigured, re-run the sites step:
 
 ` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps sites --dry-run
 ptd ensure {{.WorkloadName}} --only-steps sites
 ` + "```" + `
 
@@ -511,40 +468,23 @@ ptd ensure {{.WorkloadName}} --only-steps sites
 
 To rebuild the full environment from the eject bundle configuration:
 
-1. Re-run the infrastructure pipeline in order:
+1. Re-run the full infrastructure pipeline:
 
 ` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps bootstrap --dry-run
-ptd ensure {{.WorkloadName}} --only-steps bootstrap
-ptd ensure {{.WorkloadName}} --only-steps persistent --dry-run
-ptd ensure {{.WorkloadName}} --only-steps persistent
-ptd ensure {{.WorkloadName}} --only-steps postgres_config --dry-run
-ptd ensure {{.WorkloadName}} --only-steps postgres_config
-{{- if eq .Cloud "aws"}}
-ptd ensure {{.WorkloadName}} --only-steps eks --dry-run
-ptd ensure {{.WorkloadName}} --only-steps eks
-{{- else}}
-ptd ensure {{.WorkloadName}} --only-steps aks --dry-run
-ptd ensure {{.WorkloadName}} --only-steps aks
-{{- end}}
-ptd ensure {{.WorkloadName}} --only-steps clusters --dry-run
-ptd ensure {{.WorkloadName}} --only-steps clusters
-ptd ensure {{.WorkloadName}} --only-steps helm --dry-run
-ptd ensure {{.WorkloadName}} --only-steps helm
-ptd ensure {{.WorkloadName}} --only-steps sites --dry-run
-ptd ensure {{.WorkloadName}} --only-steps sites
+ptd ensure {{.WorkloadName}}
 ` + "```" + `
+
+   This runs all steps in order (bootstrap through sites), including any custom steps.
 
 2. Restore data from backups:
 
 {{- if eq .Cloud "aws"}}
    - Restore RDS from snapshot or point-in-time recovery (see Database Recovery above).
    - Restore FSx from backup (see Storage Recovery above).
-   - Restore S3 objects from versioned copies if needed.
+   - S3 data buckets have no versioning — data loss is permanent unless you have external backups.
 {{- else}}
    - Restore Azure PostgreSQL from point-in-time recovery (see Database Recovery above).
-   - Restore Azure Files or managed disks from snapshots (see Storage Recovery above).
-   - Restore blob objects from versioned copies if needed.
+   - Azure storage has no versioning or soft delete — data loss is permanent unless you have external backups.
 {{- end}}
 
 3. Re-populate manual secrets:
