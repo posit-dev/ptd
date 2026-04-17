@@ -1,3 +1,10 @@
+# [1.23.0](https://github.com/posit-dev/ptd/compare/v1.22.1...v1.23.0) (2026-04-17)
+
+
+### Features
+
+* mirror nvidia device plugin for azure ([f09c491](https://github.com/posit-dev/ptd/commit/f09c49164196a70ef752e928a790f31fcd24e9b0))
+
 ## [1.22.1](https://github.com/posit-dev/ptd/compare/v1.22.0...v1.22.1) (2026-04-17)
 
 
