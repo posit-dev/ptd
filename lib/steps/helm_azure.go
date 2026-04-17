@@ -19,7 +19,6 @@ import (
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	yaml "gopkg.in/yaml.v3"
 )
 
 // Role UUIDs used by Azure helm resources (not already in clusters.go constants).
@@ -536,11 +535,7 @@ func azureHelmExternalDNS(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, com
 				},
 			},
 		}
-		data, marshalErr := yaml.Marshal(v)
-		if marshalErr != nil {
-			return "", marshalErr
-		}
-		return string(data), nil
+		return marshalYAML(v)
 	}).(pulumi.StringOutput)
 
 	_, err = apiextensions.NewCustomResource(ctx, chartResourceName, &apiextensions.CustomResourceArgs{
@@ -668,11 +663,7 @@ func azureHelmLoki(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNa
 			},
 			"test": map[string]interface{}{"enabled": false},
 		}
-		data, marshalErr := yaml.Marshal(v)
-		if marshalErr != nil {
-			return "", marshalErr
-		}
-		return string(data), nil
+		return marshalYAML(v)
 	}).(pulumi.StringOutput)
 
 	_, err = apiextensions.NewCustomResource(ctx, chartResourceName, &apiextensions.CustomResourceArgs{
@@ -780,11 +771,7 @@ func azureHelmMimir(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 			},
 			"nginx": map[string]interface{}{"enabled": false},
 		}
-		data, marshalErr := yaml.Marshal(v)
-		if marshalErr != nil {
-			return "", marshalErr
-		}
-		return string(data), nil
+		return marshalYAML(v)
 	}).(pulumi.StringOutput)
 
 	_, err = apiextensions.NewCustomResource(ctx, chartResourceName, &apiextensions.CustomResourceArgs{
@@ -1070,11 +1057,7 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 				"hosts":    []interface{}{fmt.Sprintf("faro.%s", domain)},
 			},
 		}
-		data, marshalErr := yaml.Marshal(v)
-		if marshalErr != nil {
-			return "", marshalErr
-		}
-		return string(data), nil
+		return marshalYAML(v)
 	}).(pulumi.StringOutput)
 
 	_, err = apiextensions.NewCustomResource(ctx, chartResourceName, &apiextensions.CustomResourceArgs{

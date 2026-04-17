@@ -286,14 +286,22 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 	return nil
 }
 
-func helmChartCR(ctx *pulumi.Context, resourceName, metaName, namespace, repo, chart, targetNamespace, version string, valuesContent map[string]interface{}, k8sOpt pulumi.ResourceOption, aliases ...pulumi.ResourceOption) error {
+// marshalYAML encodes v as YAML with 2-space indentation (matching Python's yaml.dump default).
+func marshalYAML(v interface{}) (string, error) {
 	var buf strings.Builder
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
-	if encErr := enc.Encode(valuesContent); encErr != nil {
+	if err := enc.Encode(v); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func helmChartCR(ctx *pulumi.Context, resourceName, metaName, namespace, repo, chart, targetNamespace, version string, valuesContent map[string]interface{}, k8sOpt pulumi.ResourceOption, aliases ...pulumi.ResourceOption) error {
+	valuesYAML, encErr := marshalYAML(valuesContent)
+	if encErr != nil {
 		return fmt.Errorf("failed to marshal values for %s: %w", resourceName, encErr)
 	}
-	valuesYAML := buf.String()
 
 	opts := []pulumi.ResourceOption{k8sOpt}
 	opts = append(opts, aliases...)
@@ -1536,7 +1544,6 @@ func isThirdPartyTelemetryEnabled(v *bool) bool {
 	return *v
 }
 
-// mainDomain returns the domain of the first site (sorted by name), or empty string.
 // mainDomain returns the domain of the "main" site, mirroring Python's
 // WorkloadConfig.domain property (self.sites["main"].domain). Falls back to
 // the first site alphabetically for workloads without a "main" site.
