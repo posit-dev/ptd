@@ -1,6 +1,9 @@
 package proxy
 
+// Registry file locking uses syscall.Flock which is only available on Linux and macOS.
+
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -79,22 +82,25 @@ func loadRegistryFromHandle(f *os.File) (map[string]*RunningProxy, error) {
 }
 
 // saveRegistryToHandle marshals the registry map and writes it to the open file handle,
-// truncating first to handle shrinkage.
+// truncating first to handle shrinkage. Encoding is done into a buffer first so that
+// a truncate is never followed by a partial write on encoding failure.
 func saveRegistryToHandle(f *os.File, m map[string]*RunningProxy) error {
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("seeking registry file: %w", err)
-	}
-
-	if err := f.Truncate(0); err != nil {
-		return fmt.Errorf("truncating registry file: %w", err)
-	}
-
-	enc := json.NewEncoder(f)
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(m); err != nil {
 		return fmt.Errorf("encoding registry: %w", err)
 	}
 
+	if err := f.Truncate(0); err != nil {
+		return fmt.Errorf("truncating registry file: %w", err)
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("seeking registry file: %w", err)
+	}
+	if _, err := f.Write(buf.Bytes()); err != nil {
+		return fmt.Errorf("writing registry file: %w", err)
+	}
 	return nil
 }
 
