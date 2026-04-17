@@ -49,7 +49,7 @@ func TestRunningProxyStoreAndLoad(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test loading the proxy from file
-	loadedProxy, err := GetRunningProxy(filePath)
+	loadedProxy, err := GetRunningProxy(filePath, "test-target")
 	require.NoError(t, err)
 
 	// Verify the loaded proxy matches the original
@@ -69,31 +69,55 @@ func TestRunningProxyStoreWithEmptyFile(t *testing.T) {
 }
 
 func TestRunningProxyDeleteFile(t *testing.T) {
-	// Create a temporary file for testing
+	// Create a temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "proxy-test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
 	filePath := filepath.Join(tmpDir, "test-proxy.json")
 
-	// Create a test file
-	err = os.WriteFile(filePath, []byte("test"), 0644)
+	// Store a proxy entry into the registry
+	p := NewRunningProxy("test-target", "8080", 12345, 0, filePath)
+	err = p.Store()
 	require.NoError(t, err)
 
-	// Create a proxy with this file
-	proxy := NewRunningProxy("test-target", "8080", 12345, 0, filePath)
+	// Entry should be present
+	loaded, err := GetRunningProxy(filePath, "test-target")
+	require.NoError(t, err)
+	assert.Equal(t, "test-target", loaded.TargetName)
 
-	// Delete the file
-	err = proxy.DeleteFile()
+	// DeleteFile removes the entry from the registry
+	err = p.DeleteFile()
 	assert.NoError(t, err)
 
-	// Verify the file no longer exists
-	_, err = os.Stat(filePath)
-	assert.True(t, os.IsNotExist(err))
+	// Entry should be gone
+	after, err := GetRunningProxy(filePath, "test-target")
+	require.NoError(t, err)
+	assert.Empty(t, after.TargetName, "entry should have been removed from registry")
 
-	// Deleting a non-existent file should not return an error
-	err = proxy.DeleteFile()
+	// Calling DeleteFile again (entry already gone) should not error
+	err = p.DeleteFile()
 	assert.NoError(t, err)
+}
+
+func TestWorkloadPort(t *testing.T) {
+	// Stable: same name always returns the same port
+	port1 := WorkloadPort("my-workload")
+	port2 := WorkloadPort("my-workload")
+	assert.Equal(t, port1, port2, "WorkloadPort should be deterministic")
+
+	// In range [10000, 10999]
+	assert.GreaterOrEqual(t, port1, 10000, "Port should be >= 10000")
+	assert.LessOrEqual(t, port1, 10999, "Port should be <= 10999")
+
+	// Different names produce different ports (at least for these two)
+	portA := WorkloadPort("workload-alpha")
+	portB := WorkloadPort("workload-beta")
+	assert.NotEqual(t, portA, portB, "Different workload names should produce different ports")
+
+	// Range check for another workload
+	assert.GreaterOrEqual(t, portA, 10000)
+	assert.LessOrEqual(t, portA, 10999)
 }
 
 // Note: The following functions are difficult to test without mocking or using real processes

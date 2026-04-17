@@ -16,8 +16,9 @@ import (
 // StartProxy starts a SOCKS proxy session if needed for the target.
 // For non-tailscale targets, it starts the appropriate proxy.
 // For tailscale targets, it verifies connectivity and warns if not connected.
+// localPort is the SOCKS port to listen on; registryFile is the shared proxy registry.
 // Returns a stop function that should be deferred, and any error.
-func StartProxy(ctx context.Context, t types.Target, proxyFile string) (stopFunc func(), err error) {
+func StartProxy(ctx context.Context, t types.Target, localPort string, registryFile string) (stopFunc func(), err error) {
 	if t.TailscaleEnabled() {
 		// Check tailscale connectivity
 		client := local.Client{}
@@ -42,7 +43,7 @@ func StartProxy(ctx context.Context, t types.Target, proxyFile string) (stopFunc
 		}
 
 		// Create and start AWS proxy session
-		ps := awslib.NewProxySession(awsTarget, GetCliPath(types.AWS), "1080", proxyFile)
+		ps := awslib.NewProxySession(awsTarget, GetCliPath(types.AWS), localPort, registryFile)
 		if err := ps.Start(ctx); err != nil {
 			return nil, fmt.Errorf("failed to start AWS proxy session: %w", err)
 		}
@@ -62,7 +63,7 @@ func StartProxy(ctx context.Context, t types.Target, proxyFile string) (stopFunc
 		}
 
 		// Create and start Azure proxy session
-		ps := azure.NewProxySession(azureTarget, GetCliPath(types.Azure), "1080", proxyFile)
+		ps := azure.NewProxySession(azureTarget, GetCliPath(types.Azure), localPort, registryFile)
 		if err := ps.Start(ctx); err != nil {
 			return nil, fmt.Errorf("failed to start Azure proxy session: %w", err)
 		}

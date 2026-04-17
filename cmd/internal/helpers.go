@@ -24,3 +24,7 @@ func ConfigDir() string {
 	}
 	return configDir
 }
+
+func RegistryFilePath() string {
+	return DataDir() + "/proxies.json"
+}
