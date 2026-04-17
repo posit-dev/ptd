@@ -18,6 +18,7 @@ EXTERNAL_DNS_NAMESPACE = "external-dns"
 GRAFANA_NAMESPACE = "grafana"
 LOKI_NAMESPACE = "loki"
 MIMIR_NAMESPACE = "mimir"
+NVIDIA_DEVICE_PLUGIN_NAMESPACE = "nvidia-device-plugin"
 
 
 class AzureWorkloadHelm(pulumi.ComponentResource):
@@ -91,6 +92,9 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
             self._define_grafana(release, components.grafana_version)
             self._define_alloy(release, components.alloy_version)
             self._define_kube_state_metrics(release, components.kube_state_metrics_version)
+
+            if self.workload.cfg.nvidia_gpu_enabled:
+                self._define_nvidia_device_plugin(release, components.nvidia_device_plugin_version)
 
     def _define_loki(self, release: str, version: str):
         loki_identity = self._define_blob_storage_managed_identity(
@@ -761,4 +765,31 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                 ),
             },
             opts=pulumi.ResourceOptions(provider=self.kube_providers[release]),
+        )
+
+    def _define_nvidia_device_plugin(self, release: str, version: str):
+        namespace = kubernetes.core.v1.Namespace(
+            f"{self.workload.compound_name}-{release}-nvidia-device-plugin-ns",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=NVIDIA_DEVICE_PLUGIN_NAMESPACE,
+            ),
+            opts=pulumi.ResourceOptions(provider=self.kube_providers[release]),
+        )
+
+        kubernetes.apiextensions.CustomResource(
+            f"{self.workload.compound_name}-{release}-nvidia-device-plugin-helm-release",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name="nvidia-device-plugin",
+                namespace=ptd.HELM_CONTROLLER_NAMESPACE,
+            ),
+            api_version="helm.cattle.io/v1",
+            kind="HelmChart",
+            spec={
+                "repo": "https://nvidia.github.io/k8s-device-plugin",
+                "chart": "nvidia-device-plugin",
+                "targetNamespace": NVIDIA_DEVICE_PLUGIN_NAMESPACE,
+                "version": version,
+                "valuesContent": "",
+            },
+            opts=pulumi.ResourceOptions(provider=self.kube_providers[release], depends_on=[namespace]),
         )
