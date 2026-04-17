@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -93,6 +94,15 @@ var proxyCmd = &cobra.Command{
 			return
 		}
 
+		// In daemon mode use context.Background() so the subprocess is not tied
+		// to this process's lifetime. exec.CommandContext kills the child when
+		// its context is cancelled, which is correct for interactive mode but
+		// wrong for daemon mode where the proxy must outlive ptd.
+		proxyCtx := cmd.Context()
+		if Daemon {
+			proxyCtx = context.Background()
+		}
+
 		// Install the SIGINT handler BEFORE starting the proxy. Startup takes
 		// several seconds (Azure bastion handshake) and the subprocesses now
 		// run in their own process groups (Setpgid: true), so terminal SIGINT
@@ -100,10 +110,10 @@ var proxyCmd = &cobra.Command{
 		// Cancelling ctx triggers exec.CommandContext's Cancel callback,
 		// which is wired in azure/aws proxy.go to do a group-kill.
 		ctx, stopSignal := signal.NotifyContext(cmd.Context(), os.Interrupt)
+		defer stopSignal()
 
-		stopProxy, err := kube.StartProxy(ctx, t, localPort, registryFile)
+		stopProxy, err := kube.StartProxy(proxyCtx, t, localPort, registryFile)
 		if err != nil {
-			stopSignal()
 			if ctx.Err() != nil {
 				slog.Info("Proxy session start cancelled by user")
 				return
@@ -114,15 +124,13 @@ var proxyCmd = &cobra.Command{
 
 		slog.Info("Proxy session started successfully", "port", localPort)
 		if Daemon {
-			// In daemon mode the proxy process is intentionally left running.
-			// Use `ptd proxy <target> --stop` to terminate it later.
+			// The proxy process is intentionally left running (started with
+			// context.Background()). Use `ptd proxy <target> --stop` to terminate it.
 			slog.Info("Running in daemon mode, proxy session will run in the background")
 			slog.Info("You can stop the proxy session with `ptd proxy <workload> --stop`")
-			stopSignal()
 			return
 		}
 
-		defer stopSignal()
 		slog.Info("Press Ctrl+C to stop the proxy session")
 		<-ctx.Done()
 		slog.Info("Received interrupt, stopping proxy session")
