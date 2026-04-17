@@ -1537,7 +1537,13 @@ func isThirdPartyTelemetryEnabled(v *bool) bool {
 }
 
 // mainDomain returns the domain of the first site (sorted by name), or empty string.
+// mainDomain returns the domain of the "main" site, mirroring Python's
+// WorkloadConfig.domain property (self.sites["main"].domain). Falls back to
+// the first site alphabetically for workloads without a "main" site.
 func mainDomain(sites map[string]types.SiteConfig) string {
+	if s, ok := sites["main"]; ok {
+		return s.Spec.Domain
+	}
 	names := helpers.SortedKeys(sites)
 	if len(names) == 0 {
 		return ""
