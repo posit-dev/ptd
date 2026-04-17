@@ -136,6 +136,11 @@ func PruneRegistry(file string) (pruned []string, err error) {
 		for name, rp := range m {
 			rp.File = file
 			if !rp.IsRunning() {
+				// Kill any surviving processes before removing the entry (e.g. Azure
+				// dual-PID sessions where one process died but the other is still running).
+				if err := rp.KillProcess(); err != nil {
+					slog.Debug("Failed to kill process during prune (may already be gone)", "target_name", name, "error", err)
+				}
 				delete(m, name)
 				pruned = append(pruned, name)
 				slog.Debug("Pruned stale proxy entry", "target_name", name, "pid", rp.Pid)
