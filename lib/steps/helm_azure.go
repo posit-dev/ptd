@@ -200,10 +200,11 @@ func azureHelmDeploy(ctx *pulumi.Context, params azureHelmParams) error {
 		return pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(oldURN)}})
 	}
 
-	// withNestedAlias returns an alias for resources nested under a Python ComponentResource
-	// (e.g. AlloyConfig), where the parent chain is AzureWorkloadHelm$parentType$resourceType.
+	// withNestedAlias returns an alias for resources nested under a root-level Python ComponentResource.
+	// AlloyConfig was instantiated without a parent, so its children's URNs are just
+	// parentType$resourceType (NOT AzureWorkloadHelm$parentType$...).
 	withNestedAlias := func(parentType, resourceType, resourceName string) pulumi.ResourceOption {
-		oldURN := fmt.Sprintf("urn:pulumi:%s::%s::ptd:AzureWorkloadHelm$%s$%s::%s",
+		oldURN := fmt.Sprintf("urn:pulumi:%s::%s::%s$%s::%s",
 			ctx.Stack(), outerProject, parentType, resourceType, resourceName)
 		return pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(oldURN)}})
 	}
