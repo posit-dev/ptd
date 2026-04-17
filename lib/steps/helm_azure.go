@@ -200,6 +200,14 @@ func azureHelmDeploy(ctx *pulumi.Context, params azureHelmParams) error {
 		return pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(oldURN)}})
 	}
 
+	// withNestedAlias returns an alias for resources nested under a Python ComponentResource
+	// (e.g. AlloyConfig), where the parent chain is AzureWorkloadHelm$parentType$resourceType.
+	withNestedAlias := func(parentType, resourceType, resourceName string) pulumi.ResourceOption {
+		oldURN := fmt.Sprintf("urn:pulumi:%s::%s::ptd:AzureWorkloadHelm$%s$%s::%s",
+			ctx.Stack(), outerProject, parentType, resourceType, resourceName)
+		return pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(oldURN)}})
+	}
+
 	releases := helpers.SortedKeys(params.cfg.Clusters)
 
 	for _, release := range releases {
@@ -239,7 +247,7 @@ func azureHelmDeploy(ctx *pulumi.Context, params azureHelmParams) error {
 		}
 
 		// 5. Alloy
-		if err := azureHelmAlloy(ctx, k8sOpt, name, release, params, oidcIssuerURL, resolved.AlloyVersion, withAlias); err != nil {
+		if err := azureHelmAlloy(ctx, k8sOpt, name, release, params, oidcIssuerURL, resolved.AlloyVersion, withAlias, withNestedAlias); err != nil {
 			return err
 		}
 
@@ -909,7 +917,8 @@ func azureHelmGrafana(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 
 func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName, release string,
 	params azureHelmParams, oidcIssuerURL, version string,
-	withAlias func(string, string) pulumi.ResourceOption) error {
+	withAlias func(string, string) pulumi.ResourceOption,
+	withNestedAlias func(string, string, string) pulumi.ResourceOption) error {
 
 	identity, err := azureHelmAlloyMonitoringIdentity(ctx, compoundName, release, params, oidcIssuerURL, withAlias)
 	if err != nil {
@@ -952,7 +961,8 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	}
 	alloyConfigStr := buildAlloyConfig(alloyP)
 
-	// ConfigMap for Alloy (Python used resource name "alloy-config").
+	// ConfigMap for Alloy. Python named the AlloyConfig component "alloy-config" and the ConfigMap
+	// was a child of that component, so its URN uses the nested AlloyConfig parent type.
 	cmResourceName := compoundName + "-" + release + "-alloy-config-configmap"
 	_, err = corev1.NewConfigMap(ctx, cmResourceName, &corev1.ConfigMapArgs{
 		Metadata: metav1.ObjectMetaArgs{
@@ -962,7 +972,7 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 		Data: pulumi.StringMap{
 			"config.alloy": pulumi.String(alloyConfigStr),
 		},
-	}, k8sOpt, withAlias("kubernetes:core/v1:ConfigMap", cmResourceName),
+	}, k8sOpt, withNestedAlias("ptd:AlloyConfig", "kubernetes:core/v1:ConfigMap", "alloy-config-configmap"),
 		pulumi.DependsOn([]pulumi.Resource{ns}))
 	if err != nil {
 		return fmt.Errorf("helm azure: failed to create alloy configmap for %s: %w", release, err)
