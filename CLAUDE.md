@@ -109,7 +109,7 @@ The proxy subsystem manages SOCKS proxy sessions to target bastion hosts. All pr
 # Interactive use — binds to port 1080
 ptd proxy <target>
 
-# Daemon mode — binds to the deterministic workload port (10000–10999) and
+# Daemon mode — binds to the deterministic workload port (10000–19999) and
 # stays running in the background; this is the same port used by ensure/workon
 ptd proxy <target> --daemon
 

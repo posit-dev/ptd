@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 func DataDir() string {
@@ -26,5 +27,5 @@ func ConfigDir() string {
 }
 
 func RegistryFilePath() string {
-	return DataDir() + "/proxies.json"
+	return filepath.Join(DataDir(), "proxies.json")
 }

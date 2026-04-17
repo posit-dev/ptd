@@ -17,8 +17,8 @@ import (
 func init() {
 	rootCmd.AddCommand(proxyCmd)
 	proxyCmd.AddCommand(proxyPortCmd)
-	proxyCmd.PersistentFlags().BoolVarP(&Daemon, "daemon", "d", false, "Run the proxy in the background")
-	proxyCmd.PersistentFlags().BoolVarP(&Stop, "stop", "s", false, "Stop any running proxy session")
+	proxyCmd.Flags().BoolVarP(&Daemon, "daemon", "d", false, "Run the proxy in the background")
+	proxyCmd.Flags().BoolVarP(&Stop, "stop", "s", false, "Stop any running proxy session")
 	proxyCmd.Flags().IntVar(&ProxyPort, "port", 0, "Local port to use for the proxy (default: 1080 for interactive, deterministic port for --daemon)")
 	proxyCmd.Flags().BoolVar(&List, "list", false, "List all running proxy sessions")
 	proxyCmd.Flags().BoolVar(&Prune, "prune", false, "Remove stale entries from the proxy registry")
@@ -114,6 +114,8 @@ var proxyCmd = &cobra.Command{
 
 		slog.Info("Proxy session started successfully", "port", localPort)
 		if Daemon {
+			// In daemon mode the proxy process is intentionally left running.
+			// Use `ptd proxy <target> --stop` to terminate it later.
 			slog.Info("Running in daemon mode, proxy session will run in the background")
 			slog.Info("You can stop the proxy session with `ptd proxy <workload> --stop`")
 			stopSignal()

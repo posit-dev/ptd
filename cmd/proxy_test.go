@@ -25,14 +25,14 @@ func TestProxyCommandRegistration(t *testing.T) {
 	}
 
 	// Check existing flags
-	daemonFlag := proxyCmd.PersistentFlags().Lookup("daemon")
+	daemonFlag := proxyCmd.Flags().Lookup("daemon")
 	if daemonFlag == nil {
 		t.Error("Expected daemon flag to be set")
 	} else if daemonFlag.Shorthand != "d" {
 		t.Errorf("Expected daemon flag shorthand to be 'd', got '%s'", daemonFlag.Shorthand)
 	}
 
-	stopFlag := proxyCmd.PersistentFlags().Lookup("stop")
+	stopFlag := proxyCmd.Flags().Lookup("stop")
 	if stopFlag == nil {
 		t.Error("Expected stop flag to be set")
 	} else if stopFlag.Shorthand != "s" {

@@ -11,12 +11,12 @@ import (
 	"github.com/posit-dev/ptd/lib/helpers"
 )
 
-// WorkloadPort returns a deterministic port in the range [10000, 10999] for
+// WorkloadPort returns a deterministic port in the range [10000, 19999] for
 // the given workload name, derived via FNV-32a.
 func WorkloadPort(name string) int {
 	h := fnv.New32a()
 	h.Write([]byte(name))
-	return 10000 + int(h.Sum32()%1000)
+	return 10000 + int(h.Sum32()%10000)
 }
 
 type RunningProxy struct {
@@ -44,20 +44,27 @@ func NewRunningProxy(targetName, localPort string, pid int, pid2 int, file strin
 // GetRunningProxy loads the registry at file and returns the entry for targetName.
 // Returns an empty RunningProxy (not an error) when no entry exists.
 func GetRunningProxy(file, targetName string) (*RunningProxy, error) {
-	proxies, err := ListRunningProxies(file)
+	var found *RunningProxy
+
+	err := withRegistryReadLock(file, func(f *os.File) error {
+		m, err := loadRegistryFromHandle(f)
+		if err != nil {
+			return err
+		}
+		if rp, ok := m[targetName]; ok {
+			rp.File = file
+			found = rp
+		}
+		return nil
+	})
 	if err != nil {
 		return &RunningProxy{File: file}, err
 	}
 
-	for _, rp := range proxies {
-		if rp.TargetName == targetName {
-			rp.File = file
-			return rp, nil
-		}
+	if found == nil {
+		return &RunningProxy{File: file}, nil
 	}
-
-	// Not found — return an empty proxy rather than an error.
-	return &RunningProxy{File: file}, nil
+	return found, nil
 }
 
 // Store upserts this RunningProxy into the registry file.
@@ -189,6 +196,19 @@ func Preflight(file string, targetName string, localPort string) (existingRunnin
 			"pid", existingRunningProxy.Pid)
 		active = true
 		return
+	}
+
+	// Check for a hash collision: another workload is using this port.
+	allProxies, _ := ListRunningProxies(file)
+	for _, rp := range allProxies {
+		if rp.LocalPort == localPort && rp.TargetName != targetName && rp.IsRunning() {
+			slog.Error("Port collision: another workload is using this port",
+				"local_port", localPort,
+				"target_name", targetName,
+				"colliding_target", rp.TargetName)
+			return existingRunningProxy, false, fmt.Errorf(
+				"port %s is already in use by workload %q (hash collision)", localPort, rp.TargetName)
+		}
 	}
 
 	// no running proxy is found, one last check to see if the port is open

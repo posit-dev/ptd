@@ -106,9 +106,9 @@ func TestWorkloadPort(t *testing.T) {
 	port2 := WorkloadPort("my-workload")
 	assert.Equal(t, port1, port2, "WorkloadPort should be deterministic")
 
-	// In range [10000, 10999]
+	// In range [10000, 19999]
 	assert.GreaterOrEqual(t, port1, 10000, "Port should be >= 10000")
-	assert.LessOrEqual(t, port1, 10999, "Port should be <= 10999")
+	assert.LessOrEqual(t, port1, 19999, "Port should be <= 19999")
 
 	// Different names produce different ports (at least for these two)
 	portA := WorkloadPort("workload-alpha")
@@ -117,7 +117,7 @@ func TestWorkloadPort(t *testing.T) {
 
 	// Range check for another workload
 	assert.GreaterOrEqual(t, portA, 10000)
-	assert.LessOrEqual(t, portA, 10999)
+	assert.LessOrEqual(t, portA, 19999)
 }
 
 // Note: The following functions are difficult to test without mocking or using real processes
