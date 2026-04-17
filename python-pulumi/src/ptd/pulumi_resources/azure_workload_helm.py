@@ -789,18 +789,7 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                 "chart": "nvidia-device-plugin",
                 "targetNamespace": NVIDIA_DEVICE_PLUGIN_NAMESPACE,
                 "version": version,
-                "valuesContent": yaml.dump(
-                    {
-                        "migStrategy": "none",
-                        "failOnInitError": True,
-                        "nvidiaDriverRoot": "/",
-                        "plugin": {
-                            "passDeviceSpecs": False,
-                            "deviceListStrategy": "envvar",
-                            "deviceIDStrategy": "uuid",
-                        },
-                    }
-                ),
+                "valuesContent": "",
             },
             opts=pulumi.ResourceOptions(provider=self.kube_providers[release], depends_on=[namespace]),
         )
