@@ -1122,7 +1122,10 @@ func azureHelmNvidiaDevicePlugin(ctx *pulumi.Context, k8sOpt pulumi.ResourceOpti
 		"https://nvidia.github.io/k8s-device-plugin",
 		"nvidia-device-plugin",
 		helmNvidiaNamespace,
-		version, map[string]interface{}{}, k8sOpt,
+		version, map[string]interface{}{
+			"nfd": map[string]interface{}{"enabled": true},
+			"mps": map[string]interface{}{"enabled": false},
+		}, k8sOpt,
 		withAlias("kubernetes:helm.cattle.io/v1:HelmChart", resourceName),
 		pulumi.DependsOn([]pulumi.Resource{ns}))
 }
