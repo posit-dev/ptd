@@ -273,14 +273,18 @@ Each step produces outputs consumed by later steps. See `docs/architecture/step-
 ### Large Files (>1000 lines)
 These files are large and require careful context management:
 
-**AWS:**
+**Go (lib/steps):**
+- `helm_aws.go` (~1550 lines) — AWS helm deployments (LBC, Traefik, Loki, Mimir, Grafana, Alloy, Karpenter, etc.)
+- `clusters_aws.go` (~1300 lines) — AWS cluster bootstrapping (IAM, Team Operator, HelmController, Karpenter, etc.)
+- `helm_azure.go` (~1100 lines) — Azure helm deployments (ExternalDNS, Loki, Mimir, Grafana, Alloy, managed identities)
+- `helm_helpers.go` (~880 lines) — Shared Alloy River config generator (`buildAlloyConfig`)
+
+**AWS (Python):**
 - `pulumi_resources/aws_eks_cluster.py` (~2580 lines) — EKS cluster provisioning with builder pattern
 - `pulumi_resources/aws_workload_persistent.py` (~1454 lines) — VPC, RDS, S3, IAM
-- `pulumi_resources/aws_workload_helm.py` (~1390 lines) — Helm chart deployments (AWS)
 - `__init__.py` (~1275 lines) — Base types, constants, utility functions
 - `aws_workload.py` (~815 lines) — AWS workload config and naming conventions
 
-**Azure:**
+**Azure (Python):**
 - `pulumi_resources/azure_workload_persistent.py` (~817 lines) — VNet, Postgres, Storage, ACR
-- `pulumi_resources/azure_workload_helm.py` (~675 lines) — Helm chart deployments (Azure)
 - `azure_workload.py` (~398 lines) — Azure workload config and naming with strict char limits

@@ -18,7 +18,6 @@ import ptd.pulumi_resources.aws_eks_cluster
 import ptd.pulumi_resources.aws_fsx_openzfs_multi
 import ptd.pulumi_resources.aws_vpc
 import ptd.pulumi_resources.aws_workload_persistent
-import ptd.pulumi_resources.grafana_alloy
 import ptd.pulumi_resources.traefik
 import ptd.secrecy
 import ptd.shext
@@ -45,7 +44,6 @@ def test_import_only() -> None:
     assert ptd.pulumi_resources.aws_fsx_openzfs_multi is not None
     assert ptd.pulumi_resources.aws_vpc is not None
     assert ptd.pulumi_resources.aws_workload_persistent is not None
-    assert ptd.pulumi_resources.grafana_alloy is not None
     assert ptd.pulumi_resources.traefik is not None
     assert ptd.secrecy is not None
     assert ptd.shext is not None

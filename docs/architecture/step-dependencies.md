@@ -136,12 +136,12 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 
 ---
 
-### Step 6: helm (Python) {#helm}
+### Step 6: helm (Go) {#helm}
 **Implementation:**
-- AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_helm.py`
-- Azure: `python-pulumi/src/ptd/pulumi_resources/azure_workload_helm.py`
+- AWS: `lib/steps/helm_aws.go` (`runAWSInlineGo`)
+- Azure: `lib/steps/helm_azure.go` (`runAzureInlineGo`)
 
-**Language:** Python/Pulumi
+**Language:** Go/Pulumi (inline)
 **Proxy Required:** Yes (deploys Helm charts via Kubernetes API)
 
 **Creates:**
