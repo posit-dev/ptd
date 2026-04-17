@@ -29,6 +29,7 @@ const (
 	AzKeyName                    = "posit-team-dedicated"
 	KeyVaultAdminRoleId          = "00482a5a-887f-4fb3-b363-3b7fe8e74483" // Key Vault Administrator built-in role
 	StorageBlobDataContribRoleId = "ba92f5b4-2d11-453d-a403-e96b0029c9fe" // Storage Blob Data Contributor built-in role
+	AksRbacClusterAdminRoleId    = "b1ff04bb-8a4e-4dc4-8eb5-8693973ce19b" // Azure Kubernetes Service RBAC Cluster Admin built-in role
 
 	// Tags
 	POSIT_TEAM_ENVIRONMENT    = "posit.team/environment"

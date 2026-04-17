@@ -227,6 +227,19 @@ func (s *BootstrapStep) runAzure(ctx context.Context, c types.Credentials, _ str
 		}
 	}
 
+	// Ensure AKS RBAC Cluster Admin role assignment exists for admin group
+	s.Log.Info("Ensuring AKS RBAC Cluster Admin role assignment exists", "adminGroupId", azureTarget.AdminGroupID())
+	aksRbacExists, err := azure.RoleAssignmentExists(ctx, azureCreds, azureTarget.SubscriptionID(), azureTarget.ResourceGroupName(), azureTarget.AdminGroupID(), consts.AksRbacClusterAdminRoleId)
+	if err != nil {
+		return err
+	}
+	if !aksRbacExists {
+		err = azure.CreateRoleAssignment(ctx, azureCreds, azureTarget.SubscriptionID(), azureTarget.ResourceGroupName(), azureTarget.AdminGroupID(), consts.AksRbacClusterAdminRoleId)
+		if err != nil {
+			return err
+		}
+	}
+
 	// create site secrets, certain site secret values are populated in later steps rather than here
 	for siteName := range s.DstTarget.Sites() {
 		s.Log.Info("Creating site secrets if they don't exist", "site", siteName)
