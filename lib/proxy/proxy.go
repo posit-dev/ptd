@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -61,16 +62,28 @@ func (r *RunningProxy) DeleteFile() error {
 }
 
 func (r *RunningProxy) KillProcess() error {
-	err := helpers.KillProcess(r.Pid)
-	if err != nil {
-		slog.Error("Error killing process for running proxy session", "pid", r.Pid, "error", err)
-		return fmt.Errorf("error killing process for running proxy session: %w", err)
+	err1 := helpers.KillProcess(r.Pid)
+	if err1 != nil {
+		slog.Warn("Error killing process for running proxy session", "pid", r.Pid, "error", err1)
 	}
 
-	if r.Pid2 != 0 {
-		return helpers.KillProcess(r.Pid2)
+	if r.Pid2 == 0 {
+		if err1 != nil {
+			return fmt.Errorf("error killing process for running proxy session: %w", err1)
+		}
+		return nil
 	}
 
+	err2 := helpers.KillProcess(r.Pid2)
+	if err2 != nil {
+		slog.Warn("Error killing second process for running proxy session", "pid", r.Pid2, "error", err2)
+	}
+
+	// Only propagate an error if BOTH kills failed — a single failure usually
+	// means that process already exited, which is fine.
+	if err1 != nil && err2 != nil {
+		return fmt.Errorf("error killing processes for running proxy session: %w", errors.Join(err1, err2))
+	}
 	return nil
 }
 
@@ -105,8 +118,9 @@ func (r *RunningProxy) Stop() error {
 	slog.Info("Stopping running proxy session", "target_name", r.TargetName, "local_port", r.LocalPort, "pid", r.Pid)
 
 	if err := r.KillProcess(); err != nil {
+		// KillProcess already wraps with "error killing process for running proxy session".
 		slog.Error("Error killing process for running proxy session", "pid", r.Pid, "error", err)
-		return fmt.Errorf("error killing process for running proxy session: %w", err)
+		return err
 	}
 
 	if err := r.DeleteFile(); err != nil {
