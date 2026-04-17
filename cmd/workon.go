@@ -105,7 +105,7 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 	}
 
 	// Set up kubeconfig (non-fatal)
-	kubeconfigPath, err := kube.SetupKubeConfig(cmd.Context(), t, creds)
+	kubeconfigPath, err := kube.SetupKubeConfig(cmd.Context(), t, creds, port)
 	if err != nil {
 		slog.Warn("Failed to setup kubeconfig, kubectl commands may not work", "error", err)
 	}

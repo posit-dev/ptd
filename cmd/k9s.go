@@ -58,7 +58,7 @@ func runK9s(cmd *cobra.Command, target string) {
 	}
 
 	// Set up kubeconfig using native SDK
-	kubeconfigPath, err := kube.SetupKubeConfig(cmd.Context(), t, creds)
+	kubeconfigPath, err := kube.SetupKubeConfig(cmd.Context(), t, creds, port)
 	if err != nil {
 		slog.Error("Failed to setup kubeconfig", "error", err)
 		return
