@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"os/signal"
 	"syscall"
 	"time"
 
@@ -245,20 +244,4 @@ func (p *ProxySession) Stop() error {
 	}
 
 	return p.runningProxy.Stop()
-}
-
-func (p *ProxySession) Wait() {
-	defer p.Stop()
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		for sig := range c {
-			slog.Info("Received signal, stopping proxy session", "signal", sig)
-			if err := p.Stop(); err != nil {
-				slog.Error("Error stopping proxy session", "error", err)
-			}
-			os.Exit(0)
-		}
-	}()
-	select {}
 }
