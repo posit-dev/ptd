@@ -1,3 +1,15 @@
+# [1.24.0](https://github.com/posit-dev/ptd/compare/v1.23.0...v1.24.0) (2026-04-17)
+
+
+### Bug Fixes
+
+* conditionally emit control_room remote_write when control_room_domain is set ([951a412](https://github.com/posit-dev/ptd/commit/951a41279ac1e0d7e39950bffb4bbbf64d92cbc1)), closes [#252](https://github.com/posit-dev/ptd/issues/252)
+
+
+### Features
+
+* add Azure nvidia device plugin helm deployment ([c1ed84d](https://github.com/posit-dev/ptd/commit/c1ed84dc2fa84ab1ac1ffe3738985d3091e3a322))
+
 # [1.23.0](https://github.com/posit-dev/ptd/compare/v1.22.1...v1.23.0) (2026-04-17)
 
 
