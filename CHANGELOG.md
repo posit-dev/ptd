@@ -1,3 +1,10 @@
+## [1.22.1](https://github.com/posit-dev/ptd/compare/v1.22.0...v1.22.1) (2026-04-17)
+
+
+### Bug Fixes
+
+* **proxy:** kill subprocess group on stop to avoid Azure tunnel orphan ([1c40215](https://github.com/posit-dev/ptd/commit/1c40215c89dd015e411f03ae193142acd4d58ccc))
+
 # [1.22.0](https://github.com/posit-dev/ptd/compare/v1.21.0...v1.22.0) (2026-04-17)
 
 
