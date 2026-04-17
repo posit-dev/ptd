@@ -65,9 +65,6 @@ var proxyCmd = &cobra.Command{
 		if Daemon {
 			slog.Info("Running in daemon mode, proxy session will run in the background")
 			slog.Info("You can stop the proxy session with `ptd proxy <workload> --stop`")
-			// Do NOT call stopSignal() here — cancelling ctx would fire
-			// exec.Cmd's auto-cancel and kill the daemon's subprocesses.
-			// Letting ptd exit without cancelling leaves them running.
 			return
 		}
 

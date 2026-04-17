@@ -10,7 +10,7 @@ import (
 
 // KillProcess sends SIGKILL to the process group led by pid, so any child
 // processes forked by the target (e.g. the python subprocess spawned by the
-// homebrew `az` bash wrapper) are reaped along with it. It expects pid to be
+// `az` bash wrapper) are reaped along with it. It expects pid to be
 // the process group leader; callers should spawn with
 // SysProcAttr{Setpgid: true}. If no process group with that leader exists
 // (ESRCH), it falls back to a single-process kill.

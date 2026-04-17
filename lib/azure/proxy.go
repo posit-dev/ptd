@@ -134,7 +134,7 @@ func (p *ProxySession) Start(ctx context.Context) error {
 		"--port", "22001",
 	)
 	// Put the tunnel in its own process group so helpers.KillProcess can kill
-	// the whole group — the homebrew `az` wrapper forks python without exec,
+	// the whole group — the `az` wrapper forks python without exec,
 	// and killing only the bash pid orphans the python child (which keeps
 	// port 22001 bound).
 	p.tunnelCommand.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
