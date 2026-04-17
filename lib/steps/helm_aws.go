@@ -286,10 +286,21 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 	return nil
 }
 
+// marshalYAML encodes v as YAML with 2-space indentation (matching Python's yaml.dump default).
+func marshalYAML(v interface{}) (string, error) {
+	var buf strings.Builder
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(v); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
 func helmChartCR(ctx *pulumi.Context, resourceName, metaName, namespace, repo, chart, targetNamespace, version string, valuesContent map[string]interface{}, k8sOpt pulumi.ResourceOption, aliases ...pulumi.ResourceOption) error {
-	valuesYAML, err := yaml.Marshal(valuesContent)
-	if err != nil {
-		return fmt.Errorf("failed to marshal values for %s: %w", resourceName, err)
+	valuesYAML, encErr := marshalYAML(valuesContent)
+	if encErr != nil {
+		return fmt.Errorf("failed to marshal values for %s: %w", resourceName, encErr)
 	}
 
 	opts := []pulumi.ResourceOption{k8sOpt}
@@ -299,13 +310,13 @@ func helmChartCR(ctx *pulumi.Context, resourceName, metaName, namespace, repo, c
 		"chart":           pulumi.String(chart),
 		"targetNamespace": pulumi.String(targetNamespace),
 		"version":         pulumi.String(version),
-		"valuesContent":   pulumi.String(string(valuesYAML)),
+		"valuesContent":   pulumi.String(valuesYAML),
 	}
 	if repo != "" {
 		spec["repo"] = pulumi.String(repo)
 	}
 
-	_, err = apiextensions.NewCustomResource(ctx, resourceName, &apiextensions.CustomResourceArgs{
+	_, err := apiextensions.NewCustomResource(ctx, resourceName, &apiextensions.CustomResourceArgs{
 		ApiVersion: pulumi.String("helm.cattle.io/v1"),
 		Kind:       pulumi.String("HelmChart"),
 		Metadata: metav1.ObjectMetaArgs{
@@ -1533,8 +1544,13 @@ func isThirdPartyTelemetryEnabled(v *bool) bool {
 	return *v
 }
 
-// mainDomain returns the domain of the first site (sorted by name), or empty string.
+// mainDomain returns the domain of the "main" site, mirroring Python's
+// WorkloadConfig.domain property (self.sites["main"].domain). Falls back to
+// the first site alphabetically for workloads without a "main" site.
 func mainDomain(sites map[string]types.SiteConfig) string {
+	if s, ok := sites["main"]; ok {
+		return s.Spec.Domain
+	}
 	names := helpers.SortedKeys(sites)
 	if len(names) == 0 {
 		return ""

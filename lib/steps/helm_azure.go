@@ -19,7 +19,6 @@ import (
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	yaml "gopkg.in/yaml.v3"
 )
 
 // Role UUIDs used by Azure helm resources (not already in clusters.go constants).
@@ -200,6 +199,15 @@ func azureHelmDeploy(ctx *pulumi.Context, params azureHelmParams) error {
 		return pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(oldURN)}})
 	}
 
+	// withNestedAlias returns an alias for resources nested under a root-level Python ComponentResource.
+	// AlloyConfig was instantiated without a parent, so its children's URNs are just
+	// parentType$resourceType (NOT AzureWorkloadHelm$parentType$...).
+	withNestedAlias := func(parentType, resourceType, resourceName string) pulumi.ResourceOption {
+		oldURN := fmt.Sprintf("urn:pulumi:%s::%s::%s$%s::%s",
+			ctx.Stack(), outerProject, parentType, resourceType, resourceName)
+		return pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(oldURN)}})
+	}
+
 	releases := helpers.SortedKeys(params.cfg.Clusters)
 
 	for _, release := range releases {
@@ -239,7 +247,7 @@ func azureHelmDeploy(ctx *pulumi.Context, params azureHelmParams) error {
 		}
 
 		// 5. Alloy
-		if err := azureHelmAlloy(ctx, k8sOpt, name, release, params, oidcIssuerURL, resolved.AlloyVersion, withAlias); err != nil {
+		if err := azureHelmAlloy(ctx, k8sOpt, name, release, params, oidcIssuerURL, resolved.AlloyVersion, withAlias, withNestedAlias); err != nil {
 			return err
 		}
 
@@ -527,11 +535,7 @@ func azureHelmExternalDNS(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, com
 				},
 			},
 		}
-		data, marshalErr := yaml.Marshal(v)
-		if marshalErr != nil {
-			return "", marshalErr
-		}
-		return string(data), nil
+		return marshalYAML(v)
 	}).(pulumi.StringOutput)
 
 	_, err = apiextensions.NewCustomResource(ctx, chartResourceName, &apiextensions.CustomResourceArgs{
@@ -659,11 +663,7 @@ func azureHelmLoki(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNa
 			},
 			"test": map[string]interface{}{"enabled": false},
 		}
-		data, marshalErr := yaml.Marshal(v)
-		if marshalErr != nil {
-			return "", marshalErr
-		}
-		return string(data), nil
+		return marshalYAML(v)
 	}).(pulumi.StringOutput)
 
 	_, err = apiextensions.NewCustomResource(ctx, chartResourceName, &apiextensions.CustomResourceArgs{
@@ -771,11 +771,7 @@ func azureHelmMimir(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 			},
 			"nginx": map[string]interface{}{"enabled": false},
 		}
-		data, marshalErr := yaml.Marshal(v)
-		if marshalErr != nil {
-			return "", marshalErr
-		}
-		return string(data), nil
+		return marshalYAML(v)
 	}).(pulumi.StringOutput)
 
 	_, err = apiextensions.NewCustomResource(ctx, chartResourceName, &apiextensions.CustomResourceArgs{
@@ -909,7 +905,8 @@ func azureHelmGrafana(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 
 func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName, release string,
 	params azureHelmParams, oidcIssuerURL, version string,
-	withAlias func(string, string) pulumi.ResourceOption) error {
+	withAlias func(string, string) pulumi.ResourceOption,
+	withNestedAlias func(string, string, string) pulumi.ResourceOption) error {
 
 	identity, err := azureHelmAlloyMonitoringIdentity(ctx, compoundName, release, params, oidcIssuerURL, withAlias)
 	if err != nil {
@@ -952,7 +949,8 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	}
 	alloyConfigStr := buildAlloyConfig(alloyP)
 
-	// ConfigMap for Alloy (Python used resource name "alloy-config").
+	// ConfigMap for Alloy. Python named the AlloyConfig component "alloy-config" and the ConfigMap
+	// was a child of that component, so its URN uses the nested AlloyConfig parent type.
 	cmResourceName := compoundName + "-" + release + "-alloy-config-configmap"
 	_, err = corev1.NewConfigMap(ctx, cmResourceName, &corev1.ConfigMapArgs{
 		Metadata: metav1.ObjectMetaArgs{
@@ -962,7 +960,7 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 		Data: pulumi.StringMap{
 			"config.alloy": pulumi.String(alloyConfigStr),
 		},
-	}, k8sOpt, withAlias("kubernetes:core/v1:ConfigMap", cmResourceName),
+	}, k8sOpt, withNestedAlias("ptd:AlloyConfig", "kubernetes:core/v1:ConfigMap", "alloy-config-configmap"),
 		pulumi.DependsOn([]pulumi.Resource{ns}))
 	if err != nil {
 		return fmt.Errorf("helm azure: failed to create alloy configmap for %s: %w", release, err)
@@ -1059,11 +1057,7 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 				"hosts":    []interface{}{fmt.Sprintf("faro.%s", domain)},
 			},
 		}
-		data, marshalErr := yaml.Marshal(v)
-		if marshalErr != nil {
-			return "", marshalErr
-		}
-		return string(data), nil
+		return marshalYAML(v)
 	}).(pulumi.StringOutput)
 
 	_, err = apiextensions.NewCustomResource(ctx, chartResourceName, &apiextensions.CustomResourceArgs{
