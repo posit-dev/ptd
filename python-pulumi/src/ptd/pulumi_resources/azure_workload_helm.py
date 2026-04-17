@@ -791,31 +791,6 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                 "version": version,
                 "valuesContent": yaml.dump(
                     {
-                        "nfd": {
-                            "enabled": True,
-                            "worker": {
-                                "tolerations": [
-                                    {
-                                        "key": "workload-type",
-                                        "operator": "Equal",
-                                        "value": "session",
-                                        "effect": "NoSchedule",
-                                    },
-                                    {
-                                        "key": "nvidia.com/gpu",
-                                        "operator": "Equal",
-                                        "value": "present",
-                                        "effect": "NoSchedule",
-                                    },
-                                    {
-                                        "key": "node-role.kubernetes.io/master",
-                                        "operator": "Equal",
-                                        "value": "",
-                                        "effect": "NoSchedule",
-                                    },
-                                ],
-                            },
-                        },
                         "migStrategy": "none",
                         "failOnInitError": True,
                         "nvidiaDriverRoot": "/",
@@ -824,23 +799,6 @@ class AzureWorkloadHelm(pulumi.ComponentResource):
                             "deviceListStrategy": "envvar",
                             "deviceIDStrategy": "uuid",
                         },
-                        "tolerations": [
-                            {
-                                "key": "workload-type",
-                                "operator": "Equal",
-                                "value": "session",
-                                "effect": "NoSchedule",
-                            },
-                            {
-                                "key": "nvidia.com/gpu",
-                                "operator": "Exists",
-                                "effect": "NoSchedule",
-                            },
-                            {
-                                "key": "CriticalAddonsOnly",
-                                "operator": "Exists",
-                            },
-                        ],
                     }
                 ),
             },
