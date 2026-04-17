@@ -10,6 +10,7 @@ import (
 	"github.com/posit-dev/ptd/lib/azure"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/kube"
+	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/posit-dev/ptd/lib/types"
 	azauthorization "github.com/pulumi/pulumi-azure-native-sdk/authorization/v3"
 	azmanagedidentity "github.com/pulumi/pulumi-azure-native-sdk/managedidentity/v3"
@@ -80,7 +81,7 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 			return fmt.Errorf("clusters: failed to get AKS kubeconfig for %s: %w", clusterName, err)
 		}
 		if !s.DstTarget.TailscaleEnabled() {
-			kubeconfigBytes, err = kube.AddProxyToKubeConfigBytes(kubeconfigBytes, "socks5://localhost:1080")
+			kubeconfigBytes, err = kube.AddProxyToKubeConfigBytes(kubeconfigBytes, fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name())))
 			if err != nil {
 				return fmt.Errorf("clusters: failed to add proxy to kubeconfig for %s: %w", clusterName, err)
 			}
