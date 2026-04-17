@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/posit-dev/ptd/compare/v1.21.0...v1.22.0) (2026-04-17)
+
+
+### Features
+
+* add automation for assigning aks rbac role ([0f3a5df](https://github.com/posit-dev/ptd/commit/0f3a5df60004fbc067edbf70648e0e6e5913bc08))
+
 # [1.21.0](https://github.com/posit-dev/ptd/compare/v1.20.0...v1.21.0) (2026-04-16)
 
 
