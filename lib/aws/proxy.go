@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"os/signal"
 	"strings"
 	"syscall"
 	"time"
@@ -198,24 +197,4 @@ func buildTempSshAccessCommand(publicKeyPath string) (cmd []string) {
 	cmd = append(cmd, fmt.Sprintf("echo '%s' >> /home/ec2-user/.ssh/authorized_keys", pubKeyStr))
 	cmd = append(cmd, fmt.Sprintf("(sleep 60 && sed -i '\\;%s;d' /home/ec2-user/.ssh/authorized_keys &) >/dev/null 2>&1", pubKeyStr))
 	return
-}
-
-func (p *ProxySession) Wait() {
-	defer func() {
-		if err := p.Stop(); err != nil {
-			slog.Error("Error stopping proxy session", "error", err)
-		}
-	}()
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		for sig := range c {
-			slog.Info("Received signal, stopping proxy session", "signal", sig)
-			if err := p.Stop(); err != nil {
-				slog.Error("Error stopping proxy session", "error", err)
-			}
-			os.Exit(0)
-		}
-	}()
-	select {}
 }
