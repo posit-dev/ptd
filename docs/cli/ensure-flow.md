@@ -26,7 +26,7 @@ If any step requires a proxy connection (to access private resources like databa
 - **AWS**: Starts an SSM Session Manager tunnel through a bastion host
 - **Azure**: Starts an Azure Bastion tunnel
 - **Skipped if**: Tailscale is enabled on the target
-- The proxy runs on `localhost:1080` and is available to all subsequent steps
+- The proxy binds to a deterministic per-workload port (10000–19999) and is available to all subsequent steps
 
 ### 3. Step Execution
 

@@ -434,7 +434,7 @@ $ ptd workon ganso01-staging -- kubectl get nonexistent; echo $?
 
 ### `ptd proxy`
 
-Start a SOCKS5 proxy session to the bastion host in a given target. The proxy runs on `localhost:1080` and enables secure access to private resources.
+Start a SOCKS5 proxy session to the bastion host in a given target. By default binds to `localhost:1080` for interactive/browser use; `--daemon` uses a deterministic per-workload port (10000–19999).
 
 **Usage:**
 ```bash
@@ -471,8 +471,8 @@ ptd proxy testing01-staging --stop
 **Implementation:** `/cmd/proxy.go:26`
 
 **Notes:**
-- Proxy runs on `localhost:1080`
-- Proxy session state is stored in `~/.local/share/ptd/proxy.json`
+- Interactive proxy binds to `localhost:1080`; `--daemon` binds to a deterministic per-workload port (10000–19999)
+- Proxy session state is stored in `~/.local/share/ptd/proxies.json`
 - Works with both AWS and Azure targets
 - Automatically handles credential management
 - Not needed if Tailscale is enabled for the target
@@ -730,9 +730,9 @@ Implementations:
 ### Proxy Sessions
 
 Proxy sessions enable secure access to private resources:
-- SOCKS5 proxy on `localhost:1080`
+- SOCKS5 proxy; interactive mode binds to `localhost:1080`, daemon/ensure/workon use deterministic per-workload ports (10000–19999)
 - Managed lifecycle (Start/Stop/Wait)
-- State persistence in `~/.local/share/ptd/proxy.json`
+- State persistence in `~/.local/share/ptd/proxies.json`
 - Automatic integration with ensure, k9s commands
 
 AWS: Uses SSM Session Manager (`aws ssm start-session --target <bastion-instance>`)
@@ -838,8 +838,8 @@ ptd ensure testing01-staging --auto-apply
 # Start proxy in background
 ptd proxy testing01-staging --daemon
 
-# Configure application to use SOCKS5 proxy on localhost:1080
-export HTTPS_PROXY=socks5://localhost:1080
+# Configure application to use the SOCKS5 proxy
+export HTTPS_PROXY=socks5://localhost:$(ptd proxy port testing01-staging)
 
 # When done, stop proxy
 ptd proxy testing01-staging --stop
