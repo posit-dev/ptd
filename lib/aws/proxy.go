@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/posit-dev/ptd/lib/helpers"
@@ -123,6 +124,14 @@ func (p *ProxySession) Start(ctx context.Context) error {
 		"-o", "UserKnownHostsFile=/dev/null",
 		"-N", "-D", p.localPort,
 		fmt.Sprintf("ec2-user@%s", bastionId))
+	// Put ssh in its own process group so helpers.KillProcess reaps the
+	// ProxyCommand shell and the aws-ssm-plugin subprocess it spawns.
+	p.command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// Override exec.CommandContext's default cancel (single-pid kill); the
+	// ProxyCommand shell would otherwise orphan.
+	p.command.Cancel = func() error {
+		return helpers.KillProcess(p.command.Process.Pid)
+	}
 
 	// set the environment variables for the command
 	// add each aws env var to command

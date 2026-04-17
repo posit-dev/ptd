@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/posit-dev/ptd/lib/helpers"
@@ -132,6 +133,16 @@ func (p *ProxySession) Start(ctx context.Context) error {
 		"--resource-port", "22",
 		"--port", "22001",
 	)
+	// Put the tunnel in its own process group so helpers.KillProcess can kill
+	// the whole group — the homebrew `az` wrapper forks python without exec,
+	// and killing only the bash pid orphans the python child (which keeps
+	// port 22001 bound).
+	p.tunnelCommand.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// Override exec.CommandContext's default cancel (single-pid kill), which
+	// would orphan the python child. Group-kill instead.
+	p.tunnelCommand.Cancel = func() error {
+		return helpers.KillProcess(p.tunnelCommand.Process.Pid)
+	}
 
 	// build the command to start the SOCKS proxy via SSH, using the jumpbox tunnel from above
 	p.socksCommand = exec.CommandContext(
@@ -143,6 +154,10 @@ func (p *ProxySession) Start(ctx context.Context) error {
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null",
 		"-i", p.sshKeyPath)
+	p.socksCommand.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	p.socksCommand.Cancel = func() error {
+		return helpers.KillProcess(p.socksCommand.Process.Pid)
+	}
 
 	// set the environment variables for the command
 	// HOME is required by the az CLI (Python) to locate ~/.azure config and cache directories.
@@ -174,6 +189,9 @@ func (p *ProxySession) Start(ctx context.Context) error {
 	time.Sleep(3 * time.Second)
 	if !helpers.PortOpen("localhost", "22001") {
 		slog.Error("Tunnel is not listening on port 22001")
+		if killErr := helpers.KillProcess(p.tunnelCommand.Process.Pid); killErr != nil {
+			slog.Warn("Error killing orphaned tunnel command", "pid", p.tunnelCommand.Process.Pid, "error", killErr)
+		}
 		return fmt.Errorf("tunnel session did not start successfully on port 22001")
 	}
 
@@ -187,6 +205,9 @@ func (p *ProxySession) Start(ctx context.Context) error {
 	err = p.socksCommand.Start()
 	if err != nil {
 		slog.Error("Error starting proxy session socks command", "error", err)
+		if killErr := helpers.KillProcess(p.tunnelCommand.Process.Pid); killErr != nil {
+			slog.Warn("Error killing orphaned tunnel command", "pid", p.tunnelCommand.Process.Pid, "error", killErr)
+		}
 		return err
 	}
 
@@ -201,6 +222,12 @@ func (p *ProxySession) Start(ctx context.Context) error {
 
 	if !p.runningProxy.WaitForPortOpen(8) {
 		slog.Error("Proxy is not listening on port", "local_port", p.localPort)
+		if killErr := helpers.KillProcess(p.tunnelCommand.Process.Pid); killErr != nil {
+			slog.Warn("Error killing orphaned tunnel command", "pid", p.tunnelCommand.Process.Pid, "error", killErr)
+		}
+		if killErr := helpers.KillProcess(p.socksCommand.Process.Pid); killErr != nil {
+			slog.Warn("Error killing orphaned socks command", "pid", p.socksCommand.Process.Pid, "error", killErr)
+		}
 		return fmt.Errorf("proxy session did not start successfully on port %s", p.localPort)
 	}
 
