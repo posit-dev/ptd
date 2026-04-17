@@ -287,10 +287,13 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 }
 
 func helmChartCR(ctx *pulumi.Context, resourceName, metaName, namespace, repo, chart, targetNamespace, version string, valuesContent map[string]interface{}, k8sOpt pulumi.ResourceOption, aliases ...pulumi.ResourceOption) error {
-	valuesYAML, err := yaml.Marshal(valuesContent)
-	if err != nil {
-		return fmt.Errorf("failed to marshal values for %s: %w", resourceName, err)
+	var buf strings.Builder
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if encErr := enc.Encode(valuesContent); encErr != nil {
+		return fmt.Errorf("failed to marshal values for %s: %w", resourceName, encErr)
 	}
+	valuesYAML := buf.String()
 
 	opts := []pulumi.ResourceOption{k8sOpt}
 	opts = append(opts, aliases...)
@@ -299,13 +302,13 @@ func helmChartCR(ctx *pulumi.Context, resourceName, metaName, namespace, repo, c
 		"chart":           pulumi.String(chart),
 		"targetNamespace": pulumi.String(targetNamespace),
 		"version":         pulumi.String(version),
-		"valuesContent":   pulumi.String(string(valuesYAML)),
+		"valuesContent":   pulumi.String(valuesYAML),
 	}
 	if repo != "" {
 		spec["repo"] = pulumi.String(repo)
 	}
 
-	_, err = apiextensions.NewCustomResource(ctx, resourceName, &apiextensions.CustomResourceArgs{
+	_, err := apiextensions.NewCustomResource(ctx, resourceName, &apiextensions.CustomResourceArgs{
 		ApiVersion: pulumi.String("helm.cattle.io/v1"),
 		Kind:       pulumi.String("HelmChart"),
 		Metadata: metav1.ObjectMetaArgs{
