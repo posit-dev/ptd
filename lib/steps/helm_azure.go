@@ -247,6 +247,13 @@ func azureHelmDeploy(ctx *pulumi.Context, params azureHelmParams) error {
 		if err := azureHelmKubeStateMetrics(ctx, k8sOpt, name, release, resolved.KubeStateMetricsVersion, withAlias); err != nil {
 			return err
 		}
+
+		// 7. Nvidia Device Plugin (only when GPU nodes are enabled)
+		if params.cfg.NvidiaGpuEnabled {
+			if err := azureHelmNvidiaDevicePlugin(ctx, k8sOpt, name, release, resolved.NvidiaDevicePluginVersion, withAlias); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -1094,4 +1101,28 @@ func azureHelmKubeStateMetrics(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption
 		clustersKubeSystemNamespace,
 		version, values, k8sOpt,
 		withAlias("kubernetes:helm.cattle.io/v1:HelmChart", resourceName))
+}
+
+func azureHelmNvidiaDevicePlugin(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName, release, version string,
+	withAlias func(string, string) pulumi.ResourceOption) error {
+
+	nsName := compoundName + "-" + release + "-nvidia-device-plugin-ns"
+	ns, err := corev1.NewNamespace(ctx, nsName, &corev1.NamespaceArgs{
+		Metadata: metav1.ObjectMetaArgs{
+			Name: pulumi.String(helmNvidiaNamespace),
+		},
+	}, k8sOpt, withAlias("kubernetes:core/v1:Namespace", nsName))
+	if err != nil {
+		return err
+	}
+
+	resourceName := compoundName + "-" + release + "-nvidia-device-plugin-helm-release"
+	return helmChartCR(ctx, resourceName, "nvidia-device-plugin",
+		clustersHelmControllerNamespace,
+		"https://nvidia.github.io/k8s-device-plugin",
+		"nvidia-device-plugin",
+		helmNvidiaNamespace,
+		version, map[string]interface{}{}, k8sOpt,
+		withAlias("kubernetes:helm.cattle.io/v1:HelmChart", resourceName),
+		pulumi.DependsOn([]pulumi.Resource{ns}))
 }
