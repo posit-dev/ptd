@@ -293,6 +293,8 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 
 // marshalYAML encodes v as YAML matching Python's yaml.dump default (yaml.v2 sequence behavior,
 // single-quoted boolean strings to avoid yaml.v2 quoting them as "true"/"false").
+// The boolean replacement only matches `: "keyword"` (colon-space-quoted value position), so it
+// cannot misfire on substrings inside longer string values or on YAML keys.
 func marshalYAML(v interface{}) (string, error) {
 	data, err := yamlv2.Marshal(v)
 	if err != nil {
