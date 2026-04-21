@@ -164,9 +164,9 @@ func TestStepNameFromProject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.project, func(t *testing.T) {
 			s := StackSummary{ProjectName: tt.project}
-			got := s.stepNameFromProject()
+			got := s.StepNameFromProject()
 			if got != tt.want {
-				t.Errorf("stepNameFromProject(%q) = %q, want %q", tt.project, got, tt.want)
+				t.Errorf("StepNameFromProject(%q) = %q, want %q", tt.project, got, tt.want)
 			}
 		})
 	}
