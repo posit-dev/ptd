@@ -5,14 +5,15 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
+	"strconv"
 
 	"github.com/posit-dev/ptd/cmd/internal"
 	"github.com/posit-dev/ptd/cmd/internal/legacy"
 	"github.com/posit-dev/ptd/lib/customization"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/kube"
+	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/posit-dev/ptd/lib/pulumi"
 	"github.com/posit-dev/ptd/lib/steps"
 	"github.com/spf13/cobra"
@@ -95,8 +96,8 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 	ptdRoot := helpers.GetTargetsConfigPath()
 
 	// Start proxy if needed (non-fatal)
-	proxyFile := path.Join(internal.DataDir(), "proxy.json")
-	stopProxy, err := kube.StartProxy(cmd.Context(), t, proxyFile)
+	port := strconv.Itoa(proxy.WorkloadPort(t.Name()))
+	stopProxy, err := kube.StartProxy(cmd.Context(), t, port, internal.RegistryFilePath())
 	if err != nil {
 		slog.Warn("Failed to start proxy", "error", err)
 	} else {
@@ -104,7 +105,7 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 	}
 
 	// Set up kubeconfig (non-fatal)
-	kubeconfigPath, err := kube.SetupKubeConfig(cmd.Context(), t, creds)
+	kubeconfigPath, err := kube.SetupKubeConfig(cmd.Context(), t, creds, port)
 	if err != nil {
 		slog.Warn("Failed to setup kubeconfig, kubectl commands may not work", "error", err)
 	}
