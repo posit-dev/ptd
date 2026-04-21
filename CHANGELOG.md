@@ -1,3 +1,11 @@
+# [1.25.0](https://github.com/posit-dev/ptd/compare/v1.24.0...v1.25.0) (2026-04-21)
+
+
+### Features
+
+* add unit tests for handoff helpers and fix resource categorization ([0be41ce](https://github.com/posit-dev/ptd/commit/0be41ce97d5d88bf041e6101ed9fca4ddc0621e3))
+* generate eject handoff PDF and markdown document ([0a67c38](https://github.com/posit-dev/ptd/commit/0a67c386f156e599e8fca511fa81d3f953671f5a)), closes [#216](https://github.com/posit-dev/ptd/issues/216)
+
 # [1.24.0](https://github.com/posit-dev/ptd/compare/v1.23.0...v1.24.0) (2026-04-17)
 
 
