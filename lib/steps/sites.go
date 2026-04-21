@@ -15,6 +15,7 @@ import (
 	"github.com/posit-dev/ptd/lib/azure"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/kube"
+	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/posit-dev/ptd/lib/types"
 	pulumiaws "github.com/pulumi/pulumi-aws/sdk/v6/go/aws"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/rds"
@@ -129,7 +130,7 @@ func (s *SitesStep) runAWSInlineGo(ctx context.Context, creds types.Credentials,
 		}
 		config := kube.BuildEKSKubeConfigWithExec(endpoint, caCert, clusterName, s.DstTarget.Region())
 		if !cfg.TailscaleEnabled {
-			config.Clusters[0].Cluster.ProxyURL = "socks5://localhost:1080"
+			config.Clusters[0].Cluster.ProxyURL = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
 		}
 		data, err := yaml.Marshal(config)
 		if err != nil {
@@ -361,7 +362,7 @@ func (s *SitesStep) runAzureInlineGo(ctx context.Context, creds types.Credential
 			return fmt.Errorf("sites: failed to get AKS kubeconfig for %s: %w", clusterName, err)
 		}
 
-		kubeconfigBytes, err = kube.AddProxyToKubeConfigBytes(kubeconfigBytes, "socks5://localhost:1080")
+		kubeconfigBytes, err = kube.AddProxyToKubeConfigBytes(kubeconfigBytes, fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name())))
 		if err != nil {
 			return fmt.Errorf("sites: failed to add proxy to kubeconfig for %s: %w", clusterName, err)
 		}

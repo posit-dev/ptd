@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"path"
 	"slices"
+	"strconv"
 
 	"github.com/posit-dev/ptd/cmd/internal"
 	"github.com/posit-dev/ptd/cmd/internal/legacy"
 	"github.com/posit-dev/ptd/lib/kube"
+	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/posit-dev/ptd/lib/steps"
 	"github.com/posit-dev/ptd/lib/types"
 	"github.com/spf13/cobra"
@@ -158,8 +159,8 @@ func runEnsure(ctx context.Context, target string) {
 
 	// if any of the steps require a proxy, start the proxy session, unless tailscale is enabled
 	if steps.ProxyRequiredSteps(stepsToRun) && !t.TailscaleEnabled() {
-		proxyFile := path.Join(internal.DataDir(), "proxy.json")
-		stopProxy, err := kube.StartProxy(ctx, t, proxyFile)
+		port := strconv.Itoa(proxy.WorkloadPort(t.Name()))
+		stopProxy, err := kube.StartProxy(ctx, t, port, internal.RegistryFilePath())
 		if err != nil {
 			slog.Error("Error starting proxy session", "error", err)
 			return

@@ -5,11 +5,12 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path"
+	"strconv"
 
 	"github.com/posit-dev/ptd/cmd/internal"
 	"github.com/posit-dev/ptd/cmd/internal/legacy"
 	"github.com/posit-dev/ptd/lib/kube"
+	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/spf13/cobra"
 )
 
@@ -42,8 +43,8 @@ func runK9s(cmd *cobra.Command, target string) {
 	}
 
 	// Start proxy using shared kube package
-	proxyFile := path.Join(internal.DataDir(), "proxy.json")
-	stopProxy, err := kube.StartProxy(cmd.Context(), t, proxyFile)
+	port := strconv.Itoa(proxy.WorkloadPort(target))
+	stopProxy, err := kube.StartProxy(cmd.Context(), t, port, internal.RegistryFilePath())
 	if err != nil {
 		slog.Error("Error starting proxy session", "error", err)
 		return
@@ -57,7 +58,7 @@ func runK9s(cmd *cobra.Command, target string) {
 	}
 
 	// Set up kubeconfig using native SDK
-	kubeconfigPath, err := kube.SetupKubeConfig(cmd.Context(), t, creds)
+	kubeconfigPath, err := kube.SetupKubeConfig(cmd.Context(), t, creds, port)
 	if err != nil {
 		slog.Error("Failed to setup kubeconfig", "error", err)
 		return

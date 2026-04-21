@@ -3,6 +3,7 @@ import collections
 import dataclasses
 import enum
 import json
+import os
 import re
 import typing
 import warnings
@@ -2709,6 +2710,7 @@ def get_kubeconfig_for_cluster(name, tailscale_enabled, endpoint=None, ca_data=N
     }
 
     if not tailscale_enabled:
-        k["clusters"][0]["cluster"]["proxy-url"] = "socks5://localhost:1080"
+        proxy_url = os.environ.get("ALL_PROXY", "socks5://localhost:1080")
+        k["clusters"][0]["cluster"]["proxy-url"] = proxy_url
 
     return json.dumps(k)

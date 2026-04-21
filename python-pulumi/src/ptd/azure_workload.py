@@ -252,7 +252,8 @@ class AzureWorkload(ptd.workload.AbstractWorkload):
         kubeconfig = yaml.safe_load(kubeconfig_str)
 
         # assume azure workloads do not support tailscale, enforce socks5 proxy for kube interactions
-        kubeconfig["clusters"][0]["cluster"]["proxy-url"] = "socks5://localhost:1080"
+        proxy_url = os.environ.get("ALL_PROXY", "socks5://localhost:1080")
+        kubeconfig["clusters"][0]["cluster"]["proxy-url"] = proxy_url
 
         # Save kubeconfig to a temporary file to pass to kubelogin command
         with tempfile.NamedTemporaryFile(delete=False) as temp_kubeconfig:

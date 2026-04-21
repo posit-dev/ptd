@@ -19,21 +19,23 @@ import (
 //   - For AWS: native SDK-based kubeconfig generation (no CLI dependency)
 //   - For Azure: native SDK-based kubeconfig generation
 //   - Adding proxy configuration for non-tailscale clusters
-func SetupKubeConfig(ctx context.Context, t types.Target, creds types.Credentials) (string, error) {
+//
+// localPort is the SOCKS5 proxy port to inject into the kubeconfig.
+func SetupKubeConfig(ctx context.Context, t types.Target, creds types.Credentials, localPort string) (string, error) {
 	// Create a temp kubeconfig path
 	kubeconfigPath := filepath.Join(os.TempDir(), fmt.Sprintf("kubeconfig-%s", t.HashName()))
 
 	switch t.CloudProvider() {
 	case types.AWS:
-		return setupAWSKubeConfig(ctx, t, creds, kubeconfigPath)
+		return setupAWSKubeConfig(ctx, t, creds, kubeconfigPath, localPort)
 	case types.Azure:
-		return setupAzureKubeConfig(ctx, t, creds, kubeconfigPath)
+		return setupAzureKubeConfig(ctx, t, creds, kubeconfigPath, localPort)
 	default:
 		return "", fmt.Errorf("kubeconfig setup not implemented for cloud provider: %s", t.CloudProvider())
 	}
 }
 
-func setupAWSKubeConfig(ctx context.Context, t types.Target, creds types.Credentials, kubeconfigPath string) (string, error) {
+func setupAWSKubeConfig(ctx context.Context, t types.Target, creds types.Credentials, kubeconfigPath string, localPort string) (string, error) {
 	// Convert to AWS credentials
 	awsCreds, err := aws.OnlyAwsCredentials(creds)
 	if err != nil {
@@ -102,7 +104,7 @@ func setupAWSKubeConfig(ctx context.Context, t types.Target, creds types.Credent
 
 	// Add proxy if not using tailscale
 	if !t.TailscaleEnabled() {
-		if err := AddProxyToKubeConfig(kubeconfigPath, "socks5://localhost:1080"); err != nil {
+		if err := AddProxyToKubeConfig(kubeconfigPath, fmt.Sprintf("socks5://localhost:%s", localPort)); err != nil {
 			return "", fmt.Errorf("failed to add proxy to kubeconfig: %w", err)
 		}
 	}
@@ -110,7 +112,7 @@ func setupAWSKubeConfig(ctx context.Context, t types.Target, creds types.Credent
 	return kubeconfigPath, nil
 }
 
-func setupAzureKubeConfig(ctx context.Context, t types.Target, creds types.Credentials, kubeconfigPath string) (string, error) {
+func setupAzureKubeConfig(ctx context.Context, t types.Target, creds types.Credentials, kubeconfigPath string, localPort string) (string, error) {
 	// Type-assert to azure.Target
 	azureTarget, ok := t.(azure.Target)
 	if !ok {
@@ -160,7 +162,7 @@ func setupAzureKubeConfig(ctx context.Context, t types.Target, creds types.Crede
 	}
 
 	// Always add proxy for Azure (no tailscale support)
-	if err := AddProxyToKubeConfig(kubeconfigPath, "socks5://localhost:1080"); err != nil {
+	if err := AddProxyToKubeConfig(kubeconfigPath, fmt.Sprintf("socks5://localhost:%s", localPort)); err != nil {
 		return "", fmt.Errorf("failed to add proxy to Azure kubeconfig: %w", err)
 	}
 

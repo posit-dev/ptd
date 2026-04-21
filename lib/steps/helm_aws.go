@@ -19,6 +19,7 @@ import (
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	schedulingv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/scheduling/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	yamlv2 "gopkg.in/yaml.v2"
 	yaml "gopkg.in/yaml.v3"
 )
 
@@ -202,6 +203,10 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 		k8sProvider, err := kubernetes.NewProvider(ctx, k8sProviderName, &kubernetes.ProviderArgs{
 			Kubeconfig: pulumi.String(params.kubeconfigsByCluster[release]),
 		}, withAlias("pulumi:providers:kubernetes", k8sProviderName),
+			// Also alias for old Python naming: top-level resource with -k8s suffix.
+			pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(fmt.Sprintf(
+				"urn:pulumi:%s::%s::pulumi:providers:kubernetes::%s-k8s",
+				ctx.Stack(), outerProject, k8sProviderName))}}),
 			pulumi.IgnoreChanges([]string{"kubeconfig"}))
 		if err != nil {
 			return fmt.Errorf("helm aws: failed to create k8s provider for %s: %w", release, err)
@@ -286,10 +291,26 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 	return nil
 }
 
-func helmChartCR(ctx *pulumi.Context, resourceName, metaName, namespace, repo, chart, targetNamespace, version string, valuesContent map[string]interface{}, k8sOpt pulumi.ResourceOption, aliases ...pulumi.ResourceOption) error {
-	valuesYAML, err := yaml.Marshal(valuesContent)
+// marshalYAML encodes v as YAML matching Python's yaml.dump default (yaml.v2 sequence behavior,
+// single-quoted boolean strings to avoid yaml.v2 quoting them as "true"/"false").
+// The boolean replacement only matches `: "keyword"` (colon-space-quoted value position), so it
+// cannot misfire on substrings inside longer string values or on YAML keys.
+func marshalYAML(v interface{}) (string, error) {
+	data, err := yamlv2.Marshal(v)
 	if err != nil {
-		return fmt.Errorf("failed to marshal values for %s: %w", resourceName, err)
+		return "", err
+	}
+	result := string(data)
+	for _, kw := range []string{"true", "false", "yes", "no", "on", "off"} {
+		result = strings.ReplaceAll(result, fmt.Sprintf(`: "%s"`, kw), fmt.Sprintf(`: '%s'`, kw))
+	}
+	return result, nil
+}
+
+func helmChartCR(ctx *pulumi.Context, resourceName, metaName, namespace, repo, chart, targetNamespace, version string, valuesContent map[string]interface{}, k8sOpt pulumi.ResourceOption, aliases ...pulumi.ResourceOption) error {
+	valuesYAML, encErr := marshalYAML(valuesContent)
+	if encErr != nil {
+		return fmt.Errorf("failed to marshal values for %s: %w", resourceName, encErr)
 	}
 
 	opts := []pulumi.ResourceOption{k8sOpt}
@@ -299,13 +320,13 @@ func helmChartCR(ctx *pulumi.Context, resourceName, metaName, namespace, repo, c
 		"chart":           pulumi.String(chart),
 		"targetNamespace": pulumi.String(targetNamespace),
 		"version":         pulumi.String(version),
-		"valuesContent":   pulumi.String(string(valuesYAML)),
+		"valuesContent":   pulumi.String(valuesYAML),
 	}
 	if repo != "" {
 		spec["repo"] = pulumi.String(repo)
 	}
 
-	_, err = apiextensions.NewCustomResource(ctx, resourceName, &apiextensions.CustomResourceArgs{
+	_, err := apiextensions.NewCustomResource(ctx, resourceName, &apiextensions.CustomResourceArgs{
 		ApiVersion: pulumi.String("helm.cattle.io/v1"),
 		Kind:       pulumi.String("HelmChart"),
 		Metadata: metav1.ObjectMetaArgs{
@@ -485,7 +506,7 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	}
 
 	chartResourceName := compoundName + "-" + release + "-traefik-helm-release"
-	valuesYAML, err := yaml.Marshal(traefikValues)
+	valuesYAML, err := marshalYAML(traefikValues)
 	if err != nil {
 		return err
 	}
@@ -1040,7 +1061,11 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 			"config.alloy": pulumi.String(alloyConfigStr),
 		},
 	}, k8sOpt,
-		withNestedAlias("ptd:AlloyConfig", "kubernetes:core/v1:ConfigMap", cmResourceName))
+		withNestedAlias("ptd:AlloyConfig", "kubernetes:core/v1:ConfigMap", cmResourceName),
+		// Also alias without ptd:AWSWorkloadHelm$ prefix for workloads where AlloyConfig was top-level.
+		pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(fmt.Sprintf(
+			"urn:pulumi:%s::ptd-aws-workload-helm::ptd:AlloyConfig$kubernetes:core/v1:ConfigMap::%s",
+			ctx.Stack(), cmResourceName))}}))
 	if err != nil {
 		return err
 	}
@@ -1056,12 +1081,16 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 			"password": pulumi.String(params.mimirPassword),
 		},
 	}, k8sOpt,
-		// In Python: opts=ResourceOptions(parent=namespace, ...) — so URN path includes Namespace
-		pulumi.Aliases([]pulumi.Alias{{
-			URN: pulumi.URN(fmt.Sprintf(
-				"urn:pulumi:%s::%s::ptd:AWSWorkloadHelm$kubernetes:core/v1:Namespace$kubernetes:core/v1:Secret::%s",
-				ctx.Stack(), "ptd-aws-workload-helm", secretResourceName)),
-		}}),
+		// In Python: opts=ResourceOptions(parent=namespace, ...) — so URN path includes Namespace.
+		// Two variants: with and without ptd:AWSWorkloadHelm$ prefix depending on Python state vintage.
+		pulumi.Aliases([]pulumi.Alias{
+			{URN: pulumi.URN(fmt.Sprintf(
+				"urn:pulumi:%s::ptd-aws-workload-helm::ptd:AWSWorkloadHelm$kubernetes:core/v1:Namespace$kubernetes:core/v1:Secret::%s",
+				ctx.Stack(), secretResourceName))},
+			{URN: pulumi.URN(fmt.Sprintf(
+				"urn:pulumi:%s::ptd-aws-workload-helm::kubernetes:core/v1:Namespace$kubernetes:core/v1:Secret::%s",
+				ctx.Stack(), secretResourceName))},
+		}),
 		pulumi.DependsOn([]pulumi.Resource{ns}))
 	if err != nil {
 		return err
@@ -1239,7 +1268,7 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 	}
 
 	chartResourceName := compoundName + "-karpenter-helm-release"
-	valuesYAML, err := yaml.Marshal(values)
+	valuesYAML, err := marshalYAML(values)
 	if err != nil {
 		return err
 	}
@@ -1533,8 +1562,13 @@ func isThirdPartyTelemetryEnabled(v *bool) bool {
 	return *v
 }
 
-// mainDomain returns the domain of the first site (sorted by name), or empty string.
+// mainDomain returns the domain of the "main" site, mirroring Python's
+// WorkloadConfig.domain property (self.sites["main"].domain). Falls back to
+// the first site alphabetically for workloads without a "main" site.
 func mainDomain(sites map[string]types.SiteConfig) string {
+	if s, ok := sites["main"]; ok {
+		return s.Spec.Domain
+	}
 	names := helpers.SortedKeys(sites)
 	if len(names) == 0 {
 		return ""
