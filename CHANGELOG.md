@@ -1,3 +1,15 @@
+## [1.25.1](https://github.com/posit-dev/ptd/compare/v1.25.0...v1.25.1) (2026-04-21)
+
+
+### Bug Fixes
+
+* add dual aliases for AWS provider, AlloyConfig ConfigMap, and mimir-auth Secret ([2dcd6a7](https://github.com/posit-dev/ptd/commit/2dcd6a7c6f3b6098eef2939d564ccb430dfa991f))
+* correct Alloy ConfigMap alias and YAML indentation in helm chart CRs ([5c01ca9](https://github.com/posit-dev/ptd/commit/5c01ca9423a88c0c1ab225152eae9da0cb14d230))
+* correct Alloy ConfigMap Pulumi alias to include AlloyConfig parent type ([d3f16b4](https://github.com/posit-dev/ptd/commit/d3f16b42ca873ad5fa9ed92bf2ff1a150af08412))
+* mainDomain should use site named "main", not first alphabetically ([4715421](https://github.com/posit-dev/ptd/commit/4715421e3823623dcc5ce386a86efa337cb70c13))
+* use yaml.v2 for Traefik and Karpenter values, harden alias URNs and error handling ([a33cb77](https://github.com/posit-dev/ptd/commit/a33cb77125c37600c24c826ef33cd8ade2975c68))
+* use yaml.v2 in marshalYAML and correct Azure helm diffs vs Python state ([0e50fc1](https://github.com/posit-dev/ptd/commit/0e50fc1ee20b6510a1b9105d6c27c6ead4c21177))
+
 # [1.25.0](https://github.com/posit-dev/ptd/compare/v1.24.0...v1.25.0) (2026-04-21)
 
 
