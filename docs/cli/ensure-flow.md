@@ -210,7 +210,7 @@ Creates AKS clusters:
 
 **Proxy Required**: Yes
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_workload_clusters.py`)
+**Implementation**: Go inline Pulumi (`lib/steps/clusters.go`)
 
 Configures the Kubernetes cluster created in the previous step:
 - Deploys cluster-wide Kubernetes resources
@@ -224,7 +224,7 @@ Configures the Kubernetes cluster created in the previous step:
 
 **Proxy Required**: Yes
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_workload_helm.py`)
+**Implementation**: Go inline Pulumi (`lib/steps/helm_aws.go`, `lib/steps/helm_azure.go`)
 
 Deploys essential Kubernetes applications and controllers:
 - **Team Operator**: Posit's operator for managing Team product deployments

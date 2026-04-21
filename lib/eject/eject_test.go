@@ -83,10 +83,83 @@ func TestRun_CollectsControlRoomDetails(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestRun_WritesMetadataJSON(t *testing.T) {
+	target := newWorkloadTarget("test-workload")
+	outputDir := filepath.Join(t.TempDir(), "eject-output")
+
+	config := types.AWSWorkloadConfig{
+		AccountID: "123456789012",
+		Region:    "us-east-2",
+	}
+
+	err := Run(context.Background(), target, Options{
+		TargetName:   "test-workload",
+		OutputDir:    outputDir,
+		DryRun:       true,
+		CLIVersion:   "1.2.3",
+		ConfigLoader: mockConfigLoader(config),
+	})
+
+	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(outputDir, "metadata.json"))
+}
+
+func TestRun_WritesReadme(t *testing.T) {
+	target := newWorkloadTarget("test-workload")
+	outputDir := filepath.Join(t.TempDir(), "eject-output")
+
+	err := Run(context.Background(), target, Options{
+		TargetName:   "test-workload",
+		OutputDir:    outputDir,
+		DryRun:       true,
+		ConfigLoader: mockConfigLoader(types.AWSWorkloadConfig{}),
+	})
+
+	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(outputDir, "README.md"))
+}
+
+func TestRun_CopiesWorkloadConfig(t *testing.T) {
+	workloadPath := setupWorkloadDir(t)
+	target := newWorkloadTarget("test-workload")
+	outputDir := filepath.Join(t.TempDir(), "eject-output")
+
+	err := Run(context.Background(), target, Options{
+		TargetName:   "test-workload",
+		OutputDir:    outputDir,
+		DryRun:       true,
+		WorkloadPath: workloadPath,
+		ConfigLoader: mockConfigLoader(types.AWSWorkloadConfig{}),
+		HandoffCollector: func(ctx context.Context, t types.Target, opts Options, crDetails *ControlRoomDetails) error {
+			return nil
+		},
+	})
+
+	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(outputDir, "config", "ptd.yaml"))
+	assert.FileExists(t, filepath.Join(outputDir, "config", "site_main", "site.yaml"))
+}
+
+func TestRun_SkipsConfigCopyWhenNoWorkloadPath(t *testing.T) {
+	target := newWorkloadTarget("test-workload")
+	outputDir := filepath.Join(t.TempDir(), "eject-output")
+
+	err := Run(context.Background(), target, Options{
+		TargetName:   "test-workload",
+		OutputDir:    outputDir,
+		DryRun:       true,
+		ConfigLoader: mockConfigLoader(types.AWSWorkloadConfig{}),
+	})
+
+	require.NoError(t, err)
+	assert.NoDirExists(t, filepath.Join(outputDir, "config"))
+}
+
 func newWorkloadTarget(name string) *typestest.MockTarget {
 	mt := &typestest.MockTarget{}
 	mt.On("Name").Return(name)
 	mt.On("Type").Return(types.TargetTypeWorkload)
 	mt.On("ControlRoom").Return(false)
+	mt.On("CloudProvider").Return(types.AWS)
 	return mt
 }

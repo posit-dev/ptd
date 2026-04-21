@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/posit-dev/ptd/lib/attestation"
 	"github.com/posit-dev/ptd/lib/helpers"
@@ -15,12 +16,16 @@ import (
 
 type ConfigLoaderFunc func(types.Target) (interface{}, error)
 
+type HandoffCollectorFunc func(ctx context.Context, t types.Target, opts Options, crDetails *ControlRoomDetails) error
+
 type Options struct {
-	TargetName   string
-	OutputDir    string
-	DryRun       bool
-	WorkloadPath string
-	ConfigLoader ConfigLoaderFunc // nil defaults to helpers.ConfigForTarget
+	TargetName       string
+	OutputDir        string
+	DryRun           bool
+	CLIVersion       string
+	WorkloadPath     string
+	ConfigLoader     ConfigLoaderFunc // nil defaults to helpers.ConfigForTarget
+	HandoffCollector HandoffCollectorFunc
 }
 
 type Bundle struct {
@@ -34,6 +39,13 @@ func (o *Options) configLoader() ConfigLoaderFunc {
 	return helpers.ConfigForTarget
 }
 
+func (o *Options) handoffCollector() HandoffCollectorFunc {
+	if o.HandoffCollector != nil {
+		return o.HandoffCollector
+	}
+	return collectAndRenderHandoff
+}
+
 func Run(ctx context.Context, t types.Target, opts Options) error {
 	slog.Info("Starting eject", "target", opts.TargetName, "output-dir", opts.OutputDir, "dry-run", opts.DryRun)
 
@@ -41,6 +53,7 @@ func Run(ctx context.Context, t types.Target, opts Options) error {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
+	// TODO: serialize bundle to disk once all steps (inventory, secrets, state export) are wired
 	bundle := &Bundle{}
 
 	config, err := opts.configLoader()(t)
@@ -59,7 +72,32 @@ func Run(ctx context.Context, t types.Target, opts Options) error {
 		"connections", len(crDetails.Connections),
 	)
 
-	if err := collectAndRenderHandoff(ctx, t, opts, crDetails); err != nil {
+	if opts.WorkloadPath != "" {
+		if err := CopyWorkloadConfig(opts.WorkloadPath, opts.OutputDir); err != nil {
+			return fmt.Errorf("failed to copy workload config: %w", err)
+		}
+		slog.Info("Copied workload config", "from", opts.WorkloadPath)
+	}
+
+	metadata, err := CollectMetadata(config, opts, time.Now())
+	if err != nil {
+		return fmt.Errorf("failed to collect metadata: %w", err)
+	}
+	if err := WriteMetadata(metadata, opts.OutputDir); err != nil {
+		return fmt.Errorf("failed to write metadata: %w", err)
+	}
+	slog.Info("Wrote metadata.json")
+
+	hasConfig := opts.WorkloadPath != ""
+	if err := WriteReadme(metadata, hasConfig, opts.OutputDir); err != nil {
+		return fmt.Errorf("failed to write README: %w", err)
+	}
+	slog.Info("Wrote README.md")
+	if err := WriteRemoveAccessRunbook(opts.OutputDir, crDetails, opts.TargetName, string(t.CloudProvider())); err != nil {
+		return fmt.Errorf("failed to write remove-posit-access runbook: %w", err)
+	}
+
+	if err := opts.handoffCollector()(ctx, t, opts, crDetails); err != nil {
 		return err
 	}
 

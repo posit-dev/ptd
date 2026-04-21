@@ -81,7 +81,7 @@ func setupAWSKubeConfig(ctx context.Context, t types.Target, creds types.Credent
 	slog.Info("Setting up kubeconfig", "cluster_name", clusterName, "region", t.Region(), "target", t.Name())
 
 	// Get cluster info from AWS
-	endpoint, caCert, err := aws.GetClusterInfo(ctx, awsCreds, t.Region(), clusterName)
+	endpoint, caCert, _, err := aws.GetClusterInfo(ctx, awsCreds, t.Region(), clusterName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get cluster info: %w", err)
 	}
