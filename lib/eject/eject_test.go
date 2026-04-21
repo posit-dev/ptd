@@ -130,6 +130,9 @@ func TestRun_CopiesWorkloadConfig(t *testing.T) {
 		DryRun:       true,
 		WorkloadPath: workloadPath,
 		ConfigLoader: mockConfigLoader(types.AWSWorkloadConfig{}),
+		HandoffCollector: func(ctx context.Context, t types.Target, opts Options, crDetails *ControlRoomDetails) error {
+			return nil
+		},
 	})
 
 	require.NoError(t, err)

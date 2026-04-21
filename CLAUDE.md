@@ -84,7 +84,7 @@ The Go CLI communicates the infrastructure path to Python Pulumi stacks via the 
 
 #### Build Commands
 
-- `just build-cmd`: Build command-line tool
+- `just cli`: Build command-line tool
 
 #### Test Commands
 
@@ -96,6 +96,56 @@ The Go CLI communicates the infrastructure path to Python Pulumi stacks via the 
 #### AWS Development
 
 - `just aws-unset`: Unset all AWS environment variables
+
+## Using the PTD CLI
+
+### Proxy
+
+The proxy subsystem manages SOCKS proxy sessions to target bastion hosts. All proxy state is stored in a shared registry file (`~/.local/share/ptd/proxies.json`), enabling multiple concurrent proxies.
+
+**Starting a proxy:**
+
+```bash
+# Interactive use — binds to port 1080
+ptd proxy <target>
+
+# Daemon mode — binds to the deterministic workload port (10000–19999) and
+# stays running in the background; this is the same port used by ensure/workon
+ptd proxy <target> --daemon
+
+# Explicit port
+ptd proxy <target> --port 9090
+```
+
+**Print the deterministic port for a workload:**
+
+```bash
+ptd proxy port <target>
+```
+
+**Stopping proxies:**
+
+```bash
+# Stop one workload's proxy
+ptd proxy <target> --stop
+
+# Stop all running proxies
+ptd proxy --stop
+```
+
+**Registry management:**
+
+```bash
+# List all proxy sessions recorded in the registry
+ptd proxy --list
+
+# Remove stale entries (dead PIDs / closed ports)
+ptd proxy --prune
+```
+
+**Automatic proxy in ensure/workon:**
+
+`ptd ensure` and `ptd workon` start a proxy automatically on the deterministic workload port and reuse an existing one if it is already running. For scripted or agent use, prefer `ptd workon <target> -- <cmd>` rather than managing proxies manually.
 
 ## Git Worktrees
 
@@ -120,7 +170,7 @@ Always prefix worktree directories with `ptd-` to avoid collisions with other re
 1. **Build the binary** — each worktree needs its own ptd binary:
    ```bash
    cd ../.worktrees/ptd-<branch-name>
-   just build-cmd
+   just cli
    ```
 2. **direnv** — if direnv is available, copy `envrc.recommended` to `.envrc` in the worktree, then run `direnv allow`. The file uses `source_up` to inherit workspace vars and overrides `PTD` to point to the worktree.
 3. **For agents without direnv** — set env vars explicitly before running `ptd` commands:
@@ -140,7 +190,7 @@ git worktree remove ../.worktrees/ptd-<branch-name>
 
 - **NEVER** use `git checkout -b` for new work — always `git worktree add`
 - **NEVER** put worktrees inside the repo directory — always use `../.worktrees/ptd-<name>`
-- **ALWAYS** rebuild the binary after creating a worktree (`just build-cmd`)
+- **ALWAYS** rebuild the binary after creating a worktree (`just cli`)
 - Branch names: kebab-case, no slashes, no usernames (slashes break worktree directory paths)
 
 ## Monitoring and Alerts

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/posit-dev/ptd/lib/types"
 )
 
@@ -51,10 +52,8 @@ func (s *HelmStep) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
-	// helm step always needs proxy for K8s connectivity
 	if !s.DstTarget.TailscaleEnabled() {
-		envVars["ALL_PROXY"] = "socks5://localhost:1080"
+		envVars["ALL_PROXY"] = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
 	}
 
 	switch s.DstTarget.CloudProvider() {

@@ -27,10 +27,6 @@ type ProxySession struct {
 }
 
 func NewProxySession(t Target, awsCliPath string, localPort string, file string) *ProxySession {
-	if localPort == "" {
-		localPort = "1080"
-	}
-
 	runningProxy := proxy.NewRunningProxy(
 		t.Name(),
 		localPort,

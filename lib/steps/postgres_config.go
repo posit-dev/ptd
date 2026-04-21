@@ -14,6 +14,7 @@ import (
 
 	"github.com/posit-dev/ptd/lib/azure"
 	"github.com/posit-dev/ptd/lib/helpers"
+	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/posit-dev/ptd/lib/types"
 )
 
@@ -53,7 +54,7 @@ func (s *PostgresConfigStep) Run(ctx context.Context) error {
 
 	// if the target isn't tailscale enabled, add ALL_PROXY to the env vars
 	if !s.DstTarget.TailscaleEnabled() {
-		envVars["ALL_PROXY"] = "socks5://localhost:1080" // TODO: make this configurable
+		envVars["ALL_PROXY"] = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
 	}
 
 	switch s.DstTarget.CloudProvider() {
