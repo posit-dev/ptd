@@ -84,7 +84,7 @@ Grafana Alloy is the telemetry collection agent that runs on every node in the c
 
 **Deployment**: DaemonSet in the `alloy` namespace
 
-**Configuration** (see `python-pulumi/src/ptd/pulumi_resources/grafana_alloy.py`):
+**Configuration** (see `lib/steps/helm_helpers.go`, `buildAlloyConfig`):
 - Scrapes metrics from:
   - Kubernetes pods in `posit-team`, `posit-team-system`, and `loki` namespaces
   - Node exporters (CPU, memory, disk, network)
@@ -142,7 +142,7 @@ Grafana Alloy is the telemetry collection agent that runs on every node in the c
 
 **Helm Chart**: `grafana/alloy`
 
-**Key Configuration** (from `aws_workload_helm.py:1127-1258`):
+**Key Configuration** (from `lib/steps/helm_aws.go`, `awsHelmAlloy`):
 ```yaml
 alloy:
   clustering:
@@ -174,7 +174,7 @@ Mimir is a horizontally scalable, long-term storage for Prometheus metrics.
 
 **Helm Chart**: `grafana/mimir-distributed`
 
-**Key Configuration** (from `aws_workload_helm.py:473-604`):
+**Key Configuration** (from `lib/steps/helm_aws.go`, `awsHelmMimir`):
 ```yaml
 mimir:
   structuredConfig:
@@ -215,7 +215,7 @@ Loki is a log aggregation system designed to store and query logs efficiently.
 
 **Helm Chart**: `grafana/loki`
 
-**Key Configuration** (from `aws_workload_helm.py:270-393`):
+**Key Configuration** (from `lib/steps/helm_aws.go`, `awsHelmLoki`):
 ```yaml
 loki:
   auth_enabled: false
@@ -258,7 +258,7 @@ Grafana provides the visualization layer for metrics and logs.
 
 **Helm Chart**: `grafana/grafana`
 
-**Data Sources** (from `aws_workload_helm.py:444-466`):
+**Data Sources** (from `lib/steps/helm_aws.go`, `awsHelmGrafana`):
 ```yaml
 datasources:
   - name: Loki

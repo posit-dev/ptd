@@ -18,6 +18,7 @@ var RequiredPlugins = map[string]string{
 	"postgresql":   "3.16.2",
 	"aws":          "6.65.0",
 	"azure-native": "3.8.0",
+	"kubernetes":   "4.21.1",
 }
 
 // Stack creates or fetches a Pulumi stack for the given target and base name (step)

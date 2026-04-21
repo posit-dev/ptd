@@ -1,3 +1,90 @@
+# [1.24.0](https://github.com/posit-dev/ptd/compare/v1.23.0...v1.24.0) (2026-04-17)
+
+
+### Bug Fixes
+
+* conditionally emit control_room remote_write when control_room_domain is set ([951a412](https://github.com/posit-dev/ptd/commit/951a41279ac1e0d7e39950bffb4bbbf64d92cbc1)), closes [#252](https://github.com/posit-dev/ptd/issues/252)
+
+
+### Features
+
+* add Azure nvidia device plugin helm deployment ([c1ed84d](https://github.com/posit-dev/ptd/commit/c1ed84dc2fa84ab1ac1ffe3738985d3091e3a322))
+
+# [1.23.0](https://github.com/posit-dev/ptd/compare/v1.22.1...v1.23.0) (2026-04-17)
+
+
+### Features
+
+* mirror nvidia device plugin for azure ([f09c491](https://github.com/posit-dev/ptd/commit/f09c49164196a70ef752e928a790f31fcd24e9b0))
+
+## [1.22.1](https://github.com/posit-dev/ptd/compare/v1.22.0...v1.22.1) (2026-04-17)
+
+
+### Bug Fixes
+
+* **proxy:** kill subprocess group on stop to avoid Azure tunnel orphan ([1c40215](https://github.com/posit-dev/ptd/commit/1c40215c89dd015e411f03ae193142acd4d58ccc))
+
+# [1.22.0](https://github.com/posit-dev/ptd/compare/v1.21.0...v1.22.0) (2026-04-17)
+
+
+### Features
+
+* add automation for assigning aks rbac role ([0f3a5df](https://github.com/posit-dev/ptd/commit/0f3a5df60004fbc067edbf70648e0e6e5913bc08))
+
+# [1.21.0](https://github.com/posit-dev/ptd/compare/v1.20.0...v1.21.0) (2026-04-16)
+
+
+### Bug Fixes
+
+* code review suggestions ([e21cb06](https://github.com/posit-dev/ptd/commit/e21cb06ef6b5015e4624b47b692f82629abc091d))
+
+
+### Features
+
+* **eject:** add metadata.json, README, and config copy to bundle ([9d495b5](https://github.com/posit-dev/ptd/commit/9d495b58f4bf5c9a7506d930c67910acabfda483)), closes [#219](https://github.com/posit-dev/ptd/issues/219)
+
+# [1.20.0](https://github.com/posit-dev/ptd/compare/v1.19.0...v1.20.0) (2026-04-16)
+
+
+### Bug Fixes
+
+* make snapshot dynamic, handle numeric IDs, add edge case tests ([84768b8](https://github.com/posit-dev/ptd/commit/84768b8fb439b107558283284a5899d4c80267ad))
+
+
+### Features
+
+* add config strip and snapshot for eject severance ([9d931b0](https://github.com/posit-dev/ptd/commit/9d931b0af3e696d4bc9fca2a0a74dda11103246d))
+
+# [1.19.0](https://github.com/posit-dev/ptd/compare/v1.18.0...v1.19.0) (2026-04-16)
+
+
+### Features
+
+* conditionally include control room remote_write in Alloy config ([9a141df](https://github.com/posit-dev/ptd/commit/9a141dfafa66525839cd578f8d67ae3ff80fc2ef))
+
+# [1.18.0](https://github.com/posit-dev/ptd/compare/v1.17.0...v1.18.0) (2026-04-16)
+
+
+### Features
+
+* add IAM trust removal runbook for eject bundle ([09fd47e](https://github.com/posit-dev/ptd/commit/09fd47ecb2d62c0ec2772563dfa1b99849f7f66c))
+* add re-adopt runbook generator for eject bundle ([9986433](https://github.com/posit-dev/ptd/commit/99864332054da0185dfa0ebc3922078ddea29280))
+* add RemoveWorkloadMimirPassword for eject severance ([5cafed5](https://github.com/posit-dev/ptd/commit/5cafed59643084cebb315f820696e3a2832e0242))
+* cloud-specific access removal runbooks, wire into eject ([e544235](https://github.com/posit-dev/ptd/commit/e544235431e3bacc43a2aaf78ee84dc6ad794d05))
+* tolerate nil control room target in ensure steps ([bc3e99a](https://github.com/posit-dev/ptd/commit/bc3e99af1d0b07acacd953f964bac65fa3bb104d))
+
+# [1.17.0](https://github.com/posit-dev/ptd/compare/v1.16.0...v1.17.0) (2026-04-15)
+
+
+### Bug Fixes
+
+* **clusters:** address PR review — feature gaps and deduplication ([619227e](https://github.com/posit-dev/ptd/commit/619227ec573e883864cf23aaea0628518c628800))
+
+
+### Features
+
+* rewrite clusters step in Go, retire Python implementation ([1da055e](https://github.com/posit-dev/ptd/commit/1da055e22d17fb592aaf6ba2369ae33949b9b52d))
+
 # [1.16.0](https://github.com/posit-dev/ptd/compare/v1.15.0...v1.16.0) (2026-04-15)
 
 

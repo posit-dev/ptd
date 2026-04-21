@@ -42,8 +42,21 @@ var proxyCmd = &cobra.Command{
 			return
 		}
 
-		stopProxy, err := kube.StartProxy(cmd.Context(), t, proxyFile)
+		// Install the SIGINT handler BEFORE starting the proxy. Startup takes
+		// several seconds (Azure bastion handshake) and the subprocesses now
+		// run in their own process groups (Setpgid: true), so terminal SIGINT
+		// no longer reaches them — only ptd's handler can clean them up.
+		// Cancelling ctx triggers exec.CommandContext's Cancel callback,
+		// which is wired in azure/aws proxy.go to do a group-kill.
+		ctx, stopSignal := signal.NotifyContext(cmd.Context(), os.Interrupt)
+
+		stopProxy, err := kube.StartProxy(ctx, t, proxyFile)
 		if err != nil {
+			stopSignal()
+			if ctx.Err() != nil {
+				slog.Info("Proxy session start cancelled by user")
+				return
+			}
 			slog.Error("Error starting proxy session", "error", err)
 			return
 		}
@@ -55,11 +68,9 @@ var proxyCmd = &cobra.Command{
 			return
 		}
 
-		// Wait for interrupt signal
+		defer stopSignal()
 		slog.Info("Press Ctrl+C to stop the proxy session")
-		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, os.Interrupt)
-		<-sigCh
+		<-ctx.Done()
 		slog.Info("Received interrupt, stopping proxy session")
 		stopProxy()
 	},
