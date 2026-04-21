@@ -84,7 +84,7 @@ The Go CLI communicates the infrastructure path to Python Pulumi stacks via the 
 
 #### Build Commands
 
-- `just build-cmd`: Build command-line tool
+- `just cli`: Build command-line tool
 
 #### Test Commands
 
@@ -120,7 +120,7 @@ Always prefix worktree directories with `ptd-` to avoid collisions with other re
 1. **Build the binary** — each worktree needs its own ptd binary:
    ```bash
    cd ../.worktrees/ptd-<branch-name>
-   just build-cmd
+   just cli
    ```
 2. **direnv** — if direnv is available, copy `envrc.recommended` to `.envrc` in the worktree, then run `direnv allow`. The file uses `source_up` to inherit workspace vars and overrides `PTD` to point to the worktree.
 3. **For agents without direnv** — set env vars explicitly before running `ptd` commands:
@@ -140,7 +140,7 @@ git worktree remove ../.worktrees/ptd-<branch-name>
 
 - **NEVER** use `git checkout -b` for new work — always `git worktree add`
 - **NEVER** put worktrees inside the repo directory — always use `../.worktrees/ptd-<name>`
-- **ALWAYS** rebuild the binary after creating a worktree (`just build-cmd`)
+- **ALWAYS** rebuild the binary after creating a worktree (`just cli`)
 - Branch names: kebab-case, no slashes, no usernames (slashes break worktree directory paths)
 
 ## Monitoring and Alerts
