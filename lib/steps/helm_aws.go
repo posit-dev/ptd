@@ -203,6 +203,10 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 		k8sProvider, err := kubernetes.NewProvider(ctx, k8sProviderName, &kubernetes.ProviderArgs{
 			Kubeconfig: pulumi.String(params.kubeconfigsByCluster[release]),
 		}, withAlias("pulumi:providers:kubernetes", k8sProviderName),
+			// Also alias for old Python naming: top-level resource with -k8s suffix.
+			pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(fmt.Sprintf(
+				"urn:pulumi:%s::%s::pulumi:providers:kubernetes::%s-k8s",
+				ctx.Stack(), outerProject, k8sProviderName))}}),
 			pulumi.IgnoreChanges([]string{"kubeconfig"}))
 		if err != nil {
 			return fmt.Errorf("helm aws: failed to create k8s provider for %s: %w", release, err)
@@ -1055,7 +1059,11 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 			"config.alloy": pulumi.String(alloyConfigStr),
 		},
 	}, k8sOpt,
-		withNestedAlias("ptd:AlloyConfig", "kubernetes:core/v1:ConfigMap", cmResourceName))
+		withNestedAlias("ptd:AlloyConfig", "kubernetes:core/v1:ConfigMap", cmResourceName),
+		// Also alias without ptd:AWSWorkloadHelm$ prefix for workloads where AlloyConfig was top-level.
+		pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(fmt.Sprintf(
+			"urn:pulumi:%s::%s::ptd:AlloyConfig$kubernetes:core/v1:ConfigMap::%s",
+			ctx.Stack(), ctx.Project(), cmResourceName))}}))
 	if err != nil {
 		return err
 	}
@@ -1071,12 +1079,16 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 			"password": pulumi.String(params.mimirPassword),
 		},
 	}, k8sOpt,
-		// In Python: opts=ResourceOptions(parent=namespace, ...) — so URN path includes Namespace
-		pulumi.Aliases([]pulumi.Alias{{
-			URN: pulumi.URN(fmt.Sprintf(
+		// In Python: opts=ResourceOptions(parent=namespace, ...) — so URN path includes Namespace.
+		// Two variants: with and without ptd:AWSWorkloadHelm$ prefix depending on Python state vintage.
+		pulumi.Aliases([]pulumi.Alias{
+			{URN: pulumi.URN(fmt.Sprintf(
 				"urn:pulumi:%s::%s::ptd:AWSWorkloadHelm$kubernetes:core/v1:Namespace$kubernetes:core/v1:Secret::%s",
-				ctx.Stack(), "ptd-aws-workload-helm", secretResourceName)),
-		}}),
+				ctx.Stack(), ctx.Project(), secretResourceName))},
+			{URN: pulumi.URN(fmt.Sprintf(
+				"urn:pulumi:%s::%s::kubernetes:core/v1:Namespace$kubernetes:core/v1:Secret::%s",
+				ctx.Stack(), ctx.Project(), secretResourceName))},
+		}),
 		pulumi.DependsOn([]pulumi.Resource{ns}))
 	if err != nil {
 		return err
