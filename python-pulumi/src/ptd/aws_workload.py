@@ -799,7 +799,8 @@ class AWSWorkload(ptd.workload.AbstractWorkload):
         )
 
         if not self.cfg.tailscale_enabled:
-            kubeconfig["clusters"][0]["cluster"]["proxy-url"] = "socks5://localhost:1080"
+            proxy_url = os.environ.get("ALL_PROXY", "socks5://localhost:1080")
+            kubeconfig["clusters"][0]["cluster"]["proxy-url"] = proxy_url
         return kubeconfig
 
     def aws_assume_role(self, aws_region: str | None = None) -> ptd.AWSSession:

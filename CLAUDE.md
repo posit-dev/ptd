@@ -97,6 +97,56 @@ The Go CLI communicates the infrastructure path to Python Pulumi stacks via the 
 
 - `just aws-unset`: Unset all AWS environment variables
 
+## Using the PTD CLI
+
+### Proxy
+
+The proxy subsystem manages SOCKS proxy sessions to target bastion hosts. All proxy state is stored in a shared registry file (`~/.local/share/ptd/proxies.json`), enabling multiple concurrent proxies.
+
+**Starting a proxy:**
+
+```bash
+# Interactive use — binds to port 1080
+ptd proxy <target>
+
+# Daemon mode — binds to the deterministic workload port (10000–19999) and
+# stays running in the background; this is the same port used by ensure/workon
+ptd proxy <target> --daemon
+
+# Explicit port
+ptd proxy <target> --port 9090
+```
+
+**Print the deterministic port for a workload:**
+
+```bash
+ptd proxy port <target>
+```
+
+**Stopping proxies:**
+
+```bash
+# Stop one workload's proxy
+ptd proxy <target> --stop
+
+# Stop all running proxies
+ptd proxy --stop
+```
+
+**Registry management:**
+
+```bash
+# List all proxy sessions recorded in the registry
+ptd proxy --list
+
+# Remove stale entries (dead PIDs / closed ports)
+ptd proxy --prune
+```
+
+**Automatic proxy in ensure/workon:**
+
+`ptd ensure` and `ptd workon` start a proxy automatically on the deterministic workload port and reuse an existing one if it is already running. For scripted or agent use, prefer `ptd workon <target> -- <cmd>` rather than managing proxies manually.
+
 ## Git Worktrees
 
 **Always use git worktrees instead of plain branches.** This enables concurrent Claude sessions in the same repo.
