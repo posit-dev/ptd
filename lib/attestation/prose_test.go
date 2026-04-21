@@ -20,9 +20,9 @@ func TestProductDisplayName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			got := productDisplayName(tt.input)
+			got := ProductDisplayName(tt.input)
 			if got != tt.want {
-				t.Errorf("productDisplayName(%q) = %q, want %q", tt.input, got, tt.want)
+				t.Errorf("ProductDisplayName(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}
@@ -47,9 +47,9 @@ func TestStackOrder(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := stackOrder(tt.name)
+			got := StackOrder(tt.name)
 			if got != tt.want {
-				t.Errorf("stackOrder(%q) = %d, want %d", tt.name, got, tt.want)
+				t.Errorf("StackOrder(%q) = %d, want %d", tt.name, got, tt.want)
 			}
 		})
 	}

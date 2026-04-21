@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	att "github.com/posit-dev/ptd/lib/attestation"
 	"github.com/posit-dev/ptd/lib/pulumistate"
 )
 
@@ -82,11 +83,5 @@ func purposeFromKey(key string) string {
 	if len(parts) < 4 {
 		return ""
 	}
-	project := parts[2]
-	projectParts := strings.Split(project, "-")
-	// step name is everything after ptd-{cloud}-{target_type}-
-	if len(projectParts) >= 4 {
-		return strings.Join(projectParts[3:], "-")
-	}
-	return project
+	return att.StepNameFromProjectName(parts[2])
 }
