@@ -461,9 +461,18 @@ func azureHelmExternalDNS(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, com
 	// azure.json config secret.
 	// Use fmt.Sprintf + per-field json.Marshal to match Python's json.dumps format
 	// (spaces after ":" and ",", insertion-ordered keys).
-	tenantIDJSON, _ := json.Marshal(params.tenantID)
-	subscriptionIDJSON, _ := json.Marshal(params.subscriptionID)
-	resourceGroupJSON, _ := json.Marshal(params.resourceGroupName)
+	tenantIDJSON, err := json.Marshal(params.tenantID)
+	if err != nil {
+		return fmt.Errorf("helm azure: failed to marshal tenantID: %w", err)
+	}
+	subscriptionIDJSON, err := json.Marshal(params.subscriptionID)
+	if err != nil {
+		return fmt.Errorf("helm azure: failed to marshal subscriptionID: %w", err)
+	}
+	resourceGroupJSON, err := json.Marshal(params.resourceGroupName)
+	if err != nil {
+		return fmt.Errorf("helm azure: failed to marshal resourceGroupName: %w", err)
+	}
 	azureConfigStr := fmt.Sprintf(
 		`{"tenantId": %s, "subscriptionId": %s, "resourceGroup": %s, "useWorkloadIdentityExtension": true}`,
 		tenantIDJSON, subscriptionIDJSON, resourceGroupJSON,

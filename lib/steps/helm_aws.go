@@ -504,7 +504,7 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	}
 
 	chartResourceName := compoundName + "-" + release + "-traefik-helm-release"
-	valuesYAML, err := yaml.Marshal(traefikValues)
+	valuesYAML, err := marshalYAML(traefikValues)
 	if err != nil {
 		return err
 	}
@@ -1062,8 +1062,8 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 		withNestedAlias("ptd:AlloyConfig", "kubernetes:core/v1:ConfigMap", cmResourceName),
 		// Also alias without ptd:AWSWorkloadHelm$ prefix for workloads where AlloyConfig was top-level.
 		pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(fmt.Sprintf(
-			"urn:pulumi:%s::%s::ptd:AlloyConfig$kubernetes:core/v1:ConfigMap::%s",
-			ctx.Stack(), ctx.Project(), cmResourceName))}}))
+			"urn:pulumi:%s::ptd-aws-workload-helm::ptd:AlloyConfig$kubernetes:core/v1:ConfigMap::%s",
+			ctx.Stack(), cmResourceName))}}))
 	if err != nil {
 		return err
 	}
@@ -1083,11 +1083,11 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 		// Two variants: with and without ptd:AWSWorkloadHelm$ prefix depending on Python state vintage.
 		pulumi.Aliases([]pulumi.Alias{
 			{URN: pulumi.URN(fmt.Sprintf(
-				"urn:pulumi:%s::%s::ptd:AWSWorkloadHelm$kubernetes:core/v1:Namespace$kubernetes:core/v1:Secret::%s",
-				ctx.Stack(), ctx.Project(), secretResourceName))},
+				"urn:pulumi:%s::ptd-aws-workload-helm::ptd:AWSWorkloadHelm$kubernetes:core/v1:Namespace$kubernetes:core/v1:Secret::%s",
+				ctx.Stack(), secretResourceName))},
 			{URN: pulumi.URN(fmt.Sprintf(
-				"urn:pulumi:%s::%s::kubernetes:core/v1:Namespace$kubernetes:core/v1:Secret::%s",
-				ctx.Stack(), ctx.Project(), secretResourceName))},
+				"urn:pulumi:%s::ptd-aws-workload-helm::kubernetes:core/v1:Namespace$kubernetes:core/v1:Secret::%s",
+				ctx.Stack(), secretResourceName))},
 		}),
 		pulumi.DependsOn([]pulumi.Resource{ns}))
 	if err != nil {
@@ -1266,7 +1266,7 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 	}
 
 	chartResourceName := compoundName + "-karpenter-helm-release"
-	valuesYAML, err := yaml.Marshal(values)
+	valuesYAML, err := marshalYAML(values)
 	if err != nil {
 		return err
 	}
