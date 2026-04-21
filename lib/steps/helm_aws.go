@@ -19,6 +19,7 @@ import (
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	schedulingv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/scheduling/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	yamlv2 "gopkg.in/yaml.v2"
 	yaml "gopkg.in/yaml.v3"
 )
 
@@ -286,15 +287,18 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 	return nil
 }
 
-// marshalYAML encodes v as YAML with 2-space indentation (matching Python's yaml.dump default).
+// marshalYAML encodes v as YAML matching Python's yaml.dump default (yaml.v2 sequence behavior,
+// single-quoted boolean strings to avoid yaml.v2 quoting them as "true"/"false").
 func marshalYAML(v interface{}) (string, error) {
-	var buf strings.Builder
-	enc := yaml.NewEncoder(&buf)
-	enc.SetIndent(2)
-	if err := enc.Encode(v); err != nil {
+	data, err := yamlv2.Marshal(v)
+	if err != nil {
 		return "", err
 	}
-	return buf.String(), nil
+	result := string(data)
+	for _, kw := range []string{"true", "false", "yes", "no", "on", "off"} {
+		result = strings.ReplaceAll(result, fmt.Sprintf(`: "%s"`, kw), fmt.Sprintf(`: '%s'`, kw))
+	}
+	return result, nil
 }
 
 func helmChartCR(ctx *pulumi.Context, resourceName, metaName, namespace, repo, chart, targetNamespace, version string, valuesContent map[string]interface{}, k8sOpt pulumi.ResourceOption, aliases ...pulumi.ResourceOption) error {

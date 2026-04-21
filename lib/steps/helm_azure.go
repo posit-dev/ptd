@@ -202,9 +202,9 @@ func azureHelmDeploy(ctx *pulumi.Context, params azureHelmParams) error {
 	// withNestedAlias returns an alias for resources nested under a root-level Python ComponentResource.
 	// AlloyConfig was instantiated without a parent, so its children's URNs are just
 	// parentType$resourceType (NOT AzureWorkloadHelm$parentType$...).
-	withNestedAlias := func(parentType, resourceType, resourceName string) pulumi.ResourceOption {
+	withNestedAlias := func(innerParentType, resourceType, resourceName string) pulumi.ResourceOption {
 		oldURN := fmt.Sprintf("urn:pulumi:%s::%s::%s$%s::%s",
-			ctx.Stack(), outerProject, parentType, resourceType, resourceName)
+			ctx.Stack(), outerProject, innerParentType, resourceType, resourceName)
 		return pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(oldURN)}})
 	}
 
@@ -459,17 +459,16 @@ func azureHelmExternalDNS(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, com
 	}
 
 	// azure.json config secret.
-	azureConfig := map[string]interface{}{
-		"tenantId":                     params.tenantID,
-		"subscriptionId":               params.subscriptionID,
-		"resourceGroup":                params.resourceGroupName,
-		"useWorkloadIdentityExtension": true,
-	}
-	azureConfigJSON, jsonErr := json.Marshal(azureConfig)
-	if jsonErr != nil {
-		return fmt.Errorf("helm azure: failed to marshal azure.json for external-dns: %w", jsonErr)
-	}
-	azureConfigB64 := base64.StdEncoding.EncodeToString(azureConfigJSON)
+	// Use fmt.Sprintf + per-field json.Marshal to match Python's json.dumps format
+	// (spaces after ":" and ",", insertion-ordered keys).
+	tenantIDJSON, _ := json.Marshal(params.tenantID)
+	subscriptionIDJSON, _ := json.Marshal(params.subscriptionID)
+	resourceGroupJSON, _ := json.Marshal(params.resourceGroupName)
+	azureConfigStr := fmt.Sprintf(
+		`{"tenantId": %s, "subscriptionId": %s, "resourceGroup": %s, "useWorkloadIdentityExtension": true}`,
+		tenantIDJSON, subscriptionIDJSON, resourceGroupJSON,
+	)
+	azureConfigB64 := base64.StdEncoding.EncodeToString([]byte(azureConfigStr))
 
 	secretResourceName := compoundName + "-" + release + "-external-dns-secret"
 	_, err = corev1.NewSecret(ctx, secretResourceName, &corev1.SecretArgs{
@@ -842,7 +841,7 @@ func azureHelmGrafana(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 			"serve_from_sub_path": false,
 		},
 		"database": map[string]interface{}{
-			"url":      "${PTD_DATABASE_URL}",
+			"url":      `${{ "{" }}PTD_DATABASE_URL{{ "}" }}`,
 			"ssl_mode": "require",
 		},
 	}
