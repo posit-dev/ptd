@@ -850,6 +850,10 @@ func azureHelmGrafana(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 			"serve_from_sub_path": false,
 		},
 		"database": map[string]interface{}{
+			// Go template escaping produces the literal string ${PTD_DATABASE_URL}, matching
+			// Python's output. Grafana ini supports ${VAR} for environment variable expansion.
+			// AWS uses the plain string directly; Azure differs because the Helm values pass
+			// through an additional template rendering step in the HelmChart CR controller.
 			"url":      `${{ "{" }}PTD_DATABASE_URL{{ "}" }}`,
 			"ssl_mode": "require",
 		},
