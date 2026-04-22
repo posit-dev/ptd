@@ -133,6 +133,9 @@ func TestRun_CopiesWorkloadConfig(t *testing.T) {
 		DryRun:       true,
 		WorkloadPath: workloadPath,
 		ConfigLoader: mockConfigLoader(types.AWSWorkloadConfig{}),
+		HandoffCollector: func(ctx context.Context, t types.Target, opts Options, crDetails *ControlRoomDetails) error {
+			return nil
+		},
 	})
 
 	require.NoError(t, err)
@@ -153,6 +156,10 @@ func TestRun_SkipsConfigCopyWhenNoWorkloadPath(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.NoDirExists(t, filepath.Join(outputDir, "config"))
+}
+
+var noopHandoffCollector = func(ctx context.Context, t types.Target, opts Options, crDetails *ControlRoomDetails) error {
+	return nil
 }
 
 func newWorkloadTarget(name string) *typestest.MockTarget {
@@ -206,6 +213,7 @@ func TestRun_Eject_StripsConfigAndDeletesMimir(t *testing.T) {
 			ControlRoomDomain:      "ctrl.posit.team",
 			ControlRoomRegion:      "us-east-1",
 		}),
+		HandoffCollector: noopHandoffCollector,
 	})
 
 	require.NoError(t, err)
@@ -278,6 +286,7 @@ func TestRun_Eject_NoControlRoomTarget(t *testing.T) {
 			ControlRoomDomain: "ctrl.posit.team",
 			ControlRoomRegion: "us-east-1",
 		}),
+		HandoffCollector: noopHandoffCollector,
 	})
 
 	// Should succeed — Mimir removal is skipped, config is still stripped
@@ -325,6 +334,7 @@ func TestRun_Eject_MimirDeletionFailsContinues(t *testing.T) {
 			ControlRoomDomain:    "ctrl.posit.team",
 			ControlRoomRegion:    "us-east-1",
 		}),
+		HandoffCollector: noopHandoffCollector,
 	})
 
 	require.NoError(t, err)
@@ -395,6 +405,7 @@ func TestRun_DryRun_SkipsDestructiveSteps(t *testing.T) {
 			ControlRoomDomain:    "ctrl.posit.team",
 			ControlRoomRegion:    "us-east-1",
 		}),
+		HandoffCollector: noopHandoffCollector,
 	})
 
 	require.NoError(t, err)

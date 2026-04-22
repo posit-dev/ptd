@@ -84,7 +84,7 @@ The Go CLI communicates the infrastructure path to Python Pulumi stacks via the 
 
 #### Build Commands
 
-- `just build-cmd`: Build command-line tool
+- `just cli`: Build command-line tool
 
 #### Test Commands
 
@@ -96,6 +96,56 @@ The Go CLI communicates the infrastructure path to Python Pulumi stacks via the 
 #### AWS Development
 
 - `just aws-unset`: Unset all AWS environment variables
+
+## Using the PTD CLI
+
+### Proxy
+
+The proxy subsystem manages SOCKS proxy sessions to target bastion hosts. All proxy state is stored in a shared registry file (`~/.local/share/ptd/proxies.json`), enabling multiple concurrent proxies.
+
+**Starting a proxy:**
+
+```bash
+# Interactive use — binds to port 1080
+ptd proxy <target>
+
+# Daemon mode — binds to the deterministic workload port (10000–19999) and
+# stays running in the background; this is the same port used by ensure/workon
+ptd proxy <target> --daemon
+
+# Explicit port
+ptd proxy <target> --port 9090
+```
+
+**Print the deterministic port for a workload:**
+
+```bash
+ptd proxy port <target>
+```
+
+**Stopping proxies:**
+
+```bash
+# Stop one workload's proxy
+ptd proxy <target> --stop
+
+# Stop all running proxies
+ptd proxy --stop
+```
+
+**Registry management:**
+
+```bash
+# List all proxy sessions recorded in the registry
+ptd proxy --list
+
+# Remove stale entries (dead PIDs / closed ports)
+ptd proxy --prune
+```
+
+**Automatic proxy in ensure/workon:**
+
+`ptd ensure` and `ptd workon` start a proxy automatically on the deterministic workload port and reuse an existing one if it is already running. For scripted or agent use, prefer `ptd workon <target> -- <cmd>` rather than managing proxies manually.
 
 ## Git Worktrees
 
@@ -120,7 +170,7 @@ Always prefix worktree directories with `ptd-` to avoid collisions with other re
 1. **Build the binary** — each worktree needs its own ptd binary:
    ```bash
    cd ../.worktrees/ptd-<branch-name>
-   just build-cmd
+   just cli
    ```
 2. **direnv** — if direnv is available, copy `envrc.recommended` to `.envrc` in the worktree, then run `direnv allow`. The file uses `source_up` to inherit workspace vars and overrides `PTD` to point to the worktree.
 3. **For agents without direnv** — set env vars explicitly before running `ptd` commands:
@@ -140,7 +190,7 @@ git worktree remove ../.worktrees/ptd-<branch-name>
 
 - **NEVER** use `git checkout -b` for new work — always `git worktree add`
 - **NEVER** put worktrees inside the repo directory — always use `../.worktrees/ptd-<name>`
-- **ALWAYS** rebuild the binary after creating a worktree (`just build-cmd`)
+- **ALWAYS** rebuild the binary after creating a worktree (`just cli`)
 - Branch names: kebab-case, no slashes, no usernames (slashes break worktree directory paths)
 
 ## Monitoring and Alerts
@@ -273,14 +323,18 @@ Each step produces outputs consumed by later steps. See `docs/architecture/step-
 ### Large Files (>1000 lines)
 These files are large and require careful context management:
 
-**AWS:**
+**Go (lib/steps):**
+- `helm_aws.go` (~1550 lines) — AWS helm deployments (LBC, Traefik, Loki, Mimir, Grafana, Alloy, Karpenter, etc.)
+- `clusters_aws.go` (~1300 lines) — AWS cluster bootstrapping (IAM, Team Operator, HelmController, Karpenter, etc.)
+- `helm_azure.go` (~1100 lines) — Azure helm deployments (ExternalDNS, Loki, Mimir, Grafana, Alloy, managed identities)
+- `helm_helpers.go` (~880 lines) — Shared Alloy River config generator (`buildAlloyConfig`)
+
+**AWS (Python):**
 - `pulumi_resources/aws_eks_cluster.py` (~2580 lines) — EKS cluster provisioning with builder pattern
 - `pulumi_resources/aws_workload_persistent.py` (~1454 lines) — VPC, RDS, S3, IAM
-- `pulumi_resources/aws_workload_helm.py` (~1390 lines) — Helm chart deployments (AWS)
 - `__init__.py` (~1275 lines) — Base types, constants, utility functions
 - `aws_workload.py` (~815 lines) — AWS workload config and naming conventions
 
-**Azure:**
+**Azure (Python):**
 - `pulumi_resources/azure_workload_persistent.py` (~817 lines) — VNet, Postgres, Storage, ACR
-- `pulumi_resources/azure_workload_helm.py` (~675 lines) — Helm chart deployments (Azure)
 - `azure_workload.py` (~398 lines) — Azure workload config and naming with strict char limits

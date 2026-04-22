@@ -1,0 +1,245 @@
+package eject
+
+import (
+	"fmt"
+	"io"
+	"strings"
+	"text/template"
+	"time"
+
+	att "github.com/posit-dev/ptd/lib/attestation"
+)
+
+var handoffFuncMap = template.FuncMap{
+	"formatDate": func(t time.Time) string {
+		return t.Format("2006-01-02")
+	},
+	"productName":  att.ProductDisplayName,
+	"accountLabel": att.AccountLabel,
+	"cloudName": func(infra *att.InfraConfig) string {
+		if infra != nil && infra.Cloud == "azure" {
+			return "azure"
+		}
+		return "aws"
+	},
+	"domain": func(prefix string, domain string) string {
+		if prefix == "" {
+			return "—"
+		}
+		return prefix + "." + domain
+	},
+	"hasAuth": func(products []att.ProductInfo) bool {
+		for _, p := range products {
+			if p.Auth != nil {
+				return true
+			}
+		}
+		return false
+	},
+	"shortType": shortType,
+	"compactID": compactPhysicalID,
+	"stackProse": func(stack att.StackSummary, infra *att.InfraConfig) string {
+		stepName := stack.StepNameFromProject()
+		return att.GenerateStackProse(stepName, infra)
+	},
+	"overviewText":           overviewText,
+	"ownershipOptionsText":   func() string { return ownershipOptionsText() },
+	"severancePlanDryRun":    func() string { return severancePlanDryRunText() },
+	"severancePlanLive":      func() string { return severancePlanLiveText() },
+	"pulumiOwnershipText":    pulumiOwnershipText,
+	"pulumiImportText":       func() string { return pulumiImportText() },
+	"terraformMigrationText": func() string { return terraformMigrationText() },
+	"ptdCommandDescription":  ptdCommandDescription,
+	"teamOperatorText":       func() string { return teamOperatorText() },
+	"arnReconstructionNote":  arnReconstructionNote,
+	"categorizeResources":    ResourcesByCategory,
+	"categoryOrder": func() []string {
+		cats := make([]string, len(OrderedCategories))
+		for i, c := range OrderedCategories {
+			cats[i] = c.Category
+		}
+		return cats
+	},
+	"categoryTitle": func(cat string) string {
+		for _, c := range OrderedCategories {
+			if c.Category == cat {
+				return c.Title
+			}
+		}
+		return cat
+	},
+}
+
+var handoffTemplate = template.Must(template.New("handoff").Funcs(handoffFuncMap).Parse(
+	`{{- $cloud := cloudName .Infra -}}
+# ` + ejectDocTitle + ` — {{ .TargetName }}
+
+**Environment:** {{ .TargetName }}
+**{{ accountLabel $cloud }}:** {{ .AccountID }}
+**Region:** {{ .Region }}
+{{- range .Sites }}
+**Site Domain:** {{ .Domain }}
+{{- end }}
+**Date:** {{ .GeneratedAt | formatDate }}
+{{- if .PTDVersion }}
+**PTD Version:** {{ .PTDVersion }}
+{{- end }}
+
+## Infrastructure Overview
+
+{{ overviewText $cloud }}
+
+## Taking Ownership
+
+{{ ownershipOptionsText }}
+
+## Pulumi State Ownership
+
+{{ pulumiOwnershipText $cloud $.TargetName }}
+
+### State Files
+
+| File Path | Stack |
+|---|---|
+{{ range .Stacks -}}
+| ` + "`" + `{{ .StateKey }}` + "`" + ` | {{ .ProjectName }} |
+{{ end }}
+
+### Generating a Standalone Pulumi Program
+
+{{ pulumiImportText }}
+
+### Migrating to Terraform
+
+{{ terraformMigrationText }}
+
+### Continuing with the PTD CLI
+
+The [PTD CLI](https://github.com/posit-dev/ptd) reads the ptd.yaml and site.yaml configuration files included in this bundle and converges infrastructure to match the declared state. Use ` + "`--help`" + ` on any command to see available options and usage details. Each infrastructure layer corresponds to a Pulumi step that can be run independently:
+
+| Command | Description |
+|---|---|
+{{ range .Stacks -}}
+| ` + "`" + `ptd ensure {{ $.TargetName }} --only-steps {{ .StepNameFromProject }}` + "`" + ` | {{ .StepNameFromProject | ptdCommandDescription }} |
+{{ end }}
+{{ range .Sites }}
+## Installed Products — {{ .SiteName }}
+
+| Product | Version | Domain |
+|---|---|---|
+{{ $siteDomain := .Domain -}}
+{{ range .Products -}}
+| {{ .Name | productName }} | {{ .Version }} | {{ domain .DomainPrefix $siteDomain }} |
+{{ end }}
+{{ if .Products | hasAuth -}}
+### Authentication Configuration
+
+| Product | Method | Identity Provider |
+|---|---|---|
+{{ range .Products -}}
+{{ if .Auth -}}
+| {{ .Name | productName }} | {{ .Auth.Type }} | ` + "`" + `{{ .Auth.Issuer }}` + "`" + ` |
+{{ end -}}
+{{ end }}
+{{ end -}}
+{{ end -}}
+
+{{ if .ProductSummary -}}
+{{ .ProductSummary }}
+{{ end }}
+## Team Operator
+
+{{ teamOperatorText }}
+
+## Stack Details
+{{ range .Stacks }}
+### {{ .ProjectName }}
+{{ $prose := stackProse . $.Infra -}}
+{{ if $prose }}
+{{ $prose }}
+{{ else if .Purpose }}
+{{ .Purpose }}
+{{ end -}}
+{{ end }}
+{{ if .Secrets -}}
+## Secret References
+
+The following secrets are managed in your cloud provider's secret store. Values are not included in this bundle — access them directly via AWS Secrets Manager or Azure Key Vault using the names below.
+{{ range .Secrets }}
+### {{ .Name }}
+
+**Purpose:** {{ .Purpose }}. **Created by:** {{ .CreatedBy }}.
+{{ if .Fields }}
+| Field | Description | Auto-generated |
+|---|---|---|
+{{ range .Fields -}}
+| ` + "`" + `{{ .Name }}` + "`" + ` | {{ .Description }} | {{ if .AutoGenerated }}Yes{{ else }}No{{ end }} |
+{{ end }}
+{{ end -}}
+{{ end -}}
+{{ end -}}
+{{ if and .ControlRoom .ControlRoom.Connections -}}
+## Control Room Connections
+
+This workload is connected to a control room in account {{ .ControlRoom.AccountID }} (domain: {{ .ControlRoom.Domain }}).
+
+| Category | Resource | Description |
+|---|---|---|
+{{ range .ControlRoom.Connections -}}
+| {{ .Category }} | ` + "`" + `{{ .Resource }}` + "`" + ` | {{ .Description }} |
+{{ end }}
+
+## Severance Plan
+
+{{ if .DryRun -}}
+{{ severancePlanDryRun }}
+{{ else -}}
+{{ severancePlanLive }}
+{{ end }}
+
+| Category | Action |
+|---|---|
+{{ range .ControlRoom.Connections -}}
+| {{ .Category }} | {{ .RemovalAction }} |
+{{ end }}
+{{ end -}}
+
+{{ if .Resources -}}
+## Resource Inventory
+
+Total managed resources: **{{ len .Resources }}**, broken down by category below.
+
+This inventory is a snapshot taken at the time of the eject operation. For an accurate current reflection of resources, interrogate the live Pulumi state using the commands described in Pulumi State Ownership.
+
+> {{ arnReconstructionNote $cloud .AccountID .Region }}
+
+{{- $categorized := categorizeResources .Resources -}}
+{{- range categoryOrder }}
+{{- $resources := index $categorized . }}
+{{- if $resources }}
+
+### {{ . | categoryTitle }}
+
+| Type | Physical ID | Stack |
+|---|---|---|
+{{ range $resources -}}
+| ` + "`" + `{{ .Type | shortType }}` + "`" + ` | ` + "`" + `{{ .PhysicalID | compactID }}` + "`" + ` | {{ .Purpose }} |
+{{ end }}
+{{- end }}
+{{- end }}
+{{ end -}}
+`))
+
+// RenderHandoffMarkdown writes the eject handoff data as a Markdown document to the given writer.
+func RenderHandoffMarkdown(w io.Writer, data *HandoffData) error {
+	return handoffTemplate.Execute(w, data)
+}
+
+// RenderHandoffMarkdownString returns the eject handoff as a Markdown string.
+func RenderHandoffMarkdownString(data *HandoffData) (string, error) {
+	var buf strings.Builder
+	if err := RenderHandoffMarkdown(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to render handoff markdown: %w", err)
+	}
+	return buf.String(), nil
+}

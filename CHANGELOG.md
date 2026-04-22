@@ -1,3 +1,66 @@
+# [1.26.0](https://github.com/posit-dev/ptd/compare/v1.25.1...v1.26.0) (2026-04-21)
+
+
+### Bug Fixes
+
+* **proxy:** kill surviving processes when pruning stale registry entries ([2793946](https://github.com/posit-dev/ptd/commit/27939467b50f5d54195969686023e50cc3e8a9cf))
+* **proxy:** replace hardcoded port 1080 in all steps with WorkloadPort ([01869e7](https://github.com/posit-dev/ptd/commit/01869e7e5201bd8cd301bbd65ba701e4a10f084a))
+* **proxy:** replace hardcoded port 1080 in Python Pulumi code and remove dead Go fallbacks ([8d4a3be](https://github.com/posit-dev/ptd/commit/8d4a3be8fb8acc9dfad53e65919f7ae399104ec9))
+* **proxy:** set ALL_PROXY in helm step and update docs for new port behavior ([ddbb595](https://github.com/posit-dev/ptd/commit/ddbb595081b5892cb6e717b5f1e89a660cbc5ac5))
+* **proxy:** thread proxy port through SetupKubeConfig so kubeconfig uses the correct SOCKS5 port ([77f1c0f](https://github.com/posit-dev/ptd/commit/77f1c0fde4fdc851996580b01db2e62227b755b4))
+* **proxy:** use context.Background() in daemon mode so subprocess survives ptd exit ([a2ec568](https://github.com/posit-dev/ptd/commit/a2ec568a9a7bc025bb707749a58c0bcd123e6212))
+
+
+### Features
+
+* **proxy:** add locked registry, deterministic ports, and new management commands ([d28ee37](https://github.com/posit-dev/ptd/commit/d28ee370407a37c7c6a46ab7b45920e6321e8aad))
+
+## [1.25.1](https://github.com/posit-dev/ptd/compare/v1.25.0...v1.25.1) (2026-04-21)
+
+
+### Bug Fixes
+
+* add dual aliases for AWS provider, AlloyConfig ConfigMap, and mimir-auth Secret ([2dcd6a7](https://github.com/posit-dev/ptd/commit/2dcd6a7c6f3b6098eef2939d564ccb430dfa991f))
+* correct Alloy ConfigMap alias and YAML indentation in helm chart CRs ([5c01ca9](https://github.com/posit-dev/ptd/commit/5c01ca9423a88c0c1ab225152eae9da0cb14d230))
+* correct Alloy ConfigMap Pulumi alias to include AlloyConfig parent type ([d3f16b4](https://github.com/posit-dev/ptd/commit/d3f16b42ca873ad5fa9ed92bf2ff1a150af08412))
+* mainDomain should use site named "main", not first alphabetically ([4715421](https://github.com/posit-dev/ptd/commit/4715421e3823623dcc5ce386a86efa337cb70c13))
+* use yaml.v2 for Traefik and Karpenter values, harden alias URNs and error handling ([a33cb77](https://github.com/posit-dev/ptd/commit/a33cb77125c37600c24c826ef33cd8ade2975c68))
+* use yaml.v2 in marshalYAML and correct Azure helm diffs vs Python state ([0e50fc1](https://github.com/posit-dev/ptd/commit/0e50fc1ee20b6510a1b9105d6c27c6ead4c21177))
+
+# [1.25.0](https://github.com/posit-dev/ptd/compare/v1.24.0...v1.25.0) (2026-04-21)
+
+
+### Features
+
+* add unit tests for handoff helpers and fix resource categorization ([0be41ce](https://github.com/posit-dev/ptd/commit/0be41ce97d5d88bf041e6101ed9fca4ddc0621e3))
+* generate eject handoff PDF and markdown document ([0a67c38](https://github.com/posit-dev/ptd/commit/0a67c386f156e599e8fca511fa81d3f953671f5a)), closes [#216](https://github.com/posit-dev/ptd/issues/216)
+
+# [1.24.0](https://github.com/posit-dev/ptd/compare/v1.23.0...v1.24.0) (2026-04-17)
+
+
+### Bug Fixes
+
+* conditionally emit control_room remote_write when control_room_domain is set ([951a412](https://github.com/posit-dev/ptd/commit/951a41279ac1e0d7e39950bffb4bbbf64d92cbc1)), closes [#252](https://github.com/posit-dev/ptd/issues/252)
+
+
+### Features
+
+* add Azure nvidia device plugin helm deployment ([c1ed84d](https://github.com/posit-dev/ptd/commit/c1ed84dc2fa84ab1ac1ffe3738985d3091e3a322))
+
+# [1.23.0](https://github.com/posit-dev/ptd/compare/v1.22.1...v1.23.0) (2026-04-17)
+
+
+### Features
+
+* mirror nvidia device plugin for azure ([f09c491](https://github.com/posit-dev/ptd/commit/f09c49164196a70ef752e928a790f31fcd24e9b0))
+
+## [1.22.1](https://github.com/posit-dev/ptd/compare/v1.22.0...v1.22.1) (2026-04-17)
+
+
+### Bug Fixes
+
+* **proxy:** kill subprocess group on stop to avoid Azure tunnel orphan ([1c40215](https://github.com/posit-dev/ptd/commit/1c40215c89dd015e411f03ae193142acd4d58ccc))
+
 # [1.22.0](https://github.com/posit-dev/ptd/compare/v1.21.0...v1.22.0) (2026-04-17)
 
 
