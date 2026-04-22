@@ -624,11 +624,8 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	}
 
 	// Create ALB ingress(es)
-	albTagString := formatLBTags(map[string]string{
-		"posit.team/true-name":   params.trueName,
-		"posit.team/environment": params.environment,
-		"Name":                   compoundName,
-	})
+	albTagString := fmt.Sprintf("posit.team/true-name=%s,posit.team/environment=%s,Name=%s",
+		params.trueName, params.environment, compoundName)
 
 	if params.cfg.LoadBalancerPerSite {
 		sortedSiteNames := helpers.SortedKeys(params.cfg.Sites)
@@ -656,7 +653,7 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 					Name:        pulumi.String(metaIngressName),
 					Namespace:   pulumi.String(helmTraefikNamespace),
 					Annotations: annPulumi,
-					Labels:      pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
+					Labels:      pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm"), "app": pulumi.String("traefik")},
 				},
 				OtherFields: kubernetes.UntypedArgs{
 					"spec": pulumi.Map{
@@ -718,7 +715,7 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 				Name:        pulumi.String("traefik"),
 				Namespace:   pulumi.String(helmTraefikNamespace),
 				Annotations: annPulumi,
-				Labels:      pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
+				Labels:      pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm"), "app": pulumi.String("traefik")},
 			},
 			OtherFields: kubernetes.UntypedArgs{
 				"spec": pulumi.Map{
@@ -1229,6 +1226,7 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 			},
 			"securityContext": map[string]interface{}{
 				"privileged": params.cfg.GrafanaScrapeSystemLogs,
+				"runAsUser":  nil,
 			},
 			"configMap": map[string]interface{}{
 				"create": false,
