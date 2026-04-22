@@ -64,11 +64,6 @@ func ValidateUserNodePoolConfig(pool types.AzureUserNodePoolConfig) error {
 		initialCount = *pool.InitialCount
 	}
 
-	// Azure requires at least 1 node when creating a pool
-	if initialCount < 1 {
-		return fmt.Errorf("pool %s: initial_count must be at least 1 (defaults to min_count if not specified), got %d", pool.Name, initialCount)
-	}
-
 	// Validate initial count is within range
 	if initialCount < pool.MinCount || initialCount > pool.MaxCount {
 		return fmt.Errorf("pool %s: initial_count (%d) must be between min_count (%d) and max_count (%d)", pool.Name, initialCount, pool.MinCount, pool.MaxCount)
