@@ -250,7 +250,8 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 
 		k8sProviderName := name + "-" + release
 		k8sProvider, err := kubernetes.NewProvider(ctx, k8sProviderName, &kubernetes.ProviderArgs{
-			Kubeconfig: pulumi.String(params.kubeconfigsByCluster[release]),
+			Kubeconfig:            pulumi.String(params.kubeconfigsByCluster[release]),
+			EnableServerSideApply: pulumi.BoolPtr(true),
 		}, withAlias("pulumi:providers:kubernetes", k8sProviderName),
 			// Also alias for old Python naming: top-level resource with -k8s suffix.
 			pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(fmt.Sprintf(
@@ -1118,7 +1119,9 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 
 	// Build alloy config
 	domain := mainDomain(params.cfg.Sites)
-	clusterName := compoundName + "-" + release
+	// Python's eks_cluster_name() uses "default_{fqn}-control-plane" as the cluster label in
+	// Alloy config (Pulumi logical name convention). Match this to avoid breaking dashboard queries.
+	alloyClusterName := "default_" + compoundName + "-control-plane"
 	trueName, _ := splitCompoundName(compoundName)
 
 	alloyParams := alloyConfigParams{
@@ -1129,7 +1132,7 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 		thirdPartyTelemetryEnabled: isThirdPartyTelemetryEnabled(params.cfg.ThirdPartyTelemetryEnabled),
 		release:                    release,
 		region:                     params.region,
-		clusterName:                clusterName,
+		clusterName:                alloyClusterName,
 		accountIDOrTenantID:        params.accountID,
 		cloudProvider:              "aws",
 		shouldScrapeSystemLogs:     params.cfg.GrafanaScrapeSystemLogs,
