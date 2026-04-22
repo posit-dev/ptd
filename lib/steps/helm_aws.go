@@ -770,7 +770,7 @@ func buildALBAnnotations(cfg types.AWSWorkloadConfig, certARNs []string, tagStri
 		annotations["alb.ingress.kubernetes.io/subnets"] = strings.Join(cfg.ProvisionedVpc.PrivateSubnets, ",")
 	}
 
-	if cfg.PublicLoadBalancer {
+	if cfg.PublicLoadBalancer == nil || *cfg.PublicLoadBalancer {
 		annotations["alb.ingress.kubernetes.io/scheme"] = "internet-facing"
 	} else {
 		annotations["alb.ingress.kubernetes.io/scheme"] = "internal"
