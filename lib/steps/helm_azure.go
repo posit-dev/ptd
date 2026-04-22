@@ -87,13 +87,15 @@ func (s *HelmStep) runAzureInlineGo(ctx context.Context, creds types.Credentials
 		if clusterErr != nil {
 			return fmt.Errorf("helm azure: failed to get AKS kubeconfig for %s: %w", clusterName, clusterErr)
 		}
+		proxyURL := ""
 		if !s.DstTarget.TailscaleEnabled() {
-			kubeconfigBytes, clusterErr = kube.AddProxyToKubeConfigBytes(kubeconfigBytes, fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name())))
-			if clusterErr != nil {
-				return fmt.Errorf("helm azure: failed to add proxy to kubeconfig for %s: %w", clusterName, clusterErr)
-			}
+			proxyURL = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
 		}
-		kubeconfigsByCluster[release] = string(kubeconfigBytes)
+		kubeconfig, clusterErr := kube.BuildAKSKubeconfigString(kubeconfigBytes, proxyURL)
+		if clusterErr != nil {
+			return fmt.Errorf("helm azure: %w", clusterErr)
+		}
+		kubeconfigsByCluster[release] = kubeconfig
 
 		identityInfo, clusterErr := azure.GetClusterIdentityInfo(
 			ctx, azCreds, azureTarget.SubscriptionID(), azureTarget.ResourceGroupName(), clusterName,
@@ -218,8 +220,7 @@ func azureHelmDeploy(ctx *pulumi.Context, params azureHelmParams) error {
 		k8sProviderName := name + "-" + release
 		k8sProvider, err := kubernetes.NewProvider(ctx, k8sProviderName, &kubernetes.ProviderArgs{
 			Kubeconfig: pulumi.String(params.kubeconfigsByCluster[release]),
-		}, withAlias("pulumi:providers:kubernetes", k8sProviderName),
-			pulumi.IgnoreChanges([]string{"kubeconfig"}))
+		}, withAlias("pulumi:providers:kubernetes", k8sProviderName))
 		if err != nil {
 			return fmt.Errorf("helm azure: failed to create k8s provider for %s: %w", release, err)
 		}

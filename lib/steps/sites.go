@@ -357,12 +357,11 @@ func (s *SitesStep) runAzureInlineGo(ctx context.Context, creds types.Credential
 		if err != nil {
 			return fmt.Errorf("sites: failed to get AKS kubeconfig for %s: %w", clusterName, err)
 		}
-
-		kubeconfigBytes, err = kube.AddProxyToKubeConfigBytes(kubeconfigBytes, fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name())))
+		kubeconfig, err := kube.BuildAKSKubeconfigString(kubeconfigBytes, fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name())))
 		if err != nil {
-			return fmt.Errorf("sites: failed to add proxy to kubeconfig for %s: %w", clusterName, err)
+			return fmt.Errorf("sites: %w", err)
 		}
-		kubeconfigsByRelease[release] = string(kubeconfigBytes)
+		kubeconfigsByRelease[release] = kubeconfig
 	}
 
 	ppmSize := cfg.PpmFileShareSizeGib
