@@ -378,8 +378,8 @@ github.com/pulumi/pulumi-azure-native-sdk/network/v3 v3.16.0 h1:EXdiCzZNHpNc4gSe
 github.com/pulumi/pulumi-azure-native-sdk/network/v3 v3.16.0/go.mod h1:2r+Vt14MLHpCr2bz/aXO6+VIGOl9dHXncqCoGsUsQUI=
 github.com/pulumi/pulumi-azure-native-sdk/v3 v3.16.0 h1:ezB7f2RIiKbwDybpi4uEFqnaku66GZ+6o6a+rAOpsfI=
 github.com/pulumi/pulumi-azure-native-sdk/v3 v3.16.0/go.mod h1:++PhnDe7L0yTTumzmWEyjgmRQhlGYJExPesZfHJV0o0=
-github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.25.0 h1:N1qitmrGomEaCPsblqJHaw8Re0cqqox5V+kHsi4EEtk=
-github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.25.0/go.mod h1:ACBJF6+nzUqDeRK+p2OrvykunyeHfvtbyELc6PB38fk=
+github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.21.1 h1:rDeYtMgQSf4ATFhqt33P65ulyPCbzAHFdWTyZa2iVcA=
+github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.21.1/go.mod h1:RLaX8dqvWIqDV6VjScsc1tJWp1GoZ1IDSyOPIQ/y4ps=
 github.com/pulumi/pulumi-postgresql/sdk/v3 v3.16.2 h1:ln9wupML+tgM3vtO5XtRHe5LemCqpzVTprB/wRcP+ig=
 github.com/pulumi/pulumi-postgresql/sdk/v3 v3.16.2/go.mod h1:PQlILfLvIdkUPSv3ms2RfsflJEWG7/hqmUJrwt8Vpj8=
 github.com/pulumi/pulumi-random/sdk/v4 v4.19.1 h1:MUr4+gUQy+wqhoHsuhXO6ypT40KhU9j/2DT05YU9KIg=

@@ -31,7 +31,7 @@ require (
 	github.com/pulumi/pulumi-azure-native-sdk/keyvault/v3 v3.14.0
 	github.com/pulumi/pulumi-azure-native-sdk/managedidentity/v3 v3.16.0
 	github.com/pulumi/pulumi-azure-native-sdk/network/v3 v3.16.0
-	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.25.0
+	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.21.1
 	github.com/pulumi/pulumi-postgresql/sdk/v3 v3.16.2
 	github.com/pulumi/pulumi-random/sdk/v4 v4.19.1
 	github.com/pulumi/pulumi/sdk/v3 v3.227.0
