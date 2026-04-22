@@ -268,7 +268,7 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 		}
 
 		// 2. FSx OpenZFS CSI driver
-		fsxRoleName := "fsx-openzfs." + name + ".posit.team"
+		fsxRoleName := "aws-fsx-openzfs-csi-driver." + name + ".posit.team"
 		if err := awsHelmFsxOpenzfsCsi(ctx, k8sOpt, name, release, params.accountID, fsxRoleName, resolved.AwsFsxOpenzfsCsiDriverVersion, withAlias); err != nil {
 			return err
 		}
@@ -389,6 +389,42 @@ func helmChartCR(ctx *pulumi.Context, resourceName, metaName, namespace, repo, c
 	return err
 }
 
+// awsHelmChartCR creates a HelmChart custom resource with the posit.team/managed-by label
+// added to every resource. Use this (not helmChartCR) for all AWS workload helm resources.
+func awsHelmChartCR(ctx *pulumi.Context, resourceName, metaName, namespace, repo, chart, targetNamespace, version string, valuesContent map[string]interface{}, k8sOpt pulumi.ResourceOption, aliases ...pulumi.ResourceOption) error {
+	valuesYAML, encErr := marshalYAML(valuesContent)
+	if encErr != nil {
+		return fmt.Errorf("failed to marshal values for %s: %w", resourceName, encErr)
+	}
+
+	opts := []pulumi.ResourceOption{k8sOpt}
+	opts = append(opts, aliases...)
+
+	spec := pulumi.Map{
+		"chart":           pulumi.String(chart),
+		"targetNamespace": pulumi.String(targetNamespace),
+		"version":         pulumi.String(version),
+		"valuesContent":   pulumi.String(valuesYAML),
+	}
+	if repo != "" {
+		spec["repo"] = pulumi.String(repo)
+	}
+
+	_, err := apiextensions.NewCustomResource(ctx, resourceName, &apiextensions.CustomResourceArgs{
+		ApiVersion: pulumi.String("helm.cattle.io/v1"),
+		Kind:       pulumi.String("HelmChart"),
+		Metadata: metav1.ObjectMetaArgs{
+			Name:      pulumi.String(metaName),
+			Namespace: pulumi.String(namespace),
+			Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
+		},
+		OtherFields: kubernetes.UntypedArgs{
+			"spec": spec,
+		},
+	}, opts...)
+	return err
+}
+
 func awsHelmLBC(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName, release, accountID, version string,
 	withAlias func(string, string) pulumi.ResourceOption) error {
 
@@ -399,7 +435,7 @@ func awsHelmLBC(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName,
 		"clusterName": clusterName,
 		"serviceAccount": map[string]interface{}{
 			"create": true,
-			"name":   "aws-load-balancer-controller",
+			"name":   "aws-load-balancer-controller.posit.team",
 			"annotations": map[string]interface{}{
 				"eks.amazonaws.com/role-arn": fmt.Sprintf("arn:aws:iam::%s:role/%s", accountID, lbcRoleName),
 			},
@@ -411,7 +447,7 @@ func awsHelmLBC(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName,
 	}
 
 	resourceName := compoundName + "-" + release + "-aws-lbc-helm-release"
-	return helmChartCR(ctx, resourceName, "aws-load-balancer-controller",
+	return awsHelmChartCR(ctx, resourceName, "aws-load-balancer-controller",
 		clustersHelmControllerNamespace,
 		"https://aws.github.io/eks-charts",
 		"aws-load-balancer-controller",
@@ -428,7 +464,7 @@ func awsHelmFsxOpenzfsCsi(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, com
 		"controller": map[string]interface{}{
 			"serviceAccount": map[string]interface{}{
 				"create": true,
-				"name":   "controller.fsx-openzfs.csi.aws.com",
+				"name":   "controller.aws-fsx-openzfs-csi-driver.posit.team",
 				"annotations": map[string]interface{}{
 					"eks.amazonaws.com/role-arn": fmt.Sprintf("arn:aws:iam::%s:role/%s", accountID, fsxRoleName),
 				},
@@ -442,7 +478,7 @@ func awsHelmFsxOpenzfsCsi(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, com
 		"node": map[string]interface{}{
 			"serviceAccount": map[string]interface{}{
 				"create": true,
-				"name":   "nodes.fsx-openzfs.csi.aws.com",
+				"name":   "nodes.aws-fsx-openzfs-csi-driver.posit.team",
 				"annotations": map[string]interface{}{
 					"eks.amazonaws.com/role-arn": fmt.Sprintf("arn:aws:iam::%s:role/%s", accountID, fsxRoleName),
 				},
@@ -455,7 +491,7 @@ func awsHelmFsxOpenzfsCsi(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, com
 	}
 
 	resourceName := compoundName + "-" + release + "-aws-fsx-openzfs-csi-helm-release"
-	return helmChartCR(ctx, resourceName, "aws-fsx-openzfs-csi",
+	return awsHelmChartCR(ctx, resourceName, "aws-fsx-openzfs-csi",
 		clustersHelmControllerNamespace,
 		"https://kubernetes-sigs.github.io/aws-fsx-openzfs-csi-driver",
 		"aws-fsx-openzfs-csi-driver",
@@ -473,7 +509,7 @@ func awsHelmSecretStoreCsi(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, co
 		"syncSecret":           map[string]interface{}{"enabled": true},
 	}
 	resourceName := compoundName + "-" + release + "-secret-store-csi-helm-release"
-	return helmChartCR(ctx, resourceName, "secret-store-csi",
+	return awsHelmChartCR(ctx, resourceName, "secret-store-csi",
 		clustersHelmControllerNamespace,
 		"https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts",
 		"secrets-store-csi-driver",
@@ -491,7 +527,7 @@ func awsHelmSecretStoreCsiAws(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption,
 		},
 	}
 	resourceName := compoundName + "-" + release + "-secret-store-csi-provider-aws-helm-release"
-	return helmChartCR(ctx, resourceName, "secrets-store-csi-driver-provider-aws",
+	return awsHelmChartCR(ctx, resourceName, "secrets-store-csi-driver-provider-aws",
 		clustersHelmControllerNamespace,
 		"https://aws.github.io/secrets-store-csi-driver-provider-aws",
 		"secrets-store-csi-driver-provider-aws",
@@ -507,7 +543,8 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	nsName := compoundName + "-" + release + "-traefik-ns"
 	ns, err := corev1.NewNamespace(ctx, nsName, &corev1.NamespaceArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name: pulumi.String(helmTraefikNamespace),
+			Name:   pulumi.String(helmTraefikNamespace),
+			Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 	}, k8sOpt, withAlias("kubernetes:core/v1:Namespace", nsName))
 	if err != nil {
@@ -575,6 +612,7 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 		Metadata: metav1.ObjectMetaArgs{
 			Name:      pulumi.String("traefik"),
 			Namespace: pulumi.String(clustersHelmControllerNamespace),
+			Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 		OtherFields: kubernetes.UntypedArgs{
 			"spec": chartSpec,
@@ -618,6 +656,7 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 					Name:        pulumi.String(metaIngressName),
 					Namespace:   pulumi.String(helmTraefikNamespace),
 					Annotations: annPulumi,
+					Labels:      pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 				},
 				OtherFields: kubernetes.UntypedArgs{
 					"spec": pulumi.Map{
@@ -679,6 +718,7 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 				Name:        pulumi.String("traefik"),
 				Namespace:   pulumi.String(helmTraefikNamespace),
 				Annotations: annPulumi,
+				Labels:      pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 			},
 			OtherFields: kubernetes.UntypedArgs{
 				"spec": pulumi.Map{
@@ -743,7 +783,7 @@ func awsHelmMetricsServer(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, com
 	withAlias func(string, string) pulumi.ResourceOption) error {
 
 	resourceName := compoundName + "-" + release + "-metrics-server-helm-release"
-	return helmChartCR(ctx, resourceName, "metrics-server",
+	return awsHelmChartCR(ctx, resourceName, "metrics-server",
 		clustersHelmControllerNamespace,
 		"https://kubernetes-sigs.github.io/metrics-server/",
 		"metrics-server",
@@ -759,7 +799,8 @@ func awsHelmLoki(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName
 	nsName := compoundName + "-" + release + "-loki-ns"
 	_, err := corev1.NewNamespace(ctx, nsName, &corev1.NamespaceArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name: pulumi.String(helmLokiNamespace),
+			Name:   pulumi.String(helmLokiNamespace),
+			Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 	}, k8sOpt, withAlias("kubernetes:core/v1:Namespace", nsName))
 	if err != nil {
@@ -826,7 +867,7 @@ func awsHelmLoki(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName
 		"loki": lokiCfg,
 		"serviceAccount": map[string]interface{}{
 			"create": true,
-			"name":   "loki",
+			"name":   "loki.posit.team",
 			"annotations": map[string]interface{}{
 				"eks.amazonaws.com/role-arn": fmt.Sprintf("arn:aws:iam::%s:role/%s", params.accountID, lokiRole),
 			},
@@ -846,7 +887,7 @@ func awsHelmLoki(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName
 	}
 
 	resourceName := compoundName + "-" + release + "-loki-helm-release"
-	return helmChartCR(ctx, resourceName, "loki",
+	return awsHelmChartCR(ctx, resourceName, "loki",
 		clustersHelmControllerNamespace,
 		"https://grafana.github.io/helm-charts",
 		"loki",
@@ -932,7 +973,7 @@ func awsHelmGrafana(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	}
 
 	resourceName := compoundName + "-" + release + "-grafana-helm-release"
-	return helmChartCR(ctx, resourceName, "grafana",
+	return awsHelmChartCR(ctx, resourceName, "grafana",
 		clustersHelmControllerNamespace,
 		"https://grafana.github.io/helm-charts",
 		"grafana",
@@ -948,7 +989,8 @@ func awsHelmMimir(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	nsName := compoundName + "-" + release + "-mimir-ns"
 	_, err := corev1.NewNamespace(ctx, nsName, &corev1.NamespaceArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name: pulumi.String(helmMimirNamespace),
+			Name:   pulumi.String(helmMimirNamespace),
+			Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 	}, k8sOpt, withAlias("kubernetes:core/v1:Namespace", nsName))
 	if err != nil {
@@ -996,7 +1038,7 @@ func awsHelmMimir(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	values := map[string]interface{}{
 		"serviceAccount": map[string]interface{}{
 			"create": true,
-			"name":   "mimir",
+			"name":   "mimir.posit.team",
 			"annotations": map[string]interface{}{
 				"eks.amazonaws.com/role-arn": fmt.Sprintf("arn:aws:iam::%s:role/%s", params.accountID, mimirRole),
 			},
@@ -1035,7 +1077,7 @@ func awsHelmMimir(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	}
 
 	resourceName := compoundName + "-" + release + "-mimir-helm-release"
-	return helmChartCR(ctx, resourceName, "mimir",
+	return awsHelmChartCR(ctx, resourceName, "mimir",
 		clustersHelmControllerNamespace,
 		"https://grafana.github.io/helm-charts",
 		"mimir-distributed",
@@ -1051,7 +1093,7 @@ func awsHelmKubeStateMetrics(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, 
 		"metricLabelsAllowlist": []interface{}{"pods=[launcher-instance-id,user-group-*]"},
 	}
 	resourceName := compoundName + "-" + release + "-kube-state-metrics-helm-release"
-	return helmChartCR(ctx, resourceName, "kube-state-metrics",
+	return awsHelmChartCR(ctx, resourceName, "kube-state-metrics",
 		clustersHelmControllerNamespace,
 		"https://prometheus-community.github.io/helm-charts",
 		"kube-state-metrics",
@@ -1069,7 +1111,8 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	nsName := compoundName + "-" + release + "-alloy-ns"
 	ns, err := corev1.NewNamespace(ctx, nsName, &corev1.NamespaceArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name: pulumi.String(helmAlloyNamespace),
+			Name:   pulumi.String(helmAlloyNamespace),
+			Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 	}, k8sOpt, withAlias("kubernetes:core/v1:Namespace", nsName))
 	if err != nil {
@@ -1105,6 +1148,7 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 		Metadata: metav1.ObjectMetaArgs{
 			Name:      pulumi.String(configMapName),
 			Namespace: pulumi.String(helmAlloyNamespace),
+			Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 		Data: pulumi.StringMap{
 			"config.alloy": pulumi.String(alloyConfigStr),
@@ -1125,6 +1169,7 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 		Metadata: metav1.ObjectMetaArgs{
 			Name:      pulumi.String("mimir-auth"),
 			Namespace: pulumi.String(helmAlloyNamespace),
+			Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 		StringData: pulumi.StringMap{
 			"password": pulumi.String(params.mimirPassword),
@@ -1151,7 +1196,7 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	alloyValues := map[string]interface{}{
 		"serviceAccount": map[string]interface{}{
 			"create": true,
-			"name":   "alloy",
+			"name":   "alloy.posit.team",
 			"annotations": map[string]interface{}{
 				"eks.amazonaws.com/role-arn": fmt.Sprintf("arn:aws:iam::%s:role/%s", params.accountID, alloyRoleName),
 			},
@@ -1208,7 +1253,7 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	}
 
 	chartResourceName := compoundName + "-" + release + "-grafana-alloy-release"
-	return helmChartCR(ctx, chartResourceName, "alloy",
+	return awsHelmChartCR(ctx, chartResourceName, "alloy",
 		clustersHelmControllerNamespace,
 		"https://grafana.github.io/helm-charts",
 		"alloy",
@@ -1224,7 +1269,8 @@ func awsHelmNvidiaDevicePlugin(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption
 	nsName := compoundName + "-" + release + "-nvidia-device-plugin-ns"
 	_, err := corev1.NewNamespace(ctx, nsName, &corev1.NamespaceArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name: pulumi.String(helmNvidiaNamespace),
+			Name:   pulumi.String(helmNvidiaNamespace),
+			Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 	}, k8sOpt, withAlias("kubernetes:core/v1:Namespace", nsName))
 	if err != nil {
@@ -1258,7 +1304,7 @@ func awsHelmNvidiaDevicePlugin(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption
 	}
 
 	resourceName := compoundName + "-" + release + "-nvidia-device-plugin-helm-release"
-	return helmChartCR(ctx, resourceName, "nvidia-device-plugin",
+	return awsHelmChartCR(ctx, resourceName, "nvidia-device-plugin",
 		clustersHelmControllerNamespace,
 		"https://nvidia.github.io/k8s-device-plugin",
 		"nvidia-device-plugin",
@@ -1328,6 +1374,7 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 		Metadata: metav1.ObjectMetaArgs{
 			Name:      pulumi.String("karpenter"),
 			Namespace: pulumi.String(clustersHelmControllerNamespace),
+			Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 		OtherFields: kubernetes.UntypedArgs{
 			"spec": pulumi.Map{
@@ -1441,7 +1488,8 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 			ApiVersion: pulumi.String("karpenter.sh/v1"),
 			Kind:       pulumi.String("NodePool"),
 			Metadata: metav1.ObjectMetaArgs{
-				Name: pulumi.String(nodePool.Name),
+				Name:   pulumi.String(nodePool.Name),
+				Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 			},
 			OtherFields: kubernetes.UntypedArgs{
 				"spec": nodepoolSpec,
@@ -1473,7 +1521,8 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 			ApiVersion: pulumi.String("karpenter.k8s.aws/v1"),
 			Kind:       pulumi.String("EC2NodeClass"),
 			Metadata: metav1.ObjectMetaArgs{
-				Name: pulumi.String(nodePool.Name),
+				Name:   pulumi.String(nodePool.Name),
+				Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 			},
 			OtherFields: kubernetes.UntypedArgs{
 				"spec": map[string]interface{}{
@@ -1515,7 +1564,8 @@ func awsHelmKarpenterOverprovisioning(ctx *pulumi.Context, k8sOpt pulumi.Resourc
 	pcResourceName := clusterName + "-karpenter-overprovisioning-pool-priority"
 	_, err := schedulingv1.NewPriorityClass(ctx, pcResourceName, &schedulingv1.PriorityClassArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name: pulumi.String("karpenter-overprovisioning-pool-priority"),
+			Name:   pulumi.String("karpenter-overprovisioning-pool-priority"),
+			Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 		Value:            pulumi.Int(-100),
 		GlobalDefault:    pulumi.Bool(false),
@@ -1564,6 +1614,7 @@ func awsHelmKarpenterOverprovisioning(ctx *pulumi.Context, k8sOpt pulumi.Resourc
 			Metadata: metav1.ObjectMetaArgs{
 				Name:      pulumi.String(deploymentName),
 				Namespace: pulumi.String(clustersKubeSystemNamespace),
+				Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 			},
 			Spec: appsv1.DeploymentSpecArgs{
 				Replicas: pulumi.Int(nodePool.OverprovisioningReplicas),
