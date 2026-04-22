@@ -181,7 +181,7 @@ func TestValidateUserNodePoolConfig(t *testing.T) {
 			errorMsg:    "min_count (10) must be <= max_count (5)",
 		},
 		{
-			name: "invalid initial count too low",
+			name: "valid initial count of 0 with min_count 0",
 			poolConfig: types.AzureUserNodePoolConfig{
 				Name:              "general",
 				VMSize:            "Standard_D8s_v6",
@@ -190,8 +190,7 @@ func TestValidateUserNodePoolConfig(t *testing.T) {
 				InitialCount:      func() *int { i := 0; return &i }(),
 				EnableAutoScaling: true,
 			},
-			expectError: true,
-			errorMsg:    "initial_count must be at least 1",
+			expectError: false,
 		},
 		{
 			name: "invalid initial count below min",
