@@ -70,8 +70,8 @@ func TestCopyWorkloadConfig_AnnotatesPtdYaml(t *testing.T) {
 	require.NoError(t, err)
 	content := string(data)
 
-	assert.Contains(t, content, "control_room_account_id: \"999888777666\"  # EJECT: removed during control room severance")
-	assert.Contains(t, content, "control_room_domain: ctrl.example.com  # EJECT: removed during control room severance")
+	assert.Contains(t, content, "control_room_account_id: \"999888777666\"  # EJECT: cleared during eject")
+	assert.Contains(t, content, "control_room_domain: ctrl.example.com  # EJECT: cleared during eject")
 	assert.NotContains(t, content, "account_id: \"123456789012\"  # EJECT")
 	assert.NotContains(t, content, "region: us-east-1  # EJECT")
 }
@@ -108,9 +108,9 @@ control_room_region: us-west-2
 `
 	result := AnnotateControlRoomFields(input)
 
-	assert.Contains(t, result, "control_room_account_id: \"999\"  # EJECT: removed during control room severance")
-	assert.Contains(t, result, "control_room_domain: ctrl.example.com  # EJECT: removed during control room severance")
-	assert.Contains(t, result, "control_room_region: us-west-2  # EJECT: removed during control room severance")
+	assert.Contains(t, result, "control_room_account_id: \"999\"  # EJECT: cleared during eject")
+	assert.Contains(t, result, "control_room_domain: ctrl.example.com  # EJECT: cleared during eject")
+	assert.Contains(t, result, "control_room_region: us-west-2  # EJECT: cleared during eject")
 	assert.Contains(t, result, "account_id: \"123\"\n")
 	assert.Contains(t, result, "region: us-east-1\n")
 }

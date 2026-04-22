@@ -13,7 +13,7 @@ var controlRoomFieldPattern = regexp.MustCompile(`(?m)^(\s*control_room_\w+:.*)$
 
 // CopyWorkloadConfig copies the entire workload directory into the eject
 // bundle's config/ directory. The copied ptd.yaml is annotated with comments
-// on control_room_* fields indicating they'll be removed during severance.
+// on control_room_* fields indicating they'll be cleared during eject.
 func CopyWorkloadConfig(workloadPath string, outputDir string) error {
 	configDir := filepath.Join(outputDir, "config")
 
@@ -40,10 +40,10 @@ func annotatePtdYaml(configDir string) error {
 }
 
 // AnnotateControlRoomFields adds a comment to each control_room_* field
-// indicating it will be removed during severance.
+// indicating it will be cleared during eject.
 func AnnotateControlRoomFields(yaml string) string {
 	return controlRoomFieldPattern.ReplaceAllString(yaml,
-		"$1  # EJECT: removed during control room severance")
+		"$1  # EJECT: cleared during eject")
 }
 
 func copyFile(src, dst string) error {
