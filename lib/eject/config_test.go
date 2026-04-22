@@ -150,7 +150,7 @@ kind: AWSWorkloadConfig
 spec:
   # This is an important comment
   account_id: "123456789012"
-  control_room_domain: ctrl.posit.team  # EJECT: removed during control room severance
+  control_room_domain: ctrl.posit.team  # EJECT: cleared during eject
   region: us-east-1
 `
 	path := writePtdYaml(t, yaml)
@@ -164,7 +164,7 @@ spec:
 	content := string(data)
 
 	assert.Contains(t, content, "# This is an important comment")
-	assert.Contains(t, content, `control_room_domain: "" # EJECT: removed during control room severance`)
+	assert.Contains(t, content, `control_room_domain: "" # EJECT: cleared during eject`)
 }
 
 func TestStripControlRoomFields_RoundTrip(t *testing.T) {
