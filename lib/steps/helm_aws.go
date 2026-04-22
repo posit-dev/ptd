@@ -1600,8 +1600,22 @@ func awsHelmKarpenterOverprovisioning(ctx *pulumi.Context, k8sOpt pulumi.Resourc
 			limits["nvidia.com/gpu"] = pulumi.String(*nodePool.OverprovisioningNvidiaGPU)
 		}
 
-		tolerations := make(corev1.TolerationArray, 0, len(nodePool.Taints))
-		for _, taint := range nodePool.Taints {
+		ovpTaints := make([]types.KarpenterTaint, 0, len(nodePool.Taints)+1)
+		ovpTaints = append(ovpTaints, nodePool.Taints...)
+		if nodePool.SessionTaints {
+			hasSessionTaint := false
+			for _, t := range nodePool.Taints {
+				if t.Key == "workload-type" && t.Effect == "NoSchedule" {
+					hasSessionTaint = true
+					break
+				}
+			}
+			if !hasSessionTaint {
+				ovpTaints = append(ovpTaints, types.KarpenterTaint{Key: "workload-type", Value: "session", Effect: "NoSchedule"})
+			}
+		}
+		tolerations := make(corev1.TolerationArray, 0, len(ovpTaints))
+		for _, taint := range ovpTaints {
 			tolerations = append(tolerations, corev1.TolerationArgs{
 				Key:      pulumi.String(taint.Key),
 				Operator: pulumi.StringPtr("Equal"),
