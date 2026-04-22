@@ -31,7 +31,6 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/spf13/viper"
-	yaml "gopkg.in/yaml.v3"
 )
 
 // --- AWS ---
@@ -101,19 +100,15 @@ func (s *ClustersStep) runAWSInlineGo(ctx context.Context, creds types.Credentia
 		if clusterErr != nil {
 			return fmt.Errorf("clusters: failed to get cluster info for %s: %w", clusterName, clusterErr)
 		}
-		token, clusterErr := aws.GetEKSToken(ctx, awsCreds, s.DstTarget.Region(), clusterName)
-		if clusterErr != nil {
-			return fmt.Errorf("clusters: failed to get EKS token for %s: %w", clusterName, clusterErr)
-		}
-		config := kube.BuildEKSKubeConfig(endpoint, caCert, token, clusterName)
+		proxyURL := ""
 		if !cfg.TailscaleEnabled {
-			config.Clusters[0].Cluster.ProxyURL = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
+			proxyURL = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
 		}
-		data, marshalErr := yaml.Marshal(config)
-		if marshalErr != nil {
-			return fmt.Errorf("clusters: failed to marshal kubeconfig for %s: %w", clusterName, marshalErr)
+		kubeconfig, clusterErr := kube.BuildEKSKubeconfigString(endpoint, caCert, clusterName, s.DstTarget.Region(), proxyURL)
+		if clusterErr != nil {
+			return fmt.Errorf("clusters: %w", clusterErr)
 		}
-		kubeconfigsByCluster[release] = string(data)
+		kubeconfigsByCluster[release] = kubeconfig
 
 		// Store the live OIDC issuer URL for this cluster (used by Karpenter controller role creation).
 		// Prefer the live URL from the cluster over the one in the config.
@@ -282,7 +277,7 @@ func awsClustersDeploy(ctx *pulumi.Context, _ types.Target, params awsClustersPa
 		k8sProviderName := name + "-" + release + "-k8s"
 		k8sProvider, err := kubernetes.NewProvider(ctx, k8sProviderName, &kubernetes.ProviderArgs{
 			Kubeconfig: pulumi.String(params.kubeconfigsByCluster[release]),
-		}, withAlias(), pulumi.IgnoreChanges([]string{"kubeconfig"}))
+		}, withAlias())
 		if err != nil {
 			return fmt.Errorf("clusters: failed to create K8s provider for %s: %w", release, err)
 		}
