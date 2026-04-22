@@ -11,6 +11,7 @@ import (
 	"github.com/posit-dev/ptd/lib/azure"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/kube"
+	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/posit-dev/ptd/lib/types"
 	azauthorization "github.com/pulumi/pulumi-azure-native-sdk/authorization/v3"
 	azmanagedidentity "github.com/pulumi/pulumi-azure-native-sdk/managedidentity/v3"
@@ -87,7 +88,7 @@ func (s *HelmStep) runAzureInlineGo(ctx context.Context, creds types.Credentials
 			return fmt.Errorf("helm azure: failed to get AKS kubeconfig for %s: %w", clusterName, clusterErr)
 		}
 		if !s.DstTarget.TailscaleEnabled() {
-			kubeconfigBytes, clusterErr = kube.AddProxyToKubeConfigBytes(kubeconfigBytes, "socks5://localhost:1080")
+			kubeconfigBytes, clusterErr = kube.AddProxyToKubeConfigBytes(kubeconfigBytes, fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name())))
 			if clusterErr != nil {
 				return fmt.Errorf("helm azure: failed to add proxy to kubeconfig for %s: %w", clusterName, clusterErr)
 			}

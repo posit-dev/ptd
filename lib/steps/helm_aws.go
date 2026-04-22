@@ -11,6 +11,7 @@ import (
 	"github.com/posit-dev/ptd/lib/aws"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/kube"
+	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/posit-dev/ptd/lib/types"
 	kubernetes "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes"
 	apiextensions "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apiextensions"
@@ -77,7 +78,7 @@ func (s *HelmStep) runAWSInlineGo(ctx context.Context, creds types.Credentials, 
 		}
 		config := kube.BuildEKSKubeConfig(endpoint, caCert, token, clusterName)
 		if !cfg.TailscaleEnabled {
-			config.Clusters[0].Cluster.ProxyURL = "socks5://localhost:1080"
+			config.Clusters[0].Cluster.ProxyURL = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
 		}
 		data, marshalErr := yaml.Marshal(config)
 		if marshalErr != nil {
