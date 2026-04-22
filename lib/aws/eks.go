@@ -94,6 +94,51 @@ func GetEKSToken(ctx context.Context, c *Credentials, region string, clusterName
 	return token, nil
 }
 
+// ClusterVPCConfig holds the VPC-related configuration for an EKS cluster.
+type ClusterVPCConfig struct {
+	SubnetIDs        []string
+	SecurityGroupIDs []string // includes clusterSecurityGroupId
+	VpcID            string
+}
+
+// GetClusterVPCConfig returns the VPC configuration for an EKS cluster by calling DescribeCluster.
+func GetClusterVPCConfig(ctx context.Context, c *Credentials, region string, clusterName string) (ClusterVPCConfig, error) {
+	client := eks.New(eks.Options{
+		Region:      region,
+		Credentials: c.credentialsProvider,
+	})
+
+	output, err := client.DescribeCluster(ctx, &eks.DescribeClusterInput{
+		Name: aws.String(clusterName),
+	})
+	if err != nil {
+		return ClusterVPCConfig{}, fmt.Errorf("failed to describe cluster %s: %w", clusterName, err)
+	}
+
+	if output.Cluster == nil || output.Cluster.ResourcesVpcConfig == nil {
+		return ClusterVPCConfig{}, fmt.Errorf("cluster %s has no VPC config", clusterName)
+	}
+
+	vpc := output.Cluster.ResourcesVpcConfig
+
+	sgIDs := make([]string, 0, len(vpc.SecurityGroupIds)+1)
+	sgIDs = append(sgIDs, vpc.SecurityGroupIds...)
+	if vpc.ClusterSecurityGroupId != nil && *vpc.ClusterSecurityGroupId != "" {
+		sgIDs = append(sgIDs, *vpc.ClusterSecurityGroupId)
+	}
+
+	vpcID := ""
+	if vpc.VpcId != nil {
+		vpcID = *vpc.VpcId
+	}
+
+	return ClusterVPCConfig{
+		SubnetIDs:        vpc.SubnetIds,
+		SecurityGroupIDs: sgIDs,
+		VpcID:            vpcID,
+	}, nil
+}
+
 // GetNodeGroupNames returns the managed node group names for an EKS cluster.
 func GetNodeGroupNames(ctx context.Context, c *Credentials, region string, clusterName string) ([]string, error) {
 	client := eks.New(eks.Options{
