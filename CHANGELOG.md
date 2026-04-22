@@ -1,3 +1,10 @@
+## [1.26.2](https://github.com/posit-dev/ptd/compare/v1.26.1...v1.26.2) (2026-04-22)
+
+
+### Bug Fixes
+
+* remove min node count for azure user pools ([0c7f4fb](https://github.com/posit-dev/ptd/commit/0c7f4fb5c7825fcf51ae254dcdb57aaec2e70c51))
+
 ## [1.26.1](https://github.com/posit-dev/ptd/compare/v1.26.0...v1.26.1) (2026-04-22)
 
 
