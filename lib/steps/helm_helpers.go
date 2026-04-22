@@ -116,6 +116,9 @@ func buildAlloyConfig(params alloyConfigParams) string {
         headers = {
             "X-Scope-OrgID" = "%s",
         }
+        queue_config {
+            sample_age_limit = "5m"
+        }
     }
 }
 `, tenantName, controlRoomURL, params.compoundName, params.accountIDOrTenantID)
@@ -254,6 +257,9 @@ prometheus.remote_write "workload" {
     }
     endpoint {
         url = "%s"
+        queue_config {
+            sample_age_limit = "5m"
+        }
     }
 }
 
