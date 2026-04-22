@@ -25,19 +25,27 @@ import (
 
 // --- AWS ---
 
+// karpenterVPCConfig holds the dynamically fetched VPC networking configuration
+// for a Karpenter-enabled cluster.
+type karpenterVPCConfig struct {
+	SubnetIDs        []string
+	SecurityGroupIDs []string
+}
+
 // awsHelmParams bundles pre-fetched data for the AWS helm deploy function.
 type awsHelmParams struct {
-	compoundName            string
-	trueName                string // derived: second-to-last segment of compoundName split by "-"
-	environment             string // derived: last segment of compoundName split by "-"
-	accountID               string
-	region                  string
-	kubeconfigsByCluster    map[string]string
-	certARNs                []string
-	cfg                     types.AWSWorkloadConfig
-	mimirPassword           string // for alloy mimir-auth secret
-	nodeGroupNamesByCluster map[string][]string
-	workloadDir             string
+	compoundName                string
+	trueName                    string // derived: second-to-last segment of compoundName split by "-"
+	environment                 string // derived: last segment of compoundName split by "-"
+	accountID                   string
+	region                      string
+	kubeconfigsByCluster        map[string]string
+	certARNs                    []string
+	cfg                         types.AWSWorkloadConfig
+	mimirPassword               string // for alloy mimir-auth secret
+	nodeGroupNamesByCluster     map[string][]string
+	karpenterVPCConfigByCluster map[string]karpenterVPCConfig
+	workloadDir                 string
 }
 
 func (s *HelmStep) runAWSInlineGo(ctx context.Context, creds types.Credentials, envVars map[string]string) error {
@@ -126,21 +134,62 @@ func (s *HelmStep) runAWSInlineGo(ctx context.Context, creds types.Credentials, 
 		nodeGroupNamesByCluster[release] = names
 	}
 
+	// Fetch VPC config for clusters with Karpenter
+	karpenterVPCConfigByCluster := make(map[string]karpenterVPCConfig)
+	for release, clusterCfg := range cfg.Clusters {
+		if clusterCfg.Spec.KarpenterConfig == nil || len(clusterCfg.Spec.KarpenterConfig.NodePools) == 0 {
+			continue
+		}
+		clusterName := s.DstTarget.Name() + "-" + release
+		vpcCfg, err := aws.GetClusterVPCConfig(ctx, awsCreds, s.DstTarget.Region(), clusterName)
+		if err != nil {
+			return fmt.Errorf("helm: failed to get VPC config for cluster %s: %w", clusterName, err)
+		}
+
+		sgIDs := vpcCfg.SecurityGroupIDs
+
+		// Look up FSX NFS security group
+		fsxSGID, fsxFound, err := aws.GetNFSSecurityGroupID(ctx, awsCreds, s.DstTarget.Region(), vpcCfg.VpcID, "eks-nodes-fsx-nfs.posit.team")
+		if err != nil {
+			return fmt.Errorf("helm: failed to look up FSX NFS security group for cluster %s: %w", clusterName, err)
+		}
+		if fsxFound {
+			sgIDs = append(sgIDs, fsxSGID)
+		}
+
+		// Look up EFS NFS security group if EFS is enabled
+		if clusterCfg.Spec.EnableEfsCsiDriver || clusterCfg.Spec.EfsConfig != nil {
+			efsSGID, efsFound, err := aws.GetNFSSecurityGroupID(ctx, awsCreds, s.DstTarget.Region(), vpcCfg.VpcID, "eks-nodes-efs-nfs.posit.team")
+			if err != nil {
+				return fmt.Errorf("helm: failed to look up EFS NFS security group for cluster %s: %w", clusterName, err)
+			}
+			if efsFound {
+				sgIDs = append(sgIDs, efsSGID)
+			}
+		}
+
+		karpenterVPCConfigByCluster[release] = karpenterVPCConfig{
+			SubnetIDs:        vpcCfg.SubnetIDs,
+			SecurityGroupIDs: sgIDs,
+		}
+	}
+
 	// Derive trueName and environment from compoundName
 	trueName, environment := splitCompoundName(s.DstTarget.Name())
 
 	params := awsHelmParams{
-		compoundName:            s.DstTarget.Name(),
-		trueName:                trueName,
-		environment:             environment,
-		accountID:               awsCreds.AccountID(),
-		region:                  s.DstTarget.Region(),
-		kubeconfigsByCluster:    kubeconfigsByCluster,
-		certARNs:                certARNs,
-		cfg:                     cfg,
-		mimirPassword:           mimirPassword,
-		nodeGroupNamesByCluster: nodeGroupNamesByCluster,
-		workloadDir:             filepath.Join(helpers.GetTargetsConfigPath(), helpers.WorkDir, s.DstTarget.Name()),
+		compoundName:                s.DstTarget.Name(),
+		trueName:                    trueName,
+		environment:                 environment,
+		accountID:                   awsCreds.AccountID(),
+		region:                      s.DstTarget.Region(),
+		kubeconfigsByCluster:        kubeconfigsByCluster,
+		certARNs:                    certARNs,
+		cfg:                         cfg,
+		mimirPassword:               mimirPassword,
+		nodeGroupNamesByCluster:     nodeGroupNamesByCluster,
+		karpenterVPCConfigByCluster: karpenterVPCConfigByCluster,
+		workloadDir:                 filepath.Join(helpers.GetTargetsConfigPath(), helpers.WorkDir, s.DstTarget.Name()),
 	}
 
 	stack, err := createStack(ctx, s.Name(), s.DstTarget, func(pctx *pulumi.Context, _ types.Target) error {
@@ -1299,6 +1348,8 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 		return nil
 	}
 
+	vpcCfg := params.karpenterVPCConfigByCluster[release]
+
 	for _, nodePool := range karpenterCfg.NodePools {
 		// Build requirements
 		requirements := make([]interface{}, 0, len(nodePool.Requirements))
@@ -1308,6 +1359,16 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 				"operator": req.Operator,
 				"values":   req.Values,
 			})
+		}
+
+		// Apply disruption defaults
+		consolidationPolicy := nodePool.ConsolidationPolicy
+		if consolidationPolicy == "" {
+			consolidationPolicy = "WhenEmptyOrUnderutilized"
+		}
+		consolidateAfter := nodePool.ConsolidateAfter
+		if consolidateAfter == "" {
+			consolidateAfter = "5m"
 		}
 
 		nodepoolSpec := map[string]interface{}{
@@ -1322,8 +1383,8 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 				},
 			},
 			"disruption": map[string]interface{}{
-				"consolidationPolicy": nodePool.ConsolidationPolicy,
-				"consolidateAfter":    nodePool.ConsolidateAfter,
+				"consolidationPolicy": consolidationPolicy,
+				"consolidateAfter":    consolidateAfter,
 			},
 			"weight": nodePool.Weight,
 		}
@@ -1332,9 +1393,24 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 			nodepoolSpec["template"].(map[string]interface{})["spec"].(map[string]interface{})["expireAfter"] = *nodePool.ExpireAfter
 		}
 
-		if len(nodePool.Taints) > 0 {
-			taints := make([]interface{}, 0, len(nodePool.Taints))
+		// Build taints: start with explicitly listed taints, then add session taint if session_taints: true.
+		allTaints := make([]types.KarpenterTaint, 0, len(nodePool.Taints)+1)
+		allTaints = append(allTaints, nodePool.Taints...)
+		if nodePool.SessionTaints {
+			hasSessionTaint := false
 			for _, t := range nodePool.Taints {
+				if t.Key == "workload-type" && t.Effect == "NoSchedule" {
+					hasSessionTaint = true
+					break
+				}
+			}
+			if !hasSessionTaint {
+				allTaints = append(allTaints, types.KarpenterTaint{Key: "workload-type", Value: "session", Effect: "NoSchedule"})
+			}
+		}
+		if len(allTaints) > 0 {
+			taints := make([]interface{}, 0, len(allTaints))
+			for _, t := range allTaints {
 				taints = append(taints, map[string]interface{}{
 					"key":    t.Key,
 					"value":  t.Value,
@@ -1376,14 +1452,14 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 		}
 
 		// EC2NodeClass
-		// Subnet and security group IDs come from the cluster spec
-		subnetIDs := make([]interface{}, 0, len(clusterSpec.SubnetIDs))
-		for _, id := range clusterSpec.SubnetIDs {
-			subnetIDs = append(subnetIDs, map[string]interface{}{"id": id})
+		// Subnet and security group IDs are fetched dynamically from the live EKS cluster.
+		subnetTerms := make([]interface{}, 0, len(vpcCfg.SubnetIDs))
+		for _, id := range vpcCfg.SubnetIDs {
+			subnetTerms = append(subnetTerms, map[string]interface{}{"id": id})
 		}
-		securityGroupIDs := make([]interface{}, 0, len(clusterSpec.SecurityGroupIDs))
-		for _, id := range clusterSpec.SecurityGroupIDs {
-			securityGroupIDs = append(securityGroupIDs, map[string]interface{}{"id": id})
+		sgTerms := make([]interface{}, 0, len(vpcCfg.SecurityGroupIDs))
+		for _, id := range vpcCfg.SecurityGroupIDs {
+			sgTerms = append(sgTerms, map[string]interface{}{"id": id})
 		}
 
 		instanceProfile := fmt.Sprintf("KarpenterNodeInstanceProfile-%s.posit.team", clusterName)
@@ -1403,8 +1479,8 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 				"spec": map[string]interface{}{
 					"instanceProfile":            instanceProfile,
 					"amiSelectorTerms":           []interface{}{map[string]interface{}{"alias": "al2023@latest"}},
-					"subnetSelectorTerms":        subnetIDs,
-					"securityGroupSelectorTerms": securityGroupIDs,
+					"subnetSelectorTerms":        subnetTerms,
+					"securityGroupSelectorTerms": sgTerms,
 					"blockDeviceMappings": []interface{}{
 						map[string]interface{}{
 							"deviceName": "/dev/xvda",
