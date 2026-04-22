@@ -1,3 +1,22 @@
+## [1.26.1](https://github.com/posit-dev/ptd/compare/v1.26.0...v1.26.1) (2026-04-22)
+
+
+### Bug Fixes
+
+* default public_load_balancer to true (internet-facing) matching Python ([340fa4e](https://github.com/posit-dev/ptd/commit/340fa4ebf074478577ea1cae85b5b41252e6af42))
+* fetch Karpenter subnet/SG IDs from EKS cluster VPC config ([d64ee3b](https://github.com/posit-dev/ptd/commit/d64ee3bd3f6f6f7835f183bdca2220a1e3ae6c13))
+* match Python output details for Traefik ingress and Alloy values ([de10b28](https://github.com/posit-dev/ptd/commit/de10b2858bbd7f7d9f2b8e086da30bf2a5f57048))
+* remove EnableServerSideApply from k8s provider (not set in other migrated steps) ([f103837](https://github.com/posit-dev/ptd/commit/f1038377041c5a3f36900ab8eb02c366484e787b))
+* restore Alloy cluster label and k8s provider settings from Python ([66b3e57](https://github.com/posit-dev/ptd/commit/66b3e579ea1877c718e9867dea4e4f3bcc4e9b65))
+* retain Python naming conventions in AWS helm step migration ([39fdcb6](https://github.com/posit-dev/ptd/commit/39fdcb6e69c78c6d70bedfac2a6e13256957e4dc))
+* synthesize session taint in overprovisioning tolerations matching NodePool logic ([3ca8f49](https://github.com/posit-dev/ptd/commit/3ca8f499bb75acd297e8152835449c032851fc33))
+* use deterministic workload port instead of hardcoded 1080 for proxy ([99dfe02](https://github.com/posit-dev/ptd/commit/99dfe0282d16666c2047ade1ec46ed31203c4844))
+
+
+### Reverts
+
+* restore pulumi-kubernetes SDK to v4.21.1 to keep Azure provider stable ([51b33c0](https://github.com/posit-dev/ptd/commit/51b33c0710064aafa6fcd3510d96b8d70cd39ea4))
+
 # [1.26.0](https://github.com/posit-dev/ptd/compare/v1.25.1...v1.26.0) (2026-04-21)
 
 
