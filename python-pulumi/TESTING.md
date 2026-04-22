@@ -469,7 +469,7 @@ def test_public_method():
     assert result == "expected"
 ```
 
-**Exception:** It's acceptable to test private methods when they contain complex logic that needs thorough testing independently of the public API. See `test_grafana_alloy.py` for examples.
+**Exception:** It's acceptable to test private methods when they contain complex logic that needs thorough testing independently of the public API.
 
 ### 5. Not cleaning up test data
 

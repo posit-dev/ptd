@@ -94,6 +94,23 @@ func GetEKSToken(ctx context.Context, c *Credentials, region string, clusterName
 	return token, nil
 }
 
+// GetNodeGroupNames returns the managed node group names for an EKS cluster.
+func GetNodeGroupNames(ctx context.Context, c *Credentials, region string, clusterName string) ([]string, error) {
+	client := eks.New(eks.Options{
+		Region:      region,
+		Credentials: c.credentialsProvider,
+	})
+
+	output, err := client.ListNodegroups(ctx, &eks.ListNodegroupsInput{
+		ClusterName: aws.String(clusterName),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list nodegroups for cluster %s: %w", clusterName, err)
+	}
+
+	return output.Nodegroups, nil
+}
+
 // addExpiresQueryParam returns a middleware function that adds X-Amz-Expires to the
 // presigned URL. EKS requires this parameter for token validation.
 func addExpiresQueryParam(seconds int) func(stack *middleware.Stack) error {

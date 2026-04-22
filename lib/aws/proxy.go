@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/posit-dev/ptd/lib/helpers"
@@ -27,10 +27,6 @@ type ProxySession struct {
 }
 
 func NewProxySession(t Target, awsCliPath string, localPort string, file string) *ProxySession {
-	if localPort == "" {
-		localPort = "1080"
-	}
-
 	runningProxy := proxy.NewRunningProxy(
 		t.Name(),
 		localPort,
@@ -123,6 +119,14 @@ func (p *ProxySession) Start(ctx context.Context) error {
 		"-o", "UserKnownHostsFile=/dev/null",
 		"-N", "-D", p.localPort,
 		fmt.Sprintf("ec2-user@%s", bastionId))
+	// Put ssh in its own process group so helpers.KillProcess reaps the
+	// ProxyCommand shell and the aws-ssm-plugin subprocess it spawns.
+	p.command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// Override exec.CommandContext's default cancel (single-pid kill); the
+	// ProxyCommand shell would otherwise orphan.
+	p.command.Cancel = func() error {
+		return helpers.KillProcess(p.command.Process.Pid)
+	}
 
 	// set the environment variables for the command
 	// add each aws env var to command
@@ -189,24 +193,4 @@ func buildTempSshAccessCommand(publicKeyPath string) (cmd []string) {
 	cmd = append(cmd, fmt.Sprintf("echo '%s' >> /home/ec2-user/.ssh/authorized_keys", pubKeyStr))
 	cmd = append(cmd, fmt.Sprintf("(sleep 60 && sed -i '\\;%s;d' /home/ec2-user/.ssh/authorized_keys &) >/dev/null 2>&1", pubKeyStr))
 	return
-}
-
-func (p *ProxySession) Wait() {
-	defer func() {
-		if err := p.Stop(); err != nil {
-			slog.Error("Error stopping proxy session", "error", err)
-		}
-	}()
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		for sig := range c {
-			slog.Info("Received signal, stopping proxy session", "signal", sig)
-			if err := p.Stop(); err != nil {
-				slog.Error("Error stopping proxy session", "error", err)
-			}
-			os.Exit(0)
-		}
-	}()
-	select {}
 }

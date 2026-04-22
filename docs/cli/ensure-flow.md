@@ -26,7 +26,7 @@ If any step requires a proxy connection (to access private resources like databa
 - **AWS**: Starts an SSM Session Manager tunnel through a bastion host
 - **Azure**: Starts an Azure Bastion tunnel
 - **Skipped if**: Tailscale is enabled on the target
-- The proxy runs on `localhost:1080` and is available to all subsequent steps
+- The proxy binds to a deterministic per-workload port (10000–19999) and is available to all subsequent steps
 
 ### 3. Step Execution
 
@@ -224,7 +224,7 @@ Configures the Kubernetes cluster created in the previous step:
 
 **Proxy Required**: Yes
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_workload_helm.py`)
+**Implementation**: Go inline Pulumi (`lib/steps/helm_aws.go`, `lib/steps/helm_azure.go`)
 
 Deploys essential Kubernetes applications and controllers:
 - **Team Operator**: Posit's operator for managing Team product deployments

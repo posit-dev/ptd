@@ -67,6 +67,7 @@ class AzureWorkloadConfig(ptd.WorkloadConfig):
     netapp_volume_workbench_capacity: int = 200  # GiB
     netapp_volume_workbench_shared_capacity: int = 200  # GiB
     ppm_file_share_size_gib: int = 100  # Minimum size for PPM Azure File Share in GiB
+    nvidia_gpu_enabled: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -119,6 +120,7 @@ class AzureWorkloadClusterConfig(ptd.WorkloadClusterConfig):
 @dataclasses.dataclass(frozen=True)
 class AzureWorkloadClusterComponentConfig(ptd.WorkloadClusterComponentConfig):
     secret_store_csi_driver_azure_provider_version: str | None = "1.5.6"  # noqa: S105
+    nvidia_device_plugin_version: str | None = "0.17.1"
 
 
 def load_workload_cluster_site_dict(
@@ -250,7 +252,8 @@ class AzureWorkload(ptd.workload.AbstractWorkload):
         kubeconfig = yaml.safe_load(kubeconfig_str)
 
         # assume azure workloads do not support tailscale, enforce socks5 proxy for kube interactions
-        kubeconfig["clusters"][0]["cluster"]["proxy-url"] = "socks5://localhost:1080"
+        proxy_url = os.environ.get("ALL_PROXY", "socks5://localhost:1080")
+        kubeconfig["clusters"][0]["cluster"]["proxy-url"] = proxy_url
 
         # Save kubeconfig to a temporary file to pass to kubelogin command
         with tempfile.NamedTemporaryFile(delete=False) as temp_kubeconfig:
