@@ -74,6 +74,15 @@ func NewPythonPulumiStack(
 	}
 	slog.Debug("Pulumi workspace created successfully")
 
+	// Pulumi 3.226.0+ reads uv.lock directly (via searchup) instead of pip list; symlink it into the
+	// workspace temp dir so searchup finds it without needing to walk all the way to python-pulumi/.
+	uvLockSrc := filepath.Join(viper.GetString("TOP"), "python-pulumi", "uv.lock")
+	uvLockDst := filepath.Join(lw.WorkDir(), "uv.lock")
+	if symlinkErr := os.Symlink(uvLockSrc, uvLockDst); symlinkErr != nil && !os.IsExist(symlinkErr) {
+		err = symlinkErr
+		return
+	}
+
 	if createAutoloadFile {
 		// inanely hacky attempt at making the class name title case, except for AWS.
 		classCloud := helpers.TitleCase(cloud)
