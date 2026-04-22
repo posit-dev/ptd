@@ -239,7 +239,7 @@ type AWSWorkloadConfig struct {
 	CustomRole                              *CustomRoleConfig  `json:"custom_role" yaml:"custom_role"`
 	CreateAdminPolicyAsResource             bool               `json:"create_admin_policy_as_resource" yaml:"create_admin_policy_as_resource"`
 	ProvisionedVpc                          *AWSProvisionedVpc `json:"provisioned_vpc" yaml:"provisioned_vpc"`
-	PublicLoadBalancer                      bool               `json:"public_load_balancer" yaml:"public_load_balancer"`
+	PublicLoadBalancer                      *bool              `json:"public_load_balancer" yaml:"public_load_balancer"`
 	Region                                  string             `json:"region" yaml:"region"`
 	ResourceTags                            map[string]string  `json:"resource_tags" yaml:"resource_tags"`
 	RoleArn                                 *string            `json:"role_arn" yaml:"role_arn"`
