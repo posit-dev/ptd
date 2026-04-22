@@ -140,6 +140,21 @@ func BuildEKSKubeConfigWithExec(endpoint, caCert, clusterName, region string) Ku
 	}
 }
 
+// BuildEKSKubeconfigString builds an exec-plugin kubeconfig for an EKS cluster,
+// optionally setting a SOCKS proxy URL, and returns it as a YAML string. Pass
+// an empty proxyURL to omit the proxy (e.g. when Tailscale is enabled).
+func BuildEKSKubeconfigString(endpoint, caCert, clusterName, region, proxyURL string) (string, error) {
+	config := BuildEKSKubeConfigWithExec(endpoint, caCert, clusterName, region)
+	if proxyURL != "" {
+		config.Clusters[0].Cluster.ProxyURL = proxyURL
+	}
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal kubeconfig for %s: %w", clusterName, err)
+	}
+	return string(data), nil
+}
+
 // WriteKubeConfig marshals to YAML and writes to file with 0600 permissions
 func WriteKubeConfig(config KubeConfig, filePath string) error {
 	data, err := yaml.Marshal(config)
