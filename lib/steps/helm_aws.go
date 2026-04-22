@@ -250,8 +250,7 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 
 		k8sProviderName := name + "-" + release
 		k8sProvider, err := kubernetes.NewProvider(ctx, k8sProviderName, &kubernetes.ProviderArgs{
-			Kubeconfig:            pulumi.String(params.kubeconfigsByCluster[release]),
-			EnableServerSideApply: pulumi.BoolPtr(true),
+			Kubeconfig: pulumi.String(params.kubeconfigsByCluster[release]),
 		}, withAlias("pulumi:providers:kubernetes", k8sProviderName),
 			// Also alias for old Python naming: top-level resource with -k8s suffix.
 			pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(fmt.Sprintf(
