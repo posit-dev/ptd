@@ -21,7 +21,6 @@ import (
 	schedulingv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/scheduling/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	yamlv2 "gopkg.in/yaml.v2"
-	yaml "gopkg.in/yaml.v3"
 )
 
 // --- AWS ---
@@ -64,7 +63,7 @@ func (s *HelmStep) runAWSInlineGo(ctx context.Context, creds types.Credentials, 
 		return err
 	}
 
-	// Build per-cluster kubeconfigs
+	// Build per-cluster kubeconfigs using exec credential plugin (no embedded token).
 	kubeconfigsByCluster := make(map[string]string, len(cfg.Clusters))
 	for release := range cfg.Clusters {
 		clusterName := s.DstTarget.Name() + "-" + release
@@ -72,19 +71,15 @@ func (s *HelmStep) runAWSInlineGo(ctx context.Context, creds types.Credentials, 
 		if clusterErr != nil {
 			return fmt.Errorf("helm: failed to get cluster info for %s: %w", clusterName, clusterErr)
 		}
-		token, clusterErr := aws.GetEKSToken(ctx, awsCreds, s.DstTarget.Region(), clusterName)
-		if clusterErr != nil {
-			return fmt.Errorf("helm: failed to get EKS token for %s: %w", clusterName, clusterErr)
-		}
-		config := kube.BuildEKSKubeConfig(endpoint, caCert, token, clusterName)
+		proxyURL := ""
 		if !cfg.TailscaleEnabled {
-			config.Clusters[0].Cluster.ProxyURL = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
+			proxyURL = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
 		}
-		data, marshalErr := yaml.Marshal(config)
-		if marshalErr != nil {
-			return fmt.Errorf("helm: failed to marshal kubeconfig for %s: %w", clusterName, marshalErr)
+		kubeconfig, clusterErr := kube.BuildEKSKubeconfigString(endpoint, caCert, clusterName, s.DstTarget.Region(), proxyURL)
+		if clusterErr != nil {
+			return fmt.Errorf("helm: %w", clusterErr)
 		}
-		kubeconfigsByCluster[release] = string(data)
+		kubeconfigsByCluster[release] = kubeconfig
 	}
 
 	// Fetch cert_arns from persistent stack outputs
@@ -256,8 +251,7 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 			// Also alias for old Python naming: top-level resource with -k8s suffix.
 			pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(fmt.Sprintf(
 				"urn:pulumi:%s::%s::pulumi:providers:kubernetes::%s-k8s",
-				ctx.Stack(), outerProject, k8sProviderName))}}),
-			pulumi.IgnoreChanges([]string{"kubeconfig"}))
+				ctx.Stack(), outerProject, k8sProviderName))}}))
 		if err != nil {
 			return fmt.Errorf("helm aws: failed to create k8s provider for %s: %w", release, err)
 		}
