@@ -43,6 +43,9 @@ type azureClustersParams struct {
 	// certManagerDomains is the list of domains used for Let's Encrypt CertManager ClusterIssuers.
 	// Mirrors Python: root_domain if set, else all site domains.
 	certManagerDomains []string
+	// siteDomains is always the per-site domains (one per site), independent of root_domain.
+	// Used for Traefik Ingresses, which must be created for every site domain.
+	siteDomains []string
 	// thirdPartyTelemetryEnabled controls whether Traefik telemetry arguments are suppressed.
 	thirdPartyTelemetryEnabled bool
 	// workloadDir is the path to the workload's config directory (contains ptd.yaml, custom_k8s_resources/, etc.)
@@ -109,6 +112,14 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 		sort.Strings(certManagerDomains)
 	}
 
+	// siteDomains is always the per-site domains, independent of root_domain.
+	// Used for Traefik Ingresses, which must be created for every site domain.
+	var siteDomains []string
+	for _, siteCfg := range cfg.Sites {
+		siteDomains = append(siteDomains, siteCfg.Spec.Domain)
+	}
+	sort.Strings(siteDomains)
+
 	// Azure files storage account name: "stptdfiles" + first 14 chars of sanitized compound name.
 	// Mirrors python: AzureWorkload.azure_files_storage_account_name
 	sanitizedName := strings.ReplaceAll(s.DstTarget.Name(), "-", "")
@@ -129,6 +140,7 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 		azureFilesStorageAccountName: azureFilesStorageAccountName,
 		clusterIdentityByCluster:     clusterIdentityByCluster,
 		certManagerDomains:           certManagerDomains,
+		siteDomains:                  siteDomains,
 		thirdPartyTelemetryEnabled:   cfg.ThirdPartyTelemetryEnabled == nil || *cfg.ThirdPartyTelemetryEnabled,
 		workloadDir:                  filepath.Join(helpers.GetTargetsConfigPath(), helpers.WorkDir, s.DstTarget.Name()),
 	}
@@ -656,8 +668,10 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 			}
 		}
 
-		// extraObjects: redirect middleware + one Ingress per domain.
+		// extraObjects: redirect middleware + one Ingress per site domain.
 		// Mirrors azure_traefik.py _define_redirect_middleware() and _define_ingresses().
+		// Ingresses iterate over siteDomains (all site domains), not certManagerDomains,
+		// because a root_domain collapses cert-manager issuers but not per-site Ingresses.
 		extraObjects := pulumi.Array{
 			pulumi.Map{
 				"apiVersion": pulumi.String("traefik.io/v1alpha1"),
@@ -674,7 +688,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				},
 			},
 		}
-		for _, domain := range params.certManagerDomains {
+		for _, domain := range params.siteDomains {
 			ingressAnnotations := pulumi.Map{
 				"traefik.ingress.kubernetes.io/router.middlewares": pulumi.String("traefik-redirect-https@kubernetescrd"),
 			}
