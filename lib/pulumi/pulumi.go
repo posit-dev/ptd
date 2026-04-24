@@ -48,7 +48,7 @@ func RefreshStack(ctx context.Context, stack auto.Stack) (refreshResult auto.Ref
 
 	refreshResult, err = stack.Refresh(ctx, refreshOpts...)
 	if err != nil {
-		// don't return the full error, it's already printed to stderr.
+		slog.Error("Refresh stack error", "error", err)
 		return refreshResult, fmt.Errorf("failed to refresh stack, error above")
 	}
 	return
