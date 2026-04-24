@@ -1412,6 +1412,10 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 		if consolidateAfter == "" {
 			consolidateAfter = "5m"
 		}
+		weight := nodePool.Weight
+		if weight == 0 {
+			weight = 100
+		}
 
 		nodepoolSpec := map[string]interface{}{
 			"template": map[string]interface{}{
@@ -1428,7 +1432,7 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 				"consolidationPolicy": consolidationPolicy,
 				"consolidateAfter":    consolidateAfter,
 			},
-			"weight": nodePool.Weight,
+			"weight": weight,
 		}
 
 		if nodePool.ExpireAfter != nil {
