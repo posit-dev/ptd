@@ -50,6 +50,9 @@ type azureClustersParams struct {
 	thirdPartyTelemetryEnabled bool
 	// workloadDir is the path to the workload's config directory (contains ptd.yaml, custom_k8s_resources/, etc.)
 	workloadDir string
+	// rootDomain is the dereferenced value of cfg.RootDomain, or empty string if nil.
+	// Used to select the correct ClusterIssuer name in Traefik Ingress annotations.
+	rootDomain string
 }
 
 func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credentials, envVars map[string]string) error {
@@ -143,6 +146,12 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 		siteDomains:                  siteDomains,
 		thirdPartyTelemetryEnabled:   cfg.ThirdPartyTelemetryEnabled == nil || *cfg.ThirdPartyTelemetryEnabled,
 		workloadDir:                  filepath.Join(helpers.GetTargetsConfigPath(), helpers.WorkDir, s.DstTarget.Name()),
+		rootDomain: func() string {
+			if cfg.RootDomain != nil {
+				return *cfg.RootDomain
+			}
+			return ""
+		}(),
 	}
 
 	stack, err := createStack(ctx, s.Name(), s.DstTarget, func(pctx *pulumi.Context, target types.Target) error {
@@ -693,7 +702,11 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				"traefik.ingress.kubernetes.io/router.middlewares": pulumi.String("traefik-redirect-https@kubernetescrd"),
 			}
 			if clusterCfg.UseLetsEncrypt {
-				ingressAnnotations["cert-manager.io/cluster-issuer"] = pulumi.String(fmt.Sprintf("letsencrypt-%s", domain))
+				issuerDomain := domain
+				if params.rootDomain != "" {
+					issuerDomain = params.rootDomain
+				}
+				ingressAnnotations["cert-manager.io/cluster-issuer"] = pulumi.String(fmt.Sprintf("letsencrypt-%s", issuerDomain))
 			}
 			extraObjects = append(extraObjects, pulumi.Map{
 				"apiVersion": pulumi.String("networking.k8s.io/v1"),
