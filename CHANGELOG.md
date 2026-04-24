@@ -1,3 +1,10 @@
+## [1.26.3](https://github.com/posit-dev/ptd/compare/v1.26.2...v1.26.3) (2026-04-24)
+
+
+### Bug Fixes
+
+* **azure:** use per-site domains for Traefik Ingress generation ([97c8c8b](https://github.com/posit-dev/ptd/commit/97c8c8b1190c1ae1d0e8390c1f1a33ca70969e44))
+
 ## [1.26.2](https://github.com/posit-dev/ptd/compare/v1.26.1...v1.26.2) (2026-04-22)
 
 
