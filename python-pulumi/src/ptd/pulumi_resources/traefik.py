@@ -214,8 +214,29 @@ class Traefik(pulumi.ComponentResource):
                     "additionalArguments": [
                         "--metrics.prometheus=true",
                     ],
+                    "resources": {
+                        "requests": {
+                            "cpu": "200m",
+                            "memory": "256Mi",
+                        },
+                        "limits": {
+                            "memory": "512Mi",
+                        },
+                    },
                     "deployment": {
                         "replicas": self.deployment_replicas,
+                    },
+                    "livenessProbe": {
+                        "initialDelaySeconds": 5,
+                        "periodSeconds": 10,
+                        "timeoutSeconds": 5,
+                        "failureThreshold": 5,
+                    },
+                    "readinessProbe": {
+                        "initialDelaySeconds": 5,
+                        "periodSeconds": 10,
+                        "timeoutSeconds": 5,
+                        "failureThreshold": 3,
                     },
                     "logs": {
                         "general": {"level": "DEBUG"},
