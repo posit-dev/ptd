@@ -1,3 +1,10 @@
+## [1.26.4](https://github.com/posit-dev/ptd/compare/v1.26.3...v1.26.4) (2026-04-24)
+
+
+### Bug Fixes
+
+* **clusters-azure:** use corev1.NewConfigMapPatch for CoreDNS forwarding ConfigMap ([d3f5297](https://github.com/posit-dev/ptd/commit/d3f529726353ff6936db4a682493124d34d53b5c))
+
 ## [1.26.3](https://github.com/posit-dev/ptd/compare/v1.26.2...v1.26.3) (2026-04-24)
 
 
