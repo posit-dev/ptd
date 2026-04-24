@@ -47,7 +47,7 @@ func TestAWSWorkloadConfigSerialization(t *testing.T) {
 		KeycloakEnabled:    true,
 		VpcCidr:            "10.0.0.0/16",
 		VpcAzCount:         3,
-		PublicLoadBalancer: true,
+		PublicLoadBalancer: boolPtr(true),
 		ResourceTags: map[string]string{
 			"Environment": "test",
 			"Owner":       "team",
@@ -370,4 +370,8 @@ func TestAzureWorkloadClusterConfig_ForceMaintenanceOmittedWhenFalse(t *testing.
 	// Verify the YAML does NOT contain force_maintenance (omitempty)
 	yamlString := string(yamlData)
 	assert.NotContains(t, yamlString, "force_maintenance")
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
