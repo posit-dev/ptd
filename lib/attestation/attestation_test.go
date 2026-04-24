@@ -1,6 +1,7 @@
 package attestation
 
 import (
+	"sort"
 	"testing"
 )
 
@@ -242,4 +243,81 @@ func TestDefaultPrefix(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSummarizeStateFiles(t *testing.T) {
+	realStack := `{
+		"version": 3,
+		"checkpoint": {
+			"latest": {
+				"manifest": {"time": "2025-01-15T10:30:00Z", "version": "3.100.0"},
+				"resources": [
+					{"type": "pulumi:pulumi:Stack", "urn": "urn:pulumi:prod::proj::pulumi:pulumi:Stack::proj-prod"},
+					{"type": "azure-native:containerservice:ManagedCluster", "urn": "urn:pulumi:prod::proj::azure-native:containerservice:ManagedCluster::aks"}
+				]
+			}
+		}
+	}`
+	emptyStack := `{
+		"version": 3,
+		"checkpoint": {
+			"latest": {
+				"manifest": {"time": "2025-01-15T10:30:00Z", "version": "3.100.0"},
+				"resources": []
+			}
+		}
+	}`
+
+	t.Run("filters out (N) backup files", func(t *testing.T) {
+		files := map[string][]byte{
+			".pulumi/stacks/ptd-azure-workload-aks/prod.json":    []byte(realStack),
+			".pulumi/stacks/ptd-azure-workload-aks/prod(1).json": []byte(realStack),
+		}
+		summaries, err := summarizeStateFiles(files)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(summaries) != 1 {
+			t.Fatalf("got %d summaries, want 1", len(summaries))
+		}
+		if summaries[0].StackName != "prod" {
+			t.Errorf("StackName = %q, want %q", summaries[0].StackName, "prod")
+		}
+	})
+
+	t.Run("filters out stacks with zero resources", func(t *testing.T) {
+		files := map[string][]byte{
+			".pulumi/stacks/ptd-azure-workload-aks/prod.json":       []byte(realStack),
+			".pulumi/stacks/ptd-azure-workload-acr-cache/prod.json": []byte(emptyStack),
+		}
+		summaries, err := summarizeStateFiles(files)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(summaries) != 1 {
+			t.Fatalf("got %d summaries, want 1", len(summaries))
+		}
+		if summaries[0].ProjectName != "ptd-azure-workload-aks" {
+			t.Errorf("ProjectName = %q, want %q", summaries[0].ProjectName, "ptd-azure-workload-aks")
+		}
+	})
+
+	t.Run("returns all valid stacks with resources", func(t *testing.T) {
+		files := map[string][]byte{
+			".pulumi/stacks/ptd-azure-workload-aks/prod.json":      []byte(realStack),
+			".pulumi/stacks/ptd-azure-workload-clusters/prod.json": []byte(realStack),
+		}
+		summaries, err := summarizeStateFiles(files)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(summaries) != 2 {
+			t.Fatalf("got %d summaries, want 2", len(summaries))
+		}
+		names := []string{summaries[0].ProjectName, summaries[1].ProjectName}
+		sort.Strings(names)
+		if names[0] != "ptd-azure-workload-aks" || names[1] != "ptd-azure-workload-clusters" {
+			t.Errorf("got projects %v, want [ptd-azure-workload-aks ptd-azure-workload-clusters]", names)
+		}
+	})
 }

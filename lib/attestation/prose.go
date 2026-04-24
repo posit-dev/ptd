@@ -108,8 +108,9 @@ type InfraConfig struct {
 	VpcAzCount       int
 
 	// VNet (Azure)
-	VnetCidr          string
-	ProvisionedVnetID string
+	VnetCidr            string
+	ProvisionedVnetID   string
+	ProvisionedVnetName string
 
 	// Cluster
 	ClusterVersion string
@@ -210,12 +211,13 @@ func generateAzurePersistentProse(cfg *InfraConfig) string {
 	if cfg.ProvisionedVnetID != "" {
 		lines = append(lines, fmt.Sprintf(
 			"Integration with customer-provisioned VNet (`%s`)", cfg.ProvisionedVnetID))
+	} else if cfg.ProvisionedVnetName != "" {
+		lines = append(lines, fmt.Sprintf(
+			"Integration with customer-provisioned VNet (`%s`)", cfg.ProvisionedVnetName))
+	} else if cfg.VnetCidr != "" {
+		lines = append(lines, fmt.Sprintf("VNet with CIDR `%s`, with public, private, database, and NetApp subnets", cfg.VnetCidr))
 	} else {
-		if cfg.VnetCidr != "" {
-			lines = append(lines, fmt.Sprintf("VNet with CIDR `%s`, with public, private, database, and NetApp subnets", cfg.VnetCidr))
-		} else {
-			lines = append(lines, "PTD-managed VNet with public, private, database, and NetApp subnets")
-		}
+		lines = append(lines, "PTD-managed VNet with public, private, database, and NetApp subnets")
 	}
 
 	lines = append(lines, "Azure Database for PostgreSQL Flexible Server")
@@ -410,6 +412,8 @@ func GenerateProductSummary(cfg *InfraConfig, sites []SiteInfo) string {
 		var vnetClause string
 		if cfg.ProvisionedVnetID != "" {
 			vnetClause = fmt.Sprintf("deployed into the customer-provisioned VNet (`%s`)", cfg.ProvisionedVnetID)
+		} else if cfg.ProvisionedVnetName != "" {
+			vnetClause = fmt.Sprintf("deployed into the customer-provisioned VNet (`%s`)", cfg.ProvisionedVnetName)
 		} else if cfg.VnetCidr != "" {
 			vnetClause = fmt.Sprintf("deployed into a PTD-managed VNet (CIDR `%s`)", cfg.VnetCidr)
 		} else {
