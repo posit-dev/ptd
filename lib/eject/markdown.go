@@ -200,7 +200,7 @@ This workload is connected to a control room in account {{ .ControlRoom.AccountI
 | Category | Action |
 |---|---|
 {{ range .ControlRoom.Connections -}}
-| {{ .Category }} | {{ .SeverAction }} |
+| {{ .Category }} | {{ .RemovalAction }} |
 {{ end }}
 {{ end -}}
 

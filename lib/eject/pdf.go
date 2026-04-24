@@ -216,7 +216,7 @@ func RenderHandoffPDF(outputPath string, data *HandoffData) error {
 
 		m.AddRows(wrappingTableHeader([]string{"Category", "Action"}, []int{4, 8}))
 		for _, conn := range data.ControlRoom.Connections {
-			m.AddRows(wrappingTableRow([]string{conn.Category, conn.SeverAction}, []int{4, 8}))
+			m.AddRows(wrappingTableRow([]string{conn.Category, conn.RemovalAction}, []int{4, 8}))
 		}
 		m.AddRows(row.New(4))
 	}
