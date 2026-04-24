@@ -11,6 +11,7 @@ import (
 	"github.com/posit-dev/ptd/lib/aws"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/kube"
+	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/posit-dev/ptd/lib/types"
 	kubernetes "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes"
 	apiextensions "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apiextensions"
@@ -20,24 +21,31 @@ import (
 	schedulingv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/scheduling/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	yamlv2 "gopkg.in/yaml.v2"
-	yaml "gopkg.in/yaml.v3"
 )
 
 // --- AWS ---
 
+// karpenterVPCConfig holds the dynamically fetched VPC networking configuration
+// for a Karpenter-enabled cluster.
+type karpenterVPCConfig struct {
+	SubnetIDs        []string
+	SecurityGroupIDs []string
+}
+
 // awsHelmParams bundles pre-fetched data for the AWS helm deploy function.
 type awsHelmParams struct {
-	compoundName            string
-	trueName                string // derived: second-to-last segment of compoundName split by "-"
-	environment             string // derived: last segment of compoundName split by "-"
-	accountID               string
-	region                  string
-	kubeconfigsByCluster    map[string]string
-	certARNs                []string
-	cfg                     types.AWSWorkloadConfig
-	mimirPassword           string // for alloy mimir-auth secret
-	nodeGroupNamesByCluster map[string][]string
-	workloadDir             string
+	compoundName                string
+	trueName                    string // derived: second-to-last segment of compoundName split by "-"
+	environment                 string // derived: last segment of compoundName split by "-"
+	accountID                   string
+	region                      string
+	kubeconfigsByCluster        map[string]string
+	certARNs                    []string
+	cfg                         types.AWSWorkloadConfig
+	mimirPassword               string // for alloy mimir-auth secret
+	nodeGroupNamesByCluster     map[string][]string
+	karpenterVPCConfigByCluster map[string]karpenterVPCConfig
+	workloadDir                 string
 }
 
 func (s *HelmStep) runAWSInlineGo(ctx context.Context, creds types.Credentials, envVars map[string]string) error {
@@ -55,7 +63,7 @@ func (s *HelmStep) runAWSInlineGo(ctx context.Context, creds types.Credentials, 
 		return err
 	}
 
-	// Build per-cluster kubeconfigs
+	// Build per-cluster kubeconfigs using exec credential plugin (no embedded token).
 	kubeconfigsByCluster := make(map[string]string, len(cfg.Clusters))
 	for release := range cfg.Clusters {
 		clusterName := s.DstTarget.Name() + "-" + release
@@ -63,19 +71,15 @@ func (s *HelmStep) runAWSInlineGo(ctx context.Context, creds types.Credentials, 
 		if clusterErr != nil {
 			return fmt.Errorf("helm: failed to get cluster info for %s: %w", clusterName, clusterErr)
 		}
-		token, clusterErr := aws.GetEKSToken(ctx, awsCreds, s.DstTarget.Region(), clusterName)
-		if clusterErr != nil {
-			return fmt.Errorf("helm: failed to get EKS token for %s: %w", clusterName, clusterErr)
-		}
-		config := kube.BuildEKSKubeConfig(endpoint, caCert, token, clusterName)
+		proxyURL := ""
 		if !cfg.TailscaleEnabled {
-			config.Clusters[0].Cluster.ProxyURL = "socks5://localhost:1080"
+			proxyURL = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
 		}
-		data, marshalErr := yaml.Marshal(config)
-		if marshalErr != nil {
-			return fmt.Errorf("helm: failed to marshal kubeconfig for %s: %w", clusterName, marshalErr)
+		kubeconfig, clusterErr := kube.BuildEKSKubeconfigString(endpoint, caCert, clusterName, s.DstTarget.Region(), proxyURL)
+		if clusterErr != nil {
+			return fmt.Errorf("helm: %w", clusterErr)
 		}
-		kubeconfigsByCluster[release] = string(data)
+		kubeconfigsByCluster[release] = kubeconfig
 	}
 
 	// Fetch cert_arns from persistent stack outputs
@@ -126,21 +130,62 @@ func (s *HelmStep) runAWSInlineGo(ctx context.Context, creds types.Credentials, 
 		nodeGroupNamesByCluster[release] = names
 	}
 
+	// Fetch VPC config for clusters with Karpenter
+	karpenterVPCConfigByCluster := make(map[string]karpenterVPCConfig)
+	for release, clusterCfg := range cfg.Clusters {
+		if clusterCfg.Spec.KarpenterConfig == nil || len(clusterCfg.Spec.KarpenterConfig.NodePools) == 0 {
+			continue
+		}
+		clusterName := s.DstTarget.Name() + "-" + release
+		vpcCfg, err := aws.GetClusterVPCConfig(ctx, awsCreds, s.DstTarget.Region(), clusterName)
+		if err != nil {
+			return fmt.Errorf("helm: failed to get VPC config for cluster %s: %w", clusterName, err)
+		}
+
+		sgIDs := vpcCfg.SecurityGroupIDs
+
+		// Look up FSX NFS security group
+		fsxSGID, fsxFound, err := aws.GetNFSSecurityGroupID(ctx, awsCreds, s.DstTarget.Region(), vpcCfg.VpcID, "eks-nodes-fsx-nfs.posit.team")
+		if err != nil {
+			return fmt.Errorf("helm: failed to look up FSX NFS security group for cluster %s: %w", clusterName, err)
+		}
+		if fsxFound {
+			sgIDs = append(sgIDs, fsxSGID)
+		}
+
+		// Look up EFS NFS security group if EFS is enabled
+		if clusterCfg.Spec.EnableEfsCsiDriver || clusterCfg.Spec.EfsConfig != nil {
+			efsSGID, efsFound, err := aws.GetNFSSecurityGroupID(ctx, awsCreds, s.DstTarget.Region(), vpcCfg.VpcID, "eks-nodes-efs-nfs.posit.team")
+			if err != nil {
+				return fmt.Errorf("helm: failed to look up EFS NFS security group for cluster %s: %w", clusterName, err)
+			}
+			if efsFound {
+				sgIDs = append(sgIDs, efsSGID)
+			}
+		}
+
+		karpenterVPCConfigByCluster[release] = karpenterVPCConfig{
+			SubnetIDs:        vpcCfg.SubnetIDs,
+			SecurityGroupIDs: sgIDs,
+		}
+	}
+
 	// Derive trueName and environment from compoundName
 	trueName, environment := splitCompoundName(s.DstTarget.Name())
 
 	params := awsHelmParams{
-		compoundName:            s.DstTarget.Name(),
-		trueName:                trueName,
-		environment:             environment,
-		accountID:               awsCreds.AccountID(),
-		region:                  s.DstTarget.Region(),
-		kubeconfigsByCluster:    kubeconfigsByCluster,
-		certARNs:                certARNs,
-		cfg:                     cfg,
-		mimirPassword:           mimirPassword,
-		nodeGroupNamesByCluster: nodeGroupNamesByCluster,
-		workloadDir:             filepath.Join(helpers.GetTargetsConfigPath(), helpers.WorkDir, s.DstTarget.Name()),
+		compoundName:                s.DstTarget.Name(),
+		trueName:                    trueName,
+		environment:                 environment,
+		accountID:                   awsCreds.AccountID(),
+		region:                      s.DstTarget.Region(),
+		kubeconfigsByCluster:        kubeconfigsByCluster,
+		certARNs:                    certARNs,
+		cfg:                         cfg,
+		mimirPassword:               mimirPassword,
+		nodeGroupNamesByCluster:     nodeGroupNamesByCluster,
+		karpenterVPCConfigByCluster: karpenterVPCConfigByCluster,
+		workloadDir:                 filepath.Join(helpers.GetTargetsConfigPath(), helpers.WorkDir, s.DstTarget.Name()),
 	}
 
 	stack, err := createStack(ctx, s.Name(), s.DstTarget, func(pctx *pulumi.Context, _ types.Target) error {
@@ -206,8 +251,7 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 			// Also alias for old Python naming: top-level resource with -k8s suffix.
 			pulumi.Aliases([]pulumi.Alias{{URN: pulumi.URN(fmt.Sprintf(
 				"urn:pulumi:%s::%s::pulumi:providers:kubernetes::%s-k8s",
-				ctx.Stack(), outerProject, k8sProviderName))}}),
-			pulumi.IgnoreChanges([]string{"kubeconfig"}))
+				ctx.Stack(), outerProject, k8sProviderName))}}))
 		if err != nil {
 			return fmt.Errorf("helm aws: failed to create k8s provider for %s: %w", release, err)
 		}
@@ -219,7 +263,7 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 		}
 
 		// 2. FSx OpenZFS CSI driver
-		fsxRoleName := "fsx-openzfs." + name + ".posit.team"
+		fsxRoleName := "aws-fsx-openzfs-csi-driver." + name + ".posit.team"
 		if err := awsHelmFsxOpenzfsCsi(ctx, k8sOpt, name, release, params.accountID, fsxRoleName, resolved.AwsFsxOpenzfsCsiDriverVersion, withAlias); err != nil {
 			return err
 		}
@@ -340,6 +384,42 @@ func helmChartCR(ctx *pulumi.Context, resourceName, metaName, namespace, repo, c
 	return err
 }
 
+// awsHelmChartCR creates a HelmChart custom resource with the posit.team/managed-by label
+// added to every resource. Use this (not helmChartCR) for all AWS workload helm resources.
+func awsHelmChartCR(ctx *pulumi.Context, resourceName, metaName, namespace, repo, chart, targetNamespace, version string, valuesContent map[string]interface{}, k8sOpt pulumi.ResourceOption, aliases ...pulumi.ResourceOption) error {
+	valuesYAML, encErr := marshalYAML(valuesContent)
+	if encErr != nil {
+		return fmt.Errorf("failed to marshal values for %s: %w", resourceName, encErr)
+	}
+
+	opts := []pulumi.ResourceOption{k8sOpt}
+	opts = append(opts, aliases...)
+
+	spec := pulumi.Map{
+		"chart":           pulumi.String(chart),
+		"targetNamespace": pulumi.String(targetNamespace),
+		"version":         pulumi.String(version),
+		"valuesContent":   pulumi.String(valuesYAML),
+	}
+	if repo != "" {
+		spec["repo"] = pulumi.String(repo)
+	}
+
+	_, err := apiextensions.NewCustomResource(ctx, resourceName, &apiextensions.CustomResourceArgs{
+		ApiVersion: pulumi.String("helm.cattle.io/v1"),
+		Kind:       pulumi.String("HelmChart"),
+		Metadata: metav1.ObjectMetaArgs{
+			Name:      pulumi.String(metaName),
+			Namespace: pulumi.String(namespace),
+			Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
+		},
+		OtherFields: kubernetes.UntypedArgs{
+			"spec": spec,
+		},
+	}, opts...)
+	return err
+}
+
 func awsHelmLBC(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName, release, accountID, version string,
 	withAlias func(string, string) pulumi.ResourceOption) error {
 
@@ -350,7 +430,7 @@ func awsHelmLBC(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName,
 		"clusterName": clusterName,
 		"serviceAccount": map[string]interface{}{
 			"create": true,
-			"name":   "aws-load-balancer-controller",
+			"name":   "aws-load-balancer-controller.posit.team",
 			"annotations": map[string]interface{}{
 				"eks.amazonaws.com/role-arn": fmt.Sprintf("arn:aws:iam::%s:role/%s", accountID, lbcRoleName),
 			},
@@ -362,7 +442,7 @@ func awsHelmLBC(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName,
 	}
 
 	resourceName := compoundName + "-" + release + "-aws-lbc-helm-release"
-	return helmChartCR(ctx, resourceName, "aws-load-balancer-controller",
+	return awsHelmChartCR(ctx, resourceName, "aws-load-balancer-controller",
 		clustersHelmControllerNamespace,
 		"https://aws.github.io/eks-charts",
 		"aws-load-balancer-controller",
@@ -379,7 +459,7 @@ func awsHelmFsxOpenzfsCsi(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, com
 		"controller": map[string]interface{}{
 			"serviceAccount": map[string]interface{}{
 				"create": true,
-				"name":   "controller.fsx-openzfs.csi.aws.com",
+				"name":   "controller.aws-fsx-openzfs-csi-driver.posit.team",
 				"annotations": map[string]interface{}{
 					"eks.amazonaws.com/role-arn": fmt.Sprintf("arn:aws:iam::%s:role/%s", accountID, fsxRoleName),
 				},
@@ -393,7 +473,7 @@ func awsHelmFsxOpenzfsCsi(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, com
 		"node": map[string]interface{}{
 			"serviceAccount": map[string]interface{}{
 				"create": true,
-				"name":   "nodes.fsx-openzfs.csi.aws.com",
+				"name":   "nodes.aws-fsx-openzfs-csi-driver.posit.team",
 				"annotations": map[string]interface{}{
 					"eks.amazonaws.com/role-arn": fmt.Sprintf("arn:aws:iam::%s:role/%s", accountID, fsxRoleName),
 				},
@@ -406,7 +486,7 @@ func awsHelmFsxOpenzfsCsi(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, com
 	}
 
 	resourceName := compoundName + "-" + release + "-aws-fsx-openzfs-csi-helm-release"
-	return helmChartCR(ctx, resourceName, "aws-fsx-openzfs-csi",
+	return awsHelmChartCR(ctx, resourceName, "aws-fsx-openzfs-csi",
 		clustersHelmControllerNamespace,
 		"https://kubernetes-sigs.github.io/aws-fsx-openzfs-csi-driver",
 		"aws-fsx-openzfs-csi-driver",
@@ -424,7 +504,7 @@ func awsHelmSecretStoreCsi(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, co
 		"syncSecret":           map[string]interface{}{"enabled": true},
 	}
 	resourceName := compoundName + "-" + release + "-secret-store-csi-helm-release"
-	return helmChartCR(ctx, resourceName, "secret-store-csi",
+	return awsHelmChartCR(ctx, resourceName, "secret-store-csi",
 		clustersHelmControllerNamespace,
 		"https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts",
 		"secrets-store-csi-driver",
@@ -442,7 +522,7 @@ func awsHelmSecretStoreCsiAws(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption,
 		},
 	}
 	resourceName := compoundName + "-" + release + "-secret-store-csi-provider-aws-helm-release"
-	return helmChartCR(ctx, resourceName, "secrets-store-csi-driver-provider-aws",
+	return awsHelmChartCR(ctx, resourceName, "secrets-store-csi-driver-provider-aws",
 		clustersHelmControllerNamespace,
 		"https://aws.github.io/secrets-store-csi-driver-provider-aws",
 		"secrets-store-csi-driver-provider-aws",
@@ -458,7 +538,8 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	nsName := compoundName + "-" + release + "-traefik-ns"
 	ns, err := corev1.NewNamespace(ctx, nsName, &corev1.NamespaceArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name: pulumi.String(helmTraefikNamespace),
+			Name:   pulumi.String(helmTraefikNamespace),
+			Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 	}, k8sOpt, withAlias("kubernetes:core/v1:Namespace", nsName))
 	if err != nil {
@@ -526,6 +607,7 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 		Metadata: metav1.ObjectMetaArgs{
 			Name:      pulumi.String("traefik"),
 			Namespace: pulumi.String(clustersHelmControllerNamespace),
+			Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 		OtherFields: kubernetes.UntypedArgs{
 			"spec": chartSpec,
@@ -537,11 +619,8 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	}
 
 	// Create ALB ingress(es)
-	albTagString := formatLBTags(map[string]string{
-		"posit.team/true-name":   params.trueName,
-		"posit.team/environment": params.environment,
-		"Name":                   compoundName,
-	})
+	albTagString := fmt.Sprintf("posit.team/true-name=%s,posit.team/environment=%s,Name=%s",
+		params.trueName, params.environment, compoundName)
 
 	if params.cfg.LoadBalancerPerSite {
 		sortedSiteNames := helpers.SortedKeys(params.cfg.Sites)
@@ -569,6 +648,7 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 					Name:        pulumi.String(metaIngressName),
 					Namespace:   pulumi.String(helmTraefikNamespace),
 					Annotations: annPulumi,
+					Labels:      pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm"), "app": pulumi.String("traefik")},
 				},
 				OtherFields: kubernetes.UntypedArgs{
 					"spec": pulumi.Map{
@@ -630,6 +710,7 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 				Name:        pulumi.String("traefik"),
 				Namespace:   pulumi.String(helmTraefikNamespace),
 				Annotations: annPulumi,
+				Labels:      pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm"), "app": pulumi.String("traefik")},
 			},
 			OtherFields: kubernetes.UntypedArgs{
 				"spec": pulumi.Map{
@@ -681,7 +762,7 @@ func buildALBAnnotations(cfg types.AWSWorkloadConfig, certARNs []string, tagStri
 		annotations["alb.ingress.kubernetes.io/subnets"] = strings.Join(cfg.ProvisionedVpc.PrivateSubnets, ",")
 	}
 
-	if cfg.PublicLoadBalancer {
+	if cfg.PublicLoadBalancer == nil || *cfg.PublicLoadBalancer {
 		annotations["alb.ingress.kubernetes.io/scheme"] = "internet-facing"
 	} else {
 		annotations["alb.ingress.kubernetes.io/scheme"] = "internal"
@@ -694,7 +775,7 @@ func awsHelmMetricsServer(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, com
 	withAlias func(string, string) pulumi.ResourceOption) error {
 
 	resourceName := compoundName + "-" + release + "-metrics-server-helm-release"
-	return helmChartCR(ctx, resourceName, "metrics-server",
+	return awsHelmChartCR(ctx, resourceName, "metrics-server",
 		clustersHelmControllerNamespace,
 		"https://kubernetes-sigs.github.io/metrics-server/",
 		"metrics-server",
@@ -710,7 +791,8 @@ func awsHelmLoki(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName
 	nsName := compoundName + "-" + release + "-loki-ns"
 	_, err := corev1.NewNamespace(ctx, nsName, &corev1.NamespaceArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name: pulumi.String(helmLokiNamespace),
+			Name:   pulumi.String(helmLokiNamespace),
+			Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 	}, k8sOpt, withAlias("kubernetes:core/v1:Namespace", nsName))
 	if err != nil {
@@ -777,7 +859,7 @@ func awsHelmLoki(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName
 		"loki": lokiCfg,
 		"serviceAccount": map[string]interface{}{
 			"create": true,
-			"name":   "loki",
+			"name":   "loki.posit.team",
 			"annotations": map[string]interface{}{
 				"eks.amazonaws.com/role-arn": fmt.Sprintf("arn:aws:iam::%s:role/%s", params.accountID, lokiRole),
 			},
@@ -797,7 +879,7 @@ func awsHelmLoki(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName
 	}
 
 	resourceName := compoundName + "-" + release + "-loki-helm-release"
-	return helmChartCR(ctx, resourceName, "loki",
+	return awsHelmChartCR(ctx, resourceName, "loki",
 		clustersHelmControllerNamespace,
 		"https://grafana.github.io/helm-charts",
 		"loki",
@@ -883,7 +965,7 @@ func awsHelmGrafana(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	}
 
 	resourceName := compoundName + "-" + release + "-grafana-helm-release"
-	return helmChartCR(ctx, resourceName, "grafana",
+	return awsHelmChartCR(ctx, resourceName, "grafana",
 		clustersHelmControllerNamespace,
 		"https://grafana.github.io/helm-charts",
 		"grafana",
@@ -899,7 +981,8 @@ func awsHelmMimir(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	nsName := compoundName + "-" + release + "-mimir-ns"
 	_, err := corev1.NewNamespace(ctx, nsName, &corev1.NamespaceArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name: pulumi.String(helmMimirNamespace),
+			Name:   pulumi.String(helmMimirNamespace),
+			Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 	}, k8sOpt, withAlias("kubernetes:core/v1:Namespace", nsName))
 	if err != nil {
@@ -947,7 +1030,7 @@ func awsHelmMimir(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	values := map[string]interface{}{
 		"serviceAccount": map[string]interface{}{
 			"create": true,
-			"name":   "mimir",
+			"name":   "mimir.posit.team",
 			"annotations": map[string]interface{}{
 				"eks.amazonaws.com/role-arn": fmt.Sprintf("arn:aws:iam::%s:role/%s", params.accountID, mimirRole),
 			},
@@ -986,7 +1069,7 @@ func awsHelmMimir(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	}
 
 	resourceName := compoundName + "-" + release + "-mimir-helm-release"
-	return helmChartCR(ctx, resourceName, "mimir",
+	return awsHelmChartCR(ctx, resourceName, "mimir",
 		clustersHelmControllerNamespace,
 		"https://grafana.github.io/helm-charts",
 		"mimir-distributed",
@@ -1002,7 +1085,7 @@ func awsHelmKubeStateMetrics(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, 
 		"metricLabelsAllowlist": []interface{}{"pods=[launcher-instance-id,user-group-*]"},
 	}
 	resourceName := compoundName + "-" + release + "-kube-state-metrics-helm-release"
-	return helmChartCR(ctx, resourceName, "kube-state-metrics",
+	return awsHelmChartCR(ctx, resourceName, "kube-state-metrics",
 		clustersHelmControllerNamespace,
 		"https://prometheus-community.github.io/helm-charts",
 		"kube-state-metrics",
@@ -1020,7 +1103,8 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	nsName := compoundName + "-" + release + "-alloy-ns"
 	ns, err := corev1.NewNamespace(ctx, nsName, &corev1.NamespaceArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name: pulumi.String(helmAlloyNamespace),
+			Name:   pulumi.String(helmAlloyNamespace),
+			Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 	}, k8sOpt, withAlias("kubernetes:core/v1:Namespace", nsName))
 	if err != nil {
@@ -1029,7 +1113,9 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 
 	// Build alloy config
 	domain := mainDomain(params.cfg.Sites)
-	clusterName := compoundName + "-" + release
+	// Python's eks_cluster_name() uses "default_{fqn}-control-plane" as the cluster label in
+	// Alloy config, where fqn = compoundName + "-" + release (e.g. ganso01-staging-20250328).
+	alloyClusterName := "default_" + compoundName + "-" + release + "-control-plane"
 	trueName, _ := splitCompoundName(compoundName)
 
 	alloyParams := alloyConfigParams{
@@ -1040,7 +1126,7 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 		thirdPartyTelemetryEnabled: isThirdPartyTelemetryEnabled(params.cfg.ThirdPartyTelemetryEnabled),
 		release:                    release,
 		region:                     params.region,
-		clusterName:                clusterName,
+		clusterName:                alloyClusterName,
 		accountIDOrTenantID:        params.accountID,
 		cloudProvider:              "aws",
 		shouldScrapeSystemLogs:     params.cfg.GrafanaScrapeSystemLogs,
@@ -1056,6 +1142,7 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 		Metadata: metav1.ObjectMetaArgs{
 			Name:      pulumi.String(configMapName),
 			Namespace: pulumi.String(helmAlloyNamespace),
+			Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 		Data: pulumi.StringMap{
 			"config.alloy": pulumi.String(alloyConfigStr),
@@ -1076,6 +1163,7 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 		Metadata: metav1.ObjectMetaArgs{
 			Name:      pulumi.String("mimir-auth"),
 			Namespace: pulumi.String(helmAlloyNamespace),
+			Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 		StringData: pulumi.StringMap{
 			"password": pulumi.String(params.mimirPassword),
@@ -1102,7 +1190,7 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	alloyValues := map[string]interface{}{
 		"serviceAccount": map[string]interface{}{
 			"create": true,
-			"name":   "alloy",
+			"name":   "alloy.posit.team",
 			"annotations": map[string]interface{}{
 				"eks.amazonaws.com/role-arn": fmt.Sprintf("arn:aws:iam::%s:role/%s", params.accountID, alloyRoleName),
 			},
@@ -1135,6 +1223,7 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 			},
 			"securityContext": map[string]interface{}{
 				"privileged": params.cfg.GrafanaScrapeSystemLogs,
+				"runAsUser":  nil,
 			},
 			"configMap": map[string]interface{}{
 				"create": false,
@@ -1159,7 +1248,7 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	}
 
 	chartResourceName := compoundName + "-" + release + "-grafana-alloy-release"
-	return helmChartCR(ctx, chartResourceName, "alloy",
+	return awsHelmChartCR(ctx, chartResourceName, "alloy",
 		clustersHelmControllerNamespace,
 		"https://grafana.github.io/helm-charts",
 		"alloy",
@@ -1175,7 +1264,8 @@ func awsHelmNvidiaDevicePlugin(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption
 	nsName := compoundName + "-" + release + "-nvidia-device-plugin-ns"
 	_, err := corev1.NewNamespace(ctx, nsName, &corev1.NamespaceArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name: pulumi.String(helmNvidiaNamespace),
+			Name:   pulumi.String(helmNvidiaNamespace),
+			Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 	}, k8sOpt, withAlias("kubernetes:core/v1:Namespace", nsName))
 	if err != nil {
@@ -1209,7 +1299,7 @@ func awsHelmNvidiaDevicePlugin(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption
 	}
 
 	resourceName := compoundName + "-" + release + "-nvidia-device-plugin-helm-release"
-	return helmChartCR(ctx, resourceName, "nvidia-device-plugin",
+	return awsHelmChartCR(ctx, resourceName, "nvidia-device-plugin",
 		clustersHelmControllerNamespace,
 		"https://nvidia.github.io/k8s-device-plugin",
 		"nvidia-device-plugin",
@@ -1279,6 +1369,7 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 		Metadata: metav1.ObjectMetaArgs{
 			Name:      pulumi.String("karpenter"),
 			Namespace: pulumi.String(clustersHelmControllerNamespace),
+			Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 		OtherFields: kubernetes.UntypedArgs{
 			"spec": pulumi.Map{
@@ -1299,6 +1390,8 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 		return nil
 	}
 
+	vpcCfg := params.karpenterVPCConfigByCluster[release]
+
 	for _, nodePool := range karpenterCfg.NodePools {
 		// Build requirements
 		requirements := make([]interface{}, 0, len(nodePool.Requirements))
@@ -1308,6 +1401,16 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 				"operator": req.Operator,
 				"values":   req.Values,
 			})
+		}
+
+		// Apply disruption defaults
+		consolidationPolicy := nodePool.ConsolidationPolicy
+		if consolidationPolicy == "" {
+			consolidationPolicy = "WhenEmptyOrUnderutilized"
+		}
+		consolidateAfter := nodePool.ConsolidateAfter
+		if consolidateAfter == "" {
+			consolidateAfter = "5m"
 		}
 
 		nodepoolSpec := map[string]interface{}{
@@ -1322,8 +1425,8 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 				},
 			},
 			"disruption": map[string]interface{}{
-				"consolidationPolicy": nodePool.ConsolidationPolicy,
-				"consolidateAfter":    nodePool.ConsolidateAfter,
+				"consolidationPolicy": consolidationPolicy,
+				"consolidateAfter":    consolidateAfter,
 			},
 			"weight": nodePool.Weight,
 		}
@@ -1332,9 +1435,24 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 			nodepoolSpec["template"].(map[string]interface{})["spec"].(map[string]interface{})["expireAfter"] = *nodePool.ExpireAfter
 		}
 
-		if len(nodePool.Taints) > 0 {
-			taints := make([]interface{}, 0, len(nodePool.Taints))
+		// Build taints: start with explicitly listed taints, then add session taint if session_taints: true.
+		allTaints := make([]types.KarpenterTaint, 0, len(nodePool.Taints)+1)
+		allTaints = append(allTaints, nodePool.Taints...)
+		if nodePool.SessionTaints {
+			hasSessionTaint := false
 			for _, t := range nodePool.Taints {
+				if t.Key == "workload-type" && t.Effect == "NoSchedule" {
+					hasSessionTaint = true
+					break
+				}
+			}
+			if !hasSessionTaint {
+				allTaints = append(allTaints, types.KarpenterTaint{Key: "workload-type", Value: "session", Effect: "NoSchedule"})
+			}
+		}
+		if len(allTaints) > 0 {
+			taints := make([]interface{}, 0, len(allTaints))
+			for _, t := range allTaints {
 				taints = append(taints, map[string]interface{}{
 					"key":    t.Key,
 					"value":  t.Value,
@@ -1365,7 +1483,8 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 			ApiVersion: pulumi.String("karpenter.sh/v1"),
 			Kind:       pulumi.String("NodePool"),
 			Metadata: metav1.ObjectMetaArgs{
-				Name: pulumi.String(nodePool.Name),
+				Name:   pulumi.String(nodePool.Name),
+				Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 			},
 			OtherFields: kubernetes.UntypedArgs{
 				"spec": nodepoolSpec,
@@ -1376,14 +1495,14 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 		}
 
 		// EC2NodeClass
-		// Subnet and security group IDs come from the cluster spec
-		subnetIDs := make([]interface{}, 0, len(clusterSpec.SubnetIDs))
-		for _, id := range clusterSpec.SubnetIDs {
-			subnetIDs = append(subnetIDs, map[string]interface{}{"id": id})
+		// Subnet and security group IDs are fetched dynamically from the live EKS cluster.
+		subnetTerms := make([]interface{}, 0, len(vpcCfg.SubnetIDs))
+		for _, id := range vpcCfg.SubnetIDs {
+			subnetTerms = append(subnetTerms, map[string]interface{}{"id": id})
 		}
-		securityGroupIDs := make([]interface{}, 0, len(clusterSpec.SecurityGroupIDs))
-		for _, id := range clusterSpec.SecurityGroupIDs {
-			securityGroupIDs = append(securityGroupIDs, map[string]interface{}{"id": id})
+		sgTerms := make([]interface{}, 0, len(vpcCfg.SecurityGroupIDs))
+		for _, id := range vpcCfg.SecurityGroupIDs {
+			sgTerms = append(sgTerms, map[string]interface{}{"id": id})
 		}
 
 		instanceProfile := fmt.Sprintf("KarpenterNodeInstanceProfile-%s.posit.team", clusterName)
@@ -1397,14 +1516,15 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 			ApiVersion: pulumi.String("karpenter.k8s.aws/v1"),
 			Kind:       pulumi.String("EC2NodeClass"),
 			Metadata: metav1.ObjectMetaArgs{
-				Name: pulumi.String(nodePool.Name),
+				Name:   pulumi.String(nodePool.Name),
+				Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 			},
 			OtherFields: kubernetes.UntypedArgs{
 				"spec": map[string]interface{}{
 					"instanceProfile":            instanceProfile,
 					"amiSelectorTerms":           []interface{}{map[string]interface{}{"alias": "al2023@latest"}},
-					"subnetSelectorTerms":        subnetIDs,
-					"securityGroupSelectorTerms": securityGroupIDs,
+					"subnetSelectorTerms":        subnetTerms,
+					"securityGroupSelectorTerms": sgTerms,
 					"blockDeviceMappings": []interface{}{
 						map[string]interface{}{
 							"deviceName": "/dev/xvda",
@@ -1439,7 +1559,8 @@ func awsHelmKarpenterOverprovisioning(ctx *pulumi.Context, k8sOpt pulumi.Resourc
 	pcResourceName := clusterName + "-karpenter-overprovisioning-pool-priority"
 	_, err := schedulingv1.NewPriorityClass(ctx, pcResourceName, &schedulingv1.PriorityClassArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name: pulumi.String("karpenter-overprovisioning-pool-priority"),
+			Name:   pulumi.String("karpenter-overprovisioning-pool-priority"),
+			Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
 		Value:            pulumi.Int(-100),
 		GlobalDefault:    pulumi.Bool(false),
@@ -1473,8 +1594,22 @@ func awsHelmKarpenterOverprovisioning(ctx *pulumi.Context, k8sOpt pulumi.Resourc
 			limits["nvidia.com/gpu"] = pulumi.String(*nodePool.OverprovisioningNvidiaGPU)
 		}
 
-		tolerations := make(corev1.TolerationArray, 0, len(nodePool.Taints))
-		for _, taint := range nodePool.Taints {
+		ovpTaints := make([]types.KarpenterTaint, 0, len(nodePool.Taints)+1)
+		ovpTaints = append(ovpTaints, nodePool.Taints...)
+		if nodePool.SessionTaints {
+			hasSessionTaint := false
+			for _, t := range nodePool.Taints {
+				if t.Key == "workload-type" && t.Effect == "NoSchedule" {
+					hasSessionTaint = true
+					break
+				}
+			}
+			if !hasSessionTaint {
+				ovpTaints = append(ovpTaints, types.KarpenterTaint{Key: "workload-type", Value: "session", Effect: "NoSchedule"})
+			}
+		}
+		tolerations := make(corev1.TolerationArray, 0, len(ovpTaints))
+		for _, taint := range ovpTaints {
 			tolerations = append(tolerations, corev1.TolerationArgs{
 				Key:      pulumi.String(taint.Key),
 				Operator: pulumi.StringPtr("Equal"),
@@ -1488,6 +1623,7 @@ func awsHelmKarpenterOverprovisioning(ctx *pulumi.Context, k8sOpt pulumi.Resourc
 			Metadata: metav1.ObjectMetaArgs{
 				Name:      pulumi.String(deploymentName),
 				Namespace: pulumi.String(clustersKubeSystemNamespace),
+				Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 			},
 			Spec: appsv1.DeploymentSpecArgs{
 				Replicas: pulumi.Int(nodePool.OverprovisioningReplicas),

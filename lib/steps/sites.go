@@ -117,10 +117,6 @@ func (s *SitesStep) runAWSInlineGo(ctx context.Context, creds types.Credentials,
 		return fmt.Errorf("sites: failed to parse workload secret: %w", err)
 	}
 
-	// Build kubeconfig per release using the exec credential plugin so no token
-	// is embedded. The kubeconfig is stable across runs — no Pulumi state diff
-	// on token rotation. The AWS_ACCESS_KEY_ID/SECRET/SESSION_TOKEN env vars
-	// set by prepareEnvVarsForPulumi are inherited by the aws subprocess.
 	kubeconfigsByRelease := make(map[string]string, len(cfg.Clusters))
 	for release := range cfg.Clusters {
 		clusterName := s.DstTarget.Name() + "-" + release
@@ -128,15 +124,15 @@ func (s *SitesStep) runAWSInlineGo(ctx context.Context, creds types.Credentials,
 		if err != nil {
 			return fmt.Errorf("sites: failed to get cluster info for %s: %w", clusterName, err)
 		}
-		config := kube.BuildEKSKubeConfigWithExec(endpoint, caCert, clusterName, s.DstTarget.Region())
+		proxyURL := ""
 		if !cfg.TailscaleEnabled {
-			config.Clusters[0].Cluster.ProxyURL = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
+			proxyURL = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
 		}
-		data, err := yaml.Marshal(config)
+		kubeconfig, err := kube.BuildEKSKubeconfigString(endpoint, caCert, clusterName, s.DstTarget.Region(), proxyURL)
 		if err != nil {
-			return fmt.Errorf("sites: failed to marshal kubeconfig for %s: %w", clusterName, err)
+			return fmt.Errorf("sites: %w", err)
 		}
-		kubeconfigsByRelease[release] = string(data)
+		kubeconfigsByRelease[release] = kubeconfig
 	}
 
 	params := awsSiteParams{
@@ -361,12 +357,11 @@ func (s *SitesStep) runAzureInlineGo(ctx context.Context, creds types.Credential
 		if err != nil {
 			return fmt.Errorf("sites: failed to get AKS kubeconfig for %s: %w", clusterName, err)
 		}
-
-		kubeconfigBytes, err = kube.AddProxyToKubeConfigBytes(kubeconfigBytes, fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name())))
+		kubeconfig, err := kube.BuildAKSKubeconfigString(kubeconfigBytes, fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name())))
 		if err != nil {
-			return fmt.Errorf("sites: failed to add proxy to kubeconfig for %s: %w", clusterName, err)
+			return fmt.Errorf("sites: %w", err)
 		}
-		kubeconfigsByRelease[release] = string(kubeconfigBytes)
+		kubeconfigsByRelease[release] = kubeconfig
 	}
 
 	ppmSize := cfg.PpmFileShareSizeGib

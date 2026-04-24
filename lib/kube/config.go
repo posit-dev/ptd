@@ -140,6 +140,21 @@ func BuildEKSKubeConfigWithExec(endpoint, caCert, clusterName, region string) Ku
 	}
 }
 
+// BuildEKSKubeconfigString builds an exec-plugin kubeconfig for an EKS cluster,
+// optionally setting a SOCKS proxy URL, and returns it as a YAML string. Pass
+// an empty proxyURL to omit the proxy (e.g. when Tailscale is enabled).
+func BuildEKSKubeconfigString(endpoint, caCert, clusterName, region, proxyURL string) (string, error) {
+	config := BuildEKSKubeConfigWithExec(endpoint, caCert, clusterName, region)
+	if proxyURL != "" {
+		config.Clusters[0].Cluster.ProxyURL = proxyURL
+	}
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal kubeconfig for %s: %w", clusterName, err)
+	}
+	return string(data), nil
+}
+
 // WriteKubeConfig marshals to YAML and writes to file with 0600 permissions
 func WriteKubeConfig(config KubeConfig, filePath string) error {
 	data, err := yaml.Marshal(config)
@@ -152,6 +167,64 @@ func WriteKubeConfig(config KubeConfig, filePath string) error {
 	}
 
 	return nil
+}
+
+// BuildAKSKubeconfigString converts the raw AKS kubeconfig from GetKubeCredentials
+// into a stable form suitable for Pulumi state. Azure returns a kubeconfig whose
+// exec plugin uses --login devicecode (interactive), which fails in Pulumi subprocesses
+// when no token is cached — device code flow requires a TTY. PTD uses --login azurecli
+// instead: the Pulumi subprocess environment sets NO_PROXY=.microsoftonline.com so
+// Azure CLI token refresh works, and the kubeconfig is identical on every run (no
+// cluster-specific IDs in the args), making it stable in Pulumi state without
+// IgnoreChanges. Pass empty proxyURL to omit the proxy (e.g. when Tailscale is enabled).
+func BuildAKSKubeconfigString(data []byte, proxyURL string) (string, error) {
+	var config map[string]interface{}
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return "", fmt.Errorf("failed to parse AKS kubeconfig: %w", err)
+	}
+
+	if proxyURL != "" {
+		if clusters, ok := config["clusters"].([]interface{}); ok {
+			for _, cluster := range clusters {
+				if clusterMap, ok := cluster.(map[interface{}]interface{}); ok {
+					if clusterInfo, ok := clusterMap["cluster"].(map[interface{}]interface{}); ok {
+						clusterInfo["proxy-url"] = proxyURL
+					}
+				}
+			}
+		}
+	}
+
+	// Replace --login devicecode with --login azurecli in the exec args so the
+	// kubeconfig works non-interactively in the Pulumi subprocess. devicecode requires
+	// a TTY for the device code flow when no token is cached. azurecli uses the Azure
+	// CLI's cached credentials via `az account get-access-token --resource <server-id>`,
+	// which works non-interactively (microsoftonline.com is in NO_PROXY). All other
+	// args (--server-id, --tenant-id, etc.) are preserved unchanged.
+	if users, ok := config["users"].([]interface{}); ok {
+		for _, user := range users {
+			if userMap, ok := user.(map[interface{}]interface{}); ok {
+				if userInfo, ok := userMap["user"].(map[interface{}]interface{}); ok {
+					if exec, ok := userInfo["exec"].(map[interface{}]interface{}); ok {
+						if args, ok := exec["args"].([]interface{}); ok {
+							for i, arg := range args {
+								if arg == "--login" && i+1 < len(args) {
+									args[i+1] = "azurecli"
+									break
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	modified, err := yaml.Marshal(config)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal AKS kubeconfig: %w", err)
+	}
+	return string(modified), nil
 }
 
 // AddProxyToKubeConfig reads existing kubeconfig, adds proxy-url to all clusters, writes back
