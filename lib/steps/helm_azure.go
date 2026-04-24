@@ -764,12 +764,18 @@ func azureHelmMimir(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 			"mimir": map[string]interface{}{
 				"structuredConfig": structuredConfig,
 			},
-			"minio":         map[string]interface{}{"enabled": false},
-			"alertmanager":  map[string]interface{}{"enabled": false},
-			"ruler":         map[string]interface{}{"enabled": false},
-			"ingester":      map[string]interface{}{"persistentVolume": map[string]interface{}{"size": "20Gi"}},
-			"compactor":     map[string]interface{}{"persistentVolume": map[string]interface{}{"size": "20Gi"}},
-			"store_gateway": map[string]interface{}{"persistentVolume": map[string]interface{}{"size": "20Gi"}},
+			"minio":        map[string]interface{}{"enabled": false},
+			"alertmanager": map[string]interface{}{"enabled": false},
+			"ruler":        map[string]interface{}{"enabled": false},
+			"ingester":     map[string]interface{}{"persistentVolume": map[string]interface{}{"size": "20Gi"}},
+			"compactor":    map[string]interface{}{"persistentVolume": map[string]interface{}{"size": "20Gi"}},
+			"store_gateway": map[string]interface{}{
+				"persistentVolume": map[string]interface{}{"size": "20Gi"},
+				"resources": map[string]interface{}{
+					"requests": map[string]interface{}{"cpu": "100m", "memory": "512Mi"},
+					"limits":   map[string]interface{}{"cpu": "1", "memory": "4Gi"},
+				},
+			},
 			"gateway": map[string]interface{}{
 				"enabledNonEnterprise": true,
 				"nginx": map[string]interface{}{

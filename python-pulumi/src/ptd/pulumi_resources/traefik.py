@@ -220,6 +220,7 @@ class Traefik(pulumi.ComponentResource):
                             "memory": "256Mi",
                         },
                         "limits": {
+                            "cpu": "1000m",
                             "memory": "512Mi",
                         },
                     },
