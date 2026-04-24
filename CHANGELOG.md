@@ -1,3 +1,10 @@
+## [1.26.5](https://github.com/posit-dev/ptd/compare/v1.26.4...v1.26.5) (2026-04-24)
+
+
+### Bug Fixes
+
+* default Karpenter NodePool weight to 100 when unset ([8f2de5e](https://github.com/posit-dev/ptd/commit/8f2de5ec66f9c4320c6617f8c5ae5e003f75f0ce))
+
 ## [1.26.4](https://github.com/posit-dev/ptd/compare/v1.26.3...v1.26.4) (2026-04-24)
 
 
