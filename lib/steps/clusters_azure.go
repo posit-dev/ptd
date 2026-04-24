@@ -861,7 +861,6 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 
 		// ── CoreDNS forwarding (optional) ──────────────────────────────────────
 		// Python: uses kubernetes.core.v1.ConfigMapPatch with replace_on_changes=[].
-		// In Go Pulumi SDK, we use a custom K8s resource with server-side apply semantics.
 		// DNS forwarding entries are direct children of AzureWorkloadClusters.
 		if len(params.dnsForwardDomains) > 0 {
 			dnsData := pulumi.StringMap{}
@@ -870,18 +869,14 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				val := fmt.Sprintf("%s:53 {\n  errors\n  cache 30\n  forward . %s\n}\n", domain.Host, domain.IP)
 				dnsData[key] = pulumi.String(val)
 			}
-			_, err = apiextensions.NewCustomResource(ctx,
+			_, err = corev1.NewConfigMapPatch(ctx,
 				fmt.Sprintf("%s-%s-coredns-forward", name, release),
-				&apiextensions.CustomResourceArgs{
-					ApiVersion: pulumi.String("v1"),
-					Kind:       pulumi.String("ConfigMap"),
-					Metadata: &metav1.ObjectMetaArgs{
-						Name:      pulumi.String("coredns-custom"),
-						Namespace: pulumi.String(clustersKubeSystemNamespace),
+				&corev1.ConfigMapPatchArgs{
+					Metadata: &metav1.ObjectMetaPatchArgs{
+						Name:      pulumi.StringPtr("coredns-custom"),
+						Namespace: pulumi.StringPtr(clustersKubeSystemNamespace),
 					},
-					OtherFields: kubernetes.UntypedArgs{
-						"data": dnsData,
-					},
+					Data: dnsData,
 				}, k8sProviderOpt, withAlias())
 			if err != nil {
 				return fmt.Errorf("clusters: failed to create coredns forwarding configmap for %s: %w", release, err)
