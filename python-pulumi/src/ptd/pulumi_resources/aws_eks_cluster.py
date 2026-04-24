@@ -2331,7 +2331,14 @@ class AWSEKSCluster(pulumi.ComponentResource):
                     "ingester": {"persistentVolume": {"size": "20Gi"}},
                     "compactor": {"persistentVolume": {"size": "20Gi"}},
                     "distributor": {"replicas": 3},
-                    "store_gateway": {"persistentVolume": {"size": "20Gi"}, "replicas": 3},
+                    "store_gateway": {
+                        "persistentVolume": {"size": "20Gi"},
+                        "replicas": 3,
+                        "resources": {
+                            "requests": {"cpu": "100m", "memory": "512Mi"},
+                            "limits": {"cpu": "1", "memory": "4Gi"},
+                        },
+                    },
                     "nginx": {"enabled": False},
                     "gateway": {
                         "enabledNonEnterprise": True,
