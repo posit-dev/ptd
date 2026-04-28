@@ -1055,6 +1055,10 @@ func awsHelmMimir(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 			"replicas":             mreplicas,
 			"zoneAwareReplication": map[string]interface{}{"enabled": false},
 			"affinity":             affinityRule,
+			"resources": map[string]interface{}{
+				"requests": map[string]interface{}{"cpu": "100m", "memory": "512Mi"},
+				"limits":   map[string]interface{}{"cpu": "1", "memory": "4Gi"},
+			},
 		},
 		"gateway": map[string]interface{}{
 			"enabledNonEnterprise": true,
