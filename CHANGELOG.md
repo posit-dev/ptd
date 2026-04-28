@@ -1,3 +1,10 @@
+## [1.26.6](https://github.com/posit-dev/ptd/compare/v1.26.5...v1.26.6) (2026-04-28)
+
+
+### Bug Fixes
+
+* add CPU limits to Mimir store-gateway and Traefik ([09ba466](https://github.com/posit-dev/ptd/commit/09ba4661aa907522595b7b01a58a456750332335))
+
 ## [1.26.5](https://github.com/posit-dev/ptd/compare/v1.26.4...v1.26.5) (2026-04-24)
 
 
