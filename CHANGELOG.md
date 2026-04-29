@@ -1,3 +1,15 @@
+# [1.27.0](https://github.com/posit-dev/ptd/compare/v1.26.6...v1.27.0) (2026-04-29)
+
+
+### Bug Fixes
+
+* address review feedback on NetApp backup PR ([68ae95b](https://github.com/posit-dev/ptd/commit/68ae95b571f72522748cead25ccaca7291e26f32))
+
+
+### Features
+
+* add snapshot and backup protection to Azure NetApp volumes ([27e90a6](https://github.com/posit-dev/ptd/commit/27e90a65e752af6415c65fb8e4520ecfbc10859a))
+
 ## [1.26.6](https://github.com/posit-dev/ptd/compare/v1.26.5...v1.26.6) (2026-04-28)
 
 
