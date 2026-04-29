@@ -292,18 +292,6 @@ type AzureWorkloadConfig struct {
 	RootDomain *string `yaml:"root_domain"`
 }
 
-func (c *AzureWorkloadConfig) SetDefaults() {
-	if c.NetappBackupRetentionDays == 0 {
-		c.NetappBackupRetentionDays = 30
-	}
-	if c.NetappDailyBackupStartTime == "" {
-		c.NetappDailyBackupStartTime = "02:00"
-	}
-	if c.NetappSnapshotsToKeep == 0 {
-		c.NetappSnapshotsToKeep = 7
-	}
-}
-
 type NetworkConfig struct {
 	VnetCidr                  string                   `yaml:"vnet_cidr"`
 	PublicSubnetCidr          string                   `yaml:"public_subnet_cidr"`

@@ -30,7 +30,8 @@ class AzureWorkloadPersistent(pulumi.ComponentResource):
     - Mimir authentication password
 
     Uses all-in-constructor pattern with `_define_*()` methods. Unlike AWS EKS builder pattern,
-    there are no method ordering dependencies - all `_define_*()` methods can be called in any order.
+    most `_define_*()` methods can be called in any order. Exception:
+    `_define_netapp_volumes()` must follow `_define_file_storage()` (needs snapshot/backup resources).
 
     Outputs are consumed by later steps:
     - postgres_config: Database connection details
@@ -558,8 +559,10 @@ class AzureWorkloadPersistent(pulumi.ComponentResource):
             h_str, m_str = time_str.split(":")
             hour, minute = int(h_str), int(m_str)
         except (ValueError, AttributeError):
+            hour, minute = -1, -1
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):  # noqa: PLR2004
             msg = f"netapp_daily_backup_start_time must be HH:MM, got {time_str!r}"
-            raise ValueError(msg) from None
+            raise ValueError(msg)
 
         self.snapshot_policy = netapp.SnapshotPolicy(
             self.workload.netapp_snapshot_policy_name,
