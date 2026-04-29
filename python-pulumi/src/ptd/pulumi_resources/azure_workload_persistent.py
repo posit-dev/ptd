@@ -553,6 +553,58 @@ class AzureWorkloadPersistent(pulumi.ComponentResource):
             ),
         )
 
+        time_str = self.workload.cfg.netapp_daily_backup_start_time
+        try:
+            h_str, m_str = time_str.split(":")
+            hour, minute = int(h_str), int(m_str)
+        except (ValueError, AttributeError):
+            msg = f"netapp_daily_backup_start_time must be HH:MM, got {time_str!r}"
+            raise ValueError(msg) from None
+
+        self.snapshot_policy = netapp.SnapshotPolicy(
+            self.workload.netapp_snapshot_policy_name,
+            snapshot_policy_name=self.workload.netapp_snapshot_policy_name,
+            resource_group_name=self.workload.resource_group_name,
+            account_name=netapp_account.name,
+            location=self.workload.cfg.region,
+            enabled=True,
+            daily_schedule=netapp.DailyScheduleArgs(
+                hour=hour,
+                minute=minute,
+                snapshots_to_keep=self.workload.cfg.netapp_snapshots_to_keep,
+            ),
+            tags=self.required_tags,
+            opts=pulumi.ResourceOptions(
+                protect=self.workload.cfg.protect_persistent_resources,
+            ),
+        )
+
+        self.backup_vault = netapp.BackupVault(
+            self.workload.netapp_backup_vault_name,
+            backup_vault_name=self.workload.netapp_backup_vault_name,
+            resource_group_name=self.workload.resource_group_name,
+            account_name=netapp_account.name,
+            location=self.workload.cfg.region,
+            tags=self.required_tags,
+            opts=pulumi.ResourceOptions(
+                protect=self.workload.cfg.protect_persistent_resources,
+            ),
+        )
+
+        self.backup_policy = netapp.BackupPolicy(
+            self.workload.netapp_backup_policy_name,
+            backup_policy_name=self.workload.netapp_backup_policy_name,
+            resource_group_name=self.workload.resource_group_name,
+            account_name=netapp_account.name,
+            location=self.workload.cfg.region,
+            enabled=True,
+            daily_backups_to_keep=self.workload.cfg.netapp_backup_retention_days,
+            tags=self.required_tags,
+            opts=pulumi.ResourceOptions(
+                protect=self.workload.cfg.protect_persistent_resources,
+            ),
+        )
+
     _NETAPP_VOLUME_PRODUCTS: typing.ClassVar[dict[str, str]] = {
         "connect": "netapp_volume_connect_capacity",
         "workbench": "netapp_volume_workbench_capacity",
@@ -602,6 +654,15 @@ class AzureWorkloadPersistent(pulumi.ComponentResource):
                                 has_root_access=True,
                             ),
                         ],
+                    ),
+                    data_protection=netapp.VolumePropertiesDataProtectionArgs(
+                        backup=netapp.VolumeBackupPropertiesArgs(
+                            backup_policy_id=self.backup_policy.id,
+                            backup_vault_id=self.backup_vault.id,
+                        ),
+                        snapshot=netapp.VolumeSnapshotPropertiesArgs(
+                            snapshot_policy_id=self.snapshot_policy.id,
+                        ),
                     ),
                     tags=self.required_tags,
                     opts=pulumi.ResourceOptions(
