@@ -21,19 +21,20 @@ import (
 
 // AttestationData contains all collected information about a workload deployment
 type AttestationData struct {
-	TargetName     string                 `json:"target_name"`
-	CloudProvider  string                 `json:"cloud_provider"`
-	Region         string                 `json:"region"`
-	AccountID      string                 `json:"account_id"`
-	Profile        string                 `json:"profile"`
-	GeneratedAt    time.Time              `json:"generated_at"`
-	Sites          []SiteInfo             `json:"sites"`
-	Stacks         []StackSummary         `json:"stacks"`
-	CustomSteps    []CustomStepInfo       `json:"custom_steps"`
-	ClusterConfig  map[string]interface{} `json:"cluster_config"`
-	Infra          *InfraConfig           `json:"infra"`
-	ProductSummary string                 `json:"product_summary"`
-	RawStateFiles  map[string][]byte      `json:"-"`
+	TargetName      string                 `json:"target_name"`
+	CloudProvider   string                 `json:"cloud_provider"`
+	Region          string                 `json:"region"`
+	AccountID       string                 `json:"account_id"`
+	Profile         string                 `json:"profile"`
+	GeneratedAt     time.Time              `json:"generated_at"`
+	Sites           []SiteInfo             `json:"sites"`
+	Stacks          []StackSummary         `json:"stacks"`
+	CustomSteps     []CustomStepInfo       `json:"custom_steps"`
+	ClusterConfig   map[string]interface{} `json:"cluster_config"`
+	Infra           *InfraConfig           `json:"infra"`
+	ProductSummary  string                 `json:"product_summary"`
+	StateBackendURL string                 `json:"state_backend_url,omitempty"`
+	RawStateFiles   map[string][]byte      `json:"-"`
 }
 
 // SiteInfo contains information extracted from a site.yaml file
@@ -182,15 +183,16 @@ func Collect(ctx context.Context, target types.Target, workloadPath string) (*At
 
 	// Initialize attestation data
 	attestation := &AttestationData{
-		TargetName:    target.Name(),
-		CloudProvider: string(target.CloudProvider()),
-		Region:        target.Region(),
-		AccountID:     creds.AccountID(),
-		GeneratedAt:   time.Now().UTC(),
-		Sites:         []SiteInfo{},
-		Stacks:        []StackSummary{},
-		CustomSteps:   []CustomStepInfo{},
-		ClusterConfig: make(map[string]interface{}),
+		TargetName:      target.Name(),
+		CloudProvider:   string(target.CloudProvider()),
+		Region:          target.Region(),
+		AccountID:       creds.AccountID(),
+		GeneratedAt:     time.Now().UTC(),
+		Sites:           []SiteInfo{},
+		Stacks:          []StackSummary{},
+		CustomSteps:     []CustomStepInfo{},
+		ClusterConfig:   make(map[string]interface{}),
+		StateBackendURL: target.PulumiBackendUrl(),
 	}
 
 	// Extract cluster config and profile from ptd.yaml
@@ -411,9 +413,10 @@ func parseAzureInfraConfig(data []byte) (*InfraConfig, error) {
 			TenantID       string `yaml:"tenant_id"`
 			Region         string `yaml:"region"`
 			Network        struct {
-				VnetCidr          string `yaml:"vnet_cidr"`
-				ProvisionedVnetID string `yaml:"provisioned_vnet_id"`
-				VnetRsgName       string `yaml:"vnet_rsg_name"`
+				VnetCidr            string `yaml:"vnet_cidr"`
+				ProvisionedVnetID   string `yaml:"provisioned_vnet_id"`
+				ProvisionedVnetName string `yaml:"provisioned_vnet_name"`
+				VnetRsgName         string `yaml:"vnet_rsg_name"`
 			} `yaml:"network"`
 			KeycloakEnabled          bool `yaml:"keycloak_enabled"`
 			ExternalDNSEnabled       bool `yaml:"external_dns_enabled"`
@@ -440,6 +443,7 @@ func parseAzureInfraConfig(data []byte) (*InfraConfig, error) {
 		Cloud:                    "azure",
 		VnetCidr:                 raw.Spec.Network.VnetCidr,
 		ProvisionedVnetID:        raw.Spec.Network.ProvisionedVnetID,
+		ProvisionedVnetName:      raw.Spec.Network.ProvisionedVnetName,
 		KeycloakEnabled:          raw.Spec.KeycloakEnabled,
 		ExternalDNSEnabled:       raw.Spec.ExternalDNSEnabled,
 		SecretsStoreAddonEnabled: raw.Spec.SecretsStoreAddonEnabled,
@@ -686,6 +690,29 @@ func DownloadStateFiles(ctx context.Context, creds types.Credentials, target typ
 	return files, nil
 }
 
+// summarizeStateFiles converts a map of state file keys to raw JSON into
+// StackSummary values, filtering out backup files (e.g. "name(1).json") and
+// stacks with zero managed resources.
+func summarizeStateFiles(files map[string][]byte) ([]StackSummary, error) {
+	var summaries []StackSummary
+	for key, data := range files {
+		// Skip backup/renamed state files like "argenx01-production(1).json"
+		filename := filepath.Base(key)
+		if strings.Contains(strings.TrimSuffix(filename, ".json"), "(") {
+			continue
+		}
+		summary, err := parseStateFile(data, key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to process state file %s: %w", key, err)
+		}
+		if summary.ResourceCount == 0 {
+			continue
+		}
+		summaries = append(summaries, summary)
+	}
+	return summaries, nil
+}
+
 // collectStackSummaries fetches Pulumi state files and extracts summaries.
 // Supports both AWS (S3) and Azure (Blob Storage) backends.
 func collectStackSummaries(ctx context.Context, creds types.Credentials, target types.Target) ([]StackSummary, map[string][]byte, error) {
@@ -693,14 +720,9 @@ func collectStackSummaries(ctx context.Context, creds types.Credentials, target 
 	if err != nil {
 		return nil, nil, err
 	}
-
-	var summaries []StackSummary
-	for key, data := range files {
-		summary, err := parseStateFile(data, key)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to process state file %s: %w", key, err)
-		}
-		summaries = append(summaries, summary)
+	summaries, err := summarizeStateFiles(files)
+	if err != nil {
+		return nil, nil, err
 	}
 	return summaries, files, nil
 }
