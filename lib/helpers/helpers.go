@@ -66,6 +66,7 @@ func LoadPtdYaml(filename string) (interface{}, error) {
 		if err := base.Spec.Decode(&config); err != nil {
 			return nil, err
 		}
+		config.SetDefaults()
 		return config, nil
 	case "AWSControlRoomConfig":
 		var config types.AWSControlRoomConfig

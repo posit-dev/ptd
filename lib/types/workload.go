@@ -273,6 +273,9 @@ type AzureWorkloadConfig struct {
 	AdminGroupID                        string                                `yaml:"admin_group_id"`
 	AutomatedVolumeProvisioning         bool                                  `yaml:"automated_volume_provisioning"`
 	BastionInstanceType                 string                                `yaml:"bastion_instance_type"`
+	NetappBackupRetentionDays           int                                   `yaml:"netapp_backup_retention_days"`
+	NetappDailyBackupStartTime          string                                `yaml:"netapp_daily_backup_start_time"`
+	NetappSnapshotsToKeep               int                                   `yaml:"netapp_snapshots_to_keep"`
 	NetappVolumeConnectCapacity         int                                   `yaml:"netapp_volume_connect_capacity"`
 	NetappVolumeWorkbenchCapacity       int                                   `yaml:"netapp_volume_workbench_capacity"`
 	NetappVolumeWorkbenchSharedCapacity int                                   `yaml:"netapp_volume_workbench_shared_capacity"`
@@ -287,6 +290,18 @@ type AzureWorkloadConfig struct {
 	// RootDomain, when set, is used as the sole cert-manager domain instead of per-site domains.
 	// Mirrors Python: AzureWorkloadConfig.root_domain (via WorkloadConfig.domains fallback).
 	RootDomain *string `yaml:"root_domain"`
+}
+
+func (c *AzureWorkloadConfig) SetDefaults() {
+	if c.NetappBackupRetentionDays == 0 {
+		c.NetappBackupRetentionDays = 30
+	}
+	if c.NetappDailyBackupStartTime == "" {
+		c.NetappDailyBackupStartTime = "02:00"
+	}
+	if c.NetappSnapshotsToKeep == 0 {
+		c.NetappSnapshotsToKeep = 7
+	}
 }
 
 type NetworkConfig struct {
