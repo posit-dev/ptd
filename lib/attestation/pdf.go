@@ -136,10 +136,10 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 		totalResources += s.ResourceCount
 	}
 	if cloud == "azure" {
-		PdfMetaRow(m, "State backend", fmt.Sprintf("azblob://<container>?storage_account=%s", data.TargetName))
+		PdfMetaRow(m, "State backend", data.StateBackendURL)
 		PdfMetaRow(m, "Encryption", fmt.Sprintf("Azure Key Vault posit-team-dedicated in subscription %s", data.AccountID))
 	} else {
-		PdfMetaRow(m, "State backend", fmt.Sprintf("s3://ptd-%s/.pulumi/stacks/", data.TargetName))
+		PdfMetaRow(m, "State backend", data.StateBackendURL)
 		PdfMetaRow(m, "Encryption", fmt.Sprintf("AWS KMS key alias/posit-team-dedicated in account %s", data.AccountID))
 	}
 

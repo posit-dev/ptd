@@ -46,6 +46,10 @@ var funcMap = template.FuncMap{
 	"encryptionText":   func(cloud string) string { return encryptionTextFor(cloud) },
 	"accountLabel":     AccountLabel,
 	"stateBackend": func(data *AttestationData) string {
+		if data.StateBackendURL != "" {
+			return data.StateBackendURL
+		}
+		// fallback for tests/older code paths
 		if data.Infra != nil && data.Infra.Cloud == "azure" {
 			return fmt.Sprintf("azblob://<container>?storage_account=%s", data.TargetName)
 		}
