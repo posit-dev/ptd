@@ -63,6 +63,9 @@ class AzureWorkloadConfig(ptd.WorkloadConfig):
     admin_group_id: str | None = None
     automated_volume_provisioning: bool = False
     bastion_instance_type: str = "Standard_B1s"
+    netapp_backup_retention_days: int = 30
+    netapp_daily_backup_start_time: str = "02:00"
+    netapp_snapshots_to_keep: int = 7
     netapp_volume_connect_capacity: int = 200  # GiB
     netapp_volume_workbench_capacity: int = 200  # GiB
     netapp_volume_workbench_shared_capacity: int = 200  # GiB
@@ -379,8 +382,20 @@ class AzureWorkload(ptd.workload.AbstractWorkload):
         return f"naa-ptd-{self.compound_name}"
 
     @property
+    def netapp_backup_policy_name(self) -> str:
+        return f"bkp-ptd-{self.compound_name}"
+
+    @property
+    def netapp_backup_vault_name(self) -> str:
+        return f"bkv-ptd-{self.compound_name}"
+
+    @property
     def netapp_pool_name(self) -> str:
         return f"nap-ptd-{self.compound_name}"
+
+    @property
+    def netapp_snapshot_policy_name(self) -> str:
+        return f"snp-ptd-{self.compound_name}"
 
     # Replicates ResourceGroupName logic from azure/target.go
     @property
