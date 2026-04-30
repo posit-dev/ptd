@@ -1779,11 +1779,6 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 repository_opts=k8s.helm.v3.RepositoryOptsArgs(
                     repo="https://kubernetes-sigs.github.io/metrics-server/",
                 ),
-                values={
-                    "hostNetwork": {"enabled": True},
-                    "containerPort": 4443,
-                    "args": ["--kubelet-preferred-address-types=InternalIP"],
-                },
             ),
             opts=pulumi.ResourceOptions(provider=self.provider, parent=self),
         )
