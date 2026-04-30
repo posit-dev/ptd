@@ -1,3 +1,15 @@
+## [1.27.1](https://github.com/posit-dev/ptd/compare/v1.27.0...v1.27.1) (2026-04-30)
+
+
+### Bug Fixes
+
+* configure metrics-server for EKS host networking ([f7aef61](https://github.com/posit-dev/ptd/commit/f7aef61291b71ee8970f32e9f42b1eb9796ee6a4))
+
+
+### Reverts
+
+* remove unneeded metrics-server values from control room path ([e4790ac](https://github.com/posit-dev/ptd/commit/e4790acd12afd172b9fdb2d1ae287463332c24d6))
+
 # [1.27.0](https://github.com/posit-dev/ptd/compare/v1.26.6...v1.27.0) (2026-04-29)
 
 
