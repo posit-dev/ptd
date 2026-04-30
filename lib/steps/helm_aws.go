@@ -780,7 +780,11 @@ func awsHelmMetricsServer(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, com
 		"https://kubernetes-sigs.github.io/metrics-server/",
 		"metrics-server",
 		clustersKubeSystemNamespace,
-		version, map[string]interface{}{}, k8sOpt,
+		version, map[string]interface{}{
+			"hostNetwork":   map[string]interface{}{"enabled": true},
+			"containerPort": 4443,
+			"args":          []interface{}{"--kubelet-preferred-address-types=InternalIP"},
+		}, k8sOpt,
 		withAlias("kubernetes:helm.cattle.io/v1:HelmChart", resourceName))
 }
 
