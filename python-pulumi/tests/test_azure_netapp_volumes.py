@@ -62,7 +62,7 @@ def test_netapp_volume_capacity_defaults():
     config = _make_config()
     assert config.netapp_volume_connect_capacity == 200
     assert config.netapp_volume_workbench_capacity == 200
-    assert config.netapp_volume_workbench_shared_capacity == 200
+    assert config.netapp_volume_workbench_shared_capacity == 50
 
 
 def test_netapp_volume_capacity_custom_values():
