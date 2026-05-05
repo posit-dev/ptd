@@ -1,3 +1,10 @@
+## [1.27.2](https://github.com/posit-dev/ptd/compare/v1.27.1...v1.27.2) (2026-05-05)
+
+
+### Bug Fixes
+
+* tune Azure NetApp workbench-shared volumes and enable backup enforcement ([9cefeac](https://github.com/posit-dev/ptd/commit/9cefeac544cced276a8a563c0a9a7d35e6091dbc))
+
 ## [1.27.1](https://github.com/posit-dev/ptd/compare/v1.27.0...v1.27.1) (2026-04-30)
 
 
