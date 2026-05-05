@@ -658,10 +658,13 @@ class AzureWorkloadPersistent(pulumi.ComponentResource):
                             ),
                         ],
                     ),
-                    data_protection=netapp.VolumePropertiesDataProtectionArgs(
+                    data_protection=None
+                    if product == "workbench-shared"
+                    else netapp.VolumePropertiesDataProtectionArgs(
                         backup=netapp.VolumeBackupPropertiesArgs(
                             backup_policy_id=self.backup_policy.id,
                             backup_vault_id=self.backup_vault.id,
+                            policy_enforced=True,
                         ),
                         snapshot=netapp.VolumeSnapshotPropertiesArgs(
                             snapshot_policy_id=self.snapshot_policy.id,

@@ -68,7 +68,7 @@ class AzureWorkloadConfig(ptd.WorkloadConfig):
     netapp_snapshots_to_keep: int = 7
     netapp_volume_connect_capacity: int = 200  # GiB
     netapp_volume_workbench_capacity: int = 200  # GiB
-    netapp_volume_workbench_shared_capacity: int = 200  # GiB
+    netapp_volume_workbench_shared_capacity: int = 50  # GiB
     ppm_file_share_size_gib: int = 100  # Minimum size for PPM Azure File Share in GiB
     nvidia_gpu_enabled: bool = False
 
