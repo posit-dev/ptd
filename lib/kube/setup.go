@@ -156,14 +156,13 @@ func setupAzureKubeConfig(ctx context.Context, t types.Target, creds types.Crede
 		return "", fmt.Errorf("failed to get Azure kubeconfig: %w", err)
 	}
 
-	// Write the raw bytes to file
-	if err := os.WriteFile(kubeconfigPath, kubeconfigBytes, 0600); err != nil {
-		return "", fmt.Errorf("failed to write Azure kubeconfig: %w", err)
+	kubeconfig, err := BuildAKSKubeconfigString(kubeconfigBytes, fmt.Sprintf("socks5://localhost:%s", localPort))
+	if err != nil {
+		return "", fmt.Errorf("failed to build Azure kubeconfig: %w", err)
 	}
 
-	// Always add proxy for Azure (no tailscale support)
-	if err := AddProxyToKubeConfig(kubeconfigPath, fmt.Sprintf("socks5://localhost:%s", localPort)); err != nil {
-		return "", fmt.Errorf("failed to add proxy to Azure kubeconfig: %w", err)
+	if err := os.WriteFile(kubeconfigPath, []byte(kubeconfig), 0600); err != nil {
+		return "", fmt.Errorf("failed to write Azure kubeconfig: %w", err)
 	}
 
 	return kubeconfigPath, nil
