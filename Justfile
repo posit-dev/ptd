@@ -72,7 +72,7 @@ symlink-binaries:
   mkdir -p $binlocal
 
   # Create or update symlinks, skipping binaries in our own .local/bin to avoid circular references
-  for binary in aws az pulumi; do
+  for binary in aws pulumi; do
     target="$(PATH="${PATH//$binlocal:/}" which "$binary" 2>/dev/null)"
     if [ -z "$target" ]; then
       printf 'WARNING: %s not found in PATH (excluding %s), skipping\n' "$binary" "$binlocal" >&2
@@ -80,6 +80,22 @@ symlink-binaries:
     fi
     ln -sf "$target" "$binlocal/$binary"
   done
+
+  # az uses a bash script that calculates its Python path relative to $BASH_SOURCE[0].
+  # A symlink breaks that calculation, so write a wrapper that calls Python directly.
+  az_real="$(PATH="${PATH//$binlocal:/}" which az 2>/dev/null)"
+  if [ -z "$az_real" ]; then
+    printf 'WARNING: az not found in PATH (excluding %s), skipping\n' "$binlocal" >&2
+  else
+    az_python="$(grep -o '/[^ ]*python3' "$az_real" 2>/dev/null | head -1)"
+    if [ -z "$az_python" ]; then
+      printf 'WARNING: could not determine az Python path from %s, falling back to symlink\n' "$az_real" >&2
+      ln -sf "$az_real" "$binlocal/az"
+    else
+      printf '#!/usr/bin/env bash\nAZ_INSTALLER=DEB %s -Im azure.cli "$@"\n' "$az_python" > "$binlocal/az"
+      chmod +x "$binlocal/az"
+    fi
+  fi
 
 install-thumbprint:
   #!/usr/bin/env bash
