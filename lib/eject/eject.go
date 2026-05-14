@@ -30,10 +30,6 @@ type Options struct {
 	HandoffCollector  HandoffCollectorFunc
 }
 
-type Bundle struct {
-	ControlRoom *ControlRoomDetails `json:"control_room"`
-}
-
 func (o *Options) configLoader() ConfigLoaderFunc {
 	if o.ConfigLoader != nil {
 		return o.ConfigLoader
@@ -67,8 +63,6 @@ func Run(ctx context.Context, t types.Target, opts Options) error {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	bundle := &Bundle{}
-
 	config, err := opts.configLoader()(t)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
@@ -97,7 +91,6 @@ func Run(ctx context.Context, t types.Target, opts Options) error {
 	if err != nil {
 		return fmt.Errorf("failed to collect control room details: %w", err)
 	}
-	bundle.ControlRoom = crDetails
 	slog.Info("Collected control room details",
 		"account_id", crDetails.AccountID,
 		"domain", crDetails.Domain,
