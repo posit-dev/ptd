@@ -174,14 +174,14 @@ func newWorkloadTarget(name string) *typestest.MockTarget {
 func TestRun_Eject_StripsConfigAndDeletesMimir(t *testing.T) {
 	workloadDir := t.TempDir()
 	ptdYaml := filepath.Join(workloadDir, "ptd.yaml")
-	os.WriteFile(ptdYaml, []byte(`spec:
+	require.NoError(t, os.WriteFile(ptdYaml, []byte(`spec:
   account_id: "111111111111"
   region: us-east-2
   control_room_account_id: "999999999999"
   control_room_cluster_name: main01-prod
   control_room_domain: ctrl.posit.team
   control_room_region: us-east-1
-`), 0644)
+`), 0644))
 
 	target := newWorkloadTarget("test-workload")
 	creds := typestest.DefaultCredentials()
@@ -243,7 +243,7 @@ func TestRun_Eject_StripsConfigAndDeletesMimir(t *testing.T) {
 
 func TestRun_Eject_FailsPreflightOnEmptyConfig(t *testing.T) {
 	workloadDir := t.TempDir()
-	os.WriteFile(filepath.Join(workloadDir, "ptd.yaml"), []byte("spec:\n  region: us-east-2\n"), 0644)
+	require.NoError(t, os.WriteFile(filepath.Join(workloadDir, "ptd.yaml"), []byte("spec:\n  region: us-east-2\n"), 0644))
 
 	target := newWorkloadTarget("test-workload")
 	creds := typestest.DefaultCredentials()
@@ -265,10 +265,10 @@ func TestRun_Eject_FailsPreflightOnEmptyConfig(t *testing.T) {
 
 func TestRun_Eject_NoControlRoomTarget(t *testing.T) {
 	workloadDir := t.TempDir()
-	os.WriteFile(filepath.Join(workloadDir, "ptd.yaml"), []byte(`spec:
+	require.NoError(t, os.WriteFile(filepath.Join(workloadDir, "ptd.yaml"), []byte(`spec:
   control_room_domain: ctrl.posit.team
   control_room_region: us-east-1
-`), 0644)
+`), 0644))
 
 	target := newWorkloadTarget("test-workload")
 	creds := typestest.DefaultCredentials()
@@ -305,11 +305,11 @@ func TestRun_Eject_NoControlRoomTarget(t *testing.T) {
 func TestRun_Eject_MimirDeletionFailsContinues(t *testing.T) {
 	workloadDir := t.TempDir()
 	ptdYaml := filepath.Join(workloadDir, "ptd.yaml")
-	os.WriteFile(ptdYaml, []byte(`spec:
+	require.NoError(t, os.WriteFile(ptdYaml, []byte(`spec:
   control_room_account_id: "999999999999"
   control_room_domain: ctrl.posit.team
   control_room_region: us-east-1
-`), 0644)
+`), 0644))
 
 	target := newWorkloadTarget("test-workload")
 	creds := typestest.DefaultCredentials()
@@ -380,7 +380,7 @@ func TestRun_DryRun_SkipsDestructiveSteps(t *testing.T) {
   control_room_domain: ctrl.posit.team
   control_room_region: us-east-1
 `
-	os.WriteFile(ptdYaml, []byte(originalConfig), 0644)
+	require.NoError(t, os.WriteFile(ptdYaml, []byte(originalConfig), 0644))
 
 	target := newWorkloadTarget("test-workload")
 
