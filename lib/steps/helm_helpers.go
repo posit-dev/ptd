@@ -102,8 +102,138 @@ func buildAlloyConfig(params alloyConfigParams) string {
 	controlRoomForwardTo := ""
 	controlRoomBlock := ""
 	if hasControlRoom {
-		controlRoomForwardTo = "prometheus.remote_write.control_room.receiver,"
-		controlRoomBlock = fmt.Sprintf(`prometheus.remote_write "control_room" {
+		// Route through an intermediate relabel component that keeps only the metrics
+		// needed by the control room (alert rules + provisioned dashboards). This avoids
+		// forwarding high-cardinality workload-internal metrics to the control room Mimir.
+		controlRoomForwardTo = "prometheus.relabel.control_room_filter.receiver,"
+
+		// Metrics required by control room alert rules (grafana_alerts/*.yaml) and
+		// provisioned dashboards (grafana_dashboards/*.json). Keep this list in sync
+		// with those files — add a metric here whenever a new alert or dashboard panel
+		// references a metric name not already present.
+		controlRoomMetricFilter := "" +
+			"aws_applicationelb_httpcode_target_5_xx_count_sum" +
+			"|aws_applicationelb_target_response_time_average" +
+			"|aws_applicationelb_un_healthy_host_count_average" +
+			"|aws_ec2_network_out_average" +
+			"|aws_ec2_network_packets_out_average" +
+			"|aws_fsx_storage_capacity_average" +
+			"|aws_fsx_used_storage_capacity_average" +
+			"|aws_networkelb_un_healthy_host_count_average" +
+			"|aws_rds_cpuutilization_average" +
+			"|aws_rds_database_connections_average" +
+			"|aws_rds_free_storage_space_average" +
+			"|aws_rds_freeable_memory_average" +
+			"|azure_microsoft_dbforpostgresql_flexibleservers_active_connections_average_count" +
+			"|azure_microsoft_dbforpostgresql_flexibleservers_connections_failed_total_count" +
+			"|azure_microsoft_dbforpostgresql_flexibleservers_cpu_percent_average_percent" +
+			"|azure_microsoft_dbforpostgresql_flexibleservers_memory_percent_average_percent" +
+			"|azure_microsoft_dbforpostgresql_flexibleservers_storage_percent_average_percent" +
+			"|azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagereadlatency_average_milliseconds" +
+			"|azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagewritelatency_average_milliseconds" +
+			"|azure_microsoft_netapp_netappaccounts_capacitypools_volumes_throughputlimitreached_average_count" +
+			"|azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent" +
+			"|azure_microsoft_storage_storageaccounts_availability_average_percent" +
+			"|azure_microsoft_storage_storageaccounts_successe2elatency_average_milliseconds" +
+			"|connect_content_app_sessions_current" +
+			"|connect_content_hits_total" +
+			"|connect_http_request_count" +
+			"|connect_http_request_duration_seconds_bucket" +
+			"|connect_http_request_duration_seconds_count" +
+			"|connect_http_request_duration_seconds_sum" +
+			"|connect_http_request_inflight_gauge" +
+			"|connect_http_response_size_bytes_sum" +
+			"|connect_jobs_queue_oldest_job_age_seconds" +
+			"|connect_jobs_queue_total_jobs_in_queue" +
+			"|connect_users_active" +
+			"|container_cpu_cfs_throttled_seconds_total" +
+			"|container_cpu_usage_seconds_total" +
+			"|container_memory_working_set_bytes" +
+			"|container_network_receive_bytes_total" +
+			"|container_network_transmit_bytes_total" +
+			"|container_oom_events_total" +
+			"|kube_configmap_info" +
+			"|kube_daemonset_labels" +
+			"|kube_deployment_labels" +
+			"|kube_deployment_spec_replicas" +
+			"|kube_deployment_status_replicas" +
+			"|kube_deployment_status_replicas_available" +
+			"|kube_deployment_status_replicas_ready" +
+			"|kube_endpoint_info" +
+			"|kube_hpa_labels" +
+			"|kube_ingress_info" +
+			"|kube_namespace_created" +
+			"|kube_namespace_labels" +
+			"|kube_networkpolicy_labels" +
+			"|kube_node_info" +
+			"|kube_node_status_condition" +
+			"|kube_persistentvolumeclaim_info" +
+			"|kube_pod_container_resource_limits" +
+			"|kube_pod_container_resource_requests" +
+			"|kube_pod_container_status_restarts_total" +
+			"|kube_pod_container_status_running" +
+			"|kube_pod_container_status_terminated_reason" +
+			"|kube_pod_container_status_waiting_reason" +
+			"|kube_pod_info" +
+			"|kube_pod_status_phase" +
+			"|kube_pod_status_qos_class" +
+			"|kube_pod_status_reason" +
+			"|kube_secret_info" +
+			"|kube_service_info" +
+			"|kube_statefulset_labels" +
+			"|kube_statefulset_status_replicas" +
+			"|kube_statefulset_status_replicas_ready" +
+			"|loki_ingester_wal_disk_full_failures_total" +
+			"|machine_cpu_cores" +
+			"|machine_memory_bytes" +
+			"|node_cpu_core_throttles_total" +
+			"|node_cpu_seconds_total" +
+			"|node_memory_MemAvailable_bytes" +
+			"|node_memory_MemTotal_bytes" +
+			"|node_network_receive_bytes_total" +
+			"|node_network_receive_drop_total" +
+			"|node_network_transmit_bytes_total" +
+			"|node_network_transmit_drop_total" +
+			"|ppm_binary_routing_fallback" +
+			"|ppm_git_builds_failed_total" +
+			"|ppm_http_requests_inflight" +
+			"|ppm_http_requests_total" +
+			"|ppm_http_response_size_bytes_total" +
+			"|ppm_license_days_left" +
+			"|ppm_pkg_downloads_total" +
+			"|ppm_repo_source_sync_duration_seconds_bucket" +
+			"|ppm_storage_size" +
+			"|ppm_storage_used" +
+			"|probe_http_status_code" +
+			"|pwb_active_user_sessions" +
+			"|pwb_build_info" +
+			"|pwb_http_handlers_inflight" +
+			"|pwb_http_requests_inflight" +
+			"|pwb_http_requests_total" +
+			"|pwb_http_response_duration_seconds_bucket" +
+			"|pwb_http_response_duration_seconds_count" +
+			"|pwb_http_response_duration_seconds_sum" +
+			"|pwb_http_response_size_bytes_total" +
+			"|pwb_license_active_users" +
+			"|pwb_license_user_seats" +
+			"|pwb_session_startup_and_connect_duration_seconds_count" +
+			"|pwb_session_startup_and_connect_duration_seconds_sum" +
+			"|pwb_session_startup_duration_seconds_count" +
+			"|pwb_session_startup_duration_seconds_sum" +
+			"|pwb_sessions" +
+			"|up"
+
+		controlRoomBlock = fmt.Sprintf(`prometheus.relabel "control_room_filter" {
+    forward_to = [prometheus.remote_write.control_room.receiver]
+
+    rule {
+        source_labels = ["__name__"]
+        regex         = "%s"
+        action        = "keep"
+    }
+}
+
+prometheus.remote_write "control_room" {
     external_labels = {
         tenant_name = "%s",
     }
@@ -123,7 +253,7 @@ func buildAlloyConfig(params alloyConfigParams) string {
         }
     }
 }
-`, tenantName, controlRoomURL, params.compoundName, params.accountIDOrTenantID)
+`, controlRoomMetricFilter, tenantName, controlRoomURL, params.compoundName, params.accountIDOrTenantID)
 	}
 
 	config := fmt.Sprintf(`
