@@ -71,7 +71,7 @@ var funcMap = template.FuncMap{
 
 var markdownTemplate = template.Must(template.New("attestation").Funcs(funcMap).Parse(
 	`{{- $cloud := cloudName .Infra -}}
-# ` + docTitle + ` — {{ .TargetName }}
+# {{ .DisplayTitle }}
 
 **Environment:** {{ .TargetName }}
 **{{ accountLabel $cloud }}:** {{ .AccountID }}
@@ -203,11 +203,13 @@ The Git history for the ` + "`" + `{{ .TargetName }}/` + "`" + ` directory provi
 
 ` + confirmationText + `
 
+_Generated: {{ .GeneratedAt | formatDate }}_
+
 ## Sign-Off
 
 | | Name | Date |
 |---|---|---|
-| Prepared By | | |
+| Prepared By | | {{ .GeneratedAt | formatDate }} |
 `))
 
 // RenderMarkdown writes the attestation data as a Markdown document to the given writer.

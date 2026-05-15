@@ -22,6 +22,7 @@ import (
 // AttestationData contains all collected information about a workload deployment
 type AttestationData struct {
 	TargetName      string                 `json:"target_name"`
+	Title           string                 `json:"title,omitempty"`
 	CloudProvider   string                 `json:"cloud_provider"`
 	Region          string                 `json:"region"`
 	AccountID       string                 `json:"account_id"`
@@ -35,6 +36,17 @@ type AttestationData struct {
 	ProductSummary  string                 `json:"product_summary"`
 	StateBackendURL string                 `json:"state_backend_url,omitempty"`
 	RawStateFiles   map[string][]byte      `json:"-"`
+}
+
+// DisplayTitle returns the title to render at the top of the attestation
+// document. When Title is set (e.g. via the --title CLI flag) it is used
+// verbatim; otherwise the default "Installation Confirmation — <target>" is
+// returned.
+func (a *AttestationData) DisplayTitle() string {
+	if a.Title != "" {
+		return a.Title
+	}
+	return fmt.Sprintf("%s — %s", docTitle, a.TargetName)
 }
 
 // SiteInfo contains information extracted from a site.yaml file
