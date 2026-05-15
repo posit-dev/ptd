@@ -91,7 +91,7 @@ class AzureUserNodePoolConfig:
 @dataclasses.dataclass(frozen=True)
 class AzureWorkloadClusterConfig(ptd.WorkloadClusterConfig):
     components: AzureWorkloadClusterComponentConfig | None = None
-    kubernetes_version: str | None = "v1.31.1"
+    kubernetes_version: str | None = "1.35.4"
     outbound_type: str = "LoadBalancer"
     public_endpoint_access: bool = True
     system_node_pool_instance_type: str | None = "Standard_D2s_v6"
