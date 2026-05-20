@@ -185,6 +185,7 @@ class AWSWorkloadEKS(pulumi.ComponentResource):
         # Create launch template for this node group
         launch_template = pulumi_aws.ec2.LaunchTemplate(
             full_name,
+            update_default_version=True,
             metadata_options=pulumi_aws.ec2.LaunchTemplateMetadataOptionsArgs(  # enforce IMDSv2
                 http_endpoint="enabled",
                 http_put_response_hop_limit=2,
