@@ -243,7 +243,7 @@ class AWSWorkloadClusterConfig(ptd.WorkloadClusterConfig):
     vpc_id: str | None = None
     ami_type: str = "AL2023_x86_64_STANDARD"
     cert: uuid.UUID | None = None
-    cluster_version: str | None = "1.33.0"
+    cluster_version: str | None = "1.35"
     flavor: str = "eks-managedmachinepool"
     mp_instance_type: str = "t3.large"
     mp_min_size: int = 4
