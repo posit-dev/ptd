@@ -1,3 +1,10 @@
+## [1.27.3](https://github.com/posit-dev/ptd/compare/v1.27.2...v1.27.3) (2026-05-20)
+
+
+### Bug Fixes
+
+* keep EKS nodegroup launch template default version in sync ([c910a1e](https://github.com/posit-dev/ptd/commit/c910a1e25c05a80bbd5932849b4114c50958f89e))
+
 ## [1.27.2](https://github.com/posit-dev/ptd/compare/v1.27.1...v1.27.2) (2026-05-05)
 
 
