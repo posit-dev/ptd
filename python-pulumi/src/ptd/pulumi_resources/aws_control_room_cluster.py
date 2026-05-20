@@ -116,6 +116,7 @@ class AWSControlRoomCluster(pulumi.ComponentResource):
                     ),
                 ),
             ],
+            update_default_version=True,
             opts=pulumi.ResourceOptions(parent=self.eks.eks),
         )
 
