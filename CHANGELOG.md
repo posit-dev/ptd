@@ -1,3 +1,10 @@
+## [1.27.4](https://github.com/posit-dev/ptd/compare/v1.27.3...v1.27.4) (2026-05-21)
+
+
+### Bug Fixes
+
+* keep control room EKS nodegroup launch template default version in sync ([c101d90](https://github.com/posit-dev/ptd/commit/c101d903f2a221acc8c909925d7d25ad8939681e))
+
 ## [1.27.3](https://github.com/posit-dev/ptd/compare/v1.27.2...v1.27.3) (2026-05-20)
 
 
