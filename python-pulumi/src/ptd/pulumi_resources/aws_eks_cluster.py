@@ -1231,7 +1231,7 @@ class AWSEKSCluster(pulumi.ComponentResource):
         # Need to attach AmazonEBSCSIDriverPolicyV2
         aws.iam.RolePolicyAttachment(
             f"{self.name}-ebs-csi-driver",
-            policy_arn="arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicyV2",
+            policy_arn="arn:aws:iam::aws:policy/AmazonEBSCSIDriverPolicyV2",
             role=sa_role.name,
             opts=pulumi.ResourceOptions(parent=sa_role),
         )

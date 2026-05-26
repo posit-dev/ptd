@@ -1359,7 +1359,7 @@ class AWSWorkloadPersistent(pulumi.ComponentResource):
         aws.iam.RolePolicyAttachment(
             "ebs-csi-driver-policy-att",
             role=self.ebs_csi_role.name,
-            policy_arn="arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicyV2",
+            policy_arn="arn:aws:iam::aws:policy/AmazonEBSCSIDriverPolicyV2",
             opts=pulumi.ResourceOptions(parent=self.ebs_csi_role, delete_before_replace=True),
         )
 
