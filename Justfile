@@ -87,6 +87,9 @@ symlink-binaries:
   if [ -z "$az_real" ]; then
     printf 'WARNING: az not found in PATH (excluding %s), skipping\n' "$binlocal" >&2
   else
+    # Drop any pre-existing entry: `>` follows symlinks and would write through
+    # to a root-owned target on CI runners that pre-install az.
+    rm -f "$binlocal/az"
     az_python="$(grep -o '/[^ ]*python3' "$az_real" 2>/dev/null | head -1)"
     if [ -z "$az_python" ]; then
       printf 'WARNING: could not determine az Python path from %s, falling back to symlink\n' "$az_real" >&2
