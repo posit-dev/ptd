@@ -1,3 +1,10 @@
+# [1.28.0](https://github.com/posit-dev/ptd/compare/v1.27.4...v1.28.0) (2026-05-26)
+
+
+### Features
+
+* default secrets-store CSI to EKS addon and adopt CRDs cleanly ([ea85a98](https://github.com/posit-dev/ptd/commit/ea85a982867b5758a935dff34fc7008f225b2c76))
+
 ## [1.27.4](https://github.com/posit-dev/ptd/compare/v1.27.3...v1.27.4) (2026-05-21)
 
 
