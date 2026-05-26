@@ -519,7 +519,7 @@ func collectSites(workloadPath string, siteDomains map[string]string) ([]SiteInf
 				Image:        siteYAML.Spec.Connect.Image,
 				Version:      cleanVersion(siteYAML.Spec.Connect.Image),
 				Replicas:     siteYAML.Spec.Connect.Replicas,
-				DomainPrefix: defaultPrefix(siteYAML.Spec.Connect.DomainPrefix, "pub"),
+				DomainPrefix: defaultPrefix(siteYAML.Spec.Connect.DomainPrefix, "connect"),
 			}
 			if siteYAML.Spec.Connect.Auth != nil {
 				p.Auth = &AuthDetail{
@@ -536,7 +536,7 @@ func collectSites(workloadPath string, siteDomains map[string]string) ([]SiteInf
 				Image:        siteYAML.Spec.Workbench.Image,
 				Version:      cleanVersion(siteYAML.Spec.Workbench.Image),
 				Replicas:     siteYAML.Spec.Workbench.Replicas,
-				DomainPrefix: defaultPrefix(siteYAML.Spec.Workbench.DomainPrefix, "dev"),
+				DomainPrefix: defaultPrefix(siteYAML.Spec.Workbench.DomainPrefix, "workbench"),
 			}
 			if siteYAML.Spec.Workbench.Auth != nil {
 				p.Auth = &AuthDetail{
@@ -553,7 +553,7 @@ func collectSites(workloadPath string, siteDomains map[string]string) ([]SiteInf
 				Image:        siteYAML.Spec.PackageManager.Image,
 				Version:      cleanVersion(siteYAML.Spec.PackageManager.Image),
 				Replicas:     siteYAML.Spec.PackageManager.Replicas,
-				DomainPrefix: defaultPrefix(siteYAML.Spec.PackageManager.DomainPrefix, "pkg"),
+				DomainPrefix: defaultPrefix(siteYAML.Spec.PackageManager.DomainPrefix, "packagemanager"),
 			})
 		}
 
