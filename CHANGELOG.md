@@ -1,3 +1,11 @@
+## [1.28.1](https://github.com/posit-dev/ptd/compare/v1.28.0...v1.28.1) (2026-05-26)
+
+
+### Bug Fixes
+
+* rm -f stale az entry before writing wrapper ([be35ebb](https://github.com/posit-dev/ptd/commit/be35ebba21bcb1e856d65ed635208e2a7b62e01e))
+* use azurecli login for AKS kubeconfig and fix az symlink in symlink-binaries ([ed40c19](https://github.com/posit-dev/ptd/commit/ed40c19bfccce0fe214df660ba4cfd426a840170))
+
 # [1.28.0](https://github.com/posit-dev/ptd/compare/v1.27.4...v1.28.0) (2026-05-26)
 
 
