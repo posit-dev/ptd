@@ -887,7 +887,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 
 		// ── Custom K8s resources (optional, per-cluster) ─────────────────────────
 		if err := createCustomK8sResources(ctx, params.workloadDir, release,
-			params.clusters[release].CustomK8sResources, k8sProviderOpt, withAlias()); err != nil {
+			params.clusters[release].CustomK8sResources, k8sProviderOpt); err != nil {
 			return err
 		}
 	}

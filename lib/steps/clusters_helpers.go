@@ -316,7 +316,6 @@ func createCustomK8sResources(
 	release string,
 	subfolders []string,
 	k8sProviderOpt pulumi.ResourceOption,
-	aliasOpt pulumi.ResourceOption,
 ) error {
 	if len(subfolders) == 0 {
 		return nil
@@ -361,7 +360,7 @@ func createCustomK8sResources(
 			logicalName := fmt.Sprintf("%s-custom-%s-%s", release, subfolder, stem)
 			if _, err := k8syamlv2.NewConfigFile(ctx, logicalName, &k8syamlv2.ConfigFileArgs{
 				File: pulumi.String(yamlFile),
-			}, k8sProviderOpt, aliasOpt); err != nil {
+			}, k8sProviderOpt); err != nil {
 				return fmt.Errorf("custom_k8s_resources: failed to apply %s: %w", yamlFile, err)
 			}
 		}
