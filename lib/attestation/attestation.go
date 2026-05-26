@@ -339,7 +339,7 @@ func parseAWSInfraConfig(data []byte) (*InfraConfig, error) {
 			KeycloakEnabled             bool   `yaml:"keycloak_enabled"`
 			ExternalDNSEnabled          bool   `yaml:"external_dns_enabled"`
 			PublicLoadBalancer          bool   `yaml:"public_load_balancer"`
-			SecretsStoreAddonEnabled    bool   `yaml:"secrets_store_addon_enabled"`
+			SecretsStoreAddonEnabled    *bool  `yaml:"secrets_store_addon_enabled"`
 			HostedZoneManagementEnabled *bool  `yaml:"hosted_zone_management_enabled"`
 			CustomerManagedBastionId    string `yaml:"customer_managed_bastion_id"`
 			LoadBalancerPerSite         bool   `yaml:"load_balancer_per_site"`
@@ -372,7 +372,7 @@ func parseAWSInfraConfig(data []byte) (*InfraConfig, error) {
 		KeycloakEnabled:          raw.Spec.KeycloakEnabled,
 		ExternalDNSEnabled:       raw.Spec.ExternalDNSEnabled,
 		PublicLoadBalancer:       raw.Spec.PublicLoadBalancer,
-		SecretsStoreAddonEnabled: raw.Spec.SecretsStoreAddonEnabled,
+		SecretsStoreAddonEnabled: raw.Spec.SecretsStoreAddonEnabled == nil || *raw.Spec.SecretsStoreAddonEnabled,
 		CustomerManagedBastionID: raw.Spec.CustomerManagedBastionId,
 		LoadBalancerPerSite:      raw.Spec.LoadBalancerPerSite,
 		SiteDomains:              make(map[string]string),

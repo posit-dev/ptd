@@ -1325,6 +1325,8 @@ class AWSEKSCluster(pulumi.ComponentResource):
                 addon_version=version,
                 cluster_name=self.name,
                 tags=self.eks.tags,
+                resolve_conflicts_on_create="OVERWRITE",
+                resolve_conflicts_on_update="OVERWRITE",
                 configuration_values=json.dumps(
                     {
                         "tolerations": [
