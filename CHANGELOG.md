@@ -1,3 +1,10 @@
+## [1.28.2](https://github.com/posit-dev/ptd/compare/v1.28.1...v1.28.2) (2026-05-26)
+
+
+### Bug Fixes
+
+* align attestation domainPrefix defaults with team-operator CRD ([d7b3258](https://github.com/posit-dev/ptd/commit/d7b32589462c22ebbfc69b75c805c65d2012c90e))
+
 ## [1.28.1](https://github.com/posit-dev/ptd/compare/v1.28.0...v1.28.1) (2026-05-26)
 
 
