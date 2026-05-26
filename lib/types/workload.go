@@ -244,7 +244,7 @@ type AWSWorkloadConfig struct {
 	ResourceTags                            map[string]string  `json:"resource_tags" yaml:"resource_tags"`
 	RoleArn                                 *string            `json:"role_arn" yaml:"role_arn"`
 	TailscaleEnabled                        bool               `json:"tailscale_enabled" yaml:"tailscale_enabled"`
-	SecretsStoreAddonEnabled                bool               `json:"secrets_store_addon_enabled" yaml:"secrets_store_addon_enabled"`
+	SecretsStoreAddonEnabled                *bool              `json:"secrets_store_addon_enabled,omitempty" yaml:"secrets_store_addon_enabled,omitempty"`
 	TrustedPrincipals                       []string           `json:"trusted_principals" yaml:"trusted_principals"`
 	HostedZoneID                            *string            `json:"hosted_zone_id" yaml:"hosted_zone_id"`
 	HostedZoneManagementEnabled             *bool              `json:"hosted_zone_management_enabled,omitempty" yaml:"hosted_zone_management_enabled,omitempty"`
@@ -253,6 +253,16 @@ type AWSWorkloadConfig struct {
 	ThirdPartyTelemetryEnabled              *bool              `json:"third_party_telemetry_enabled,omitempty" yaml:"third_party_telemetry_enabled,omitempty"`
 	NetworkTrust                            string             `json:"network_trust" yaml:"network_trust"`
 	NvidiaGpuEnabled                        bool               `json:"nvidia_gpu_enabled" yaml:"nvidia_gpu_enabled"`
+}
+
+// IsSecretsStoreAddonEnabled returns whether the EKS-managed secrets-store
+// CSI driver provider addon should be used instead of the helm-installed
+// driver + provider releases. Defaults to true when unset.
+func (c *AWSWorkloadConfig) IsSecretsStoreAddonEnabled() bool {
+	if c.SecretsStoreAddonEnabled == nil {
+		return true
+	}
+	return *c.SecretsStoreAddonEnabled
 }
 
 type AWSProvisionedVpc struct {

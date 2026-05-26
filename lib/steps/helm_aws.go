@@ -269,7 +269,7 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 		}
 
 		// 3 & 4. Secret Store CSI (if not using addon)
-		if !params.cfg.SecretsStoreAddonEnabled {
+		if !params.cfg.IsSecretsStoreAddonEnabled() {
 			if err := awsHelmSecretStoreCsi(ctx, k8sOpt, name, release, resolved.SecretStoreCsiDriverVersion, withAlias); err != nil {
 				return err
 			}
