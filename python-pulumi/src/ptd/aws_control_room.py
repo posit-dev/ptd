@@ -43,7 +43,7 @@ class AWSControlRoomConfig:
     power_user_arn: str | None = None
     eks_access_entries: ptd.EKSAccessEntriesConfig = dataclasses.field(default_factory=ptd.EKSAccessEntriesConfig)
     db_allocated_storage: int = 100
-    db_engine_version: str = "16.4"
+    db_engine_version: str = "16.14"
     db_instance_class: str = "db.t3.small"
     eks_k8s_version: str | None = "1.30"
     eks_node_group_max: int = 3

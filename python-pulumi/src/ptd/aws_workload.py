@@ -163,7 +163,7 @@ class AWSWorkloadConfig(ptd.WorkloadConfig):
 
     bastion_instance_type: str = "t4g.nano"
     db_allocated_storage: int = 100
-    db_engine_version: str = "15.12"
+    db_engine_version: str = "15.18"
     db_instance_class: str = "db.t3.small"
     db_performance_insights_enabled: bool = False
     db_deletion_protection: bool = False
