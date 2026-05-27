@@ -20,6 +20,7 @@ import (
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	"github.com/spf13/viper"
 )
 
 // Role UUIDs used by Azure helm resources (not already in clusters.go constants).
@@ -966,6 +967,8 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 		resourceGroupName:          params.resourceGroupName,
 		clusterResourceGroupName:   clusterResourceGroupName,
 		publicSubnetCidr:           params.cfg.Network.PublicSubnetCidr,
+		filterControlRoomMetrics:   params.cfg.FilterControlRoomMetrics,
+		ptdRoot:                    viper.GetString("TOP"),
 	}
 	alloyConfigStr := buildAlloyConfig(alloyP)
 
