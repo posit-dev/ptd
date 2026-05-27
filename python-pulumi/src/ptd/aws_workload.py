@@ -181,6 +181,8 @@ class AWSWorkloadConfig(ptd.WorkloadConfig):
     fsx_openzfs_override_deployment_type: str | None = None
     fsx_openzfs_storage_capacity: int = 100
     fsx_openzfs_throughput_capacity: int = 320
+    # Parsed from YAML so Python doesn't reject the field; only used by Go Alloy config generation.
+    filter_control_room_metrics: bool = False
     grafana_scrape_system_logs: bool = False  # only enable for debugging, runs agent as root
     load_balancer_per_site: bool = False
     nvidia_gpu_enabled: bool = False
