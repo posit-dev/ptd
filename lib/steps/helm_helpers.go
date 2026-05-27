@@ -116,8 +116,9 @@ func buildAlloyConfig(params alloyConfigParams) string {
 			metricFilter, filterErr := BuildControlRoomMetricFilter(params.ptdRoot)
 			if filterErr != nil {
 				// Fall back to forwarding all metrics rather than breaking the deploy.
+				// Reset controlRoomForwardTo to route directly to the remote_write (no filter).
 				fmt.Printf("helm: warning: failed to build control room metric filter: %v; forwarding all metrics\n", filterErr)
-				controlRoomForwardTo = ""
+				controlRoomForwardTo = "prometheus.remote_write.control_room.receiver,"
 			} else {
 				controlRoomBlock = fmt.Sprintf(`prometheus.relabel "control_room_filter" {
     forward_to = [prometheus.remote_write.control_room.receiver]

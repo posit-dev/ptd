@@ -52,29 +52,47 @@ func TestBuildControlRoomMetricFilter(t *testing.T) {
 		"loki_ingester_wal_disk_full_failures_total",
 		"up",
 	}
-	for _, m := range knownMetrics {
-		// Each metric should appear as a full token (not a substring of another metric).
-		parts := strings.Split(result, "|")
-		found := false
-		for _, p := range parts {
-			if p == m {
-				found = true
-				break
-			}
-		}
-		assert.True(t, found, "expected metric %q to be present in filter result", m)
-	}
-
-	// Verify that known PromQL function names are NOT present as top-level tokens.
-	forbiddenTokens := []string{"rate", "sum", "by", "count", "avg", "last_over_time", "offset"}
 	parts := strings.Split(result, "|")
 	partSet := make(map[string]bool, len(parts))
 	for _, p := range parts {
 		partSet[p] = true
 	}
+	for _, m := range knownMetrics {
+		assert.True(t, partSet[m], "expected metric %q to be present in filter result", m)
+	}
+
+	// Verify that known PromQL function names are NOT present as top-level tokens.
+	forbiddenTokens := []string{"rate", "sum", "by", "count", "avg", "last_over_time", "offset"}
 	for _, f := range forbiddenTokens {
 		assert.False(t, partSet[f], "PromQL keyword/function %q should not appear as a metric name in the filter", f)
 	}
+}
+
+// TestBuildAlloyConfigFilterFallback verifies that when filterControlRoomMetrics is true
+// but BuildControlRoomMetricFilter fails (e.g. bad ptdRoot), the generated Alloy config
+// still forwards metrics to the control room remote_write rather than silently dropping them.
+func TestBuildAlloyConfigFilterFallback(t *testing.T) {
+	config := buildAlloyConfig(alloyConfigParams{
+		compoundName:             "test-workload",
+		controlRoomDomain:        "ctrl.example.posit.team",
+		accountIDOrTenantID:      "123456789012",
+		cloudProvider:            "aws",
+		filterControlRoomMetrics: true,
+		ptdRoot:                  "/nonexistent/path/that/will/cause/an/error",
+	})
+
+	// The control room remote_write block must be present.
+	assert.Contains(t, config, `prometheus.remote_write "control_room"`,
+		"control room remote_write block should be present even when filter fails")
+
+	// The default relabel forward_to must route directly to the remote_write receiver,
+	// not to the (absent) filter component.
+	assert.Contains(t, config, "prometheus.remote_write.control_room.receiver",
+		"forward_to should fall back to direct remote_write receiver when filter build fails")
+
+	// The filter relabel component must NOT be present — it was never built.
+	assert.NotContains(t, config, `prometheus.relabel "control_room_filter"`,
+		"control_room_filter relabel block should be absent when filter build fails")
 }
 
 func TestExtractMetricNamesFromExpr(t *testing.T) {

@@ -49,6 +49,8 @@ var labelBlockRe = regexp.MustCompile(`\{[^}]*\}`)
 // aggregationGroupingRe matches by(...), without(...), on(...), ignoring(...)
 // clauses in PromQL aggregations / binary operators. The label names inside
 // these clauses must not be treated as metric names.
+// Note: \([^)]*\) does not handle nested parentheses, but PromQL by/without/on/ignoring
+// clauses never contain nested parens, so this assumption is safe.
 var aggregationGroupingRe = regexp.MustCompile(`(?i)\b(?:by|without|on|ignoring)\s*\([^)]*\)`)
 
 // extractMetricNamesFromExpr extracts bare metric name identifiers from a PromQL expression.
@@ -71,6 +73,13 @@ func extractMetricNamesFromExpr(expr string) []string {
 
 		// Skip single-character identifiers (too short to be a real metric).
 		if len(ident) <= 1 {
+			continue
+		}
+
+		// Skip dunder identifiers like __name__, __job__ — these are Prometheus
+		// internal labels, not metric names, and shouldn't appear bare in expressions
+		// outside label selectors (which are already stripped).
+		if strings.HasPrefix(ident, "__") {
 			continue
 		}
 
@@ -152,6 +161,10 @@ func walkJSONValue(v interface{}, out *[]string) {
 			if k == "expr" {
 				if s, ok := child.(string); ok {
 					*out = append(*out, s)
+				} else {
+					// Non-string "expr" value — recurse defensively in case it contains
+					// nested objects or arrays with expr fields.
+					walkJSONValue(child, out)
 				}
 			} else {
 				walkJSONValue(child, out)
@@ -241,5 +254,7 @@ func BuildControlRoomMetricFilter(ptdRoot string) (string, error) {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	return strings.Join(names, "|"), nil
+	filter := strings.Join(names, "|")
+	fmt.Printf("helm: control room metric filter: %d metrics, %d bytes\n", len(names), len(filter))
+	return filter, nil
 }
