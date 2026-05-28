@@ -49,7 +49,7 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 
 	// Title
 	m.AddRows(
-		text.NewRow(16, fmt.Sprintf("%s — %s", docTitle, data.TargetName), props.Text{
+		text.NewRow(16, data.DisplayTitle(), props.Text{
 			Size:  20,
 			Style: fontstyle.Bold,
 			Align: align.Left,
@@ -109,10 +109,10 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 		}
 		if hasAuth {
 			PdfSubSection(m, "Authentication Configuration")
-			m.AddRows(PdfTableHeader([]string{"Product", "Method", "Identity Provider"}, []int{4, 3, 5}))
+			m.AddRows(PdfTableHeader([]string{"Product", "Method", "Identity Provider"}, []int{3, 1, 8}))
 			for _, p := range site.Products {
 				if p.Auth != nil {
-					m.AddRows(PdfTableRow([]string{ProductDisplayName(p.Name), p.Auth.Type, p.Auth.Issuer}, []int{4, 3, 5}))
+					m.AddRows(PdfTableRow([]string{ProductDisplayName(p.Name), p.Auth.Type, p.Auth.Issuer}, []int{3, 1, 8}))
 				}
 			}
 			m.AddRows(row.New(4))
@@ -234,6 +234,13 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 			Align: align.Left,
 		}),
 		row.New(6),
+		text.NewRow(8, fmt.Sprintf("Generated: %s", data.GeneratedAt.Format("2006-01-02 15:04 MST")), props.Text{
+			Size:  9,
+			Style: fontstyle.Italic,
+			Align: align.Left,
+			Color: MutedColor,
+		}),
+		row.New(4),
 		text.NewRow(10, "Sign-Off", props.Text{
 			Size:  14,
 			Style: fontstyle.Bold,
@@ -246,7 +253,7 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 		}),
 		row.New(2),
 		PdfTableHeader([]string{"", "Name", "Date"}, []int{3, 5, 4}),
-		PdfSignatureRow("Prepared By"),
+		PdfSignatureRow("Prepared By", data.GeneratedAt.Format("2006-01-02")),
 	))
 
 	// Generate
@@ -396,8 +403,9 @@ func PdfTableRow(values []string, sizes []int) core.Row {
 	})
 }
 
-// PdfSignatureRow renders a signature line row with the role label and blank fields.
-func PdfSignatureRow(role string) core.Row {
+// PdfSignatureRow renders a signature line row with the role label, a blank
+// name field, and an optional pre-filled date.
+func PdfSignatureRow(role, date string) core.Row {
 	return row.New(12).Add(
 		col.New(3).Add(text.New(role, props.Text{
 			Size:  9,
@@ -405,7 +413,7 @@ func PdfSignatureRow(role string) core.Row {
 			Align: align.Left,
 		})),
 		col.New(5).Add(text.New("", props.Text{Size: 9})),
-		col.New(4).Add(text.New("", props.Text{Size: 9})),
+		col.New(4).Add(text.New(date, props.Text{Size: 9})),
 	).WithStyle(&props.Cell{
 		BorderType:      border.Bottom,
 		BorderColor:     BorderColor,
