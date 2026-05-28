@@ -1,3 +1,10 @@
+## [1.28.3](https://github.com/posit-dev/ptd/compare/v1.28.2...v1.28.3) (2026-05-28)
+
+
+### Bug Fixes
+
+* **proxy:** use OR-semantics for dual-PID IsRunning ([69d3823](https://github.com/posit-dev/ptd/commit/69d3823307311173c582f42b90b5ed70a84bbcd8))
+
 ## [1.28.2](https://github.com/posit-dev/ptd/compare/v1.28.1...v1.28.2) (2026-05-26)
 
 
