@@ -151,13 +151,17 @@ func (r *RunningProxy) IsRunning() bool {
 		return first
 	}
 
-	second := helpers.ProcessRunning(r.Pid2)
-
-	if first && second {
-		return true
-	}
-
-	return false
+	// For dual-PID proxy sessions (Azure: `az network bastion tunnel` + `ssh -ND`),
+	// the `az` wrapper exits/orphans shortly after startup while the ssh SOCKS
+	// listener stays up holding the port. The ssh process is the load-bearing
+	// one. Treat the session as running if EITHER process is alive — AND-semantics
+	// would flip the session to "stopped" the moment `az` exits, which:
+	//   1. misreports a functional proxy as stopped in `ptd proxy --list`
+	//   2. causes Preflight to refuse reuse, then trip the port-collision error
+	//   3. causes --prune to kill the still-functional ssh tunnel
+	// The KillProcess path already tolerates one PID being dead, so this aligns
+	// IsRunning with that reality.
+	return first || helpers.ProcessRunning(r.Pid2)
 }
 
 func (r *RunningProxy) Stop() error {

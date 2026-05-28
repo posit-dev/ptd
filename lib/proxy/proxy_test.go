@@ -154,6 +154,9 @@ func TestRunningProxyWithDualPids(t *testing.T) {
 // Note: These tests mock the process running checks since we can't easily create real processes for testing
 
 func TestIsRunningWithDualPids(t *testing.T) {
+	// os.Getpid() is guaranteed to be running — the test process itself.
+	livePid := os.Getpid()
+
 	testCases := []struct {
 		name         string
 		pid          int
@@ -161,13 +164,13 @@ func TestIsRunningWithDualPids(t *testing.T) {
 		expectResult bool
 	}{
 		{
-			name:         "Both PIDs valid (mocked as not running)",
+			name:         "Both PIDs dead",
 			pid:          -1,
 			pid2:         -2,
 			expectResult: false,
 		},
 		{
-			name:         "Only primary PID provided",
+			name:         "Only primary PID provided, primary dead",
 			pid:          -1,
 			pid2:         0,
 			expectResult: false,
@@ -177,6 +180,28 @@ func TestIsRunningWithDualPids(t *testing.T) {
 			pid:          -1000,
 			pid2:         -2000,
 			expectResult: false,
+		},
+		{
+			// Models the Azure case: `az network bastion tunnel` (Pid) has
+			// exited/orphaned, but the ssh SOCKS listener (Pid2) is still alive.
+			// Under OR-semantics the session is correctly reported as running.
+			name:         "Primary PID dead, secondary PID alive (Azure ssh still listening)",
+			pid:          -1,
+			pid2:         livePid,
+			expectResult: true,
+		},
+		{
+			// Inverse: primary alive, secondary dead — also still running.
+			name:         "Primary PID alive, secondary PID dead",
+			pid:          livePid,
+			pid2:         -1,
+			expectResult: true,
+		},
+		{
+			name:         "Both PIDs alive",
+			pid:          livePid,
+			pid2:         livePid,
+			expectResult: true,
 		},
 	}
 
