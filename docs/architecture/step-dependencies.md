@@ -219,8 +219,8 @@ Control rooms use a simpler 4-step pipeline:
 workspaces → persistent → postgres_config → cluster
 ```
 
-### Step 1: workspaces (Python) {#workspaces}
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_control_room_workspaces.py`
+### Step 1: workspaces (Go) {#workspaces}
+**Implementation:** `lib/steps/workspaces.go`, `lib/steps/workspaces_aws.go`, `lib/steps/vpc_aws.go`
 **Proxy Required:** No
 
 **Creates:**
