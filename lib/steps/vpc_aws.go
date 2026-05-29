@@ -524,7 +524,7 @@ func (v *awsVpcState) createPublicNACLBaseRules() error {
 	return nil
 }
 
-// createPrivateNACLBaseRules creates the 6 base rules for the private NACL.
+// createPrivateNACLBaseRules creates the 5 base rules for the private NACL.
 func (v *awsVpcState) createPrivateNACLBaseRules() error {
 	rules := []struct {
 		name       string
@@ -554,6 +554,10 @@ func (v *awsVpcState) createPrivateNACLBaseRules() error {
 //
 // The Python with_nacl_rule signature uses port_range and protocol="all"|"tcp"|"udp".
 // protocol -1 means all; port=0 with protocol=-1 means all traffic.
+//
+// Rule numbers are drawn from per-(privacy, direction) counters in awsVpcState
+// that start at 2000 and increment by 500 on each call (matching the Python
+// behavior). Consumers relying on awsVpcState should be aware of this stride.
 func (v *awsVpcState) withNACLRule(
 	privacy string, // "public" or "private"
 	port int, // single port (0 for all-protocol)

@@ -463,13 +463,6 @@ func TestAWSWorkspacesDefaultRoleName(t *testing.T) {
 	t.Fatal("IAM role resource not found")
 }
 
-func TestLowercaseStr(t *testing.T) {
-	assert.Equal(t, "alice", lowercaseStr("Alice"))
-	assert.Equal(t, "bob", lowercaseStr("Bob"))
-	assert.Equal(t, "john", lowercaseStr("JOHN"))
-	assert.Equal(t, "already", lowercaseStr("already"))
-}
-
 func TestWorkspacesStepNotControlRoom(t *testing.T) {
 	tgt := &typestest.MockTarget{}
 	tgt.On("Name").Return("some-workload")

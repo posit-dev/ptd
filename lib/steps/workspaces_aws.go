@@ -481,7 +481,7 @@ fi`),
 
 	// Per-user: create AD user + workspace
 	for _, u := range params.trustedUsers {
-		accountName := lowercaseStr(u.GivenName)
+		accountName := strings.ToLower(u.GivenName)
 
 		// Create/delete the AD user via the `aws ds-data` CLI (matching the Python
 		// aws_directoryservicedata.py provider). As with data-access enablement,
@@ -563,18 +563,4 @@ aws ds-data create-user --directory-id "$AD_DIRECTORY_ID" --sam-account-name "$A
 	}
 
 	return nil
-}
-
-// lowercaseStr converts a string to lowercase, replicating Python's str.lower().
-func lowercaseStr(s string) string {
-	result := make([]byte, len(s))
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			result[i] = c + 32
-		} else {
-			result[i] = c
-		}
-	}
-	return string(result)
 }
