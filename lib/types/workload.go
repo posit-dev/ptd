@@ -253,6 +253,10 @@ type AWSWorkloadConfig struct {
 	ThirdPartyTelemetryEnabled              *bool              `json:"third_party_telemetry_enabled,omitempty" yaml:"third_party_telemetry_enabled,omitempty"`
 	NetworkTrust                            string             `json:"network_trust" yaml:"network_trust"`
 	NvidiaGpuEnabled                        bool               `json:"nvidia_gpu_enabled" yaml:"nvidia_gpu_enabled"`
+	// FilterControlRoomMetrics enables the per-workload metric filter before forwarding to the
+	// control room Mimir remote_write. When true, only metrics referenced by grafana_alerts and
+	// grafana_dashboards are forwarded. Defaults to false so rollout can be done per-workload.
+	FilterControlRoomMetrics bool `json:"filter_control_room_metrics" yaml:"filter_control_room_metrics"`
 }
 
 // IsSecretsStoreAddonEnabled returns whether the EKS-managed secrets-store
@@ -300,6 +304,10 @@ type AzureWorkloadConfig struct {
 	// RootDomain, when set, is used as the sole cert-manager domain instead of per-site domains.
 	// Mirrors Python: AzureWorkloadConfig.root_domain (via WorkloadConfig.domains fallback).
 	RootDomain *string `yaml:"root_domain"`
+	// FilterControlRoomMetrics enables the per-workload metric filter before forwarding to the
+	// control room Mimir remote_write. When true, only metrics referenced by grafana_alerts and
+	// grafana_dashboards are forwarded. Defaults to false so rollout can be done per-workload.
+	FilterControlRoomMetrics bool `yaml:"filter_control_room_metrics"`
 }
 
 type NetworkConfig struct {

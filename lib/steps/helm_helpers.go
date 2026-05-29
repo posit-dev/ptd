@@ -34,6 +34,12 @@ type alloyConfigParams struct {
 	publicSubnetCidr         string
 	// tenant_name override (falls back to compoundName)
 	tenantName string
+	// filterControlRoomMetrics enables dynamic metric filtering before the control room remote_write.
+	// When true, only metrics extracted from grafana_alerts and grafana_dashboards are forwarded.
+	filterControlRoomMetrics bool
+	// ptdRoot is the repository root path (value of the TOP viper key).
+	// Required when filterControlRoomMetrics is true.
+	ptdRoot string
 }
 
 // ptdComponentForAlloy defines a PTD product component for blackbox health-check targets.
@@ -102,8 +108,33 @@ func buildAlloyConfig(params alloyConfigParams) string {
 	controlRoomForwardTo := ""
 	controlRoomBlock := ""
 	if hasControlRoom {
-		controlRoomForwardTo = "prometheus.remote_write.control_room.receiver,"
-		controlRoomBlock = fmt.Sprintf(`prometheus.remote_write "control_room" {
+		if params.filterControlRoomMetrics {
+			// Dynamic filter: parse grafana_alerts/*.yaml and grafana_dashboards/*.json
+			// at ensure time to derive the exact set of metrics to forward.
+			controlRoomForwardTo = "prometheus.relabel.control_room_filter.receiver,"
+
+			metricFilter, filterErr := BuildControlRoomMetricFilter(params.ptdRoot)
+			if filterErr != nil {
+				// Fall back to forwarding all metrics rather than breaking the deploy.
+				// Reset controlRoomForwardTo to route directly to the remote_write (no filter).
+				fmt.Printf("helm: warning: failed to build control room metric filter: %v; forwarding all metrics\n", filterErr)
+				controlRoomForwardTo = "prometheus.remote_write.control_room.receiver,"
+			} else {
+				controlRoomBlock = fmt.Sprintf(`prometheus.relabel "control_room_filter" {
+    forward_to = [prometheus.remote_write.control_room.receiver]
+
+    rule {
+        source_labels = ["__name__"]
+        regex         = "%s"
+        action        = "keep"
+    }
+}
+
+`, metricFilter)
+			}
+		}
+
+		controlRoomBlock += fmt.Sprintf(`prometheus.remote_write "control_room" {
     external_labels = {
         tenant_name = "%s",
     }
@@ -124,6 +155,11 @@ func buildAlloyConfig(params alloyConfigParams) string {
     }
 }
 `, tenantName, controlRoomURL, params.compoundName, params.accountIDOrTenantID)
+
+		if !params.filterControlRoomMetrics {
+			// No filter: forward directly to the remote_write.
+			controlRoomForwardTo = "prometheus.remote_write.control_room.receiver,"
+		}
 	}
 
 	config := fmt.Sprintf(`

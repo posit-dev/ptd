@@ -70,6 +70,8 @@ class AzureWorkloadConfig(ptd.WorkloadConfig):
     netapp_volume_workbench_capacity: int = 200  # GiB
     netapp_volume_workbench_shared_capacity: int = 50  # GiB
     ppm_file_share_size_gib: int = 100  # Minimum size for PPM Azure File Share in GiB
+    # Parsed from YAML so Python doesn't reject the field; only used by Go Alloy config generation.
+    filter_control_room_metrics: bool = False
     nvidia_gpu_enabled: bool = False
 
 
