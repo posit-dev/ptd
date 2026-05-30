@@ -1,3 +1,10 @@
+# [1.29.0](https://github.com/posit-dev/ptd/compare/v1.28.3...v1.29.0) (2026-05-30)
+
+
+### Features
+
+* port workspaces step and AWSVpc to inline Go ([4674c7b](https://github.com/posit-dev/ptd/commit/4674c7bb8441bd4392f2b2b83705d2351db46d5f))
+
 ## [1.28.3](https://github.com/posit-dev/ptd/compare/v1.28.2...v1.28.3) (2026-05-28)
 
 
