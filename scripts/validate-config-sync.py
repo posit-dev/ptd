@@ -11,6 +11,8 @@ Exit code 0: No mismatches found
 Exit code 1: Mismatches found (Go fields missing in Python)
 """
 
+from __future__ import annotations
+
 import re
 import sys
 from pathlib import Path
@@ -24,6 +26,13 @@ TYPE_MAPPINGS = {
     "SiteConfigSpec": ("AWSSiteConfig", "python-pulumi/src/ptd/aws_workload.py", "SiteConfig"),
     "AzureWorkloadConfig": ("AzureWorkloadConfig", "python-pulumi/src/ptd/azure_workload.py", "WorkloadConfig"),
     "NetworkConfig": ("NetworkConfig", "python-pulumi/src/ptd/azure_workload.py", None),
+    "AWSControlRoomConfig": ("AWSControlRoomConfig", "python-pulumi/src/ptd/aws_control_room.py", None),
+}
+
+# Go structs that live in a file other than lib/types/workload.go.
+# Maps Go struct name -> Go source file (relative to repo root).
+GO_FILE_OVERRIDES = {
+    "AWSControlRoomConfig": "lib/types/controlroom.go",
 }
 
 # Base classes to extract (from __init__.py)
@@ -69,6 +78,9 @@ PYTHON_ONLY_ALLOWLIST = {
         "dns_forward_domains",  # Python-specific
         "provisioned_vnet_name",  # Python field name (provisioned_vnet_id in Go)
     },
+    "AWSControlRoomConfig": {
+        "ebs_csi_addon_version",  # Python-only EKS addon version, not in Go YAML schema
+    },
 }
 
 # Go fields that don't exist in Python (field name differences or Go-only)
@@ -78,6 +90,11 @@ GO_ONLY_ALLOWLIST = {
     },
     "NetworkConfig": {
         "provisioned_vnet_id",  # Go field name; Python uses provisioned_vnet_name
+    },
+    "AWSControlRoomConfig": {
+        # Go-only: the control room never passes this to Python; ECR repository
+        # management is handled entirely in Go (see lib/types/controlroom.go).
+        "manage_ecr_repositories",
     },
 }
 
@@ -173,10 +190,10 @@ def extract_python_dataclass_fields(python_file: Path, class_name: str, base_cla
 def main() -> int:
     """Main validation logic."""
     repo_root = Path(__file__).parent.parent
-    go_file = repo_root / "lib" / "types" / "workload.go"
+    default_go_file = repo_root / "lib" / "types" / "workload.go"
 
-    if not go_file.exists():
-        print(f"ERROR: Go file not found: {go_file}")
+    if not default_go_file.exists():
+        print(f"ERROR: Go file not found: {default_go_file}")
         return 1
 
     print("Validating Go ↔ Python config field sync...\n")
@@ -194,6 +211,16 @@ def main() -> int:
             print(f"ERROR: Python file not found: {python_file}")
             has_errors = True
             continue
+
+        # Some Go structs live outside lib/types/workload.go.
+        if go_struct in GO_FILE_OVERRIDES:
+            go_file = repo_root / GO_FILE_OVERRIDES[go_struct]
+            if not go_file.exists():
+                print(f"ERROR: Go file not found: {go_file}")
+                has_errors = True
+                continue
+        else:
+            go_file = default_go_file
 
         go_fields = extract_go_yaml_fields(go_file, go_struct)
         python_fields = extract_python_dataclass_fields(python_file, python_class, base_class_name, repo_root)

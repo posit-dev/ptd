@@ -45,7 +45,7 @@ Control rooms provide centralized management and monitoring for workloads.
 
 **Purpose**: Provision workspace infrastructure
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_control_room_workspaces.py`)
+**Implementation**: Inline Go Pulumi (`lib/steps/workspaces.go`, `lib/steps/workspaces_aws.go`, `lib/steps/vpc_aws.go`)
 
 Creates the infrastructure needed for administrative workspaces in the control room.
 
