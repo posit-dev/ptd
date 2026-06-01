@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 
@@ -34,10 +35,11 @@ const persistentAzureWorkloadProjectName = "ptd-azure-workload-persistent"
 // the Azure workload persistent step (single super().__init__).
 const persistentAzureWorkloadCompType = "ptd:AzureWorkloadPersistent"
 
-// persistentAzureBastionCompType is the nested AzureBastion ComponentResource
-// type token. Bastion children alias to
-// ptd:AzureWorkloadPersistent$ptd:AzureBastion$<type>::<name>.
-const persistentAzureBastionCompType = persistentAzureWorkloadCompType + "$ptd:AzureBastion"
+// persistentAzureBastionCompType is the AzureBastion ComponentResource type
+// token. In live state the AzureBastion component is TOP-LEVEL (not nested under
+// ptd:AzureWorkloadPersistent), so its children's old URNs are
+// ptd:AzureBastion$<type>::<name>.
+const persistentAzureBastionCompType = "ptd:AzureBastion"
 
 // persistentAzureManagedByValue is the posit.team/managed-by tag value Python set
 // on Azure workload persistent resources (the Python module __name__).
@@ -97,6 +99,34 @@ func (s *PersistentStep) runAzureInlineGo(ctx context.Context, creds types.Crede
 	cfg, ok := rawConfig.(types.AzureWorkloadConfig)
 	if !ok {
 		return fmt.Errorf("persistent: expected AzureWorkloadConfig, got %T", rawConfig)
+	}
+
+	// Apply Python AzureWorkloadConfig dataclass defaults for fields not set in
+	// ptd.yaml (Go zero-values would otherwise diff live resources / drop protect).
+	cfg.ProtectPersistentResources = true // Python default True; never set false in config
+	if cfg.BastionInstanceType == "" {
+		cfg.BastionInstanceType = "Standard_B1s"
+	}
+	if cfg.NetappBackupRetentionDays == 0 {
+		cfg.NetappBackupRetentionDays = 30
+	}
+	if cfg.NetappDailyBackupStartTime == "" {
+		cfg.NetappDailyBackupStartTime = "02:00"
+	}
+	if cfg.NetappSnapshotsToKeep == 0 {
+		cfg.NetappSnapshotsToKeep = 7
+	}
+	if cfg.NetappVolumeConnectCapacity == 0 {
+		cfg.NetappVolumeConnectCapacity = 200
+	}
+	if cfg.NetappVolumeWorkbenchCapacity == 0 {
+		cfg.NetappVolumeWorkbenchCapacity = 200
+	}
+	if cfg.NetappVolumeWorkbenchSharedCapacity == 0 {
+		cfg.NetappVolumeWorkbenchSharedCapacity = 50
+	}
+	if cfg.PpmFileShareSizeGib == 0 {
+		cfg.PpmFileShareSizeGib = 100
 	}
 
 	azTarget, ok := s.DstTarget.(azure.Target)
@@ -266,14 +296,6 @@ func azureWorkloadPersistentDeploy(ctx *pulumi.Context, _ types.Target, params a
 		return pulumi.Aliases([]pulumi.Alias{{ParentURN: pulumi.URN(componentURN)}})
 	}
 
-	// withVNetParentAlias: subnets created with parent=self.vnet have the VNet as
-	// their old URN parent. Only valid when the VNet is created by this step.
-	vnetParentURN := fmt.Sprintf("urn:pulumi:%s::%s::%s$azure-native:network:VirtualNetwork::%s",
-		ctx.Stack(), persistentAzureWorkloadProjectName, persistentAzureWorkloadCompType, params.vnetName)
-	withVNetParentAlias := func() pulumi.ResourceOption {
-		return pulumi.Aliases([]pulumi.Alias{{ParentURN: pulumi.URN(vnetParentURN)}})
-	}
-
 	// withPoolParentAlias: netapp volumes are created with parent=self.capacity_pool.
 	poolParentURN := fmt.Sprintf("urn:pulumi:%s::%s::%s$azure-native:netapp:CapacityPool::%s",
 		ctx.Stack(), persistentAzureWorkloadProjectName, persistentAzureWorkloadCompType, params.netappPoolName)
@@ -290,17 +312,9 @@ func azureWorkloadPersistentDeploy(ctx *pulumi.Context, _ types.Target, params a
 		return pulumi.Aliases([]pulumi.Alias{{ParentURN: pulumi.URN(bastionParentURN)}})
 	}
 
-	// subnetParentAlias selects vnet-parent vs component-parent depending on
-	// whether the VNet is created here (vnet_cidr set) or adopted
-	// (provisioned_vnet_name set). Python: parent=self.vnet if self.vnet else None.
-	subnetParentAlias := withAlias
-	if params.cfg.Network.VnetCidr != "" && params.cfg.Network.ProvisionedVnetName == "" {
-		subnetParentAlias = withVNetParentAlias
-	}
-
 	// ── VNet (create or adopt) + 6 subnets each with an NSG ────────────────────
 	vnetID, privateSubnet, appGatewaySubnet, bastionSubnet, publicIP, err := azureBuildVNet(
-		ctx, params, tags, protect, withAlias, subnetParentAlias,
+		ctx, params, tags, protect, withAlias,
 	)
 	if err != nil {
 		return fmt.Errorf("persistent: vnet: %w", err)
@@ -425,7 +439,10 @@ func protectOpt(protect bool) pulumi.ResourceOption {
 func azureTagMap(tags map[string]string) pulumi.StringMap {
 	out := pulumi.StringMap{}
 	for k, v := range tags {
-		out[k] = pulumi.String(v)
+		// Azure tag keys cannot contain '/'. Mirror Python azure_tag_key_format,
+		// which replaces '/' with ':' (e.g. posit.team/environment ->
+		// posit.team:environment). Without this every Azure resource's tags churn.
+		out[strings.ReplaceAll(k, "/", ":")] = pulumi.String(v)
 	}
 	return out
 }
@@ -455,12 +472,16 @@ func azureBuildVNet(
 	tags pulumi.StringMap,
 	protect bool,
 	withAlias func() pulumi.ResourceOption,
-	subnetParentAlias func() pulumi.ResourceOption,
 ) (pulumi.StringInput, *aznetwork.Subnet, *aznetwork.Subnet, *aznetwork.Subnet, *aznetwork.PublicIPAddress, error) {
 	cn := params.compoundName
 	net := params.cfg.Network
 
 	var vnetID pulumi.StringInput
+	// vnet is the created VirtualNetwork (nil when adopting an existing VNet). When
+	// set, subnets are parented to it so their URN is VirtualNetwork$Subnet,
+	// matching how Python created them (parent=self.vnet). When adopting, Python
+	// used parent=None, so subnets stay top-level.
+	var vnet *aznetwork.VirtualNetwork
 
 	// Branch: adopt existing VNet (provisioned_vnet_name) vs create new (vnet_cidr).
 	switch {
@@ -478,7 +499,7 @@ func azureBuildVNet(
 		}
 		vnetID = pulumi.String(existingID)
 	case net.VnetCidr != "":
-		vnet, err := aznetwork.NewVirtualNetwork(ctx, params.vnetName, &aznetwork.VirtualNetworkArgs{
+		v, err := aznetwork.NewVirtualNetwork(ctx, params.vnetName, &aznetwork.VirtualNetworkArgs{
 			VirtualNetworkName: pulumi.String(params.vnetName),
 			ResourceGroupName:  pulumi.String(params.vnetRsgName),
 			AddressSpace: &aznetwork.AddressSpaceArgs{
@@ -490,7 +511,18 @@ func azureBuildVNet(
 		if err != nil {
 			return nil, nil, nil, nil, nil, fmt.Errorf("create vnet: %w", err)
 		}
-		vnetID = vnet.ID()
+		vnet = v
+		vnetID = v.ID()
+	}
+
+	// subnetOpts: subnets are children of the created VNet (matches state URN
+	// VirtualNetwork$Subnet); when adopting an existing VNet they stay top-level.
+	subnetOpts := func() []pulumi.ResourceOption {
+		opts := []pulumi.ResourceOption{protectOpt(protect)}
+		if vnet != nil {
+			opts = append(opts, pulumi.Parent(vnet))
+		}
+		return opts
 	}
 
 	// Public subnet branch: PublicIP + NatGateway + public subnet.
@@ -527,7 +559,7 @@ func azureBuildVNet(
 			ResourceGroupName:  pulumi.String(params.vnetRsgName),
 			VirtualNetworkName: pulumi.String(params.vnetName),
 			AddressPrefix:      pulumi.String(net.PublicSubnetCidr),
-		}, protectOpt(protect), subnetParentAlias()); err != nil {
+		}, subnetOpts()...); err != nil {
 			return nil, nil, nil, nil, nil, fmt.Errorf("public subnet: %w", err)
 		}
 	}
@@ -565,7 +597,7 @@ func azureBuildVNet(
 		privateSubnetArgs.RouteTable = &aznetwork.RouteTableTypeArgs{Id: pulumi.String(net.PrivateSubnetRouteTableID)}
 	}
 	privateSubnet, err := aznetwork.NewSubnet(ctx, fmt.Sprintf("snet-ptd-%s-private", cn), privateSubnetArgs,
-		protectOpt(protect), subnetParentAlias())
+		subnetOpts()...)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("private subnet: %w", err)
 	}
@@ -605,7 +637,7 @@ func azureBuildVNet(
 			},
 		},
 		NetworkSecurityGroup: &aznetwork.NetworkSecurityGroupTypeArgs{Id: dbNSG.ID()},
-	}, protectOpt(protect), subnetParentAlias()); err != nil {
+	}, subnetOpts()...); err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("db subnet: %w", err)
 	}
 
@@ -650,7 +682,7 @@ func azureBuildVNet(
 			},
 		},
 		NetworkSecurityGroup: &aznetwork.NetworkSecurityGroupTypeArgs{Id: netappNSG.ID()},
-	}, protectOpt(protect), subnetParentAlias()); err != nil {
+	}, subnetOpts()...); err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("netapp subnet: %w", err)
 	}
 
@@ -684,7 +716,7 @@ func azureBuildVNet(
 		VirtualNetworkName:   pulumi.String(params.vnetName),
 		AddressPrefix:        pulumi.String(net.AppGatewaySubnetCidr),
 		NetworkSecurityGroup: &aznetwork.NetworkSecurityGroupTypeArgs{Id: appGatewayNSG.ID()},
-	}, protectOpt(protect), subnetParentAlias())
+	}, subnetOpts()...)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("app gateway subnet: %w", err)
 	}
@@ -705,7 +737,7 @@ func azureBuildVNet(
 		VirtualNetworkName:   pulumi.String(params.vnetName),
 		AddressPrefix:        pulumi.String(net.BastionSubnetCidr),
 		NetworkSecurityGroup: &aznetwork.NetworkSecurityGroupTypeArgs{Id: bastionNSG.ID()},
-	}, protectOpt(protect), subnetParentAlias())
+	}, subnetOpts()...)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("bastion subnet: %w", err)
 	}
