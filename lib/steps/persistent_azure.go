@@ -1218,7 +1218,14 @@ func azureBuildFilesStorageAccount(
 			},
 		},
 		Tags: tags,
-	}, protectOpt(protect), pulumi.DependsOn([]pulumi.Resource{storageAccount}), withAlias())
+	}, protectOpt(protect), pulumi.DependsOn([]pulumi.Resource{storageAccount}), withAlias(),
+		// subnet is ForceNew. The newer azure-native provider auto-populates
+		// subnet.privateEndpointNetworkPolicies / privateLinkServiceNetworkPolicies
+		// (absent from older state), which would otherwise force a destructive
+		// replace of the live private endpoint (and cascade to its DNS zone group).
+		// The subnet id is unchanged, so ignore the subnet field — the
+		// provider-upgrade ForceNew pattern.
+		pulumi.IgnoreChanges([]string{"subnet"}))
 	if err != nil {
 		return fmt.Errorf("files private endpoint: %w", err)
 	}
