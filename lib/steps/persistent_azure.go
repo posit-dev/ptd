@@ -1094,7 +1094,11 @@ func azureBuildPostgresServer(
 		},
 		Version: pulumi.String("14"),
 		Tags:    tags,
-	}, protectOpt(protect), withAlias())
+		// administratorLoginPassword is write-only (Azure never returns it). Go's
+		// RandomPassword is fresh on the first Go apply (Python's value lived in
+		// Python state), so sending it would rotate the live DB password. Ignore it
+		// to keep the existing password; greenfield still sets it on create.
+	}, protectOpt(protect), withAlias(), pulumi.IgnoreChanges([]string{"administratorLoginPassword"}))
 	if err != nil {
 		return nil, fmt.Errorf("postgres server: %w", err)
 	}
@@ -1118,7 +1122,11 @@ func azureBuildPostgresServer(
 		},
 		VaultName: pulumi.String(params.keyVaultName),
 		Tags:      tags,
-	}, protectOpt(protect), withAlias()); err != nil {
+		// The secret embeds the DB password (above). Since Go's RandomPassword
+		// differs from the live/Python value, ignore the stored value on adoption
+		// so we don't rotate the secret to a password the server doesn't have.
+		// Greenfield still writes the value on create.
+	}, protectOpt(protect), withAlias(), pulumi.IgnoreChanges([]string{"properties.value"})); err != nil {
 		return nil, fmt.Errorf("postgres admin secret: %w", err)
 	}
 
@@ -1365,7 +1373,11 @@ func azureBuildBastion(
 				Subnet: &aznetwork.SubnetTypeArgs{Id: jumpboxSubnet.ID()},
 			},
 		},
-	}, withBastionAlias())
+		// Same provider-upgrade subnet churn as the PrivateEndpoint: the newer
+		// azure-native provider populates subnet.{privateEndpoint,privateLinkService}
+		// NetworkPolicies in the NIC's inline subnet view. The subnet id is
+		// unchanged; ignore it so the bastion NIC doesn't churn on every apply.
+	}, withBastionAlias(), pulumi.IgnoreChanges([]string{"ipConfigurations[0].subnet"}))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("jumpbox nic: %w", err)
 	}
