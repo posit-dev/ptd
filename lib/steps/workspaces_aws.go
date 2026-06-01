@@ -15,9 +15,13 @@ import (
 	"github.com/pulumi/pulumi-random/sdk/v4/go/random"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 
+	"github.com/posit-dev/ptd/lib/aws"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/types"
 )
+
+// ref is a helper that returns a pointer to a string (for optional args).
+func ref(s string) *string { return &s }
 
 // workspacesProjectName is the Pulumi project name used by the Python
 // aws_control_room_workspaces step.  Aliases in this file reference this
@@ -152,53 +156,52 @@ func awsWorkspacesDeploy(pctx *pulumi.Context, target types.Target, params awsWo
 	}
 	vpcTags["Name"] = name
 
-	// Build the awsVpcState using the shared VPC builder.
-	// The outerCompType for the VPC's resources must include both component levels.
+	// Build the VPC using the shared aws.NewVPC builder.
+	// The OuterCompType for the VPC's resources must include both component levels.
 	// Pass use1Provider (the ProviderResource) so the VPC builder can use it for
 	// both resource creation and data-source invoke calls (e.g. LookupVpcEndpointService).
-	vpc, err := newAWSVpc(
-		pctx,
-		name,
-		workspacesVPCCIDR,
-		workspacesAZs,
-		vpcTags,
-		networkTags,
-		vpcCompType,
-		workspacesProjectName, // OLD Python project name for VPC alias URNs (literal, not ctx.Project())
-		use1Provider,
-	)
+	vpc, err := aws.NewVPC(pctx, aws.VPCConfig{
+		Name:          name,
+		CIDR:          workspacesVPCCIDR,
+		AZs:           workspacesAZs,
+		Tags:          vpcTags,
+		NetworkTags:   networkTags,
+		OuterCompType: vpcCompType,
+		ProjectName:   workspacesProjectName, // OLD Python project name for VPC alias URNs (literal, not ctx.Project())
+		Provider:      use1Provider,
+	})
 	if err != nil {
 		return fmt.Errorf("VPC: %w", err)
 	}
 	// aliasForVPCResource is used below for VPC-tier resources NOT created by
-	// newAWSVpc (e.g. the DHCP options set).
+	// aws.NewVPC (e.g. the DHCP options set).
 
-	if err := vpc.withSecureDefaultSecurityGroup(); err != nil {
+	if err := vpc.WithSecureDefaultSecurityGroup(); err != nil {
 		return fmt.Errorf("secure default SG: %w", err)
 	}
-	if err := vpc.withSecureDefaultNACL(); err != nil {
+	if err := vpc.WithSecureDefaultNACL(); err != nil {
 		return fmt.Errorf("secure default NACL: %w", err)
 	}
 
 	// Internal all-traffic ingress/egress rules
-	if err := vpc.withNACLRule("public", 0, -1, workspacesVPCCIDR, false); err != nil {
+	if err := vpc.WithNACLRule("public", 0, 0, -1, workspacesVPCCIDR, false); err != nil {
 		return err
 	}
-	if err := vpc.withNACLRule("public", 0, -1, workspacesVPCCIDR, true); err != nil {
+	if err := vpc.WithNACLRule("public", 0, 0, -1, workspacesVPCCIDR, true); err != nil {
 		return err
 	}
 	// SSH outbound
-	if err := vpc.withNACLRule("public", 22, 6, "0.0.0.0/0", true); err != nil {
+	if err := vpc.WithNACLRule("public", 22, 22, 6, "0.0.0.0/0", true); err != nil {
 		return err
 	}
 
 	// STS VPC endpoint
-	if err := vpc.withEndpoint("sts"); err != nil {
+	if err := vpc.WithEndpoint("sts"); err != nil {
 		return fmt.Errorf("STS endpoint: %w", err)
 	}
 
 	// HTTP outbound
-	if err := vpc.withNACLRule("public", 80, 6, "0.0.0.0/0", true); err != nil {
+	if err := vpc.WithNACLRule("public", 80, 80, 6, "0.0.0.0/0", true); err != nil {
 		return err
 	}
 
@@ -213,7 +216,7 @@ func awsWorkspacesDeploy(pctx *pulumi.Context, target types.Target, params awsWo
 		DomainNameServers: pulumi.StringArray{pulumi.String("AmazonProvidedDNS")},
 		Tags:              dhcpTags,
 	},
-		pulumi.Parent(vpc.vpc),
+		pulumi.Parent(vpc.Vpc()),
 		aliasForVPCResource("aws:ec2/vpcDhcpOptions:VpcDhcpOptions", dhcpName),
 		use1Opt,
 	); err != nil {
@@ -308,8 +311,8 @@ func awsWorkspacesDeploy(pctx *pulumi.Context, target types.Target, params awsWo
 	}
 
 	// Use the first two public subnets (workspaces only needs 2)
-	publicSubnet0 := vpc.publicSubnets[0]
-	publicSubnet1 := vpc.publicSubnets[1]
+	publicSubnet0 := vpc.PublicSubnets()[0]
+	publicSubnet1 := vpc.PublicSubnets()[1]
 
 	// Active Directory
 	adName := fmt.Sprintf("%s-ad", name)
@@ -325,7 +328,7 @@ func awsWorkspacesDeploy(pctx *pulumi.Context, target types.Target, params awsWo
 		ShortName: pulumi.String("corp"),
 		Size:      pulumi.String("Small"),
 		VpcSettings: &awsdirectoryservice.DirectoryVpcSettingsArgs{
-			VpcId: vpc.vpc.ID(),
+			VpcId: vpc.VpcID(),
 			SubnetIds: pulumi.StringArray{
 				publicSubnet0.ID(),
 				publicSubnet1.ID(),

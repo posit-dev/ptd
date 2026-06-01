@@ -53,7 +53,7 @@ Creates the infrastructure needed for administrative workspaces in the control r
 
 **Purpose**: Create persistent infrastructure resources
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_control_room_persistent.py`)
+**Implementation**: Inline Go Pulumi (`lib/steps/persistent.go`, `lib/steps/persistent_aws.go`, `lib/steps/persistent_azure.go`, `lib/steps/persistent_helpers.go`, `lib/aws/vpc.go`)
 
 Provisions long-lived infrastructure components that persist across deployments. Outputs from this step are used by subsequent steps and stored in secrets for workload access.
 
@@ -118,7 +118,7 @@ Workloads host the Posit Team products (Connect, Workbench, Package Manager) for
 
 **Purpose**: Create persistent infrastructure resources
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_workload_persistent.py`)
+**Implementation**: Inline Go Pulumi (`lib/steps/persistent.go`, `lib/steps/persistent_aws.go`, `lib/steps/persistent_azure.go`, `lib/steps/persistent_helpers.go`, `lib/aws/vpc.go`)
 
 Creates the foundational infrastructure for the workload:
 
