@@ -984,6 +984,18 @@ func azureBuildNetappVolumes(
 							UnixReadOnly:   pulumi.Bool(false),
 							UnixReadWrite:  pulumi.Bool(true),
 							HasRootAccess:  pulumi.Bool(true),
+							// Pin the export-policy default fields the newer azure-native
+							// provider (2025-08-01) populates — chownMode + kerberos5* — to
+							// their Azure defaults, so the rule is fully specified and does
+							// not churn on the provider upgrade. (These are settable and
+							// not ForceNew, so explicit values are preferable to IgnoreChanges.)
+							ChownMode:           pulumi.String("Restricted"),
+							Kerberos5ReadOnly:   pulumi.Bool(false),
+							Kerberos5ReadWrite:  pulumi.Bool(false),
+							Kerberos5iReadOnly:  pulumi.Bool(false),
+							Kerberos5iReadWrite: pulumi.Bool(false),
+							Kerberos5pReadOnly:  pulumi.Bool(false),
+							Kerberos5pReadWrite: pulumi.Bool(false),
 						},
 					},
 				},
