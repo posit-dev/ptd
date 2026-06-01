@@ -3,6 +3,7 @@ package steps
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -62,6 +63,12 @@ type awsWorkloadPersistentParams struct {
 	// When set, the RDS resource adopts it via an explicit Identifier instead of
 	// the write-only identifier_prefix (see applyRDSIdentifier).
 	existingDBIdentifier string
+
+	// resolvedPrivateSubnetIDs are the real subnet IDs (subnet-xxxx) of an
+	// adopted provisioned VPC, resolved from provisioned_vpc.private_subnets
+	// (which are Name tags, not IDs). Empty for greenfield. See
+	// aws.ResolveSubnetIDsByName / Python AWSWorkload.subnets("private").
+	resolvedPrivateSubnetIDs []string
 
 	vpcCIDR string // resolved VPC CIDR string
 
@@ -166,6 +173,19 @@ func (s *PersistentStep) runAWSInlineGo(ctx context.Context, creds types.Credent
 		environment = compoundName[idx+1:]
 	}
 
+	// Provisioned-VPC adoption: provisioned_vpc.private_subnets are Name tags, not
+	// IDs. Resolve them to real subnet IDs (mirrors Python AWSWorkload.subnets),
+	// so the adopted VPC, RDS subnet group, FSx, and route-table lookup all use
+	// the live subnet IDs instead of churning to subnet names.
+	var resolvedPrivateSubnetIDs []string
+	if cfg.ProvisionedVpc != nil && len(cfg.ProvisionedVpc.PrivateSubnets) > 0 {
+		resolvedPrivateSubnetIDs, err = aws.ResolveSubnetIDsByName(
+			ctx, awsCreds, s.DstTarget.Region(), cfg.ProvisionedVpc.VpcID, cfg.ProvisionedVpc.PrivateSubnets)
+		if err != nil {
+			return fmt.Errorf("persistent: resolve provisioned VPC subnets: %w", err)
+		}
+	}
+
 	// OIDC URL tails: live managed clusters + extra_cluster_oidc_urls.
 	oidcURLs, err := aws.ListManagedEKSClusterOIDCURLs(ctx, awsCreds, s.DstTarget.Region(), compoundName)
 	if err != nil {
@@ -216,6 +236,7 @@ func (s *PersistentStep) runAWSInlineGo(ctx context.Context, creds types.Credent
 		region:                              s.DstTarget.Region(),
 		environment:                         environment,
 		existingDBIdentifier:                existingPersistentDBIdentifier(ctx, s.DstTarget),
+		resolvedPrivateSubnetIDs:            resolvedPrivateSubnetIDs,
 		cfg:                                 cfg,
 		requiredTags:                        requiredTags,
 		oidcURLTails:                        oidcURLTails,
@@ -534,7 +555,7 @@ func buildPersistentVPC(ctx *pulumi.Context, params awsWorkloadPersistentParams)
 			OuterCompType:            persistentAWSVpcOuterCompType,
 			ProjectName:              persistentAWSWorkloadProjectName,
 			ExistingVPCID:            params.cfg.ProvisionedVpc.VpcID,
-			ExistingPrivateSubnetIDs: params.cfg.ProvisionedVpc.PrivateSubnets,
+			ExistingPrivateSubnetIDs: params.resolvedPrivateSubnetIDs,
 		})
 		if verr != nil {
 			return nil, nil, verr
@@ -1725,13 +1746,43 @@ func buildPersistentZonesAndCerts(
 		}
 
 		zoneLogical := fmt.Sprintf("%s-zone", domain)
+		primarySpec := params.cfg.Sites[primary.siteName].Spec
 		var zone *awsroute53.Zone
 		if primary.zoneID == "" {
-			z, zerr := awsroute53.NewZone(ctx, zoneLogical, &awsroute53.ZoneArgs{
+			// Private vs public zone (mirrors _define_hosted_zone). Private zones
+			// associate VPCs: the provisioned VPC (when auto_associate, default
+			// true) prepended to any explicit vpc_associations, deduped.
+			comment := "Publicly accessible"
+			var vpcs awsroute53.ZoneVpcArray
+			if primarySpec.PrivateZone {
+				comment = "Private"
+				autoAssociate := primarySpec.AutoAssociateProvisionedVpc == nil || *primarySpec.AutoAssociateProvisionedVpc
+				var vpcIDs []string
+				if autoAssociate && params.cfg.ProvisionedVpc != nil && params.cfg.ProvisionedVpc.VpcID != "" {
+					vpcIDs = append(vpcIDs, params.cfg.ProvisionedVpc.VpcID)
+				}
+				for _, v := range primarySpec.VpcAssociations {
+					if v == "" || slices.Contains(vpcIDs, v) {
+						continue
+					}
+					vpcIDs = append(vpcIDs, v)
+				}
+				for _, v := range vpcIDs {
+					vpcs = append(vpcs, awsroute53.ZoneVpcArgs{
+						VpcId:     pulumi.String(v),
+						VpcRegion: pulumi.String(params.region),
+					})
+				}
+			}
+			zoneArgs := &awsroute53.ZoneArgs{
 				Name:    pulumi.String(domain),
-				Comment: pulumi.String(fmt.Sprintf("Hosted Zone for the Posit Team Dedicated service in %s. Publicly accessible", cn)),
+				Comment: pulumi.String(fmt.Sprintf("Hosted Zone for the Posit Team Dedicated service in %s. %s", cn, comment)),
 				Tags:    awsTagMap(tags, nil),
-			},
+			}
+			if len(vpcs) > 0 {
+				zoneArgs.Vpcs = vpcs
+			}
+			z, zerr := awsroute53.NewZone(ctx, zoneLogical, zoneArgs,
 				withAlias(),
 				pulumi.Protect(protect),
 				pulumi.Aliases([]pulumi.Alias{{Name: pulumi.String(zoneAliasName)}}),
@@ -1793,24 +1844,28 @@ func buildPersistentZonesAndCerts(
 		recs := buildCertValidationRecords(ctx, params, cert, zone, zoneIDInput, primary.siteName, dashifyDomain)
 		validationRecords[domain] = recs
 
-		// certificate_validation_enabled defaults True (Go config gap). Create the
-		// CertificateValidation using the validation record FQDNs.
-		if _, verr := acm.NewCertificateValidation(ctx, fmt.Sprintf("%s-cert-validation-%s", cn, dashifyDomain), &acm.CertificateValidationArgs{
-			CertificateArn: cert.Arn,
-			ValidationRecordFqdns: recs.ApplyT(func(rs []interface{}) ([]string, error) {
-				var fqdns []string
-				for _, r := range rs {
-					if m, ok := r.(map[string]interface{}); ok {
-						if f, ok := m["fqdn"].(string); ok {
-							fqdns = append(fqdns, f)
+		// Only create the CertificateValidation when certificate_validation_enabled
+		// (Python default True). Validation records are always built (above) for
+		// the stack outputs; the CertificateValidation resource that *waits* on
+		// them is gated. example-style sites set this false.
+		if primarySpec.CertificateValidationEnabled == nil || *primarySpec.CertificateValidationEnabled {
+			if _, verr := acm.NewCertificateValidation(ctx, fmt.Sprintf("%s-cert-validation-%s", cn, dashifyDomain), &acm.CertificateValidationArgs{
+				CertificateArn: cert.Arn,
+				ValidationRecordFqdns: recs.ApplyT(func(rs []interface{}) ([]string, error) {
+					var fqdns []string
+					for _, r := range rs {
+						if m, ok := r.(map[string]interface{}); ok {
+							if f, ok := m["fqdn"].(string); ok {
+								fqdns = append(fqdns, f)
+							}
 						}
 					}
-				}
-				sort.Strings(fqdns)
-				return fqdns, nil
-			}).(pulumi.StringArrayOutput),
-		}, pulumi.Parent(cert)); verr != nil {
-			return nil, nil, nil, verr
+					sort.Strings(fqdns)
+					return fqdns, nil
+				}).(pulumi.StringArrayOutput),
+			}, pulumi.Parent(cert)); verr != nil {
+				return nil, nil, nil, verr
+			}
 		}
 	}
 

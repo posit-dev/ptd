@@ -470,6 +470,14 @@ type SiteConfigSpec struct {
 	Domain                string `json:"domain" yaml:"domain"`
 	DomainType            string `json:"domain_type" yaml:"domain_type"`
 	UseTraefikForwardAuth bool   `json:"use_traefik_forward_auth" yaml:"use_traefik_forward_auth"`
+	// Route53 hosted-zone controls (persistent step). Mirror AWSSiteConfig.
+	// PrivateZone defaults false; AutoAssociateProvisionedVpc and
+	// CertificateValidationEnabled default TRUE in Python, so they are pointers
+	// (nil => true).
+	PrivateZone                  bool     `json:"private_zone" yaml:"private_zone"`
+	VpcAssociations              []string `json:"vpc_associations" yaml:"vpc_associations"`
+	AutoAssociateProvisionedVpc  *bool    `json:"auto_associate_provisioned_vpc" yaml:"auto_associate_provisioned_vpc"`
+	CertificateValidationEnabled *bool    `json:"certificate_validation_enabled" yaml:"certificate_validation_enabled"`
 }
 
 var ValidOutboundTypes = map[string]bool{
