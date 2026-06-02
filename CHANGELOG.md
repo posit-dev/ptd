@@ -1,3 +1,10 @@
+# [1.30.0](https://github.com/posit-dev/ptd/compare/v1.29.0...v1.30.0) (2026-06-02)
+
+
+### Features
+
+* **karpenter:** add IAM permissions required for Karpenter 1.7–1.12 ([01258c0](https://github.com/posit-dev/ptd/commit/01258c09384938bd13c45176c17c32aa031e36c7))
+
 # [1.29.0](https://github.com/posit-dev/ptd/compare/v1.28.3...v1.29.0) (2026-05-30)
 
 
