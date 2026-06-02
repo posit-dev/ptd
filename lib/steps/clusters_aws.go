@@ -1982,6 +1982,8 @@ func buildKarpenterControllerPolicy(clusterName, accountID, region, queueName st
 					fmt.Sprintf("arn:aws:ec2:%s:*:security-group/*", region),
 					fmt.Sprintf("arn:aws:ec2:%s:*:subnet/*", region),
 					fmt.Sprintf("arn:aws:ec2:%s:*:capacity-reservation/*", region),
+					// placement-group/* added in upstream Karpenter v1.11 for placement group support
+					fmt.Sprintf("arn:aws:ec2:%s:*:placement-group/*", region),
 				},
 				"Action": []string{"ec2:RunInstances", "ec2:CreateFleet"},
 			},
@@ -2093,6 +2095,8 @@ func buildKarpenterControllerPolicy(clusterName, accountID, region, queueName st
 					"ec2:DescribeInstanceTypeOfferings",
 					"ec2:DescribeInstanceTypes",
 					"ec2:DescribeLaunchTemplates",
+					// ec2:DescribePlacementGroups added in upstream Karpenter v1.11 for placement group support
+					"ec2:DescribePlacementGroups",
 					"ec2:DescribeSecurityGroups",
 					"ec2:DescribeSpotPriceHistory",
 					"ec2:DescribeSubnets",
@@ -2195,6 +2199,27 @@ func buildKarpenterControllerPolicy(clusterName, accountID, region, queueName st
 				"Action":   []string{"iam:GetInstanceProfile"},
 			},
 			{
+				// Required since upstream Karpenter v1.7 — Karpenter discovers
+				// existing instance profiles by path/tag to avoid duplicate
+				// creation and to garbage-collect orphans. iam:ListInstanceProfiles
+				// cannot be resource-scoped (it lists across the account); scope
+				// is provided by the boundary policy PositTeamDedicatedAdmin.
+				"Sid":      "AllowUnscopedInstanceProfileListAction",
+				"Effect":   "Allow",
+				"Resource": []string{"*"},
+				"Action":   []string{"iam:ListInstanceProfiles"},
+			},
+			{
+				// Required since upstream Karpenter v1.12 — used for EC2 instance
+				// status health checks. Upstream uses a separate Sid (rather than
+				// folding into AllowRegionalReadActions) because they do not put
+				// a RequestedRegion condition on this action.
+				"Sid":      "AllowUnscopedEC2DescribeInstanceStatus",
+				"Effect":   "Allow",
+				"Resource": []string{"*"},
+				"Action":   []string{"ec2:DescribeInstanceStatus"},
+			},
+			{
 				"Sid":    "AllowAPIServerEndpointDiscovery",
 				"Effect": "Allow",
 				"Resource": []string{
@@ -2202,6 +2227,15 @@ func buildKarpenterControllerPolicy(clusterName, accountID, region, queueName st
 				},
 				"Action": []string{"eks:DescribeCluster"},
 			},
+			// NOTE: upstream v1.12 also defines AllowZonalShiftStatusReadOnly
+			// granting arc-zonal-shift:GetManagedResource. We do NOT include it
+			// here because:
+			//   (1) it is only needed if AWS ARC Zonal Shift is opted into for
+			//       the cluster (off by default in PTD), and
+			//   (2) arc-zonal-shift:* is not in the PositTeamDedicatedAdmin
+			//       boundary policy (see lib/aws/iam.go), so the boundary would
+			//       deny it regardless. If we adopt Zonal Shift, both this
+			//       policy and PositTeamDedicatedAdmin need updating.
 		},
 	}
 	b, _ := json.Marshal(doc)
