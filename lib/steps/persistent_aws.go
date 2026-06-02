@@ -302,15 +302,6 @@ func awsWorkloadPersistentDeploy(ctx *pulumi.Context, _ types.Target, params aws
 		return pulumi.Aliases([]pulumi.Alias{{ParentURN: pulumi.URN(vpcComponentURN)}})
 	}
 
-	// withRoleChildAlias: alias for resources parented to an IAM role that was
-	// itself a direct child of the persistent component (URN type chain
-	// ptd:AWSWorkloadPersistent$aws:iam/role:Role::<roleName>).
-	withRoleChildAlias := func(roleName string) pulumi.ResourceOption {
-		roleURN := fmt.Sprintf("urn:pulumi:%s::%s::%s$aws:iam/role:Role::%s",
-			ctx.Stack(), persistentAWSWorkloadProjectName, persistentAWSWorkloadCompType, roleName)
-		return pulumi.Aliases([]pulumi.Alias{{ParentURN: pulumi.URN(roleURN)}})
-	}
-
 	// withBucketChildAlias: alias for a policy parented to an S3 bucket that was a
 	// direct child of the persistent component (URN type chain
 	// ptd:AWSWorkloadPersistent$aws:s3/bucket:Bucket::<bucketLogicalName>).
@@ -399,11 +390,13 @@ func awsWorkloadPersistentDeploy(ctx *pulumi.Context, _ types.Target, params aws
 	if err != nil {
 		return fmt.Errorf("persistent: eks fsx nfs sg: %w", err)
 	}
+	// The per-workload FSx SG (fsx_openzfs_sg) is created for adoption/state parity;
+	// its ID isn't needed downstream (the EKS FSX NFS SG gates the fsx endpoint).
 	_ = fsxNfsSG
 
 	// fsx endpoint (gated on enabled && "fsx" not excluded) using the EKS FSX NFS SG.
 	vpcEndpointsEnabled, excluded := persistentVPCEndpointConfig(params)
-	if vpcEndpointsEnabled && !contains(excluded, "fsx") {
+	if vpcEndpointsEnabled && !slices.Contains(excluded, "fsx") {
 		if err := vpc.WithEndpoint("fsx", eksFsxNfsSG.ID()); err != nil {
 			return fmt.Errorf("persistent: fsx endpoint: %w", err)
 		}
@@ -415,40 +408,40 @@ func awsWorkloadPersistentDeploy(ctx *pulumi.Context, _ types.Target, params aws
 	}
 
 	// ── LBC IAM ────────────────────────────────────────────────────────────────
-	if err := buildPersistentLBCIAM(ctx, params, withAlias, withRoleChildAlias); err != nil {
+	if err := buildPersistentLBCIAM(ctx, params, withAlias); err != nil {
 		return fmt.Errorf("persistent: LBC IAM: %w", err)
 	}
 
 	// ── ExternalDNS IAM (only if external_dns_enabled, *bool default true) ──────
 	if boolPtrOrDefault(params.cfg.ExternalDNSEnabled, true) {
-		if err := buildPersistentExternalDNSIAM(ctx, params, internalSites, withAlias, withRoleChildAlias); err != nil {
+		if err := buildPersistentExternalDNSIAM(ctx, params, internalSites, withAlias); err != nil {
 			return fmt.Errorf("persistent: ExternalDNS IAM: %w", err)
 		}
 	}
 
 	// ── Traefik forward-auth IAM ───────────────────────────────────────────────
-	if err := buildPersistentTraefikForwardAuthIAM(ctx, params, withAlias, withRoleChildAlias); err != nil {
+	if err := buildPersistentTraefikForwardAuthIAM(ctx, params, withAlias); err != nil {
 		return fmt.Errorf("persistent: traefik-forward-auth IAM: %w", err)
 	}
 
 	// ── Mimir (password + bucket + policy + role) ──────────────────────────────
-	mimirPassword, mimirBucket, err := buildPersistentMimir(ctx, params, protect, withAlias, withRoleChildAlias)
+	mimirPassword, mimirBucket, err := buildPersistentMimir(ctx, params, protect, withAlias)
 	if err != nil {
 		return fmt.Errorf("persistent: mimir: %w", err)
 	}
 
 	// ── Loki (bucket + policy + role) ──────────────────────────────────────────
-	if err := buildPersistentLoki(ctx, params, protect, withAlias, withBucketChildAlias, withRoleChildAlias); err != nil {
+	if err := buildPersistentLoki(ctx, params, protect, withAlias, withBucketChildAlias); err != nil {
 		return fmt.Errorf("persistent: loki: %w", err)
 	}
 
 	// ── EBS-CSI IAM ────────────────────────────────────────────────────────────
-	if err := buildPersistentEBSCsiIAM(ctx, params, withAlias, withRoleChildAlias); err != nil {
+	if err := buildPersistentEBSCsiIAM(ctx, params, withAlias); err != nil {
 		return fmt.Errorf("persistent: EBS-CSI IAM: %w", err)
 	}
 
 	// ── Alloy IAM ──────────────────────────────────────────────────────────────
-	if err := buildPersistentAlloyIAM(ctx, params, withAlias, withRoleChildAlias); err != nil {
+	if err := buildPersistentAlloyIAM(ctx, params, withAlias); err != nil {
 		return fmt.Errorf("persistent: alloy IAM: %w", err)
 	}
 
@@ -1098,18 +1091,12 @@ func buildPersistentFSx(
 		return persistentFSxResult{}, nil, err
 	}
 
+	// FSx defaulting (capacity 100 / throughput 320 / backup "02:00") is owned by
+	// runAWSInlineGo, which applies the Python dataclass defaults to cfg before
+	// these params are built; read the resolved values directly here.
 	storageCap := params.cfg.FsxOpenzfsStorageCapacity
-	if storageCap == 0 {
-		storageCap = 100
-	}
 	throughput := params.cfg.FsxOpenzfsThroughputCapacity
-	if throughput == 0 {
-		throughput = 320
-	}
 	backupTime := params.cfg.FsxOpenzfsDailyAutomaticBackupStartTime
-	if backupTime == "" {
-		backupTime = "02:00"
-	}
 
 	mkRootVolCfg := func(opts ...string) *awsfsx.OpenZfsFileSystemRootVolumeConfigurationArgs {
 		strOpts := make(pulumi.StringArray, len(opts))
@@ -1315,7 +1302,6 @@ func buildPersistentLBCIAM(
 	ctx *pulumi.Context,
 	params awsWorkloadPersistentParams,
 	withAlias func() pulumi.ResourceOption,
-	withRoleChildAlias func(string) pulumi.ResourceOption,
 ) error {
 	trust := persistentIRSATrustPolicy("kube-system",
 		[]string{"aws-load-balancer-controller.posit.team"},
@@ -1359,7 +1345,6 @@ func buildPersistentExternalDNSIAM(
 	params awsWorkloadPersistentParams,
 	internalSites []persistentInternalSite,
 	withAlias func() pulumi.ResourceOption,
-	withRoleChildAlias func(string) pulumi.ResourceOption,
 ) error {
 	trust := persistentIRSATrustPolicy("kube-system",
 		[]string{"external-dns.posit.team"},
@@ -1438,7 +1423,6 @@ func buildPersistentTraefikForwardAuthIAM(
 	ctx *pulumi.Context,
 	params awsWorkloadPersistentParams,
 	withAlias func() pulumi.ResourceOption,
-	withRoleChildAlias func(string) pulumi.ResourceOption,
 ) error {
 	trust := persistentIRSATrustPolicy("kube-system",
 		[]string{"traefik-forward-auth.posit.team"},
@@ -1478,7 +1462,6 @@ func buildPersistentMimir(
 	params awsWorkloadPersistentParams,
 	protect bool,
 	withAlias func() pulumi.ResourceOption,
-	withRoleChildAlias func(string) pulumi.ResourceOption,
 ) (*random.RandomPassword, *awss3.Bucket, error) {
 	cn := params.compoundName
 
@@ -1538,7 +1521,6 @@ func buildPersistentLoki(
 	protect bool,
 	withAlias func() pulumi.ResourceOption,
 	withBucketChildAlias func(string) pulumi.ResourceOption,
-	withRoleChildAlias func(string) pulumi.ResourceOption,
 ) error {
 	cn := params.compoundName
 
@@ -1584,7 +1566,6 @@ func buildPersistentEBSCsiIAM(
 	ctx *pulumi.Context,
 	params awsWorkloadPersistentParams,
 	withAlias func() pulumi.ResourceOption,
-	withRoleChildAlias func(string) pulumi.ResourceOption,
 ) error {
 	trust := persistentIRSATrustPolicy("kube-system",
 		[]string{"aws-ebs-csi-driver.posit.team"},
@@ -1613,7 +1594,6 @@ func buildPersistentAlloyIAM(
 	ctx *pulumi.Context,
 	params awsWorkloadPersistentParams,
 	withAlias func() pulumi.ResourceOption,
-	withRoleChildAlias func(string) pulumi.ResourceOption,
 ) error {
 	trust := persistentIRSATrustPolicy("alloy",
 		[]string{"alloy.posit.team"},

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	awsprovider "github.com/pulumi/pulumi-aws/sdk/v6/go/aws"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -221,7 +220,3 @@ func jsonMarshal(v interface{}) (string, error) {
 	}
 	return string(b), nil
 }
-
-// ensureAWSProvider is a no-op placeholder retained for symmetry with future
-// control-room/azure helpers; the workload deploy uses the stack-default provider.
-var _ = awsprovider.Provider{}

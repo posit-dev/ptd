@@ -155,7 +155,7 @@ func (s *PersistentStep) runAzureInlineGo(ctx context.Context, creds types.Crede
 
 	// required_tags = resource_tags | {true-name, environment} then + managed-by.
 	trueName, environment := compoundName, ""
-	if idx := lastDash(compoundName); idx >= 0 {
+	if idx := strings.LastIndex(compoundName, "-"); idx >= 0 {
 		trueName = compoundName[:idx]
 		environment = compoundName[idx+1:]
 	}
@@ -207,16 +207,6 @@ func (s *PersistentStep) runAzureInlineGo(ctx context.Context, creds types.Crede
 		return err
 	}
 	return s.runPersistentStack(ctx, stack, creds)
-}
-
-// lastDash returns the index of the last '-' in s, or -1.
-func lastDash(s string) int {
-	for i := len(s) - 1; i >= 0; i-- {
-		if s[i] == '-' {
-			return i
-		}
-	}
-	return -1
 }
 
 // azureACRRegistryName replicates AzureWorkload.acr_registry:
@@ -442,6 +432,8 @@ func azureTagMap(tags map[string]string) pulumi.StringMap {
 		// Azure tag keys cannot contain '/'. Mirror Python azure_tag_key_format,
 		// which replaces '/' with ':' (e.g. posit.team/environment ->
 		// posit.team:environment). Without this every Azure resource's tags churn.
+		// See CLAUDE.md "Resource Naming Conventions / Azure tags"
+		// (azure_tag_key_format) for the canonical key-format rule.
 		out[strings.ReplaceAll(k, "/", ":")] = pulumi.String(v)
 	}
 	return out
