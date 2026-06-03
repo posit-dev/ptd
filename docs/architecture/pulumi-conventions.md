@@ -77,7 +77,7 @@ def team_operator_role_name(self) -> str:
 **Pattern:** `f"{compound_name}-{purpose}"`
 
 ```python
-# Example from aws_workload_persistent.py
+# S3 bucket naming pattern (implemented in the Go persistent step)
 loki_bucket = aws.s3.Bucket(
     f"{self.workload.compound_name}-loki",
     bucket=f"{self.workload.compound_name}-loki",
@@ -88,7 +88,7 @@ loki_bucket = aws.s3.Bucket(
 ```
 
 **Usage locations:**
-- `python-pulumi/src/ptd/pulumi_resources/aws_workload_persistent.py`
+- `lib/steps/persistent_aws.go` (Go implementation of the persistent step)
 - Loki logs, Mimir metrics, general storage buckets
 
 ---
@@ -247,16 +247,16 @@ PTD uses a convention where Python Pulumi modules are dynamically loaded by Go-g
 
 1. Go generates `__main__.py` (see `lib/pulumi/python.go:127-131`):
    ```python
-   import ptd.pulumi_resources.aws_workload_persistent
+   import ptd.pulumi_resources.aws_workload_eks
 
-   ptd.pulumi_resources.aws_workload_persistent.AWSWorkloadPersistent.autoload()
+   ptd.pulumi_resources.aws_workload_eks.AWSWorkloadEKS.autoload()
    ```
 
 2. Python module provides an `autoload()` classmethod:
    ```python
-   class AWSWorkloadPersistent(pulumi.ComponentResource):
+   class AWSWorkloadEKS(pulumi.ComponentResource):
        @classmethod
-       def autoload(cls) -> "AWSWorkloadPersistent":
+       def autoload(cls) -> "AWSWorkloadEKS":
            # Reads stack name from Pulumi context
            stack_name = pulumi.get_stack()
            # Creates workload object from YAML
@@ -276,8 +276,8 @@ PTD uses a convention where Python Pulumi modules are dynamically loaded by Go-g
 
 | Element | Format | Example |
 |---------|--------|---------|
-| **Module name** | `{cloud}_{target_type}_{step_name}` | `aws_workload_persistent` |
-| **Class name** | `{Cloud}{TargetType}{StepName}` | `AWSWorkloadPersistent` |
+| **Module name** | `{cloud}_{target_type}_{step_name}` | `aws_workload_eks` |
+| **Class name** | `{Cloud}{TargetType}{StepName}` | `AWSWorkloadEKS` |
 
 **Special cases** (see `lib/pulumi/python.go:88-94`):
 - `"aws"` → `"AWS"` (not `"Aws"`)

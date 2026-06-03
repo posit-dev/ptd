@@ -47,9 +47,9 @@ PYTHON_ONLY_ALLOWLIST = {
         "db_multi_az",  # Computed property based on environment
         "hosted_zone_id",  # Computed property from sites[MAIN].zone_id
         "autoscaling_enabled",  # Python-specific field
-        "existing_flow_log_target_arns",  # Python-specific field
+        "existing_flow_log_target_arns",  # Present in both Go and Python; kept here as a no-op safety net
         "nvidia_gpu_enabled",  # Python-specific field
-        "vpc_endpoints",  # Python-specific field
+        "vpc_endpoints",  # Present in both Go and Python; kept here as a no-op safety net
         # Base class fields set by _load_common_config() in workload.py
         "environment",  # Set from workload metadata, not from YAML spec
         "network_trust",  # Set from workload metadata, not from YAML spec
@@ -74,9 +74,7 @@ PYTHON_ONLY_ALLOWLIST = {
         "control_room_state_bucket",  # Optional, set from workload metadata
     },
     "NetworkConfig": {
-        "bastion_subnet_cidr",  # Python-specific
         "dns_forward_domains",  # Python-specific
-        "provisioned_vnet_name",  # Python field name (provisioned_vnet_id in Go)
     },
     "AWSControlRoomConfig": {
         "ebs_csi_addon_version",  # Python-only EKS addon version, not in Go YAML schema

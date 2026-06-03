@@ -277,8 +277,8 @@ Go generates `__main__.py` dynamically (see `lib/pulumi/python.go:WriteMainPy`):
 import ptd.pulumi_resources.<module>
 ptd.pulumi_resources.<module>.<Class>.autoload()
 ```
-- Module: `{cloud}_{target_type}_{step_name}` (e.g., `aws_workload_persistent`)
-- Class: `{Cloud}{TargetType}{StepName}` (e.g., `AWSWorkloadPersistent`)
+- Module: `{cloud}_{target_type}_{step_name}` (e.g., `aws_workload_eks`)
+- Class: `{Cloud}{TargetType}{StepName}` (e.g., `AWSWorkloadEKS`)
 - `__main__.py` is NOT in source control — it's generated at runtime
 
 ### AWS vs Azure Infrastructure Patterns
@@ -300,7 +300,7 @@ ptd.pulumi_resources.<module>.<Class>.autoload()
 
 ### Step Execution
 Steps run sequentially via `ptd ensure`:
-1. `bootstrap` (Go) → 2. `persistent` (Python) → 3. `postgres_config` (Python) → 4. `eks`/`aks` → 5. `clusters` → 6. `helm` → 7. `sites` → 8. `persistent_reprise` (Go)
+1. `bootstrap` (Go) → 2. `persistent` (Go) → 3. `postgres_config` (Go) → 4. `eks`/`aks` → 5. `clusters` → 6. `helm` → 7. `sites` → 8. `persistent_reprise` (Go)
 
 Each step produces outputs consumed by later steps. See `docs/architecture/step-dependencies.md`.
 
@@ -331,10 +331,8 @@ These files are large and require careful context management:
 
 **AWS (Python):**
 - `pulumi_resources/aws_eks_cluster.py` (~2580 lines) — EKS cluster provisioning with builder pattern
-- `pulumi_resources/aws_workload_persistent.py` (~1454 lines) — VPC, RDS, S3, IAM
 - `__init__.py` (~1275 lines) — Base types, constants, utility functions
 - `aws_workload.py` (~815 lines) — AWS workload config and naming conventions
 
 **Azure (Python):**
-- `pulumi_resources/azure_workload_persistent.py` (~817 lines) — VNet, Postgres, Storage, ACR
 - `azure_workload.py` (~398 lines) — Azure workload config and naming with strict char limits

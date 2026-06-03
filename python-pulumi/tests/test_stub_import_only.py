@@ -13,11 +13,9 @@ import ptd.paths
 import ptd.pulumi_resources
 import ptd.pulumi_resources.aws_bastion
 import ptd.pulumi_resources.aws_control_room_cluster
-import ptd.pulumi_resources.aws_control_room_persistent
 import ptd.pulumi_resources.aws_eks_cluster
 import ptd.pulumi_resources.aws_fsx_openzfs_multi
 import ptd.pulumi_resources.aws_vpc
-import ptd.pulumi_resources.aws_workload_persistent
 import ptd.pulumi_resources.traefik
 import ptd.secrecy
 import ptd.shext
@@ -39,11 +37,9 @@ def test_import_only() -> None:
     assert ptd.pulumi_resources is not None
     assert ptd.pulumi_resources.aws_bastion is not None
     assert ptd.pulumi_resources.aws_control_room_cluster is not None
-    assert ptd.pulumi_resources.aws_control_room_persistent is not None
     assert ptd.pulumi_resources.aws_eks_cluster is not None
     assert ptd.pulumi_resources.aws_fsx_openzfs_multi is not None
     assert ptd.pulumi_resources.aws_vpc is not None
-    assert ptd.pulumi_resources.aws_workload_persistent is not None
     assert ptd.pulumi_resources.traefik is not None
     assert ptd.secrecy is not None
     assert ptd.shext is not None

@@ -87,14 +87,14 @@ When executing Python-based steps (persistent, postgres_config, helm, etc.), Go:
 2. Generates `__main__.py` dynamically (lines 77-101):
    ```python
    # Generated __main__.py example
-   import ptd.pulumi_resources.aws_workload_persistent
+   import ptd.pulumi_resources.aws_workload_eks
 
-   ptd.pulumi_resources.aws_workload_persistent.AWSWorkloadPersistent.autoload()
+   ptd.pulumi_resources.aws_workload_eks.AWSWorkloadEKS.autoload()
    ```
 
 3. Module naming convention:
-   - Module: `{cloud}_{target_type}_{step_name}` (e.g., `aws_workload_persistent`)
-   - Class: `{Cloud}{TargetType}{StepName}` (e.g., `AWSWorkloadPersistent`)
+   - Module: `{cloud}_{target_type}_{step_name}` (e.g., `aws_workload_eks`)
+   - Class: `{Cloud}{TargetType}{StepName}` (e.g., `AWSWorkloadEKS`)
 
 ### Step 3: Python re-reads YAML configuration {#python-rereads-yaml}
 

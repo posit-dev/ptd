@@ -3,8 +3,11 @@ package steps
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+
+	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 
 	"github.com/posit-dev/ptd/lib/pulumi"
 	"github.com/posit-dev/ptd/lib/secrets"
@@ -34,10 +37,8 @@ func (s *PersistentStep) Set(t types.Target, controlRoomTarget types.Target, opt
 func (s *PersistentStep) Run(ctx context.Context) error {
 	// this step is a little special because the workload persistent step
 	// has a secret output which also needs to be stored in the control room.
-
-	targetType := "workload"
-	if s.DstTarget.ControlRoom() {
-		targetType = "control-room"
+	if s.DstTarget == nil {
+		return errors.New("persistent step requires a destination target")
 	}
 
 	// get the credentials for the target
@@ -56,24 +57,36 @@ func (s *PersistentStep) Run(ctx context.Context) error {
 		"backend_url", s.DstTarget.PulumiBackendUrl(),
 		"env_var_count", len(envVars))
 
-	stack, err := pulumi.NewPythonPulumiStack(
-		ctx,
-		string(s.DstTarget.CloudProvider()), // ptd-<cloud>-<control-room/workload>-<stackname>
-		targetType,
-		"persistent",
-		s.DstTarget.Name(),
-		s.DstTarget.Region(),
-		s.DstTarget.PulumiBackendUrl(),
-		s.DstTarget.PulumiSecretsProviderKey(),
-		envVars,
-		true,
-	)
-	if err != nil {
-		return err
+	// Dispatch to the inline-Go deploy for the target's cloud / type. Each
+	// build*Stack method pre-fetches external data, constructs the inline Pulumi
+	// stack, and then drives it via runPersistentStack (below), which preserves
+	// the bespoke post-apply side effects this step needs (mimir password sync +
+	// EnsureWorkloadSecret) — the shared runPulumi helper discards stack outputs.
+	switch s.DstTarget.CloudProvider() {
+	case types.AWS:
+		if s.DstTarget.ControlRoom() {
+			return s.runAWSControlRoomInlineGo(ctx, creds, envVars)
+		}
+		return s.runAWSInlineGo(ctx, creds, envVars)
+	case types.Azure:
+		if s.DstTarget.ControlRoom() {
+			return fmt.Errorf("persistent: azure control room is not supported")
+		}
+		return s.runAzureInlineGo(ctx, creds, envVars)
+	default:
+		return fmt.Errorf("unsupported cloud provider for persistent: %s", s.DstTarget.CloudProvider())
 	}
+}
 
+// runPersistentStack drives an already-constructed persistent stack through the
+// refresh/cancel/destroy/up lifecycle and performs the persistent step's two
+// post-apply side effects for AWS workloads: syncing the mimir password into the
+// control room and ensuring the workload secret. It deliberately does NOT use
+// the shared runPulumi helper because that discards the up result's outputs,
+// which these side effects require.
+func (s *PersistentStep) runPersistentStack(ctx context.Context, stack auto.Stack, creds types.Credentials) error {
 	// output pulumi whoami details every time
-	err = pulumi.Whoami(ctx, stack)
+	err := pulumi.Whoami(ctx, stack)
 	if err != nil {
 		return err
 	}

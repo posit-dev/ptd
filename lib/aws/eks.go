@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
@@ -64,6 +65,55 @@ func GetClusterInfo(ctx context.Context, c *Credentials, region string, clusterN
 	}
 
 	return endpoint, caCert, oidcIssuerURL, nil
+}
+
+// ListManagedEKSClusterOIDCURLs lists EKS clusters in the account whose name
+// contains compoundName and returns their OIDC issuer URLs.
+//
+// It mirrors the OIDC-discovery half of Python's AWSWorkload.managed_clusters +
+// get_oidc_url (python-pulumi/src/ptd/__init__.py aws_eks_clusters): Python lists
+// eks:cluster resources carrying the posit.team/managed-by tag, filters by
+// compound_name substring, and reads each cluster's identity.oidc.issuer. PTD
+// clusters are always named with the compound name (default_<compound>-<release>-
+// control-plane), so the substring filter on ListClusters captures the same set
+// without requiring the resource-groups-tagging API. Used by the persistent step
+// to build IRSA trust policies; returns an empty slice on a greenfield account
+// (no clusters yet), matching Python.
+func ListManagedEKSClusterOIDCURLs(ctx context.Context, c *Credentials, region, compoundName string) ([]string, error) {
+	client := eks.New(eks.Options{
+		Region:      region,
+		Credentials: c.credentialsProvider,
+	})
+
+	var oidcURLs []string
+	var nextToken *string
+	for {
+		out, err := client.ListClusters(ctx, &eks.ListClustersInput{NextToken: nextToken})
+		if err != nil {
+			return nil, fmt.Errorf("list EKS clusters: %w", err)
+		}
+		for _, name := range out.Clusters {
+			if !strings.Contains(name, compoundName) {
+				continue
+			}
+			desc, err := client.DescribeCluster(ctx, &eks.DescribeClusterInput{Name: aws.String(name)})
+			if err != nil {
+				// Match Python: log-and-continue on describe failure.
+				continue
+			}
+			if desc.Cluster != nil && desc.Cluster.Identity != nil &&
+				desc.Cluster.Identity.Oidc != nil && desc.Cluster.Identity.Oidc.Issuer != nil {
+				if issuer := *desc.Cluster.Identity.Oidc.Issuer; issuer != "" {
+					oidcURLs = append(oidcURLs, issuer)
+				}
+			}
+		}
+		if out.NextToken == nil {
+			break
+		}
+		nextToken = out.NextToken
+	}
+	return oidcURLs, nil
 }
 
 // GetEKSToken generates an EKS-compatible token using STS presigned URLs

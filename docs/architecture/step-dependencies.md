@@ -33,12 +33,13 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 
 ---
 
-### Step 2: persistent (Python) {#persistent-workload}
+### Step 2: persistent (Go) {#persistent-workload}
 **Implementation:**
-- AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_persistent.py`
-- Azure: `python-pulumi/src/ptd/pulumi_resources/azure_workload_persistent.py`
+- Dispatch: `lib/steps/persistent.go`
+- AWS: `lib/steps/persistent_aws.go`, `lib/steps/persistent_helpers.go`, `lib/aws/vpc.go`
+- Azure: `lib/steps/persistent_azure.go`
 
-**Language:** Python/Pulumi
+**Language:** Inline Go Pulumi
 **Proxy Required:** No
 
 **Creates:**
@@ -232,8 +233,8 @@ workspaces → persistent → postgres_config → cluster
 
 ---
 
-### Step 2: persistent (Python) {#persistent-control-room}
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_control_room_persistent.py`
+### Step 2: persistent (Go) {#persistent-control-room}
+**Implementation:** `lib/steps/persistent.go`, `lib/steps/persistent_aws.go`, `lib/steps/persistent_helpers.go`, `lib/aws/vpc.go`
 **Proxy Required:** No
 
 Same as workload persistent: VPC, RDS, S3, IAM roles, etc.

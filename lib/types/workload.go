@@ -223,40 +223,82 @@ type AWSWorkloadConfig struct {
 	KeycloakEnabled              bool                                `json:"keycloak_enabled" yaml:"keycloak_enabled"`
 	// ExternalDNSEnabled controls whether ExternalDNS is deployed. Nil means the field was not set, which defaults
 	// to true to match the Python workload default of external_dns_enabled = True.
-	ExternalDNSEnabled                      *bool              `json:"external_dns_enabled" yaml:"external_dns_enabled"`
-	ExternalID                              *uuid.UUID         `json:"external_id" yaml:"external_id"`
-	ExtraClusterOidcUrls                    []string           `json:"extra_cluster_oidc_urls" yaml:"extra_cluster_oidc_urls"`
-	ExtraPostgresDbs                        []string           `json:"extra_postgres_dbs" yaml:"extra_postgres_dbs"`
-	FsxOpenzfsDailyAutomaticBackupStartTime string             `json:"fsx_openzfs_daily_automatic_backup_start_time" yaml:"fsx_openzfs_daily_automatic_backup_start_time"`
-	FsxOpenzfsMultiAz                       bool               `json:"fsx_openzfs_multi_az" yaml:"fsx_openzfs_multi_az"`
-	FsxOpenzfsOverrideDeploymentType        *string            `json:"fsx_openzfs_override_deployment_type" yaml:"fsx_openzfs_override_deployment_type"`
-	FsxOpenzfsStorageCapacity               int                `json:"fsx_openzfs_storage_capacity" yaml:"fsx_openzfs_storage_capacity"`
-	FsxOpenzfsThroughputCapacity            int                `json:"fsx_openzfs_throughput_capacity" yaml:"fsx_openzfs_throughput_capacity"`
-	GrafanaScrapeSystemLogs                 bool               `json:"grafana_scrape_system_logs" yaml:"grafana_scrape_system_logs"`
-	LoadBalancerPerSite                     bool               `json:"load_balancer_per_site" yaml:"load_balancer_per_site"`
-	ProtectPersistentResources              bool               `json:"protect_persistent_resources" yaml:"protect_persistent_resources"`
-	Profile                                 string             `json:"profile" yaml:"profile"`
-	CustomRole                              *CustomRoleConfig  `json:"custom_role" yaml:"custom_role"`
-	CreateAdminPolicyAsResource             bool               `json:"create_admin_policy_as_resource" yaml:"create_admin_policy_as_resource"`
-	ProvisionedVpc                          *AWSProvisionedVpc `json:"provisioned_vpc" yaml:"provisioned_vpc"`
-	PublicLoadBalancer                      *bool              `json:"public_load_balancer" yaml:"public_load_balancer"`
-	Region                                  string             `json:"region" yaml:"region"`
-	ResourceTags                            map[string]string  `json:"resource_tags" yaml:"resource_tags"`
-	RoleArn                                 *string            `json:"role_arn" yaml:"role_arn"`
-	TailscaleEnabled                        bool               `json:"tailscale_enabled" yaml:"tailscale_enabled"`
-	SecretsStoreAddonEnabled                *bool              `json:"secrets_store_addon_enabled,omitempty" yaml:"secrets_store_addon_enabled,omitempty"`
-	TrustedPrincipals                       []string           `json:"trusted_principals" yaml:"trusted_principals"`
-	HostedZoneID                            *string            `json:"hosted_zone_id" yaml:"hosted_zone_id"`
-	HostedZoneManagementEnabled             *bool              `json:"hosted_zone_management_enabled,omitempty" yaml:"hosted_zone_management_enabled,omitempty"`
-	VpcAzCount                              int                `json:"vpc_az_count" yaml:"vpc_az_count"`
-	VpcCidr                                 string             `json:"vpc_cidr" yaml:"vpc_cidr"`
-	ThirdPartyTelemetryEnabled              *bool              `json:"third_party_telemetry_enabled,omitempty" yaml:"third_party_telemetry_enabled,omitempty"`
-	NetworkTrust                            string             `json:"network_trust" yaml:"network_trust"`
-	NvidiaGpuEnabled                        bool               `json:"nvidia_gpu_enabled" yaml:"nvidia_gpu_enabled"`
+	ExternalDNSEnabled                      *bool      `json:"external_dns_enabled" yaml:"external_dns_enabled"`
+	ExternalID                              *uuid.UUID `json:"external_id" yaml:"external_id"`
+	ExtraClusterOidcUrls                    []string   `json:"extra_cluster_oidc_urls" yaml:"extra_cluster_oidc_urls"`
+	ExtraPostgresDbs                        []string   `json:"extra_postgres_dbs" yaml:"extra_postgres_dbs"`
+	FsxOpenzfsDailyAutomaticBackupStartTime string     `json:"fsx_openzfs_daily_automatic_backup_start_time" yaml:"fsx_openzfs_daily_automatic_backup_start_time"`
+	// FsxOpenzfsMultiAz selects the FSx OpenZFS deployment type. Pointer so an absent field can be
+	// distinguished from an explicit false: when nil the persistent step applies the Python default
+	// of True (→ MULTI_AZ_1). A plain bool would resolve absent→false→SINGLE_AZ and REPLACE live FSx
+	// filesystems (deployment_type is ForceNew). Mirrors Python AWSWorkloadConfig.fsx_openzfs_multi_az
+	// (default True). Nil-checked via boolPtrOrDefault(p, true) in the deploy code.
+	FsxOpenzfsMultiAz                *bool              `json:"fsx_openzfs_multi_az" yaml:"fsx_openzfs_multi_az"`
+	FsxOpenzfsOverrideDeploymentType *string            `json:"fsx_openzfs_override_deployment_type" yaml:"fsx_openzfs_override_deployment_type"`
+	FsxOpenzfsStorageCapacity        int                `json:"fsx_openzfs_storage_capacity" yaml:"fsx_openzfs_storage_capacity"`
+	FsxOpenzfsThroughputCapacity     int                `json:"fsx_openzfs_throughput_capacity" yaml:"fsx_openzfs_throughput_capacity"`
+	GrafanaScrapeSystemLogs          bool               `json:"grafana_scrape_system_logs" yaml:"grafana_scrape_system_logs"`
+	LoadBalancerPerSite              bool               `json:"load_balancer_per_site" yaml:"load_balancer_per_site"`
+	ProtectPersistentResources       bool               `json:"protect_persistent_resources" yaml:"protect_persistent_resources"`
+	Profile                          string             `json:"profile" yaml:"profile"`
+	CustomRole                       *CustomRoleConfig  `json:"custom_role" yaml:"custom_role"`
+	CreateAdminPolicyAsResource      bool               `json:"create_admin_policy_as_resource" yaml:"create_admin_policy_as_resource"`
+	ProvisionedVpc                   *AWSProvisionedVpc `json:"provisioned_vpc" yaml:"provisioned_vpc"`
+	PublicLoadBalancer               *bool              `json:"public_load_balancer" yaml:"public_load_balancer"`
+	Region                           string             `json:"region" yaml:"region"`
+	ResourceTags                     map[string]string  `json:"resource_tags" yaml:"resource_tags"`
+	RoleArn                          *string            `json:"role_arn" yaml:"role_arn"`
+	TailscaleEnabled                 bool               `json:"tailscale_enabled" yaml:"tailscale_enabled"`
+	SecretsStoreAddonEnabled         *bool              `json:"secrets_store_addon_enabled,omitempty" yaml:"secrets_store_addon_enabled,omitempty"`
+	TrustedPrincipals                []string           `json:"trusted_principals" yaml:"trusted_principals"`
+	HostedZoneID                     *string            `json:"hosted_zone_id" yaml:"hosted_zone_id"`
+	HostedZoneManagementEnabled      *bool              `json:"hosted_zone_management_enabled,omitempty" yaml:"hosted_zone_management_enabled,omitempty"`
+	VpcAzCount                       int                `json:"vpc_az_count" yaml:"vpc_az_count"`
+	VpcCidr                          string             `json:"vpc_cidr" yaml:"vpc_cidr"`
+	ThirdPartyTelemetryEnabled       *bool              `json:"third_party_telemetry_enabled,omitempty" yaml:"third_party_telemetry_enabled,omitempty"`
+	NetworkTrust                     string             `json:"network_trust" yaml:"network_trust"`
+	NvidiaGpuEnabled                 bool               `json:"nvidia_gpu_enabled" yaml:"nvidia_gpu_enabled"`
 	// FilterControlRoomMetrics enables the per-workload metric filter before forwarding to the
 	// control room Mimir remote_write. When true, only metrics referenced by grafana_alerts and
 	// grafana_dashboards are forwarded. Defaults to false so rollout can be done per-workload.
 	FilterControlRoomMetrics bool `json:"filter_control_room_metrics" yaml:"filter_control_room_metrics"`
+	// ExistingFlowLogTargetARNs is a list of pre-existing VPC Flow Log destination ARNs to attach
+	// in addition to the PTD-managed CloudWatch LogGroup. Read by the persistent step and passed to
+	// the VPC builder's with_flow_log. Mirrors Python AWSWorkloadConfig.existing_flow_log_target_arns
+	// (default None / empty).
+	ExistingFlowLogTargetARNs []string `json:"existing_flow_log_target_arns" yaml:"existing_flow_log_target_arns"`
+	// VPCEndpoints controls which interface/gateway VPC endpoints the persistent step creates.
+	// Pointer so an absent field can be distinguished from an explicit one: when nil, the persistent
+	// step must apply the Python default of VPCEndpointsConfig() — i.e. all STANDARD_VPC_ENDPOINT_SERVICES
+	// enabled with no exclusions. Mirrors Python AWSWorkloadConfig.vpc_endpoints (default None).
+	VPCEndpoints *VPCEndpointsConfig `json:"vpc_endpoints" yaml:"vpc_endpoints"`
+}
+
+// VPCEndpointsConfig controls creation of VPC endpoints in the workload VPC.
+// Mirrors Python ptd.aws_workload.VPCEndpointsConfig.
+//
+// Python default semantics: when the workload's vpc_endpoints field is absent (nil here), the
+// persistent step substitutes VPCEndpointsConfig() — Enabled=True with no excluded services — which
+// creates an endpoint for every service in STANDARD_VPC_ENDPOINT_SERVICES.
+//
+// STANDARD_VPC_ENDPOINT_SERVICES (python-pulumi/src/ptd/aws_workload.py) is the tuple:
+//
+//	("ec2", "ec2messages", "kms", "s3", "ssm", "ssmmessages")
+//
+// (note: "fsx" is intentionally NOT in STANDARD_VPC_ENDPOINT_SERVICES — the persistent step adds the
+// fsx endpoint separately, gated on Enabled && "fsx" not in ExcludedServices.)
+//
+// VALID_VPC_ENDPOINT_SERVICES (the set ExcludedServices may contain) is:
+//
+//	{"ec2", "ec2messages", "fsx", "kms", "s3", "ssm", "ssmmessages"}
+type VPCEndpointsConfig struct {
+	// Enabled controls whether VPC endpoints are created at all. Python default is True; when the
+	// outer pointer is nil the step uses Enabled=true. (A present-but-without-enabled YAML block
+	// yields the Go zero value false, matching Python only if the user explicitly sets enabled: false.)
+	Enabled bool `json:"enabled" yaml:"enabled"`
+	// ExcludedServices lists service names to skip even when Enabled. Must be a subset of
+	// VALID_VPC_ENDPOINT_SERVICES. Python default is an empty list.
+	ExcludedServices []string `json:"excluded_services" yaml:"excluded_services"`
 }
 
 // IsSecretsStoreAddonEnabled returns whether the EKS-managed secrets-store
@@ -318,7 +360,9 @@ type NetworkConfig struct {
 	DbSubnetCidr              string                   `yaml:"db_subnet_cidr"`
 	NetAppSubnetCidr          string                   `yaml:"netapp_subnet_cidr"`
 	AppGatewaySubnetCidr      string                   `yaml:"app_gateway_subnet_cidr"`
+	BastionSubnetCidr         string                   `yaml:"bastion_subnet_cidr"`
 	ProvisionedVnetID         string                   `yaml:"provisioned_vnet_id"`
+	ProvisionedVnetName       string                   `yaml:"provisioned_vnet_name"`
 	VnetRsgName               string                   `yaml:"vnet_rsg_name"`
 	DnsForwardDomains         []DNSForwardDomainConfig `yaml:"dns_forward_domains"`
 }
@@ -426,6 +470,14 @@ type SiteConfigSpec struct {
 	Domain                string `json:"domain" yaml:"domain"`
 	DomainType            string `json:"domain_type" yaml:"domain_type"`
 	UseTraefikForwardAuth bool   `json:"use_traefik_forward_auth" yaml:"use_traefik_forward_auth"`
+	// Route53 hosted-zone controls (persistent step). Mirror AWSSiteConfig.
+	// PrivateZone defaults false; AutoAssociateProvisionedVpc and
+	// CertificateValidationEnabled default TRUE in Python, so they are pointers
+	// (nil => true).
+	PrivateZone                  bool     `json:"private_zone" yaml:"private_zone"`
+	VpcAssociations              []string `json:"vpc_associations" yaml:"vpc_associations"`
+	AutoAssociateProvisionedVpc  *bool    `json:"auto_associate_provisioned_vpc" yaml:"auto_associate_provisioned_vpc"`
+	CertificateValidationEnabled *bool    `json:"certificate_validation_enabled" yaml:"certificate_validation_enabled"`
 }
 
 var ValidOutboundTypes = map[string]bool{
