@@ -54,6 +54,120 @@ type AWSWorkloadClusterSpec struct {
 	// RoutingWeight is the external-dns routing weight for this cluster's ALB ingress.
 	// Defaults to "100".
 	RoutingWeight *string `json:"routing_weight" yaml:"routing_weight"`
+
+	// ── EKS step fields (read by the eks step / AWSEKSCluster builder) ──────────
+	// These mirror python-pulumi/src/ptd/aws_workload.py AWSWorkloadClusterConfig.
+	// They are pointer-typed where the Python default is non-zero so an unset
+	// field defaults to the Python value rather than the Go zero value (see the
+	// migration playbook "Default Values"). Resolve with the EKS* helpers below.
+
+	// ClusterVersion is the EKS/Kubernetes version (Python default "1.35").
+	ClusterVersion *string `json:"cluster_version" yaml:"cluster_version"`
+	// AmiType is the managed node group AMI type (Python default "AL2023_x86_64_STANDARD").
+	AmiType *string `json:"ami_type" yaml:"ami_type"`
+	// MpInstanceType is the default ("managed pool") node group instance type (Python default "t3.large").
+	MpInstanceType *string `json:"mp_instance_type" yaml:"mp_instance_type"`
+	// MpMinSize is the default node group min size (Python default 4).
+	MpMinSize *int `json:"mp_min_size" yaml:"mp_min_size"`
+	// MpMaxSize is the default node group max size (Python default 10).
+	MpMaxSize *int `json:"mp_max_size" yaml:"mp_max_size"`
+	// RootDiskSize is the default node group root disk size in GB (Python default 200).
+	RootDiskSize *int `json:"root_disk_size" yaml:"root_disk_size"`
+	// EbsCsiAddonVersion pins the EBS CSI driver EKS managed add-on version
+	// (Python default "v1.41.0-eksbuild.1").
+	EbsCsiAddonVersion *string `json:"ebs_csi_addon_version" yaml:"ebs_csi_addon_version"`
+	// AdditionalNodeGroups are extra managed node groups keyed by name.
+	AdditionalNodeGroups map[string]NodeGroupConfig `json:"additional_node_groups" yaml:"additional_node_groups"`
+	// ForceMaintenance enables EKS ForceUpdateVersion (Python default false).
+	ForceMaintenance bool `json:"force_maintenance" yaml:"force_maintenance"`
+}
+
+// EKS* helpers resolve the pointer-typed EKS cluster fields to their Python defaults.
+func (s AWSWorkloadClusterSpec) EKSClusterVersion() string {
+	return resolveString(s.ClusterVersion, "1.35")
+}
+func (s AWSWorkloadClusterSpec) EKSAmiType() string {
+	return resolveString(s.AmiType, "AL2023_x86_64_STANDARD")
+}
+func (s AWSWorkloadClusterSpec) EKSMpInstanceType() string {
+	return resolveString(s.MpInstanceType, "t3.large")
+}
+func (s AWSWorkloadClusterSpec) EKSMpMinSize() int    { return resolveInt(s.MpMinSize, 4) }
+func (s AWSWorkloadClusterSpec) EKSMpMaxSize() int    { return resolveInt(s.MpMaxSize, 10) }
+func (s AWSWorkloadClusterSpec) EKSRootDiskSize() int { return resolveInt(s.RootDiskSize, 200) }
+func (s AWSWorkloadClusterSpec) EKSEbsCsiAddonVersion() string {
+	return resolveString(s.EbsCsiAddonVersion, "v1.41.0-eksbuild.1")
+}
+
+// UsesEksAccessEntries reports whether the EKS access-entries auth path should be
+// used (as opposed to the legacy aws-auth ConfigMap). Mirrors Python, where
+// EKSAccessEntriesConfig.enabled defaults to True and the cluster config supplies
+// a default EKSAccessEntriesConfig when the block is absent. Net semantics:
+// nil block → true; block present with enabled unset → true; enabled: true → true;
+// only an explicit enabled: false selects legacy aws-auth.
+func (s AWSWorkloadClusterSpec) UsesEksAccessEntries() bool {
+	return s.EksAccessEntries.IsEnabled()
+}
+
+// Taint mirrors python-pulumi/src/ptd/__init__.py Taint.
+type Taint struct {
+	Effect string `json:"effect" yaml:"effect"`
+	Key    string `json:"key" yaml:"key"`
+	Value  string `json:"value,omitempty" yaml:"value,omitempty"`
+}
+
+// NodeGroupConfig mirrors python-pulumi/src/ptd/__init__.py NodeGroupConfig
+// (an additional managed node group on a workload cluster). Pointer-typed
+// fields have non-zero Python defaults; resolve with the NG* helpers.
+type NodeGroupConfig struct {
+	// InstanceType is the node group instance type (Python default "t3.large").
+	InstanceType *string `json:"instance_type" yaml:"instance_type"`
+	// MinSize is the node group min size (Python default 1).
+	MinSize *int `json:"min_size" yaml:"min_size"`
+	// MaxSize is the node group max size (Python default 1).
+	MaxSize *int `json:"max_size" yaml:"max_size"`
+	// AdditionalSecurityGroupIDs are extra SGs attached to this node group's launch template.
+	AdditionalSecurityGroupIDs []string `json:"additional_security_group_ids" yaml:"additional_security_group_ids"`
+	// AdditionalRootDiskSize is the root disk size in GB (Python default 200).
+	AdditionalRootDiskSize *int `json:"additional_root_disk_size" yaml:"additional_root_disk_size"`
+	// Taints applied to this node group's nodes.
+	Taints []Taint `json:"taints" yaml:"taints"`
+	// Labels applied as tags on this node group.
+	Labels map[string]string `json:"labels" yaml:"labels"`
+	// AmiType overrides the cluster default AMI type when set (Python default None).
+	AmiType *string `json:"ami_type" yaml:"ami_type"`
+	// DesiredSize defaults to MinSize when nil (Python default None).
+	DesiredSize *int `json:"desired_size" yaml:"desired_size"`
+}
+
+// NGInstanceType resolves the node group instance type (Python default "t3.large").
+func (n NodeGroupConfig) NGInstanceType() string { return resolveString(n.InstanceType, "t3.large") }
+
+// NGMinSize resolves the node group min size (Python default 1).
+func (n NodeGroupConfig) NGMinSize() int { return resolveInt(n.MinSize, 1) }
+
+// NGMaxSize resolves the node group max size (Python default 1).
+func (n NodeGroupConfig) NGMaxSize() int { return resolveInt(n.MaxSize, 1) }
+
+// NGRootDiskSize resolves the node group root disk size in GB (Python default 200).
+func (n NodeGroupConfig) NGRootDiskSize() int { return resolveInt(n.AdditionalRootDiskSize, 200) }
+
+// NGDesiredSize resolves the desired size, falling back to the resolved min size
+// when unset (mirrors Python `ng_config.desired_size or ng_config.min_size`).
+func (n NodeGroupConfig) NGDesiredSize() int {
+	if n.DesiredSize != nil {
+		return *n.DesiredSize
+	}
+	return n.NGMinSize()
+}
+
+// NGAmiType resolves the node group AMI type, falling back to clusterDefault when
+// unset (mirrors Python `ng_config.ami_type or cluster_cfg.ami_type`).
+func (n NodeGroupConfig) NGAmiType(clusterDefault string) string {
+	if n.AmiType != nil && *n.AmiType != "" {
+		return *n.AmiType
+	}
+	return clusterDefault
 }
 
 // AWSWorkloadClusterComponents holds optional component version overrides for a cluster.
@@ -81,6 +195,18 @@ type AWSWorkloadClusterComponents struct {
 	// deployed in the clusters step (lib/steps/clusters_aws.go).
 	TraefikForwardAuthVersion *string `json:"traefik_forward_auth_version" yaml:"traefik_forward_auth_version"`
 	TraefikVersion            *string `json:"traefik_version" yaml:"traefik_version"`
+	// TigeraOperatorVersion pins the Calico/Tigera operator chart version. Consumed by
+	// the eks step (Calico CNI). Mirrors Python WorkloadClusterComponentConfig.tigera_operator_version
+	// (default "3.31.4"). Resolve via TigeraOperatorVersionOrDefault.
+	TigeraOperatorVersion *string `json:"tigera_operator_version" yaml:"tigera_operator_version"`
+}
+
+// TigeraOperatorVersionOrDefault resolves the tigera operator version (Python default "3.31.4").
+func (c *AWSWorkloadClusterComponents) TigeraOperatorVersionOrDefault() string {
+	if c == nil {
+		return "3.31.4"
+	}
+	return resolveString(c.TigeraOperatorVersion, "3.31.4")
 }
 
 // ResolvedAWSComponents is the result of resolving AWSWorkloadClusterComponents with defaults applied.
@@ -151,6 +277,18 @@ type TeamOperatorToleration struct {
 type EFSConfig struct {
 	FileSystemID  string `json:"file_system_id" yaml:"file_system_id"`
 	AccessPointID string `json:"access_point_id" yaml:"access_point_id"`
+	// MountTargetsManaged is false for BYO-EFS scenarios where mount targets are
+	// in a different VPC. Mirrors Python EFSConfig.mount_targets_managed
+	// (default True). Pointer so unset → true; resolve via IsMountTargetsManaged.
+	MountTargetsManaged *bool `json:"mount_targets_managed" yaml:"mount_targets_managed"`
+}
+
+// IsMountTargetsManaged resolves MountTargetsManaged (Python default True).
+func (c *EFSConfig) IsMountTargetsManaged() bool {
+	if c == nil || c.MountTargetsManaged == nil {
+		return true
+	}
+	return *c.MountTargetsManaged
 }
 
 // KarpenterConfig holds the Karpenter node pool configuration for a workload cluster.
@@ -309,6 +447,16 @@ func (c *AWSWorkloadConfig) IsSecretsStoreAddonEnabled() bool {
 		return true
 	}
 	return *c.SecretsStoreAddonEnabled
+}
+
+// IsThirdPartyTelemetryEnabled returns whether third-party telemetry (e.g. the
+// Tigera/Calico Felix usage reporting) is enabled. Mirrors Python
+// third_party_telemetry_enabled (default True).
+func (c *AWSWorkloadConfig) IsThirdPartyTelemetryEnabled() bool {
+	if c.ThirdPartyTelemetryEnabled == nil {
+		return true
+	}
+	return *c.ThirdPartyTelemetryEnabled
 }
 
 type AWSProvisionedVpc struct {

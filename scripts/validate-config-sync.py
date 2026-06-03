@@ -76,9 +76,6 @@ PYTHON_ONLY_ALLOWLIST = {
     "NetworkConfig": {
         "dns_forward_domains",  # Python-specific
     },
-    "AWSControlRoomConfig": {
-        "ebs_csi_addon_version",  # Python-only EKS addon version, not in Go YAML schema
-    },
 }
 
 # Go fields that don't exist in Python (field name differences or Go-only)
