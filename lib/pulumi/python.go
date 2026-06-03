@@ -94,9 +94,6 @@ func NewPythonPulumiStack(
 		// we're building the module and class name to continue supporting the ptd/pulumi-python autoload() feature
 		// without needing to check the files into source code.
 		titleCaseStackBaseName := helpers.TitleCase(stackBaseName)
-		if stackBaseName == "eks" {
-			titleCaseStackBaseName = "EKS"
-		}
 		module := fmt.Sprintf("%s_%s_%s", cloud, strings.Replace(targetType, "-", "_", -1), stackBaseName)
 		class := fmt.Sprintf("%s%s%s", classCloud, strings.Replace(helpers.TitleCase(targetType), "-", "", -1), titleCaseStackBaseName)
 

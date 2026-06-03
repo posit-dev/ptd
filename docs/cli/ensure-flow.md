@@ -78,7 +78,7 @@ Uses proxy connection (or Tailscale) to access the private database endpoint.
 
 **Proxy Required**: Yes
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_control_room_cluster.py`)
+**Implementation**: Inline Go Pulumi (`lib/steps/cluster.go`, `lib/steps/cluster_aws.go`, `lib/steps/eks_helpers.go`, `lib/aws/eks_cluster.go`, `lib/aws/eks_cluster_cr.go`)
 
 
 Provisions the Kubernetes cluster that hosts control room applications and monitoring tools.
@@ -177,7 +177,7 @@ This step is selected based on the cloud provider:
 
 #### AWS - EKS step
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_workload_eks.py`)
+**Implementation**: Inline Go Pulumi (`lib/steps/eks.go`, `lib/steps/eks_aws.go`, `lib/steps/eks_helpers.go`, `lib/aws/eks_cluster.go`)
 
 Creates EKS clusters:
 - EKS control plane with specified Kubernetes version

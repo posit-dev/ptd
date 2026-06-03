@@ -80,10 +80,10 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 
 ### Step 4: eks (AWS) or aks (Azure) (cloud-specific) {#eks-aks}
 **Implementation:**
-- AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_eks.py` (Python)
+- AWS: `lib/steps/eks.go`, `lib/steps/eks_aws.go`, `lib/steps/eks_helpers.go`, `lib/aws/eks_cluster.go` (Go)
 - Azure: `lib/steps/aks.go` (Go)
 
-**Language:** Python (AWS), **Go (Azure)** - This is a key difference from most other steps
+**Language:** Go (both AWS and Azure)
 **Proxy Required:** No
 
 **Creates:**
@@ -107,7 +107,7 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 }),
 ```
 
-**Implementation note:** AKS is implemented in **Go** (`lib/steps/aks.go`) unlike EKS which uses Python. This is because AKS cluster creation logic is better handled in Go for this implementation.
+**Implementation note:** Both AKS (`lib/steps/aks.go`) and EKS (`lib/steps/eks.go`, `lib/steps/eks_aws.go`, `lib/aws/eks_cluster.go`) are implemented in **Go** as inline Pulumi programs.
 
 **Safe to re-run:** Yes, but cluster upgrades may cause downtime.
 
@@ -249,8 +249,8 @@ Same as workload postgres_config: database users, permissions, extensions.
 
 ---
 
-### Step 4: cluster (Python) {#cluster}
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_control_room_cluster.py`
+### Step 4: cluster (Go) {#cluster}
+**Implementation:** `lib/steps/cluster.go`, `lib/steps/cluster_aws.go`, `lib/steps/eks_helpers.go`, `lib/aws/eks_cluster.go`, `lib/aws/eks_cluster_cr.go`
 **Proxy Required:** Yes
 
 **Creates:**

@@ -247,8 +247,8 @@ Brief pointer section:
 - There is no automated validation between the two — mismatches fail at runtime
 
 ### Builder Method Ordering
-- `AWSEKSCluster` uses a builder pattern where `with_*()` methods have ordering dependencies
-- Example: `with_node_role()` MUST be called before `with_node_group()` (sets `self.default_node_role`)
+- The Go `EKSCluster` builder (`lib/aws/eks_cluster.go`) uses `With*()` methods with ordering dependencies, mirroring the original Python `AWSEKSCluster` builder
+- Example: `WithNodeRole()` MUST be called before `WithNodeGroup()` (sets the default node role)
 - Check method dependencies before reordering calls
 
 ### Resource Naming Conventions
@@ -256,8 +256,8 @@ Brief pointer section:
 **AWS:**
 - IAM roles: `f"{purpose}.{compound_name}.posit.team"`
 - S3 buckets: `f"{compound_name}-{purpose}"`
-- EKS clusters: `f"default_{compound_name}-control-plane"`
-- All naming methods are on `AWSWorkload` class in `python-pulumi/src/ptd/aws_workload.py`
+- EKS cluster resource name (the `aws.eks.Cluster` first arg / `name`): workload = `{compound_name}-{release}`; control room = bare `{compound_name}`. **Do NOT use `default_{compound_name}-control-plane` for the cluster resource** — that string is the kubeconfig *context* name (`AWSWorkload.eks_cluster_name()`), not the cluster's name; using it as the resource name would replace the live control plane.
+- Naming helpers live on `AWSWorkload` (`python-pulumi/src/ptd/aws_workload.py`); the Go cluster builder (`lib/aws/eks_cluster.go`) reproduces the resource names verbatim for state adoption.
 
 **Azure:**
 - Resource Groups: `f"rsg-ptd-{sanitized_name}"`
@@ -277,19 +277,20 @@ Go generates `__main__.py` dynamically (see `lib/pulumi/python.go:WriteMainPy`):
 import ptd.pulumi_resources.<module>
 ptd.pulumi_resources.<module>.<Class>.autoload()
 ```
-- Module: `{cloud}_{target_type}_{step_name}` (e.g., `aws_workload_eks`)
-- Class: `{Cloud}{TargetType}{StepName}` (e.g., `AWSWorkloadEKS`)
+- Module: `{cloud}_{target_type}_{step_name}` (e.g., `aws_workload_bucket`)
+- Class: `{Cloud}{TargetType}{StepName}` (e.g., `AWSWorkloadBucket`)
 - `__main__.py` is NOT in source control — it's generated at runtime
+- **Legacy:** all built-in `ptd ensure` steps are now inline Go Pulumi; this path remains only for `ptd workon` and custom steps
 
 ### AWS vs Azure Infrastructure Patterns
 
 **AWS (EKS):**
-- Uses builder pattern with `with_*()` methods
-- Builder methods have ordering dependencies (e.g., `with_node_role()` must come before `with_node_group()`)
-- EKS step is Python-based (`AWSEKSCluster` class)
+- Uses the Go `EKSCluster` builder (`lib/aws/eks_cluster.go`) with `With*()` methods
+- Builder methods have ordering dependencies (e.g., `WithNodeRole()` must come before `WithNodeGroup()`)
+- EKS step is Go-based (`lib/steps/eks.go`, `lib/steps/eks_aws.go`, `lib/aws/eks_cluster.go`); the AWS control-room `cluster` step shares the same builder (`lib/steps/cluster.go`, `lib/aws/eks_cluster_cr.go`)
 
 **Azure (AKS):**
-- AKS step is Go-based (`lib/steps/aks.go`) unlike the Python-based EKS step
+- AKS step is Go-based (`lib/steps/aks.go`), like the EKS step
 - Azure persistent resources use simple `_define_*()` methods (no builder pattern)
 - No ordering dependencies between `_define_*()` methods
 
@@ -329,10 +330,12 @@ These files are large and require careful context management:
 - `helm_azure.go` (~1100 lines) — Azure helm deployments (ExternalDNS, Loki, Mimir, Grafana, Alloy, managed identities)
 - `helm_helpers.go` (~880 lines) — Shared Alloy River config generator (`buildAlloyConfig`)
 
-**AWS (Python):**
-- `pulumi_resources/aws_eks_cluster.py` (~2580 lines) — EKS cluster provisioning with builder pattern
+**Go (lib/aws):**
+- `eks_cluster.go` (~1340 lines) — `EKSCluster` builder: control plane, IAM/OIDC, node groups, CSI drivers, storage classes (shared by the `eks` and `cluster` steps)
+- `eks_cluster_cr.go` (~1180 lines) — control-room `EKSCluster` builder extensions (control-room node group, LBC, Grafana/Mimir/dashboards, Traefik forward-auth)
+- `vpc.go` (~1148 lines) — `aws.NewVPC` builder (subnets, NAT, NACLs, flow logs, endpoints, existing-VPC adoption)
+
+**Python:**
 - `__init__.py` (~1275 lines) — Base types, constants, utility functions
 - `aws_workload.py` (~815 lines) — AWS workload config and naming conventions
-
-**Azure (Python):**
 - `azure_workload.py` (~398 lines) — Azure workload config and naming with strict char limits

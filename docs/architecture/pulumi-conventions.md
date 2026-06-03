@@ -94,17 +94,17 @@ loki_bucket = aws.s3.Bucket(
 ---
 
 ##### EKS clusters
-**Pattern:** `f"default_{compound_name}-control-plane"`
+**Pattern:** `default_{compound_name}-control-plane`
 
-```python
-# Example from aws_workload_eks.py
-cluster_name = f"default_{self.workload.compound_name}-control-plane"
+```go
+// Example from lib/aws/eks_cluster.go
+clusterName := fmt.Sprintf("default_%s-control-plane", compoundName)
 
-# Creates: "default_myworkload-staging-control-plane"
+// Creates: "default_myworkload-staging-control-plane"
 ```
 
 **Usage locations:**
-- `python-pulumi/src/ptd/pulumi_resources/aws_workload_eks.py`
+- `lib/aws/eks_cluster.go`, `lib/steps/eks_aws.go`
 
 ---
 
@@ -239,24 +239,30 @@ rds_instance = aws.rds.Instance(
 
 ---
 
-## The autoload pattern
+## The autoload pattern (legacy)
 
-PTD uses a convention where Python Pulumi modules are dynamically loaded by Go-generated `__main__.py` files.
+PTD historically used a convention where Python Pulumi modules were dynamically
+loaded by Go-generated `__main__.py` files.
+
+> **Note:** All built-in `ptd ensure` steps have been migrated to inline Go
+> Pulumi programs — no first-party step uses the autoload path anymore. The
+> machinery in `lib/pulumi/python.go` remains for `ptd workon` and custom steps.
+> This section is retained as a description of the legacy pattern.
 
 ### How it works
 
-1. Go generates `__main__.py` (see `lib/pulumi/python.go:127-131`):
+1. Go generates `__main__.py` (see `WriteMainPy` in `lib/pulumi/python.go`):
    ```python
-   import ptd.pulumi_resources.aws_workload_eks
+   import ptd.pulumi_resources.<module>
 
-   ptd.pulumi_resources.aws_workload_eks.AWSWorkloadEKS.autoload()
+   ptd.pulumi_resources.<module>.<Class>.autoload()
    ```
 
 2. Python module provides an `autoload()` classmethod:
    ```python
-   class AWSWorkloadEKS(pulumi.ComponentResource):
+   class <Class>(pulumi.ComponentResource):
        @classmethod
-       def autoload(cls) -> "AWSWorkloadEKS":
+       def autoload(cls) -> "<Class>":
            # Reads stack name from Pulumi context
            stack_name = pulumi.get_stack()
            # Creates workload object from YAML
@@ -276,13 +282,12 @@ PTD uses a convention where Python Pulumi modules are dynamically loaded by Go-g
 
 | Element | Format | Example |
 |---------|--------|---------|
-| **Module name** | `{cloud}_{target_type}_{step_name}` | `aws_workload_eks` |
-| **Class name** | `{Cloud}{TargetType}{StepName}` | `AWSWorkloadEKS` |
+| **Module name** | `{cloud}_{target_type}_{step_name}` | `aws_workload_bucket` |
+| **Class name** | `{Cloud}{TargetType}{StepName}` | `AWSWorkloadBucket` |
 
-**Special cases** (see `lib/pulumi/python.go:88-94`):
+**Special cases** (see the `classCloud` / `TitleCase` handling in `lib/pulumi/python.go`):
 - `"aws"` → `"AWS"` (not `"Aws"`)
 - `"postgres_config"` → `"PostgresConfig"`
-- `"eks"` → `"EKS"`
 
 **Generated file location:** Pulumi workspace directory (temporary, not source-controlled)
 
@@ -319,43 +324,25 @@ class CertManager(pulumi.ComponentResource):
 ---
 
 ### Pattern 2: Builder/chaining
-**Example:** `AWSEKSCluster`
+**Example:** `EKSCluster` (`lib/aws/eks_cluster.go`)
 
-`__init__` sets up state, then `with_*()` methods build resources incrementally. Returns `self` for chaining.
+The constructor sets up state, then `With*()` methods build resources incrementally and return the builder for chaining. This Go builder is a faithful port of the original Python `AWSEKSCluster` ComponentResource (the old `ptd:AWSEKSCluster` type token still appears in alias URNs so existing Pulumi state is adopted, not replaced).
 
-```python
-class AWSEKSCluster(pulumi.ComponentResource):
-    def __init__(self, name, subnet_ids, version, tags, **kwargs):
-        super().__init__(f"ptd:{self.__class__.__name__}", name, **kwargs)
-
-        self.name = name
-        self.tags = tags
-        # Initialize collections
-        self.node_groups = {}
-        self.fargate_profiles = {}
-
-        # Create cluster (but not node groups yet)
-        self.eks = aws.eks.Cluster(...)
-
-    def with_node_role(self) -> "AWSEKSCluster":
-        self.default_node_role = aws.iam.Role(...)
-        return self
-
-    def with_node_group(self, name, ...) -> "AWSEKSCluster":
-        self.node_groups[name] = aws.eks.NodeGroup(...)
-        return self
-
-# Usage
-cluster = AWSEKSCluster(...).with_node_role().with_node_group("default")
+```go
+// lib/aws/eks_cluster.go
+c, _ := aws.NewEKSCluster(ctx, cfg)
+c.WithNodeRole(roleName).        // must run before WithNodeGroup (sets the default node role)
+    WithNodeGroup(nodeGroupParams).
+    WithOidcProvider()
 ```
 
 **When to use:**
 - Complex resources with many optional components
 - Want to expose a fluent API for configuration
 
-**Important:** Builder methods in `AWSEKSCluster` have ordering dependencies. For example, `with_node_role()` must be called before `with_node_group()` because it sets `self.default_node_role`.
+**Important:** Builder methods on `EKSCluster` have ordering dependencies that mirror the original Python builder. For example, `WithNodeRole()` must be called before `WithNodeGroup()` because it sets the default node role consumed by the node group.
 
-**Azure note:** Azure does NOT use the builder pattern. AKS cluster creation is handled in Go (`lib/steps/aks.go`), not Python. Azure Python components use the all-in-constructor pattern with `_define_*()` methods that have no ordering dependencies.
+**Azure note:** Azure does NOT use the builder pattern. AKS cluster creation is handled in Go (`lib/steps/aks.go`) using the all-in-one deploy-function pattern with no ordering dependencies.
 
 ---
 
@@ -532,7 +519,7 @@ class AzureWorkload(AbstractWorkload):
         return f"stptd{name}"
 ```
 
-**Critical:** AKS cluster creation is in Go (`lib/steps/aks.go`), not Python, unlike EKS.
+**Note:** Both AKS (`lib/steps/aks.go`) and EKS (`lib/steps/eks.go`, `lib/aws/eks_cluster.go`) cluster creation are implemented in Go as inline Pulumi programs.
 
 ---
 
