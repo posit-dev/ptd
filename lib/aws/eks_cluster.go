@@ -495,14 +495,12 @@ func (c *EKSCluster) WithNodeGroup(p NodeGroupParams) *EKSCluster {
 	}
 	ltTags["Name"] = pulumi.String(p.Name)
 
-	tagSpec := awsec2.LaunchTemplateTagSpecificationArgs{Tags: ltTags}
 	// Build per-resource-type tag specifications (instance + volume), each with
 	// the same tag map (Python tag_specifications).
 	tagSpecs := awsec2.LaunchTemplateTagSpecificationArray{
 		awsec2.LaunchTemplateTagSpecificationArgs{ResourceType: pulumi.String("instance"), Tags: ltTags},
 		awsec2.LaunchTemplateTagSpecificationArgs{ResourceType: pulumi.String("volume"), Tags: ltTags},
 	}
-	_ = tagSpec
 
 	// The launch template in the Python wrapper has parent=self (the wrapper
 	// component, e.g. AWSWorkloadEKS), NOT the AWSEKSCluster. So its old URN is
