@@ -1,3 +1,19 @@
+# [1.31.0](https://github.com/posit-dev/ptd/compare/v1.30.0...v1.31.0) (2026-06-03)
+
+
+### Bug Fixes
+
+* adopt Azure persistent resources faithfully (tags, protect, subnets, bastion) ([485c30b](https://github.com/posit-dev/ptd/commit/485c30b057d11a615b627952646f705d4518cde1))
+* adopt existing VPC subnets and private zones in persistent (AWS) ([eb6b4a2](https://github.com/posit-dev/ptd/commit/eb6b4a29ed4c95053e96f08ef6788503bc90fa8a))
+* ignore PrivateEndpoint subnet churn on azure-native provider upgrade ([bca5bd0](https://github.com/posit-dev/ptd/commit/bca5bd052d1e915f91b3ad5e844ee32b339751a3))
+* pin NetApp export-policy defaults to stop azure-native upgrade churn ([47a5be2](https://github.com/posit-dev/ptd/commit/47a5be25fdfd5a577a2e581193839e130bc236f5))
+* stop Azure persistent churn on DB admin secret and bastion NIC subnet ([a5ea7d3](https://github.com/posit-dev/ptd/commit/a5ea7d3231a28668c48ad15f5a082012834f9fdf))
+
+
+### Features
+
+* migrate persistent step from Python to inline Go Pulumi ([b0137c6](https://github.com/posit-dev/ptd/commit/b0137c6ab8d9e13c90f7a84f209169342f929490))
+
 # [1.30.0](https://github.com/posit-dev/ptd/compare/v1.29.0...v1.30.0) (2026-06-02)
 
 
