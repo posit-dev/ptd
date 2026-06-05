@@ -1096,6 +1096,14 @@ func (c *EKSCluster) WithEbsCsiDriver(roleName, version string) *EKSCluster {
 		ServiceAccountRoleArn: saRole.Arn,
 		Tags:                  c.cluster.Tags,
 		ConfigurationValues:   pulumi.String(string(configValues)),
+		// PRESERVE so an addon update keeps customer-modified fields rather than
+		// failing on conflict. The addon's defaultStorageClass feature wants to own
+		// the storageclass.kubernetes.io/is-default-class annotation on
+		// ebs-csi-default-sc, but WithEncryptedEbsStorageClass patches it to false so
+		// the encrypted SC is the cluster default. Without PRESERVE the reconcile hits
+		// a ConfigurationConflict and the addon goes UPDATE_FAILED. (NOT OVERWRITE —
+		// that would clobber the patch and make the plaintext SC default again.)
+		ResolveConflictsOnUpdate: pulumi.String("PRESERVE"),
 	}
 	if version != "" {
 		addonArgs.AddonVersion = pulumi.String(version)
