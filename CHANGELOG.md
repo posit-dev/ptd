@@ -1,3 +1,10 @@
+## [1.31.1](https://github.com/posit-dev/ptd/compare/v1.31.0...v1.31.1) (2026-06-04)
+
+
+### Bug Fixes
+
+* **ci:** repoint team-operator version bump at Go default ([4ac73aa](https://github.com/posit-dev/ptd/commit/4ac73aae9196031a4b12c8619e5ead9168c4c85f)), closes [#237](https://github.com/posit-dev/ptd/issues/237)
+
 # [1.31.0](https://github.com/posit-dev/ptd/compare/v1.30.0...v1.31.0) (2026-06-03)
 
 
