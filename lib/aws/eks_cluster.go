@@ -1096,20 +1096,21 @@ func (c *EKSCluster) WithEbsCsiDriver(roleName, version string) *EKSCluster {
 		ServiceAccountRoleArn: saRole.Arn,
 		Tags:                  c.cluster.Tags,
 		ConfigurationValues:   pulumi.String(string(configValues)),
-		// PRESERVE so an addon update keeps customer-modified fields rather than
-		// failing on conflict. The addon's defaultStorageClass feature wants to own
-		// the storageclass.kubernetes.io/is-default-class annotation on
-		// ebs-csi-default-sc, but WithEncryptedEbsStorageClass patches it to false so
-		// the encrypted SC is the cluster default. Without PRESERVE the reconcile hits
-		// a ConfigurationConflict and the addon goes UPDATE_FAILED. (NOT OVERWRITE —
-		// that would clobber the patch and make the plaintext SC default again.)
-		ResolveConflictsOnUpdate: pulumi.String("PRESERVE"),
 	}
 	if version != "" {
 		addonArgs.AddonVersion = pulumi.String(version)
 	}
+	// IgnoreChanges on configurationValues: the live addon was created by the prior
+	// (Python) step with this exact config; we adopt it but must NOT re-serialize and
+	// re-apply it. Any addon update makes EKS re-reconcile the addon, and its
+	// defaultStorageClass feature re-asserts is-default-class=true on ebs-csi-default-sc,
+	// overriding the WithEncryptedEbsStorageClass patch that makes the *encrypted* SC
+	// the default -> two default StorageClasses. Adopting the field as-is avoids the
+	// reconcile entirely. See the tracking issue for the proper long-term fix
+	// (stop using the addon's defaultStorageClass feature and own the SCs directly).
 	addon, err := awseks.NewAddon(c.ctx, c.cfg.Name+"-ebs-csi", addonArgs,
-		c.clusterChildAlias("aws:eks/addon:Addon", c.cfg.Name+"-ebs-csi"))
+		c.clusterChildAlias("aws:eks/addon:Addon", c.cfg.Name+"-ebs-csi"),
+		pulumi.IgnoreChanges([]string{"configurationValues"}))
 	if err != nil {
 		c.err = fmt.Errorf("eks: failed to create EBS CSI addon for %s: %w", c.cfg.Name, err)
 		return c
@@ -1281,7 +1282,11 @@ func (c *EKSCluster) WithAwsSecretsStoreCsiDriverProvider() *EKSCluster {
 		ResolveConflictsOnCreate: pulumi.String("OVERWRITE"),
 		ResolveConflictsOnUpdate: pulumi.String("OVERWRITE"),
 		ConfigurationValues:      pulumi.String(string(configValues)),
-	}, c.clusterChildAlias("aws:eks/addon:Addon", c.cfg.Name+"-aws-secrets-store-csi-driver-provider"))
+		// IgnoreChanges configurationValues (see ebs-csi): adopt the live addon's config
+		// as-is rather than re-serializing it, so the migration doesn't trigger a
+		// needless addon reconcile.
+	}, c.clusterChildAlias("aws:eks/addon:Addon", c.cfg.Name+"-aws-secrets-store-csi-driver-provider"),
+		pulumi.IgnoreChanges([]string{"configurationValues"}))
 	if err != nil {
 		c.err = fmt.Errorf("eks: failed to create secrets-store CSI addon for %s: %w", c.cfg.Name, err)
 		return c
