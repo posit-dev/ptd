@@ -77,24 +77,29 @@ The Go code uses these structs to:
 
 **Location:** `lib/pulumi/python.go`
 
-When executing Python-based steps (persistent, postgres_config, helm, etc.), Go:
+> **Note:** All built-in `ptd ensure` steps are now implemented as inline Go
+> Pulumi programs — none use the Python autoload path anymore. The machinery
+> described below remains in `lib/pulumi/python.go` for `ptd workon` and custom
+> steps, but is no longer exercised by any first-party step.
 
-1. Sets PTD_ROOT (line 55 of `lib/pulumi/python.go`):
+When setting up a Python Pulumi workspace, Go:
+
+1. Sets PTD_ROOT (`lib/pulumi/python.go`):
    ```go
    envVars["PTD_ROOT"] = helpers.GetTargetsConfigPath()
    ```
 
-2. Generates `__main__.py` dynamically (lines 77-101):
+2. Generates `__main__.py` dynamically:
    ```python
    # Generated __main__.py example
-   import ptd.pulumi_resources.aws_workload_eks
+   import ptd.pulumi_resources.<module>
 
-   ptd.pulumi_resources.aws_workload_eks.AWSWorkloadEKS.autoload()
+   ptd.pulumi_resources.<module>.<Class>.autoload()
    ```
 
 3. Module naming convention:
-   - Module: `{cloud}_{target_type}_{step_name}` (e.g., `aws_workload_eks`)
-   - Class: `{Cloud}{TargetType}{StepName}` (e.g., `AWSWorkloadEKS`)
+   - Module: `{cloud}_{target_type}_{step_name}`
+   - Class: `{Cloud}{TargetType}{StepName}`
 
 ### Step 3: Python re-reads YAML configuration {#python-rereads-yaml}
 

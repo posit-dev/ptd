@@ -2,8 +2,8 @@ package steps
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/posit-dev/ptd/lib/pulumi"
 	"github.com/posit-dev/ptd/lib/types"
 )
 
@@ -28,41 +28,15 @@ func (s *EKSStep) Set(t types.Target, controlRoomTarget types.Target, options St
 }
 
 func (s *EKSStep) Run(ctx context.Context) error {
-	targetType := "workload"
-	if s.DstTarget.ControlRoom() {
-		targetType = "control-room"
+	if s.DstTarget == nil {
+		return fmt.Errorf("eks step requires a destination target")
 	}
 
-	// get the credentials for the target
-	creds, err := s.DstTarget.Credentials(ctx)
-	if err != nil {
-		return err
+	// eks is AWS-only (Azure workloads use the aks step).
+	switch s.DstTarget.CloudProvider() {
+	case types.AWS:
+		return s.runAWSInlineGo(ctx)
+	default:
+		return fmt.Errorf("unsupported cloud provider for eks: %s", s.DstTarget.CloudProvider())
 	}
-	envVars, err := prepareEnvVarsForPulumi(ctx, s.DstTarget, creds)
-	if err != nil {
-		return err
-	}
-
-	stack, err := pulumi.NewPythonPulumiStack(
-		ctx,
-		string(s.DstTarget.CloudProvider()), // ptd-<cloud>-<control-room/workload>-<stackname>
-		targetType,
-		"eks",
-		s.DstTarget.Name(),
-		s.DstTarget.Region(),
-		s.DstTarget.PulumiBackendUrl(),
-		s.DstTarget.PulumiSecretsProviderKey(),
-		envVars,
-		true,
-	)
-	if err != nil {
-		return err
-	}
-
-	err = pulumiRefreshPreviewUpCancel(ctx, stack, s.Options)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

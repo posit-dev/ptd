@@ -41,6 +41,69 @@ func GetNFSSecurityGroupID(ctx context.Context, c *Credentials, region, vpcID, n
 	return "", false, nil
 }
 
+// GetVpcID returns the ID of the PTD-managed VPC for a workload/control room,
+// looked up by the compound-name Name tag + the posit.team/managed-by tag-key.
+// Mirrors Python aws_vpc / aws_vpc_id. Returns "", false, nil when no VPC
+// matches (greenfield).
+func GetVpcID(ctx context.Context, c *Credentials, region, name string) (string, bool, error) {
+	client := ec2.New(ec2.Options{
+		Region:      region,
+		Credentials: c.credentialsProvider,
+	})
+	out, err := client.DescribeVpcs(ctx, &ec2.DescribeVpcsInput{
+		Filters: []ec2types.Filter{
+			{Name: aws.String("tag:Name"), Values: []string{name}},
+			{Name: aws.String("tag-key"), Values: []string{"posit.team/managed-by"}},
+		},
+	})
+	if err != nil {
+		return "", false, fmt.Errorf("describe vpcs for %s: %w", name, err)
+	}
+	for _, v := range out.Vpcs {
+		if v.VpcId != nil {
+			return *v.VpcId, true, nil
+		}
+	}
+	return "", false, nil
+}
+
+// GetWorkloadPrivateSubnetIDs returns the PTD-managed private subnet IDs for a
+// workload's VPC, mirroring Python aws_subnets_for_vpc(network_access="private").
+// It filters by vpc-id + the PTD network-access tag. When tagNames is non-empty
+// (provisioned-VPC case) it instead filters by tag:Name in tagNames. Returns the
+// EC2 API result order (the order Python/boto3 used to build the existing state).
+func GetWorkloadPrivateSubnetIDs(ctx context.Context, c *Credentials, region, name, vpcID string, tagNames []string) ([]string, error) {
+	client := ec2.New(ec2.Options{
+		Region:      region,
+		Credentials: c.credentialsProvider,
+	})
+
+	filters := []ec2types.Filter{
+		{Name: aws.String("vpc-id"), Values: []string{vpcID}},
+	}
+	if len(tagNames) > 0 {
+		filters = append(filters, ec2types.Filter{Name: aws.String("tag:Name"), Values: tagNames})
+	} else {
+		filters = append(filters,
+			ec2types.Filter{Name: aws.String("tag:Name"), Values: []string{name + "-*"}},
+			ec2types.Filter{Name: aws.String("tag-key"), Values: []string{"posit.team/managed-by"}},
+			ec2types.Filter{Name: aws.String("tag:posit.team/network-access"), Values: []string{"private"}},
+		)
+	}
+
+	out, err := client.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{Filters: filters})
+	if err != nil {
+		return nil, fmt.Errorf("describe private subnets for %s: %w", name, err)
+	}
+	var ids []string
+	for _, s := range out.Subnets {
+		if s.SubnetId != nil {
+			ids = append(ids, *s.SubnetId)
+		}
+	}
+	return ids, nil
+}
+
 // ResolveSubnetIDsByName resolves subnet Name-tag values to their real subnet
 // IDs within a VPC, mirroring Python's aws_subnets_for_vpc (a describe_subnets
 // filtered by vpc-id + tag:Name). Used by the provisioned-VPC adoption path,

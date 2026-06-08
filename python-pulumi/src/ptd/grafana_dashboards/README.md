@@ -6,7 +6,7 @@ This directory contains JSON definitions for Grafana dashboards deployed with Po
 
 Dashboards are deployed as Kubernetes ConfigMaps and automatically loaded into Grafana. The deployment process:
 
-1. JSON files in this directory are read by `pulumi_resources/aws_eks_cluster.py` (method `_create_dashboard_configmaps`)
+1. JSON files in this directory are read by the Go `cluster` step (`lib/steps/cluster_aws.go` loads them from this directory; `lib/aws/eks_cluster_cr.go` `WithGrafana` creates the ConfigMaps)
 2. Each JSON file becomes a ConfigMap in the `grafana` namespace
 3. Grafana's dashboard provisioning sidecar watches these ConfigMaps and loads dashboards automatically
 4. Changes to JSON files trigger ConfigMap updates, which Grafana detects and reloads

@@ -60,7 +60,7 @@ aws-unset:
 ############################################################################
 alias link-bins := symlink-binaries
 
-deps: python-deps check-session-manager-plugin symlink-binaries install-thumbprint install-git-hooks
+deps: python-deps check-session-manager-plugin symlink-binaries install-git-hooks
 
 # install python dependencies (uv handles this automatically, but here if you need it)
 python-deps:
@@ -99,12 +99,6 @@ symlink-binaries:
       chmod +x "$binlocal/az"
     fi
   fi
-
-install-thumbprint:
-  #!/usr/bin/env bash
-  binlocal="{{ justfile_directory() }}/.local/bin"
-  mkdir -p $binlocal
-  CGO_ENABLED=0 GOBIN=$binlocal go install github.com/rstudio/goex/cmd/thumbprint@latest
 
 check-session-manager-plugin:
   #!/bin/bash

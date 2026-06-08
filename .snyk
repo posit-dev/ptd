@@ -54,4 +54,7 @@ exclude:
     - e2e/**
     - cmd/**/*_test.go
     - lib/**/*_test.go
+    # OIDC thumbprint helpers: SHA1 is mandated by the AWS IAM OpenID Connect
+    # provider thumbprint format (a CA-cert fingerprint, not a password hash).
     - lib/helpers/oidc.go
+    - lib/aws/oidc.go
