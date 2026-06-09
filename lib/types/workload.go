@@ -518,7 +518,7 @@ type NetworkConfig struct {
 	// When true, the persistent step ignores subnet addressPrefix/addressPrefixes/
 	// ipamPoolPrefixAllocations so Pulumi does not fight the customer's IPAM on
 	// every deploy.
-	CustomerManagedNetwork bool `json:"customer_managed_network" yaml:"customer_managed_network"`
+	CustomerManagedNetwork bool `yaml:"customer_managed_network"`
 }
 
 // DNSForwardDomainConfig holds a domain and its forwarding IP for CoreDNS configuration.

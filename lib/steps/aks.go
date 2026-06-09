@@ -177,11 +177,7 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 			"agentPoolProfiles[*].powerState",
 			"privateLinkResources",
 			"windowsProfile",
-			// Microsoft Defender for Containers is enabled out-of-band by some customers
-			// via their own Azure Policy / Defender for Cloud, pointing at a Log
-			// Analytics workspace we don't own. We never set securityProfile.defender
-			// ourselves, so without this Pulumi would try to remove the customer's
-			// Defender integration on every deploy. Ignore it for all clusters.
+			// Customer-enabled out-of-band (Defender for Cloud); we never set this field.
 			"securityProfile.defender",
 		}
 
