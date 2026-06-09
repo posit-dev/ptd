@@ -514,6 +514,18 @@ func azureBuildVNet(
 		if vnet != nil {
 			opts = append(opts, pulumi.Parent(vnet))
 		}
+		// When the customer's landing zone owns subnet address allocation (e.g. via
+		// Azure Virtual Network Manager / IPAM pools), Azure migrates addressPrefix
+		// to addressPrefixes and populates ipamPoolPrefixAllocations out from under
+		// us. Ignore those fields so Pulumi does not revert the customer's IPAM on
+		// every deploy. Applies to all subnets created here.
+		if net.CustomerManagedNetwork {
+			opts = append(opts, pulumi.IgnoreChanges([]string{
+				"addressPrefix",
+				"addressPrefixes",
+				"ipamPoolPrefixAllocations",
+			}))
+		}
 		return opts
 	}
 

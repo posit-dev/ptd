@@ -513,6 +513,12 @@ type NetworkConfig struct {
 	ProvisionedVnetName       string                   `yaml:"provisioned_vnet_name"`
 	VnetRsgName               string                   `yaml:"vnet_rsg_name"`
 	DnsForwardDomains         []DNSForwardDomainConfig `yaml:"dns_forward_domains"`
+	// CustomerManagedNetwork indicates the customer's landing zone owns subnet
+	// address allocation (e.g. via Azure Virtual Network Manager / IPAM pools).
+	// When true, the persistent step ignores subnet addressPrefix/addressPrefixes/
+	// ipamPoolPrefixAllocations so Pulumi does not fight the customer's IPAM on
+	// every deploy.
+	CustomerManagedNetwork bool `json:"customer_managed_network" yaml:"customer_managed_network"`
 }
 
 // DNSForwardDomainConfig holds a domain and its forwarding IP for CoreDNS configuration.
