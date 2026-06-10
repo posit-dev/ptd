@@ -895,11 +895,17 @@ func collectBootstrapResources(target types.Target) []ResourceDetail {
 	case types.Azure:
 		if t, ok := target.(ptdazure.Target); ok {
 			resources = bootstrapAzureResources(t)
+		} else {
+			fmt.Fprintf(os.Stderr, "Warning: target %q reports Azure but is not an *azure.Target; bootstrap inventory will be empty\n", target.Name())
 		}
 	case types.AWS:
 		if t, ok := target.(ptdaws.Target); ok {
 			resources = bootstrapAWSResources(t)
+		} else {
+			fmt.Fprintf(os.Stderr, "Warning: target %q reports AWS but is not an *aws.Target; bootstrap inventory will be empty\n", target.Name())
 		}
+	default:
+		fmt.Fprintf(os.Stderr, "Warning: unrecognized cloud provider %q for target %q; bootstrap inventory will be empty\n", target.CloudProvider(), target.Name())
 	}
 	sort.Slice(resources, func(i, j int) bool {
 		if resources[i].Type != resources[j].Type {

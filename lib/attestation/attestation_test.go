@@ -5,6 +5,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/posit-dev/ptd/lib/aws"
 	"github.com/posit-dev/ptd/lib/azure"
 	"github.com/posit-dev/ptd/lib/pulumistate"
 	"github.com/posit-dev/ptd/lib/types"
@@ -269,6 +270,54 @@ func TestCollectBootstrapResourcesAzure(t *testing.T) {
 		target.VaultName(),
 		"posit-team-dedicated", // consts.AzKeyName
 		"main-pub-db-password", // a per-site secret
+	} {
+		r, ok := byName[name]
+		if !ok {
+			t.Errorf("expected bootstrap resource %q to be present", name)
+			continue
+		}
+		if r.DisplayID() == "" {
+			t.Errorf("bootstrap resource %q has empty DisplayID", name)
+		}
+	}
+
+	// Results must be sorted by type then name.
+	if !sort.SliceIsSorted(res, func(i, j int) bool {
+		if res[i].Type != res[j].Type {
+			return res[i].Type < res[j].Type
+		}
+		return res[i].Name < res[j].Name
+	}) {
+		t.Error("bootstrap resources are not sorted by type then name")
+	}
+}
+
+func TestCollectBootstrapResourcesAWS(t *testing.T) {
+	sites := map[string]types.SiteConfig{
+		"main": {Spec: types.SiteConfigSpec{Domain: "example.com"}},
+	}
+	// createAdminPolicyAsResource is set explicitly so the expected resource
+	// count is deterministic (the admin policy is only emitted when true).
+	target := aws.NewTarget("example01-production", "123456789012", "example-profile", nil, "us-east-2", false, false, true, sites, nil)
+
+	res := collectBootstrapResources(target)
+
+	// state bucket + KMS alias + admin policy + workload secret + 3 per-site secrets.
+	if len(res) != 7 {
+		t.Fatalf("got %d bootstrap resources, want 7", len(res))
+	}
+
+	// Spot-check key resources are present with derived IDs.
+	byName := make(map[string]ResourceDetail, len(res))
+	for _, r := range res {
+		byName[r.Name] = r
+	}
+	for _, name := range []string{
+		target.StateBucketName(),
+		"example01-production.posit.team",
+		"example01-production-main.posit.team",
+		"example01-production-main.sessions.posit.team",
+		"example01-production-main-ssh-ppm-keys.posit.team",
 	} {
 		r, ok := byName[name]
 		if !ok {
