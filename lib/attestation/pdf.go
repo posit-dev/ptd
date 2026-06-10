@@ -14,6 +14,7 @@ import (
 	"github.com/johnfercher/maroto/v2/pkg/config"
 	"github.com/johnfercher/maroto/v2/pkg/consts/align"
 	"github.com/johnfercher/maroto/v2/pkg/consts/border"
+	"github.com/johnfercher/maroto/v2/pkg/consts/breakline"
 	"github.com/johnfercher/maroto/v2/pkg/consts/fontstyle"
 	"github.com/johnfercher/maroto/v2/pkg/core"
 	"github.com/johnfercher/maroto/v2/pkg/props"
@@ -256,6 +257,65 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 		PdfSignatureRow("Prepared By", data.GeneratedAt.Format("2006-01-02")),
 	))
 
+	// Appendix A — full resource inventory, on its own page.
+	appendixRows := []core.Row{
+		text.NewRow(10, "Appendix A — Full Resource Inventory", props.Text{
+			Size:  14,
+			Style: fontstyle.Bold,
+			Align: align.Left,
+			Color: AccentColor,
+		}),
+		line.NewRow(2, props.Line{
+			Color:     BorderColor,
+			Thickness: 0.5,
+		}),
+		row.New(2),
+		text.NewRow(14, "Every managed resource across all Pulumi stacks, as reported by the state files at the time of generation. Pulumi-internal resources are excluded. The bootstrap step provisions the Pulumi state backend itself and runs outside Pulumi; its resources are listed from PTD's naming conventions rather than from state.", props.Text{
+			Size:  9,
+			Align: align.Left,
+		}),
+		row.New(2),
+		PdfAppendixHeader([]string{"Step / Stack", "Name", "Type", "Cloud / Logical Resource ID"}, appendixColSizes),
+	}
+	for _, res := range data.BootstrapResources {
+		appendixRows = append(appendixRows, PdfAppendixRow([]string{"bootstrap", res.Name, res.Type, res.DisplayID()}, appendixColSizes))
+	}
+	for _, stack := range data.Stacks {
+		step := stack.StepNameFromProject()
+		for _, res := range stack.Resources {
+			appendixRows = append(appendixRows, PdfAppendixRow([]string{step, res.Name, res.Type, res.DisplayID()}, appendixColSizes))
+		}
+	}
+	m.AddPages(page.New().Add(appendixRows...))
+
+	// Appendix B — Kubernetes objects, on its own page.
+	appendixBRows := []core.Row{
+		text.NewRow(10, "Appendix B — Kubernetes Objects", props.Text{
+			Size:  14,
+			Style: fontstyle.Bold,
+			Align: align.Left,
+			Color: AccentColor,
+		}),
+		line.NewRow(2, props.Line{
+			Color:     BorderColor,
+			Thickness: 0.5,
+		}),
+		row.New(2),
+		text.NewRow(18, "Kubernetes objects PTD configures across the cluster, with the cluster-assigned metadata.uid recorded in Pulumi state at the last deployment. The UID is assigned by Kubernetes when an object is admitted, so it confirms the object was actually created. Helm releases wrap multiple objects and carry no single UID.", props.Text{
+			Size:  9,
+			Align: align.Left,
+		}),
+		row.New(2),
+		PdfAppendixHeader([]string{"Step", "Kind", "Namespace", "Name", "UID"}, appendixBColSizes),
+	}
+	for _, stack := range data.Stacks {
+		step := stack.StepNameFromProject()
+		for _, obj := range stack.KubernetesObjects {
+			appendixBRows = append(appendixBRows, PdfAppendixRow([]string{step, obj.Kind, obj.DisplayNamespace(), obj.Name, obj.DisplayUID()}, appendixBColSizes))
+		}
+	}
+	m.AddPages(page.New().Add(appendixBRows...))
+
 	// Generate
 	doc, err := m.Generate()
 	if err != nil {
@@ -397,6 +457,51 @@ func PdfTableRow(values []string, sizes []int) core.Row {
 		}))
 	}
 	return row.New(6).Add(cols...).WithStyle(&props.Cell{
+		BorderType:      border.Bottom,
+		BorderColor:     BorderColor,
+		BorderThickness: 0.2,
+	})
+}
+
+// appendixColSizes are the grid widths (summing to 12) for the resource
+// inventory table: Step/Stack, Name, Type, Resource ID.
+var appendixColSizes = []int{2, 3, 3, 4}
+
+// appendixBColSizes are the grid widths (summing to 12) for the Kubernetes
+// objects table: Step, Kind, Namespace, Name, UID.
+var appendixBColSizes = []int{2, 2, 2, 3, 3}
+
+// PdfAppendixHeader renders the resource-inventory header at a compact font size.
+func PdfAppendixHeader(headers []string, sizes []int) core.Row {
+	cols := make([]core.Col, len(headers))
+	for i, h := range headers {
+		cols[i] = col.New(sizes[i]).Add(text.New(h, props.Text{
+			Size:  7,
+			Style: fontstyle.Bold,
+			Align: align.Left,
+		}))
+	}
+	return row.New(6).Add(cols...).WithStyle(&props.Cell{
+		BackgroundColor: HeaderBg,
+		BorderType:      border.Bottom,
+		BorderColor:     BorderColor,
+		BorderThickness: 0.3,
+	})
+}
+
+// PdfAppendixRow renders a resource-inventory row. The row auto-sizes its
+// height and each cell uses the dash break strategy so long, space-free values
+// (resource types and cloud ARNs) wrap within the column instead of overflowing.
+func PdfAppendixRow(values []string, sizes []int) core.Row {
+	cols := make([]core.Col, len(values))
+	for i, v := range values {
+		cols[i] = col.New(sizes[i]).Add(text.New(v, props.Text{
+			Size:              7,
+			Align:             align.Left,
+			BreakLineStrategy: breakline.DashStrategy,
+		}))
+	}
+	return row.New().Add(cols...).WithStyle(&props.Cell{
 		BorderType:      border.Bottom,
 		BorderColor:     BorderColor,
 		BorderThickness: 0.2,

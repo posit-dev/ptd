@@ -210,6 +210,34 @@ _Generated: {{ .GeneratedAt | formatDate }}_
 | | Name | Date |
 |---|---|---|
 | Prepared By | | {{ .GeneratedAt | formatDate }} |
+
+## Appendix A — Full Resource Inventory
+
+The following table enumerates every managed resource across all Pulumi stacks, as reported by the state files at the time of generation. Pulumi-internal resources (the stack object and provider instances) are excluded. The ` + "`" + `bootstrap` + "`" + ` step provisions the Pulumi state backend itself and therefore runs outside Pulumi; its resources are listed from PTD's naming conventions rather than from state.
+
+| Step / Stack | Name | Type | Cloud / Logical Resource ID |
+|---|---|---|---|
+{{ range .BootstrapResources -}}
+| bootstrap | ` + "`" + `{{ .Name }}` + "`" + ` | {{ .Type }} | ` + "`" + `{{ .DisplayID }}` + "`" + ` |
+{{ end -}}
+{{ range .Stacks -}}
+{{ $step := .StepNameFromProject -}}
+{{ range .Resources -}}
+| {{ $step }} | ` + "`" + `{{ .Name }}` + "`" + ` | ` + "`" + `{{ .Type }}` + "`" + ` | ` + "`" + `{{ .DisplayID }}` + "`" + ` |
+{{ end -}}
+{{ end }}
+## Appendix B — Kubernetes Objects
+
+This table lists the Kubernetes objects PTD configures across the cluster, together with the cluster-assigned ` + "`" + `metadata.uid` + "`" + ` recorded in Pulumi state at the time of the last deployment. The UID is assigned by Kubernetes when an object is admitted, so it confirms the object was actually created in the cluster. Helm releases wrap multiple objects and therefore carry no single UID.
+
+| Step | Kind | Namespace | Name | UID |
+|---|---|---|---|---|
+{{ range .Stacks -}}
+{{ $step := .StepNameFromProject -}}
+{{ range .KubernetesObjects -}}
+| {{ $step }} | {{ .Kind }} | {{ .DisplayNamespace }} | ` + "`" + `{{ .Name }}` + "`" + ` | ` + "`" + `{{ .DisplayUID }}` + "`" + ` |
+{{ end -}}
+{{ end }}
 `))
 
 // RenderMarkdown writes the attestation data as a Markdown document to the given writer.
