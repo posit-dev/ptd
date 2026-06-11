@@ -275,15 +275,15 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 			Align: align.Left,
 		}),
 		row.New(2),
-		PdfAppendixHeader([]string{"Step / Stack", "Name", "Type", "Cloud / Logical Resource ID"}, appendixColSizes),
+		PdfAppendixHeader([]string{"Pulumi Stack", "Name", "Type", "Cloud / Logical Resource ID"}, appendixColSizes),
 	}
 	for _, res := range data.BootstrapResources {
 		appendixRows = append(appendixRows, PdfAppendixRow([]string{"bootstrap", res.Name, res.Type, res.DisplayID()}, appendixColSizes))
 	}
 	for _, stack := range data.Stacks {
-		step := stack.StepNameFromProject()
+		project := stack.ProjectName
 		for _, res := range stack.Resources {
-			appendixRows = append(appendixRows, PdfAppendixRow([]string{step, res.Name, res.Type, res.DisplayID()}, appendixColSizes))
+			appendixRows = append(appendixRows, PdfAppendixRow([]string{project, res.Name, res.Type, res.DisplayID()}, appendixColSizes))
 		}
 	}
 	m.AddPages(page.New().Add(appendixRows...))
@@ -306,12 +306,12 @@ func RenderPDF(outputPath string, data *AttestationData) error {
 			Align: align.Left,
 		}),
 		row.New(2),
-		PdfAppendixHeader([]string{"Step", "Kind", "Namespace", "Name", "UID"}, appendixBColSizes),
+		PdfAppendixHeader([]string{"Pulumi Stack", "Kind", "Namespace", "Name", "UID"}, appendixBColSizes),
 	}
 	for _, stack := range data.Stacks {
-		step := stack.StepNameFromProject()
+		project := stack.ProjectName
 		for _, obj := range stack.KubernetesObjects {
-			appendixBRows = append(appendixBRows, PdfAppendixRow([]string{step, obj.Kind, obj.DisplayNamespace(), obj.Name, obj.DisplayUID()}, appendixBColSizes))
+			appendixBRows = append(appendixBRows, PdfAppendixRow([]string{project, obj.Kind, obj.DisplayNamespace(), obj.Name, obj.DisplayUID()}, appendixBColSizes))
 		}
 	}
 	m.AddPages(page.New().Add(appendixBRows...))

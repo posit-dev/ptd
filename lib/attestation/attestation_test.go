@@ -475,6 +475,63 @@ func TestPurposeForStack(t *testing.T) {
 	}
 }
 
+func TestParseInfraConfigExternalDNSDefault(t *testing.T) {
+	t.Run("aws omitted defaults true", func(t *testing.T) {
+		yaml := `spec:
+  vpc_cidr: 10.0.0.0/16
+`
+		cfg, err := parseAWSInfraConfig([]byte(yaml))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !cfg.ExternalDNSEnabled {
+			t.Errorf("ExternalDNSEnabled = false, want true (omitted should default true)")
+		}
+	})
+
+	t.Run("aws explicit false", func(t *testing.T) {
+		yaml := `spec:
+  external_dns_enabled: false
+`
+		cfg, err := parseAWSInfraConfig([]byte(yaml))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.ExternalDNSEnabled {
+			t.Errorf("ExternalDNSEnabled = true, want false (explicit false)")
+		}
+	})
+
+	t.Run("azure omitted defaults true", func(t *testing.T) {
+		yaml := `kind: AzureWorkloadConfig
+spec:
+  subscription_id: sub-id
+`
+		cfg, err := parseAzureInfraConfig([]byte(yaml))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !cfg.ExternalDNSEnabled {
+			t.Errorf("ExternalDNSEnabled = false, want true (omitted should default true)")
+		}
+	})
+
+	t.Run("azure explicit false", func(t *testing.T) {
+		yaml := `kind: AzureWorkloadConfig
+spec:
+  subscription_id: sub-id
+  external_dns_enabled: false
+`
+		cfg, err := parseAzureInfraConfig([]byte(yaml))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.ExternalDNSEnabled {
+			t.Errorf("ExternalDNSEnabled = true, want false (explicit false)")
+		}
+	})
+}
+
 func TestCleanVersion(t *testing.T) {
 	tests := []struct {
 		image string

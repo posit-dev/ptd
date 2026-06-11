@@ -152,7 +152,7 @@ var stackPurposes = map[string]map[string]string{
 		"sites":           "Posit product deployments (TeamSite CRDs), ingress resources, site-specific configuration",
 	},
 	"azure": {
-		"persistent":      "VNet, Azure PostgreSQL, Storage accounts, NetApp Files, Key Vault, managed identities, NSGs",
+		"persistent":      "Network, PostgreSQL database, storage accounts, NetApp/Azure Files for product data, Key Vault, managed identities, network security groups",
 		"postgres-config": "PostgreSQL database users, databases, and grants",
 		"aks":             "AKS cluster, node pools, managed identity, storage classes",
 		"acr-cache":       "Azure Container Registry cache rules for container image pull-through",
@@ -308,6 +308,17 @@ func Collect(ctx context.Context, target types.Target, workloadPath string) (*At
 	}
 	attestation.Sites = sites
 
+	// Chronicle is optional; flag it on the infra config when any site configures
+	// it, so chronicle-specific prose (e.g. the Azure storage container) is only
+	// emitted when the telemetry is actually deployed.
+	for _, site := range sites {
+		for _, product := range site.Products {
+			if product.Name == "chronicle" {
+				infraCfg.ChronicleEnabled = true
+			}
+		}
+	}
+
 	// Read customizations/manifest.yaml
 	customSteps, err := collectCustomSteps(workloadPath)
 	if err != nil {
@@ -409,7 +420,7 @@ func parseAWSInfraConfig(data []byte) (*InfraConfig, error) {
 			VpcAzCount                  int    `yaml:"vpc_az_count"`
 			FsxOpenzfsMultiAz           bool   `yaml:"fsx_openzfs_multi_az"`
 			KeycloakEnabled             bool   `yaml:"keycloak_enabled"`
-			ExternalDNSEnabled          bool   `yaml:"external_dns_enabled"`
+			ExternalDNSEnabled          *bool  `yaml:"external_dns_enabled"`
 			PublicLoadBalancer          bool   `yaml:"public_load_balancer"`
 			SecretsStoreAddonEnabled    *bool  `yaml:"secrets_store_addon_enabled"`
 			HostedZoneManagementEnabled *bool  `yaml:"hosted_zone_management_enabled"`
@@ -442,7 +453,7 @@ func parseAWSInfraConfig(data []byte) (*InfraConfig, error) {
 		VpcAzCount:               raw.Spec.VpcAzCount,
 		FsxMultiAz:               raw.Spec.FsxOpenzfsMultiAz,
 		KeycloakEnabled:          raw.Spec.KeycloakEnabled,
-		ExternalDNSEnabled:       raw.Spec.ExternalDNSEnabled,
+		ExternalDNSEnabled:       raw.Spec.ExternalDNSEnabled == nil || *raw.Spec.ExternalDNSEnabled,
 		PublicLoadBalancer:       raw.Spec.PublicLoadBalancer,
 		SecretsStoreAddonEnabled: raw.Spec.SecretsStoreAddonEnabled == nil || *raw.Spec.SecretsStoreAddonEnabled,
 		CustomerManagedBastionID: raw.Spec.CustomerManagedBastionId,
@@ -490,9 +501,9 @@ func parseAzureInfraConfig(data []byte) (*InfraConfig, error) {
 				ProvisionedVnetName string `yaml:"provisioned_vnet_name"`
 				VnetRsgName         string `yaml:"vnet_rsg_name"`
 			} `yaml:"network"`
-			KeycloakEnabled          bool `yaml:"keycloak_enabled"`
-			ExternalDNSEnabled       bool `yaml:"external_dns_enabled"`
-			SecretsStoreAddonEnabled bool `yaml:"secrets_store_addon_enabled"`
+			KeycloakEnabled          bool  `yaml:"keycloak_enabled"`
+			ExternalDNSEnabled       *bool `yaml:"external_dns_enabled"`
+			SecretsStoreAddonEnabled bool  `yaml:"secrets_store_addon_enabled"`
 			Clusters                 map[string]struct {
 				KubernetesVersion          string `yaml:"kubernetes_version"`
 				SystemNodePoolInstanceType string `yaml:"system_node_pool_instance_type"`
@@ -517,7 +528,7 @@ func parseAzureInfraConfig(data []byte) (*InfraConfig, error) {
 		ProvisionedVnetID:        raw.Spec.Network.ProvisionedVnetID,
 		ProvisionedVnetName:      raw.Spec.Network.ProvisionedVnetName,
 		KeycloakEnabled:          raw.Spec.KeycloakEnabled,
-		ExternalDNSEnabled:       raw.Spec.ExternalDNSEnabled,
+		ExternalDNSEnabled:       raw.Spec.ExternalDNSEnabled == nil || *raw.Spec.ExternalDNSEnabled,
 		SecretsStoreAddonEnabled: raw.Spec.SecretsStoreAddonEnabled,
 		SiteDomains:              make(map[string]string),
 	}
