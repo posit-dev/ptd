@@ -31,7 +31,7 @@ Produces an artifact bundle with configuration files, Pulumi state exports, reso
 secret references, and operational documentation.
 
 By default runs in dry-run mode (--dry-run=true), which generates the full artifact bundle
-without modifying any infrastructure. Use --dry-run=false to proceed with control room severance.`,
+without modifying any infrastructure. Use --dry-run=false to disconnect the control room.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		runEject(cmd, args[0])
@@ -59,7 +59,11 @@ func runEject(cmd *cobra.Command, targetName string) {
 	}
 
 	if !ejectDryRun {
-		fmt.Printf("WARNING: Running eject with --dry-run=false will proceed with control room severance.\n")
+		fmt.Printf("WARNING: Running eject with --dry-run=false will disconnect the control room.\n")
+		fmt.Printf("This will:\n")
+		fmt.Printf("  - Strip all control_room_* fields from ptd.yaml\n")
+		fmt.Printf("  - Delete the workload's Mimir password from the control room\n")
+		fmt.Printf("\n")
 		fmt.Printf("Type the full target name (%s) to confirm: ", targetName)
 
 		reader := bufio.NewReader(os.Stdin)
@@ -78,12 +82,25 @@ func runEject(cmd *cobra.Command, targetName string) {
 		slog.Info("Confirmation accepted, proceeding with eject")
 	}
 
+	var controlRoomTarget types.Target
+	if !ejectDryRun {
+		controlRoomTarget, err = legacy.ControlRoomTargetFromName(targetName)
+		if err != nil {
+			slog.Error("Could not load control room target", "error", err)
+			return
+		}
+		if controlRoomTarget == nil {
+			slog.Warn("No control room configured for workload; Mimir password removal will be skipped")
+		}
+	}
+
 	opts := eject.Options{
-		TargetName:   targetName,
-		OutputDir:    outputDir,
-		DryRun:       ejectDryRun,
-		CLIVersion:   Version,
-		WorkloadPath: legacy.WorkloadPathFromTargetName(targetName),
+		TargetName:        targetName,
+		OutputDir:         outputDir,
+		DryRun:            ejectDryRun,
+		CLIVersion:        Version,
+		WorkloadPath:      legacy.WorkloadPathFromTargetName(targetName),
+		ControlRoomTarget: controlRoomTarget,
 	}
 
 	if err := eject.Run(ctx, t, opts); err != nil {
@@ -91,5 +108,9 @@ func runEject(cmd *cobra.Command, targetName string) {
 		return
 	}
 
-	slog.Info("Eject complete", "target", targetName, "output-dir", outputDir, "dry-run", ejectDryRun)
+	if ejectDryRun {
+		slog.Info("Eject complete (dry run)", "target", targetName, "output-dir", outputDir)
+	} else {
+		slog.Info("Eject complete", "target", targetName, "output-dir", outputDir)
+	}
 }

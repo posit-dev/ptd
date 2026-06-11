@@ -7,10 +7,10 @@ import (
 )
 
 type ControlRoomConnection struct {
-	Category    string `json:"category"`
-	Description string `json:"description"`
-	Resource    string `json:"resource"`
-	SeverAction string `json:"sever_action"`
+	Category      string `json:"category"`
+	Description   string `json:"description"`
+	Resource      string `json:"resource"`
+	RemovalAction string `json:"removal_action"`
 }
 
 type ControlRoomDetails struct {
@@ -21,7 +21,7 @@ type ControlRoomDetails struct {
 	Connections []ControlRoomConnection `json:"connections"`
 }
 
-func CollectControlRoomDetails(config interface{}, targetName string) (*ControlRoomDetails, error) {
+func CollectControlRoomDetails(config interface{}, targetName string, controlRoomName string) (*ControlRoomDetails, error) {
 	var accountID, clusterName, domain, region string
 
 	switch cfg := config.(type) {
@@ -46,58 +46,39 @@ func CollectControlRoomDetails(config interface{}, targetName string) (*ControlR
 		Region:      region,
 	}
 
-	details.Connections = buildConnections(details, targetName)
+	details.Connections = buildConnections(details, controlRoomName)
 
 	return details, nil
 }
 
-func buildConnections(details *ControlRoomDetails, targetName string) []ControlRoomConnection {
+func buildConnections(details *ControlRoomDetails, controlRoomName string) []ControlRoomConnection {
 	var conns []ControlRoomConnection
 
 	if details.AccountID != "" {
 		conns = append(conns, ControlRoomConnection{
-			Category:    "IAM Trust",
-			Description: "Cross-account IAM trust allows the control room to manage this workload",
-			Resource:    fmt.Sprintf("AWS account %s", details.AccountID),
-			SeverAction: "Remove trust policy entries referencing the control room account",
+			Category:      "IAM Trust",
+			Description:   "Cross-account IAM trust allows the control room to manage this workload",
+			Resource:      fmt.Sprintf("AWS account %s", details.AccountID),
+			RemovalAction: "Remove trust policy entries referencing the control room account",
 		})
 	}
 
 	if details.Domain != "" {
 		mimirEndpoint := fmt.Sprintf("https://mimir.%s/api/v1/push", details.Domain)
 		conns = append(conns, ControlRoomConnection{
-			Category:    "Observability",
-			Description: "Alloy remote_write pushes metrics to the control room Mimir instance",
-			Resource:    mimirEndpoint,
-			SeverAction: "Remove the prometheus.remote_write \"control_room\" block from Alloy config",
+			Category:      "Observability",
+			Description:   "Alloy remote_write pushes metrics to the control room Mimir instance",
+			Resource:      mimirEndpoint,
+			RemovalAction: "Remove the prometheus.remote_write \"control_room\" block from Alloy config",
 		})
 
-		lokiEndpoint := fmt.Sprintf("https://loki.%s/loki/api/v1/push", details.Domain)
-		conns = append(conns, ControlRoomConnection{
-			Category:    "Observability",
-			Description: "Alloy forwards logs to the control room Loki instance",
-			Resource:    lokiEndpoint,
-			SeverAction: "Remove the loki.write \"control_room\" block from Alloy config",
-		})
-	}
-
-	if details.Domain != "" {
 		// The mimir password secret lives in the control room's secret store
-		secretName := fmt.Sprintf("%s.mimir-auth.posit.team", targetName)
+		secretName := fmt.Sprintf("%s.mimir-auth.posit.team", controlRoomName)
 		conns = append(conns, ControlRoomConnection{
-			Category:    "Secret Sync",
-			Description: "Mimir authentication password is synced to the control room's secret store",
-			Resource:    secretName,
-			SeverAction: "Delete the mimir password entry from the control room's Secrets Manager",
-		})
-	}
-
-	if details.ClusterName != "" {
-		conns = append(conns, ControlRoomConnection{
-			Category:    "Team Operator",
-			Description: "Team Operator Helm values reference the control room for configuration",
-			Resource:    fmt.Sprintf("Control room cluster: %s", details.ClusterName),
-			SeverAction: "Reconfigure Helm values to remove control room references",
+			Category:      "Secret Sync",
+			Description:   "Mimir authentication password is synced to the control room's secret store",
+			Resource:      secretName,
+			RemovalAction: "Delete the mimir password entry from the control room's Secrets Manager",
 		})
 	}
 
