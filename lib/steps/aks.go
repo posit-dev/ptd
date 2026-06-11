@@ -177,6 +177,8 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 			"agentPoolProfiles[*].powerState",
 			"privateLinkResources",
 			"windowsProfile",
+			// Customer-enabled out-of-band (Defender for Cloud); we never set this field.
+			"securityProfile.defender",
 		}
 
 		// Always ignore agentPoolProfiles when using separate AgentPool resources

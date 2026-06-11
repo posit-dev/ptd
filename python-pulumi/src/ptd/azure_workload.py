@@ -33,6 +33,10 @@ class NetworkConfig:
     vnet_rsg_name: str | None = None
     dns_forward_domains: list[dict[str, str]] = dataclasses.field(default_factory=list)
     private_subnet_route_table_id: str | None = None
+    # Consumed by the Go persistent step (lib/steps/persistent_azure.go) to ignore
+    # subnet address-allocation drift when the customer's landing zone manages it
+    # via IPAM. Declared here so the Python config loader accepts the YAML key.
+    customer_managed_network: bool = False
 
     def __post_init__(self):
         """Validate DNS forward domain entries if configured."""
