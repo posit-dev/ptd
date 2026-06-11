@@ -386,7 +386,7 @@ func PdfParagraph(m core.Maroto, content string) {
 // PdfBullet renders a single bullet point.
 func PdfBullet(m core.Maroto, content string) {
 	m.AddRows(
-		row.New(6).Add(
+		row.New().Add(
 			col.New(1).Add(text.New("•", props.Text{
 				Size:  9,
 				Align: align.Center,
@@ -419,10 +419,12 @@ func PdfStackDetail(m core.Maroto, name string, prose string) {
 			PdfBullet(m, l[2:])
 		} else {
 			m.AddRows(
-				text.NewRow(6, l, props.Text{
-					Size:  9,
-					Align: align.Left,
-				}),
+				row.New().Add(
+					col.New(12).Add(text.New(l, props.Text{
+						Size:  9,
+						Align: align.Left,
+					})),
+				),
 			)
 		}
 	}
