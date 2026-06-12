@@ -78,7 +78,7 @@ This separation ensures that the lightweight Workbench app doesn't consume expen
 ```
 User Configuration (ptd.yaml) session_taints: true
     ↓
-Python Pulumi Processing
+PTD ensure (inline-Go Pulumi steps)
     ├─→ Adds taint to Karpenter NodePool
     └─→ Injects tolerations into Site CRD
     ↓

@@ -315,17 +315,9 @@ Pulumi stacks follow this naming convention:
 
 Example: `ptd-aws-workload-persistent` project with stack `organization/ptd-aws-workload-persistent/workload01`
 
-### Python Pulumi Integration
+### Inline-Go Pulumi Steps
 
-Go code dynamically generates a `__main__.py` file for each Python Pulumi stack:
-
-```python
-import ptd.pulumi_resources.<module>
-
-ptd.pulumi_resources.<module>.<Class>.autoload()
-```
-
-The `PTD_ROOT` environment variable is passed to Python, allowing it to locate target configurations.
+Each step is an inline-Go Pulumi program defined in `lib/steps` and compiled into the `ptd` binary. The CLI builds the stack workspace (project, stack name, backend, secrets provider) and runs the step's program directly via the Pulumi Automation API; there is no separate program file generated on disk.
 
 ## Error Handling
 

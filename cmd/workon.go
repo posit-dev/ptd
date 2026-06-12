@@ -141,8 +141,12 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 			pulumiStackName = stack.Name()
 
 		} else if steps.ValidStep(step, t.ControlRoom()) {
-			// Handle standard step
-			stack, err := pulumi.NewPythonPulumiStack(
+			// Handle standard step. Built-in steps are inline-Go Pulumi programs, so
+			// `pulumi preview/up` is not possible from here (the program is compiled
+			// into the binary). This Go-runtime state workspace exists for the manual
+			// state-cutover runbooks: `pulumi stack export/import`,
+			// `state unprotect/delete`, etc., which read state and need no program.
+			stack, err := pulumi.NewStateWorkspaceStack(
 				cmd.Context(),
 				string(t.CloudProvider()), // ptd-<cloud>-<control-room/workload>-<stackname>
 				targetType,
@@ -152,7 +156,6 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 				t.PulumiBackendUrl(),
 				t.PulumiSecretsProviderKey(),
 				credEnvVars,
-				true,
 			)
 			if err != nil {
 				slog.Error("Failed to create Pulumi stack", "error", err)
@@ -160,6 +163,7 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 			}
 
 			workDir = stack.Workspace().WorkDir()
+			pulumiStackName = stack.Name()
 		} else {
 			slog.Error("Invalid step provided", "step", step)
 			return

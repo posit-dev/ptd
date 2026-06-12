@@ -102,7 +102,7 @@ func (t Target) BastionId(ctx context.Context) (string, error) {
 	}
 	envVars := creds.EnvVars()
 
-	persistentStack, err := pulumi.NewPythonPulumiStack(
+	persistentOutputs, err := pulumi.ReadStackOutputs(
 		ctx,
 		"aws",
 		"workload",
@@ -112,13 +112,7 @@ func (t Target) BastionId(ctx context.Context) (string, error) {
 		t.PulumiBackendUrl(),
 		t.PulumiSecretsProviderKey(),
 		envVars,
-		false,
 	)
-	if err != nil {
-		return "", err
-	}
-
-	persistentOutputs, err := persistentStack.Outputs(ctx)
 	if err != nil {
 		return "", err
 	}
