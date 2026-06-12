@@ -93,6 +93,9 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 
 	credEnvVars := creds.EnvVars()
 
+	// PTD_ROOT is exported into the workon shell below for custom (user-defined)
+	// steps, which may be Python-based and resolve their resources relative to it.
+	// Built-in steps are inline Go and no longer read it.
 	ptdRoot := helpers.GetTargetsConfigPath()
 
 	// Start proxy if needed (non-fatal)
@@ -152,7 +155,6 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 				targetType,
 				step,
 				t.Name(),
-				t.Region(),
 				t.PulumiBackendUrl(),
 				t.PulumiSecretsProviderKey(),
 				credEnvVars,

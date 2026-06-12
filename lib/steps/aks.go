@@ -438,7 +438,6 @@ func getPersistentStackOutputs(ctx context.Context, target types.Target) (auto.O
 		string(target.Type()),
 		"persistent",
 		target.Name(),
-		target.Region(),
 		target.PulumiBackendUrl(),
 		target.PulumiSecretsProviderKey(),
 		envVars,

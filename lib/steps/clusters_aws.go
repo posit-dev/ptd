@@ -194,7 +194,6 @@ func getPostgresConfigStackOutputs(ctx context.Context, target types.Target, env
 		string(target.Type()),
 		"postgres_config",
 		target.Name(),
-		target.Region(),
 		target.PulumiBackendUrl(),
 		target.PulumiSecretsProviderKey(),
 		envVars,

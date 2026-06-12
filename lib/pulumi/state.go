@@ -11,8 +11,10 @@ import (
 // stateWorkspaceConfig builds a StackConfig for a Go-runtime workspace used purely
 // for reading state (stack outputs) or running manual state operations. The
 // backend URL and secrets provider must match the values the stack was created
-// with by ptd ensure, or output decryption will fail.
-func stateWorkspaceConfig(cloud, targetType, stackBaseName, targetName, targetRegion, backendURL, secretsProvider string, extraEnvVars map[string]string) StackConfig {
+// with by ptd ensure, or output decryption will fail. Region is deliberately not
+// set: state-only operations never invoke a provider, so ConfigureStackRegion is
+// not called for these workspaces (unlike InlineStack/LocalStack).
+func stateWorkspaceConfig(cloud, targetType, stackBaseName, targetName, backendURL, secretsProvider string, extraEnvVars map[string]string) StackConfig {
 	envVars := k8sEnvVars()
 	for k, v := range extraEnvVars {
 		envVars[k] = v
@@ -22,7 +24,6 @@ func stateWorkspaceConfig(cloud, targetType, stackBaseName, targetName, targetRe
 		TargetType:      targetType,
 		StackBaseName:   stackBaseName,
 		TargetName:      targetName,
-		TargetRegion:    targetRegion,
 		BackendURL:      backendURL,
 		SecretsProvider: secretsProvider,
 		EnvVars:         envVars,
@@ -70,12 +71,11 @@ func ReadStackOutputs(
 	targetType string,
 	stackBaseName string,
 	targetName string,
-	targetRegion string,
 	backendURL string,
 	secretsProvider string,
 	extraEnvVars map[string]string,
 ) (auto.OutputMap, error) {
-	config := stateWorkspaceConfig(cloud, targetType, stackBaseName, targetName, targetRegion, backendURL, secretsProvider, extraEnvVars)
+	config := stateWorkspaceConfig(cloud, targetType, stackBaseName, targetName, backendURL, secretsProvider, extraEnvVars)
 	stack, err := newStateStack(ctx, config)
 	if err != nil {
 		return nil, err
@@ -94,11 +94,10 @@ func NewStateWorkspaceStack(
 	targetType string,
 	stackBaseName string,
 	targetName string,
-	targetRegion string,
 	backendURL string,
 	secretsProvider string,
 	extraEnvVars map[string]string,
 ) (auto.Stack, error) {
-	config := stateWorkspaceConfig(cloud, targetType, stackBaseName, targetName, targetRegion, backendURL, secretsProvider, extraEnvVars)
+	config := stateWorkspaceConfig(cloud, targetType, stackBaseName, targetName, backendURL, secretsProvider, extraEnvVars)
 	return newStateStack(ctx, config)
 }

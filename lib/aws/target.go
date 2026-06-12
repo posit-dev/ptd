@@ -108,7 +108,6 @@ func (t Target) BastionId(ctx context.Context) (string, error) {
 		"workload",
 		"persistent",
 		t.Name(),
-		t.Region(),
 		t.PulumiBackendUrl(),
 		t.PulumiSecretsProviderKey(),
 		envVars,

@@ -191,7 +191,6 @@ func (t Target) BastionInfo(ctx context.Context) (*BastionInfo, error) {
 		"workload",
 		"persistent",
 		t.Name(),
-		t.Region(),
 		t.PulumiBackendUrl(),
 		t.PulumiSecretsProviderKey(),
 		envVars,
