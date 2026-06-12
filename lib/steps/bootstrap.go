@@ -42,6 +42,9 @@ func (s *BootstrapStep) Run(ctx context.Context) error {
 		return err
 	}
 
+	// NOTE: lib/attestation.collectBootstrapResources synthesizes this same
+	// resource list from PTD's naming conventions (bootstrap produces no Pulumi
+	// state). Keep the two in sync if the provisioned resources change here.
 	switch s.DstTarget.CloudProvider() {
 	case types.AWS:
 		err = s.runAws(ctx, creds, s.DstTarget.Name())

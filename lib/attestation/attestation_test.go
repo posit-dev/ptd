@@ -1,8 +1,14 @@
 package attestation
 
 import (
+	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/posit-dev/ptd/lib/aws"
+	"github.com/posit-dev/ptd/lib/azure"
+	"github.com/posit-dev/ptd/lib/pulumistate"
+	"github.com/posit-dev/ptd/lib/types"
 )
 
 func TestParseStateFile(t *testing.T) {
@@ -144,6 +150,276 @@ func TestParseStateFile(t *testing.T) {
 	}
 }
 
+func TestResourceNameFromURN(t *testing.T) {
+	tests := []struct {
+		urn  string
+		want string
+	}{
+		{"urn:pulumi:prod::proj::aws:s3/bucket:Bucket::my-bucket", "my-bucket"},
+		{"urn:pulumi:prod::proj::azure-native:containerservice:ManagedCluster::aks", "aks"},
+		// Component resources nest the type chain; the name is still the last segment.
+		{"urn:pulumi:prod::proj::my:component:Thing$aws:ec2/vpc:Vpc::my-vpc", "my-vpc"},
+		{"", ""},
+		{"no-delimiters", "no-delimiters"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.urn, func(t *testing.T) {
+			if got := resourceNameFromURN(tt.urn); got != tt.want {
+				t.Errorf("resourceNameFromURN(%q) = %q, want %q", tt.urn, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseStateFileResources(t *testing.T) {
+	stateJSON := `{
+		"version": 3,
+		"checkpoint": {
+			"latest": {
+				"manifest": {"time": "2025-01-15T10:30:00Z", "version": "3.100.0"},
+				"resources": [
+					{"type": "pulumi:pulumi:Stack", "urn": "urn:pulumi:prod::proj::pulumi:pulumi:Stack::proj-prod"},
+					{"type": "pulumi:providers:aws", "urn": "urn:pulumi:prod::proj::pulumi:providers:aws::default"},
+					{"type": "aws:s3/bucket:Bucket", "urn": "urn:pulumi:prod::proj::aws:s3/bucket:Bucket::my-bucket", "id": "my-bucket-1234"},
+					{"type": "aws:ec2/vpc:Vpc", "urn": "urn:pulumi:prod::proj::aws:ec2/vpc:Vpc::my-vpc", "id": "vpc-0abc"}
+				]
+			}
+		}
+	}`
+
+	summary, err := parseStateFile([]byte(stateJSON), ".pulumi/stacks/ptd-aws-workload-persistent/prod.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Internal resources are excluded; only the two cloud resources remain.
+	if len(summary.Resources) != 2 {
+		t.Fatalf("got %d resources, want 2", len(summary.Resources))
+	}
+
+	// Resources are sorted by type, so the VPC precedes the bucket.
+	want := []ResourceDetail{
+		{Name: "my-vpc", Type: "aws:ec2/vpc:Vpc", ID: "vpc-0abc", URN: "urn:pulumi:prod::proj::aws:ec2/vpc:Vpc::my-vpc"},
+		{Name: "my-bucket", Type: "aws:s3/bucket:Bucket", ID: "my-bucket-1234", URN: "urn:pulumi:prod::proj::aws:s3/bucket:Bucket::my-bucket"},
+	}
+	for i, w := range want {
+		got := summary.Resources[i]
+		if got != w {
+			t.Errorf("Resources[%d] = %+v, want %+v", i, got, w)
+		}
+	}
+}
+
+func TestResourceDetailDisplayID(t *testing.T) {
+	urn := "urn:pulumi:prod::proj::ptd:AzureBastion::bastion"
+	tests := []struct {
+		name string
+		res  ResourceDetail
+		want string
+	}{
+		{"cloud id present", ResourceDetail{ID: "vpc-0abc", URN: urn}, "vpc-0abc"},
+		{"empty id falls back to urn", ResourceDetail{ID: "", URN: urn}, urn},
+		{"literal none falls back to urn", ResourceDetail{ID: "none", URN: urn}, urn},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.res.DisplayID(); got != tt.want {
+				t.Errorf("DisplayID() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBootstrapSiteSecretFields(t *testing.T) {
+	got := bootstrapSiteSecretFields("main")
+	want := []string{
+		"dev-db-password",
+		"keycloak-db-password",
+		"keycloak-db-user",
+		"pkg-db-password",
+		"pkg-secret-key",
+		"pub-db-password",
+		"pub-secret-key",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("bootstrapSiteSecretFields(main) = %v, want %v", got, want)
+	}
+}
+
+func TestCollectBootstrapResourcesAzure(t *testing.T) {
+	sites := map[string]types.SiteConfig{
+		"main": {Spec: types.SiteConfigSpec{Domain: "example.com"}},
+	}
+	target := azure.NewTarget("example01-production", "sub-id", "tenant-id", "westeurope", sites, "admin-group-id", "", nil)
+
+	res := collectBootstrapResources(target)
+
+	// 5 foundational resources + 3 role assignments + 7 per-site secrets.
+	if len(res) != 15 {
+		t.Fatalf("got %d bootstrap resources, want 15", len(res))
+	}
+
+	// Spot-check that key foundational resources are present with derived IDs.
+	byName := make(map[string]ResourceDetail, len(res))
+	for _, r := range res {
+		byName[r.Name] = r
+	}
+	for _, name := range []string{
+		target.ResourceGroupName(),
+		target.StateBucketName(),
+		target.VaultName(),
+		"posit-team-dedicated", // consts.AzKeyName
+		"main-pub-db-password", // a per-site secret
+	} {
+		r, ok := byName[name]
+		if !ok {
+			t.Errorf("expected bootstrap resource %q to be present", name)
+			continue
+		}
+		if r.DisplayID() == "" {
+			t.Errorf("bootstrap resource %q has empty DisplayID", name)
+		}
+	}
+
+	// Results must be sorted by type then name.
+	if !sort.SliceIsSorted(res, func(i, j int) bool {
+		if res[i].Type != res[j].Type {
+			return res[i].Type < res[j].Type
+		}
+		return res[i].Name < res[j].Name
+	}) {
+		t.Error("bootstrap resources are not sorted by type then name")
+	}
+}
+
+func TestCollectBootstrapResourcesAWS(t *testing.T) {
+	sites := map[string]types.SiteConfig{
+		"main": {Spec: types.SiteConfigSpec{Domain: "example.com"}},
+	}
+	// createAdminPolicyAsResource is set explicitly so the expected resource
+	// count is deterministic (the admin policy is only emitted when true).
+	target := aws.NewTarget("example01-production", "123456789012", "example-profile", nil, "us-east-2", false, false, true, sites, nil)
+
+	res := collectBootstrapResources(target)
+
+	// state bucket + KMS alias + admin policy + workload secret + 3 per-site secrets.
+	if len(res) != 7 {
+		t.Fatalf("got %d bootstrap resources, want 7", len(res))
+	}
+
+	// Spot-check key resources are present with derived IDs.
+	byName := make(map[string]ResourceDetail, len(res))
+	for _, r := range res {
+		byName[r.Name] = r
+	}
+	for _, name := range []string{
+		target.StateBucketName(),
+		"example01-production.posit.team",
+		"example01-production-main.posit.team",
+		"example01-production-main.sessions.posit.team",
+		"example01-production-main-ssh-ppm-keys.posit.team",
+	} {
+		r, ok := byName[name]
+		if !ok {
+			t.Errorf("expected bootstrap resource %q to be present", name)
+			continue
+		}
+		if r.DisplayID() == "" {
+			t.Errorf("bootstrap resource %q has empty DisplayID", name)
+		}
+	}
+
+	// Results must be sorted by type then name.
+	if !sort.SliceIsSorted(res, func(i, j int) bool {
+		if res[i].Type != res[j].Type {
+			return res[i].Type < res[j].Type
+		}
+		return res[i].Name < res[j].Name
+	}) {
+		t.Error("bootstrap resources are not sorted by type then name")
+	}
+}
+
+func TestExtractKubernetesObject(t *testing.T) {
+	tests := []struct {
+		name string
+		res  pulumistate.PulumiResource
+		want KubernetesObject
+	}{
+		{
+			name: "namespaced object with uid",
+			res: pulumistate.PulumiResource{
+				Type: "kubernetes:core/v1:ConfigMap",
+				URN:  "urn:pulumi:p::proj::kubernetes:core/v1:ConfigMap::cm",
+				Outputs: map[string]interface{}{
+					"kind": "ConfigMap",
+					"metadata": map[string]interface{}{
+						"name":      "alloy-config",
+						"namespace": "alloy",
+						"uid":       "abc-123",
+					},
+				},
+			},
+			want: KubernetesObject{Kind: "ConfigMap", Namespace: "alloy", Name: "alloy-config", UID: "abc-123"},
+		},
+		{
+			name: "cluster-scoped object has no namespace",
+			res: pulumistate.PulumiResource{
+				Type: "kubernetes:core/v1:Namespace",
+				URN:  "urn:pulumi:p::proj::kubernetes:core/v1:Namespace::ns",
+				Outputs: map[string]interface{}{
+					"kind":     "Namespace",
+					"metadata": map[string]interface{}{"name": "posit-team", "uid": "ns-1"},
+				},
+			},
+			want: KubernetesObject{Kind: "Namespace", Namespace: "", Name: "posit-team", UID: "ns-1"},
+		},
+		{
+			name: "helm release: top-level name/namespace, no uid",
+			res: pulumistate.PulumiResource{
+				Type: "kubernetes:helm.sh/v3:Release",
+				URN:  "urn:pulumi:p::proj::kubernetes:helm.sh/v3:Release::traefik",
+				Outputs: map[string]interface{}{
+					"name":      "traefik",
+					"namespace": "traefik",
+				},
+			},
+			want: KubernetesObject{Kind: "Helm Release", Namespace: "traefik", Name: "traefik", UID: ""},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractKubernetesObject(tt.res)
+			if got != tt.want {
+				t.Errorf("extractKubernetesObject() = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestKubernetesObjectDisplay(t *testing.T) {
+	ns := KubernetesObject{Kind: "Namespace", Name: "posit-team", UID: "ns-1"}
+	if ns.DisplayNamespace() != "—" {
+		t.Errorf("cluster-scoped DisplayNamespace() = %q, want —", ns.DisplayNamespace())
+	}
+	if ns.DisplayUID() != "ns-1" {
+		t.Errorf("DisplayUID() = %q, want ns-1", ns.DisplayUID())
+	}
+
+	release := KubernetesObject{Kind: "Helm Release", Namespace: "traefik", Name: "traefik"}
+	if release.DisplayUID() != "— (release)" {
+		t.Errorf("Helm release DisplayUID() = %q, want — (release)", release.DisplayUID())
+	}
+	if release.DisplayNamespace() != "traefik" {
+		t.Errorf("DisplayNamespace() = %q, want traefik", release.DisplayNamespace())
+	}
+
+	orphan := KubernetesObject{Kind: "ConfigMap", Name: "x"}
+	if orphan.DisplayUID() != "—" {
+		t.Errorf("missing-uid non-release DisplayUID() = %q, want —", orphan.DisplayUID())
+	}
+}
+
 func TestStepNameFromProject(t *testing.T) {
 	tests := []struct {
 		project string
@@ -197,6 +473,63 @@ func TestPurposeForStack(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseInfraConfigExternalDNSDefault(t *testing.T) {
+	t.Run("aws omitted defaults true", func(t *testing.T) {
+		yaml := `spec:
+  vpc_cidr: 10.0.0.0/16
+`
+		cfg, err := parseAWSInfraConfig([]byte(yaml))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !cfg.ExternalDNSEnabled {
+			t.Errorf("ExternalDNSEnabled = false, want true (omitted should default true)")
+		}
+	})
+
+	t.Run("aws explicit false", func(t *testing.T) {
+		yaml := `spec:
+  external_dns_enabled: false
+`
+		cfg, err := parseAWSInfraConfig([]byte(yaml))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.ExternalDNSEnabled {
+			t.Errorf("ExternalDNSEnabled = true, want false (explicit false)")
+		}
+	})
+
+	t.Run("azure omitted defaults true", func(t *testing.T) {
+		yaml := `kind: AzureWorkloadConfig
+spec:
+  subscription_id: sub-id
+`
+		cfg, err := parseAzureInfraConfig([]byte(yaml))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !cfg.ExternalDNSEnabled {
+			t.Errorf("ExternalDNSEnabled = false, want true (omitted should default true)")
+		}
+	})
+
+	t.Run("azure explicit false", func(t *testing.T) {
+		yaml := `kind: AzureWorkloadConfig
+spec:
+  subscription_id: sub-id
+  external_dns_enabled: false
+`
+		cfg, err := parseAzureInfraConfig([]byte(yaml))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.ExternalDNSEnabled {
+			t.Errorf("ExternalDNSEnabled = true, want false (explicit false)")
+		}
+	})
 }
 
 func TestCleanVersion(t *testing.T) {
