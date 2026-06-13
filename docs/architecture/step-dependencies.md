@@ -4,7 +4,7 @@ This document explains the step execution pipeline for PTD deployments, includin
 
 ## Overview
 
-PTD organizes infrastructure deployment into sequential steps. Each step depends on resources that previous steps create. The Go CLI orchestrates step execution, while most steps use Python Pulumi to create cloud resources.
+PTD organizes infrastructure deployment into sequential steps. Each step depends on resources that previous steps create. The Go CLI orchestrates step execution; each step is an inline-Go Pulumi program (in `lib/steps`) that creates cloud resources.
 
 **Location:** `lib/steps/steps.go`
 
@@ -57,9 +57,8 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 
 ---
 
-### Step 3: postgres_config (Python) {#postgres-config}
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_workload_postgres_config.py`
-**Language:** Python/Pulumi
+### Step 3: postgres_config {#postgres-config}
+**Implementation:** `lib/steps/postgres_config.go`
 **Proxy Required:** Yes (connects to private RDS)
 
 **Creates:**
@@ -241,8 +240,8 @@ Same as workload persistent: VPC, RDS, S3, IAM roles, etc.
 
 ---
 
-### Step 3: postgres_config (Python) {#postgres-config-control-room}
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_control_room_postgres_config.py`
+### Step 3: postgres_config {#postgres-config-control-room}
+**Implementation:** `lib/steps/postgres_config.go`
 **Proxy Required:** Yes
 
 Same as workload postgres_config: database users, permissions, extensions.

@@ -13,13 +13,6 @@ repos:
         language: system
         pass_filenames: false
 
-      - id: test-python-pulumi
-        name: Test Python Pulumi
-        entry: just test-python-pulumi
-        language: system
-        pass_filenames: false
-        files: ^python-pulumi/.*\.py$
-
       - id: test-cmd
         name: Test CLI
         entry: just test-cmd

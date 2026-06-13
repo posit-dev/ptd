@@ -11,7 +11,6 @@ import (
 	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/posit-dev/ptd/lib/types"
 	awspulumi "github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	"github.com/spf13/viper"
 )
 
 type ClusterStep struct {
@@ -219,9 +218,8 @@ func (s *ClusterStep) runAWSInlineGo(ctx context.Context) error {
 		}
 	}
 
-	// ── Grafana alert + dashboard files (read from the repo, like Python) ───────
-	ptdRoot := viper.GetString("TOP")
-	alerts, dashboards, err := loadGrafanaConfigMapFiles(ptdRoot)
+	// ── Grafana alert + dashboard files (read from the embedded assets) ─────────
+	alerts, dashboards, err := loadGrafanaConfigMapFiles()
 	if err != nil {
 		return fmt.Errorf("cluster: failed to load grafana alert/dashboard files: %w", err)
 	}

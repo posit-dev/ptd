@@ -176,10 +176,6 @@ ptd --targets-config-dir ./test-configs-1 ensure workload01
 ptd --targets-config-dir ./test-configs-2 ensure workload01
 ```
 
-## Integration with Python
-
-The PTD CLI automatically passes the targets configuration directory to Python Pulumi stacks via the `PTD_ROOT` environment variable. You don't need to configure anything in Python - it automatically receives the correct path from the Go CLI.
-
 ## Troubleshooting
 
 ### Error: Directory does not exist

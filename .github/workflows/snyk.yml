@@ -21,17 +21,6 @@ jobs:
 
       - uses: snyk/actions/setup@0.4.0
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-
-      - name: Set up Python
-        run: uv python install
-        working-directory: python-pulumi
-
-      - name: Install deps
-        run: uv sync
-        working-directory: python-pulumi
-
       - uses: warjiang/setup-skopeo@main
 
       - uses: actions/setup-go@v5
@@ -62,7 +51,6 @@ jobs:
       - name: Snyk check for open source dependency vulnerabilities
         # Scan specific projects instead of --all-projects to avoid Snyk CLI packageURL validation issues
         # Note: cmd/go.mod excluded due to Snyk CLI bug with Go module name validation
-        # Note: python-pulumi excluded - Snyk doesn't support uv/pyproject.toml
         run: |
           snyk monitor --policy-path=.snyk --file=lib/go.mod
         env:
