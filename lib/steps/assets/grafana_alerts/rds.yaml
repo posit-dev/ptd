@@ -43,7 +43,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: aws_rds_cpuutilization_average{job="integrations/cloudwatch"}
+                expr: aws_rds_cpuutilization_average{job="integrations/cloudwatch", dimension_DBInstanceIdentifier!=""}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -112,7 +112,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: aws_rds_free_storage_space_average{job="integrations/cloudwatch"}
+                expr: aws_rds_free_storage_space_average{job="integrations/cloudwatch", dimension_DBInstanceIdentifier!=""}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -182,7 +182,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: aws_rds_free_storage_space_average{job="integrations/cloudwatch"}
+                expr: aws_rds_free_storage_space_average{job="integrations/cloudwatch", dimension_DBInstanceIdentifier!=""}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -252,7 +252,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: aws_rds_freeable_memory_average{job="integrations/cloudwatch"}
+                expr: aws_rds_freeable_memory_average{job="integrations/cloudwatch", dimension_DBInstanceIdentifier!=""}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -322,7 +322,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: aws_rds_database_connections_average{job="integrations/cloudwatch"}
+                expr: aws_rds_database_connections_average{job="integrations/cloudwatch", dimension_DBInstanceIdentifier!=""}
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
