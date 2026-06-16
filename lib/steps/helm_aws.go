@@ -893,6 +893,29 @@ func awsHelmLoki(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName
 		withAlias("kubernetes:helm.cattle.io/v1:HelmChart", resourceName))
 }
 
+// grafanaIngressValues builds the Grafana Helm ingress values.
+//
+// Grafana is routed through traefik-forward-auth only when the main site opts into it.
+// The forward-auth middlewares (kube-system-traefik-forward-auth-main and
+// -add-forwarded-headers) are created by the clusters step only when a site sets
+// use_traefik_forward_auth: true. Adding the annotation unconditionally leaves the
+// Grafana ingress referencing a non-existent middleware on workloads that don't enable
+// forward-auth, which makes Traefik invalidate the router (HTTP 404). Otherwise Grafana
+// authenticates with local accounts and the ingress should route straight through.
+func grafanaIngressValues(domain string, sites map[string]types.SiteConfig) map[string]interface{} {
+	ingress := map[string]interface{}{
+		"enabled": true,
+		"hosts":   []interface{}{fmt.Sprintf("grafana.%s", domain)},
+		"path":    "/",
+	}
+	if mainSite, ok := sites["main"]; ok && mainSite.Spec.UseTraefikForwardAuth {
+		ingress["annotations"] = map[string]interface{}{
+			"traefik.ingress.kubernetes.io/router.middlewares": "kube-system-traefik-forward-auth-add-forwarded-headers@kubernetescrd,kube-system-traefik-forward-auth-main@kubernetescrd",
+		}
+	}
+	return ingress
+}
+
 func awsHelmGrafana(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName, release string,
 	params awsHelmParams, version string,
 	withAlias func(string, string) pulumi.ResourceOption) error {
@@ -936,14 +959,7 @@ func awsHelmGrafana(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	values := map[string]interface{}{
 		"envFromSecret": "grafana-db-url",
 		"grafana.ini":   iniCfg,
-		"ingress": map[string]interface{}{
-			"enabled": true,
-			"annotations": map[string]interface{}{
-				"traefik.ingress.kubernetes.io/router.middlewares": "kube-system-traefik-forward-auth-add-forwarded-headers@kubernetescrd,kube-system-traefik-forward-auth-main@kubernetescrd",
-			},
-			"hosts": []interface{}{fmt.Sprintf("grafana.%s", domain)},
-			"path":  "/",
-		},
+		"ingress":       grafanaIngressValues(domain, params.cfg.Sites),
 		"datasources": map[string]interface{}{
 			"datasources.yaml": map[string]interface{}{
 				"apiVersion": 1,
