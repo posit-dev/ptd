@@ -4,10 +4,10 @@ on:
   push:
     branches: [main]
     tags: [v*]
-    paths: [cmd/**,lib/**,.github/workflows/cli.yml]
+    paths: [cmd/**,lib/**,.github/workflows/cmd.yml,.github/actions/go-cache/**]
 
   pull_request:
-    paths: [cmd/**,lib/**,.github/workflows/cli.yml]
+    paths: [cmd/**,lib/**,.github/workflows/cmd.yml,.github/actions/go-cache/**]
 
   merge_group:
 jobs:
@@ -24,10 +24,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: cmd/go.mod
-          cache: true
-          cache-dependency-path: |
-            cmd/go.sum
-            lib/go.sum
+          cache: false
+
+      - uses: ./.github/actions/go-cache
+        with:
+          prefix: cmd-test
 
       - name: Test cmd
         run: just test-cmd
@@ -45,10 +46,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: cmd/go.mod
-          cache: true
-          cache-dependency-path: |
-            cmd/go.sum
-            lib/go.sum
+          cache: false
+
+      - uses: ./.github/actions/go-cache
+        with:
+          prefix: cmd-build
 
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6

@@ -4,10 +4,10 @@ on:
   push:
     branches: [main]
     tags: [v*]
-    paths: [lib/**,.github/workflows/lib.yml]
+    paths: [lib/**,.github/workflows/lib.yml,.github/actions/go-cache/**]
 
   pull_request:
-    paths: [lib/**,.github/workflows/lib.yml]
+    paths: [lib/**,.github/workflows/lib.yml,.github/actions/go-cache/**]
 
   merge_group:
 jobs:
@@ -24,9 +24,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: lib/go.mod
-          cache: true
-          cache-dependency-path: |
-            lib/go.sum
+          cache: false
+
+      - uses: ./.github/actions/go-cache
+        with:
+          prefix: lib-test
 
       - name: Test lib with coverage
         run: just test-lib

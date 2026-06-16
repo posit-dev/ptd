@@ -1,0 +1,27 @@
+name: Go build and module cache
+description: >-
+  Self-refreshing cache for the Go build cache (~/.cache/go-build) and module
+  cache (~/go/pkg/mod). Keyed on a hash of the Go sources and go.sum so the key
+  rotates when source changes (immutable cache entries can then re-save), with a
+  prefix-based restore-keys fallback to recover the most recent prior cache for
+  an incremental rebuild. Use a distinct prefix per job to keep namespaces
+  separate.
+
+inputs:
+  prefix:
+    description: >-
+      Cache namespace for this job (e.g. cmd-test, cmd-build, lib-test). Keeps
+      each job's cache separate so differing build fingerprints do not collide.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-gocache-${{ inputs.prefix }}-${{ hashFiles('**/*.go', '**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-gocache-${{ inputs.prefix }}-
