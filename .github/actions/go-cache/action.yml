@@ -4,15 +4,19 @@ description: >-
   cache (~/go/pkg/mod). Keyed on a hash of the Go sources and go.sum so the key
   rotates when source changes (immutable cache entries can then re-save), with a
   prefix-based restore-keys fallback to recover the most recent prior cache for
-  an incremental rebuild. Use a distinct prefix per job to keep namespaces
-  separate.
+  an incremental rebuild. Jobs that build with the same Go flags (here, all jobs
+  run CGO_ENABLED=0 with no -trimpath) can share one prefix so each job warms the
+  others; pass a distinct prefix only to isolate a job with a different build
+  fingerprint.
 
 inputs:
   prefix:
     description: >-
-      Cache namespace for this job (e.g. cmd-test, cmd-build, lib-test). Keeps
-      each job's cache separate so differing build fingerprints do not collide.
-    required: true
+      Cache namespace. Jobs sharing a build fingerprint should share a prefix so
+      compiled packages are reused across jobs. Override only to isolate a job
+      whose build flags differ.
+    required: false
+    default: go
 
 runs:
   using: composite

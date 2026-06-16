@@ -10,6 +10,12 @@ on:
     paths: [lib/**,.github/workflows/lib.yml,.github/actions/go-cache/**]
 
   merge_group:
+
+# Build and test with cgo disabled to match the shipped binary and share one
+# go-cache namespace across the cmd and lib workflows.
+env:
+  CGO_ENABLED: "0"
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -27,8 +33,6 @@ jobs:
           cache: false
 
       - uses: ./.github/actions/go-cache
-        with:
-          prefix: lib-test
 
       - name: Test lib with coverage
         run: just test-lib

@@ -10,6 +10,13 @@ on:
     paths: [cmd/**,lib/**,.github/workflows/cmd.yml,.github/actions/go-cache/**]
 
   merge_group:
+
+# Build and test with cgo disabled to match the shipped binary (goreleaser sets
+# CGO_ENABLED=0). Keeping every job on one build fingerprint lets them share a
+# single go-cache namespace.
+env:
+  CGO_ENABLED: "0"
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -27,8 +34,6 @@ jobs:
           cache: false
 
       - uses: ./.github/actions/go-cache
-        with:
-          prefix: cmd-test
 
       - name: Test cmd
         run: just test-cmd
@@ -49,8 +54,6 @@ jobs:
           cache: false
 
       - uses: ./.github/actions/go-cache
-        with:
-          prefix: cmd-build
 
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6
