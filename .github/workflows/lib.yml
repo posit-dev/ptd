@@ -21,11 +21,6 @@ jobs:
 
       - uses: extractions/setup-just@v2
 
-      - name: Install requirements
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgpgme-dev libbtrfs-dev
-
       - uses: actions/setup-go@v5
         with:
           go-version-file: lib/go.mod
