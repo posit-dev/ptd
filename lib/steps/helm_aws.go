@@ -20,7 +20,6 @@ import (
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	schedulingv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/scheduling/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	"github.com/spf13/viper"
 	yamlv2 "gopkg.in/yaml.v2"
 )
 
@@ -1142,7 +1141,6 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 		sites:                      params.cfg.Sites,
 		workloadDir:                params.workloadDir,
 		filterControlRoomMetrics:   params.cfg.FilterControlRoomMetrics,
-		ptdRoot:                    viper.GetString("TOP"),
 	}
 	alloyConfigStr := buildAlloyConfig(alloyParams)
 

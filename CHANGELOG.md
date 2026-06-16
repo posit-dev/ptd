@@ -1,3 +1,10 @@
+## [1.31.2](https://github.com/posit-dev/ptd/compare/v1.31.1...v1.31.2) (2026-06-16)
+
+
+### Bug Fixes
+
+* **alerts:** make RDS alerts identify the specific database ([2897125](https://github.com/posit-dev/ptd/commit/28971250839b34cb5d73d6aa89ba45df30f06ec4))
+
 ## [1.31.1](https://github.com/posit-dev/ptd/compare/v1.31.0...v1.31.1) (2026-06-04)
 
 

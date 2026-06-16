@@ -1827,7 +1827,7 @@ func buildPersistentZonesAndCerts(
 		// Only create the CertificateValidation when certificate_validation_enabled
 		// (Python default True). Validation records are always built (above) for
 		// the stack outputs; the CertificateValidation resource that *waits* on
-		// them is gated. example-style sites set this false.
+		// them is gated. Sites that disable certificate_validation_enabled set this false.
 		if primarySpec.CertificateValidationEnabled == nil || *primarySpec.CertificateValidationEnabled {
 			if _, verr := acm.NewCertificateValidation(ctx, fmt.Sprintf("%s-cert-validation-%s", cn, dashifyDomain), &acm.CertificateValidationArgs{
 				CertificateArn: cert.Arn,

@@ -2,12 +2,12 @@
 
 This document covers Pulumi-specific conventions that are critical for making correct changes to PTD infrastructure code without accidentally destroying resources.
 
+All PTD infrastructure is defined in inline-Go Pulumi programs under `lib/steps` (with shared builders in `lib/aws` and `lib/azure`), compiled into the `ptd` binary.
+
 ## Table of contents
 - [Resource naming (CRITICAL)](#resource-naming-critical)
-- [The autoload pattern](#the-autoload-pattern)
 - [Constructor patterns](#constructor-patterns)
 - [Output[T] handling](#outputt-handling)
-- [Key classes and their roles](#key-classes-and-their-roles)
 
 ---
 
@@ -23,26 +23,24 @@ Pulumi resources have two kinds of names:
    - Pulumi uses this to track resources across updates
    - Not visible in cloud console
 
-2. Physical name (the `name` field in resource args)
+2. Physical name (the `Name`/`Bucket`/etc. field in resource args)
    - This is the actual name in AWS/Azure/Kubernetes
    - Appears in cloud console, CLI output, etc.
    - Can sometimes be changed without destroying the resource (depends on cloud provider)
 
 ### Example
 
-```python
-# DON'T DO THIS (changes logical name)
-aws.s3.Bucket(
-    f"{compound_name}-loki",  # ❌ If compound_name changes, bucket is DESTROYED
-    bucket=f"{compound_name}-loki-logs",
-    ...
+```go
+// DON'T DO THIS (logical name depends on compoundName)
+aws.NewBucket(ctx,
+    fmt.Sprintf("%s-loki", compoundName), // if compoundName changes, the bucket is DESTROYED
+    &aws.BucketArgs{Bucket: pulumi.String(fmt.Sprintf("%s-loki-logs", compoundName))},
 )
 
-# DO THIS (stable logical name)
-aws.s3.Bucket(
-    f"loki-logs-bucket",  # ✅ Stable logical name
-    bucket=f"{compound_name}-loki-logs",  # Physical name can change
-    ...
+// DO THIS (stable logical name)
+aws.NewBucket(ctx,
+    "loki-logs-bucket", // stable logical name
+    &aws.BucketArgs{Bucket: pulumi.String(fmt.Sprintf("%s-loki-logs", compoundName))}, // physical name can change
 )
 ```
 
@@ -52,64 +50,45 @@ aws.s3.Bucket(
 
 ### Resource naming patterns
 
-PTD uses consistent naming patterns. Here are common patterns found in the codebase:
+PTD uses consistent naming patterns. The naming helpers are implemented in Go and produce these physical names verbatim for state adoption.
 
 #### AWS naming patterns
 
 ##### IAM roles
-**Pattern:** `f"{purpose}.{compound_name}.posit.team"`
+**Pattern:** `{purpose}.{compound_name}.posit.team`
 
-```python
-# Example from aws_workload.py
-def team_operator_role_name(self) -> str:
-    return f"team-operator.{self.compound_name}.posit.team"
-
-# Creates: "team-operator.myworkload-staging.posit.team"
-```
+Example: `team-operator.myworkload-staging.posit.team`
 
 **Usage locations:**
-- `python-pulumi/src/ptd/aws_workload.py`
-- IAM role names for EKS IAM Roles for Service Accounts (IRSA)
+- `lib/aws` and `lib/steps` (e.g. IAM role names for EKS IAM Roles for Service Accounts (IRSA))
 
 ---
 
 ##### S3 buckets
-**Pattern:** `f"{compound_name}-{purpose}"`
+**Pattern:** `{compound_name}-{purpose}`
 
-```python
-# S3 bucket naming pattern (implemented in the Go persistent step)
-loki_bucket = aws.s3.Bucket(
-    f"{self.workload.compound_name}-loki",
-    bucket=f"{self.workload.compound_name}-loki",
-    ...
-)
-
-# Creates: "myworkload-staging-loki"
-```
+Example: `myworkload-staging-loki`
 
 **Usage locations:**
-- `lib/steps/persistent_aws.go` (Go implementation of the persistent step)
+- `lib/steps/persistent_aws.go` (the persistent step)
 - Loki logs, Mimir metrics, general storage buckets
 
 ---
 
 ##### EKS clusters
-**Pattern:** `default_{compound_name}-control-plane`
+The EKS `aws.eks.Cluster` resource name (first arg / `name`) differs by target type:
+- Workload: `{compound_name}-{release}`
+- Control room: bare `{compound_name}`
 
-```go
-// Example from lib/aws/eks_cluster.go
-clusterName := fmt.Sprintf("default_%s-control-plane", compoundName)
-
-// Creates: "default_myworkload-staging-control-plane"
-```
+**Do NOT** use `default_{compound_name}-control-plane` as the cluster resource name. That string is the kubeconfig *context* name, not the cluster's name; using it as the resource name would replace the live control plane.
 
 **Usage locations:**
-- `lib/aws/eks_cluster.go`, `lib/steps/eks_aws.go`
+- `lib/aws/eks_cluster.go`, `lib/aws/eks_cluster_cr.go`, `lib/steps/eks_aws.go`, `lib/steps/cluster_aws.go`
 
 ---
 
 ##### Helm releases
-**Pattern:** `f"{compound_name}-{release}-{component}"`
+**Pattern (logical name):** `{compound_name}-{release}-{component}`
 
 ```go
 // Example from lib/steps/helm_aws.go
@@ -119,8 +98,8 @@ apiextensions.NewCustomResource(ctx,
         Metadata: metav1.ObjectMetaArgs{
             Name: pulumi.String("aws-fsx-openzfs-csi"), // physical name (what appears in K8s)
         },
-        ...
-    }, ...)
+        // ...
+    })
 
 // Logical name: "myworkload-staging-r1-aws-fsx-openzfs-csi-helm-release"
 // Physical name: "aws-fsx-openzfs-csi"
@@ -133,58 +112,28 @@ apiextensions.NewCustomResource(ctx,
 
 #### Azure naming patterns
 
-Azure has strict naming constraints. All naming methods are on the `AzureWorkload` class in `python-pulumi/src/ptd/azure_workload.py`.
+Azure has strict naming constraints. The Azure naming helpers live in `lib/azure` and the Azure steps in `lib/steps`.
 
 ##### Resource groups
-**Pattern:** `f"rsg-ptd-{sanitized_name}"`
+**Pattern:** `rsg-ptd-{sanitized_name}` (lowercase, non-`[a-z0-9-]` replaced with `-`)
 
-```python
-# Example from azure_workload.py
-@property
-def resource_group_name(self) -> str:
-    name = self.compound_name.lower()
-    name = re.sub(r"[^a-z0-9-]", "-", name)
-    return f"rsg-ptd-{name}"
-
-# Creates: "rsg-ptd-myworkload-staging"
-```
+Example: `rsg-ptd-myworkload-staging`
 
 ---
 
 ##### Key Vault
-**Pattern:** `f"kv-ptd-{compound_name[:17]}"` (max 24 chars total)
+**Pattern:** `kv-ptd-{compound_name[:17]}` (max 24 chars total)
 
-```python
-# Example from azure_workload.py
-@functools.cached_property
-def key_vault_name(self) -> str:
-    name = self.compound_name.lower()
-    name = re.sub(r"[^a-z0-9-]", "-", name)
-    name = name[:17]  # Truncate to fit max length
-    return f"kv-ptd-{name}"
-
-# Creates: "kv-ptd-myworkload-st" (truncated if necessary)
-```
+Example: `kv-ptd-myworkload-st` (truncated if necessary)
 
 **Critical:** Key Vault names have a 24-character limit. The compound name is truncated to 17 chars to leave room for the `kv-ptd-` prefix.
 
 ---
 
 ##### Storage accounts
-**Pattern:** `f"stptd{compound_name_no_hyphens[:19]}"` (max 24 chars, NO hyphens)
+**Pattern:** `stptd{compound_name_no_hyphens[:19]}` (max 24 chars, NO hyphens)
 
-```python
-# Example from azure_workload.py
-@property
-def storage_account_name(self) -> str:
-    name = self.compound_name.lower()
-    name = re.sub(r"[^a-z0-9-]", "-", name)
-    name = name.replace("-", "")  # Remove ALL hyphens
-    name = name[:19]
-    return f"stptd{name}"
-
-# Creates: "stptdmyworkloadstaging" (no hyphens!)
-```
+Example: `stptdmyworkloadstaging` (no hyphens)
 
 **Critical:** Storage account names:
 - Cannot contain hyphens (Azure requirement)
@@ -194,33 +143,19 @@ def storage_account_name(self) -> str:
 ---
 
 ##### VNets
-**Pattern:** `f"vnet-ptd-{compound_name}"`
+**Pattern:** `vnet-ptd-{compound_name}`
 
-```python
-# Example from azure_workload.py
-@property
-def vnet_name(self) -> str:
-    return f"vnet-ptd-{self.compound_name}"
-
-# Creates: "vnet-ptd-myworkload-staging"
-```
+Example: `vnet-ptd-myworkload-staging`
 
 ---
 
 ##### AKS clusters
-**Pattern:** `f"{compound_name}-{release}"`
+**Pattern:** `{compound_name}-{release}`
 
-```python
-# Example from azure_workload.py
-def cluster_name(self, release: str) -> str:
-    return f"{self.compound_name}-{release}"
-
-# Creates: "myworkload-staging-r1"
-```
+Example: `myworkload-staging-r1`
 
 **Usage locations:**
-- `python-pulumi/src/ptd/azure_workload.py`
-- All Azure resource naming methods
+- `lib/azure`, `lib/steps/aks.go`
 
 ---
 
@@ -228,105 +163,31 @@ def cluster_name(self, release: str) -> str:
 
 Add comments to warn future editors:
 
-```python
-# CRITICAL: This logical name is in Pulumi state. Changing it will DESTROY the RDS instance.
-rds_instance = aws.rds.Instance(
-    "postgresql-primary",  # ← Comment above this line
-    identifier=f"{self.workload.compound_name}-postgres",
-    ...
+```go
+// CRITICAL: This logical name is in Pulumi state. Changing it will DESTROY the RDS instance.
+rds.NewInstance(ctx,
+    "postgresql-primary", // <- comment above this line
+    &rds.InstanceArgs{Identifier: pulumi.String(fmt.Sprintf("%s-postgres", compoundName))},
 )
 ```
 
 ---
 
-## The autoload pattern (legacy)
-
-PTD historically used a convention where Python Pulumi modules were dynamically
-loaded by Go-generated `__main__.py` files.
-
-> **Note:** All built-in `ptd ensure` steps have been migrated to inline Go
-> Pulumi programs — no first-party step uses the autoload path anymore. The
-> machinery in `lib/pulumi/python.go` remains for `ptd workon` and custom steps.
-> This section is retained as a description of the legacy pattern.
-
-### How it works
-
-1. Go generates `__main__.py` (see `WriteMainPy` in `lib/pulumi/python.go`):
-   ```python
-   import ptd.pulumi_resources.<module>
-
-   ptd.pulumi_resources.<module>.<Class>.autoload()
-   ```
-
-2. Python module provides an `autoload()` classmethod:
-   ```python
-   class <Class>(pulumi.ComponentResource):
-       @classmethod
-       def autoload(cls) -> "<Class>":
-           # Reads stack name from Pulumi context
-           stack_name = pulumi.get_stack()
-           # Creates workload object from YAML
-           workload = ptd.aws_workload.AWSWorkload(stack_name)
-           # Instantiates the component
-           return cls(workload=workload)
-   ```
-
-3. Component constructor creates all resources:
-   ```python
-   def __init__(self, workload: ptd.aws_workload.AWSWorkload):
-       super().__init__(f"ptd:{self.__class__.__name__}", workload.compound_name)
-       # Create resources here
-   ```
-
-### Naming convention
-
-| Element | Format | Example |
-|---------|--------|---------|
-| **Module name** | `{cloud}_{target_type}_{step_name}` | `aws_workload_bucket` |
-| **Class name** | `{Cloud}{TargetType}{StepName}` | `AWSWorkloadBucket` |
-
-**Special cases** (see the `classCloud` / `TitleCase` handling in `lib/pulumi/python.go`):
-- `"aws"` → `"AWS"` (not `"Aws"`)
-- `"postgres_config"` → `"PostgresConfig"`
-
-**Generated file location:** Pulumi workspace directory (temporary, not source-controlled)
-
----
-
 ## Constructor patterns
 
-PTD uses three main patterns for Pulumi component constructors:
+PTD uses two main patterns for building Pulumi resources in Go:
 
-### Pattern 1: All-in-constructor
-**Example:** `CertManager`
+### Pattern 1: Inline deploy function
 
-All resources created in `__init__`, call `register_outputs({})` at the end.
+Most steps build all of their resources in a single deploy function that takes a `*pulumi.Context` and the parsed config. Used for simple to moderate steps with no incremental builder needs.
 
-```python
-class CertManager(pulumi.ComponentResource):
-    def __init__(self, workload, provider, **kwargs):
-        super().__init__(f"ptd:{self.__class__.__name__}", workload.compound_name, **kwargs)
-
-        # Create all resources
-        self.namespace = k8s.core.v1.Namespace(...)
-        self.helm_release = k8s.helm.v3.Release(...)
-
-        # Register outputs
-        self.register_outputs({})
-```
-
-**When to use:**
-- Simple components with no conditional logic
-- All resources created unconditionally
-
-**Azure note:** Azure workload components consistently use this pattern with `_define_*()` helper methods (no builder pattern).
-
----
+**Azure note:** Azure workload/persistent resources use this pattern; there is no builder.
 
 ### Pattern 2: Builder/chaining
+
 **Example:** `EKSCluster` (`lib/aws/eks_cluster.go`)
 
-The constructor sets up state, then `With*()` methods build resources incrementally and return the builder for chaining. This Go builder is a faithful port of the original Python `AWSEKSCluster` ComponentResource (the old `ptd:AWSEKSCluster` type token still appears in alias URNs so existing Pulumi state is adopted, not replaced).
+A constructor sets up state, then `With*()` methods build resources incrementally and return the builder for chaining. The `ptd:AWSEKSCluster` type token still appears in alias URNs so existing Pulumi state is adopted, not replaced.
 
 ```go
 // lib/aws/eks_cluster.go
@@ -336,431 +197,83 @@ c.WithNodeRole(roleName).        // must run before WithNodeGroup (sets the defa
     WithOidcProvider()
 ```
 
-**When to use:**
-- Complex resources with many optional components
-- Want to expose a fluent API for configuration
+**Important:** Builder methods on `EKSCluster` have ordering dependencies. For example, `WithNodeRole()` must be called before `WithNodeGroup()` because it sets the default node role consumed by the node group.
 
-**Important:** Builder methods on `EKSCluster` have ordering dependencies that mirror the original Python builder. For example, `WithNodeRole()` must be called before `WithNodeGroup()` because it sets the default node role consumed by the node group.
-
-**Azure note:** Azure does NOT use the builder pattern. AKS cluster creation is handled in Go (`lib/steps/aks.go`) using the all-in-one deploy-function pattern with no ordering dependencies.
-
----
-
-### Pattern 3: Autoload + constructor
-**Example:** `AWSWorkloadHelm`, `AzureWorkloadHelm`
-
-`autoload()` classmethod loads config, then `__init__` creates resources.
-
-```python
-class AWSWorkloadHelm(pulumi.ComponentResource):
-    @classmethod
-    def autoload(cls) -> "AWSWorkloadHelm":
-        return cls(workload=ptd.aws_workload.AWSWorkload(pulumi.get_stack()))
-
-    def __init__(self, workload: ptd.aws_workload.AWSWorkload):
-        super().__init__(f"ptd:{self.__class__.__name__}", workload.compound_name)
-
-        self.workload = workload
-        # Create resources
-        self._define_traefik(...)
-        self._define_loki(...)
-```
-
-**When to use:**
-- Components invoked via Go-generated `__main__.py`
-- Need to load configuration from YAML before creating resources
+**Azure note:** Azure does NOT use the builder pattern. AKS cluster creation is handled in `lib/steps/aks.go` using the inline deploy-function pattern with no ordering dependencies.
 
 ---
 
 ## Output[T] handling
 
-Pulumi resources return `Output[T]` (similar to promises/futures) instead of plain values. You **cannot use outputs directly** in f-strings or conditionals.
+Pulumi resources return `pulumi.Output[T]` (similar to promises/futures) instead of plain values. You **cannot use outputs directly** in string formatting or conditionals.
 
 ### Problem
 
-```python
-# ❌ WRONG - outputs can't be used directly
-bucket_name = bucket.id  # This is Output[str], not str
-print(f"Created bucket: {bucket_name}")  # Won't work as expected
+```go
+// WRONG - outputs can't be used directly
+bucketName := bucket.ID() // this is pulumi.IDOutput, not a string
+fmt.Printf("Created bucket: %s\n", bucketName) // won't print the resolved value
 ```
 
-### Solution 1: `.apply()`
+### Solution 1: ApplyT
 
-Use `.apply()` to transform outputs:
+Use `ApplyT` to transform a single output:
 
-```python
-# ✅ Correct
-bucket_name = bucket.id.apply(lambda name: f"s3://{name}")
+```go
+url := bucket.ID().ApplyT(func(id pulumi.ID) string {
+    return fmt.Sprintf("s3://%s", id)
+}).(pulumi.StringOutput)
 ```
 
-### Solution 2: `Output.all()` for multiple outputs
+### Solution 2: pulumi.All for multiple outputs
 
 Combine multiple outputs before transforming:
 
-```python
-# ✅ Correct
-url = pulumi.Output.all(bucket.id, key.id).apply(
-    lambda args: f"s3://{args[0]}/{args[1]}"
-)
+```go
+url := pulumi.All(bucket.ID(), key.ID()).ApplyT(func(args []interface{}) string {
+    return fmt.Sprintf("s3://%s/%s", args[0], args[1])
+}).(pulumi.StringOutput)
 ```
 
-### Solution 3: Use outputs in resource args
+### Solution 3: Pass outputs straight into resource args
 
-Pulumi automatically unwraps outputs when passed to resource constructors:
-
-```python
-# ✅ Correct - Pulumi handles Output[str] automatically
-policy = aws.iam.Policy(
-    "my-policy",
-    policy=bucket.arn.apply(lambda arn: json.dumps({
-        "Statement": [{
-            "Resource": arn,
-            ...
-        }]
-    }))
-)
-```
-
-### Testing with mocks
-
-In tests using `pulumi.runtime.set_mocks()`, outputs resolve synchronously:
-
-```python
-@pulumi.runtime.test
-def test_something():
-    pulumi.runtime.set_mocks(...)
-
-    bucket = aws.s3.Bucket("test-bucket")
-    # In tests, .id resolves immediately
-    assert bucket.id == "test-bucket"
-```
-
----
-
-## Key classes and their roles
-
-### AbstractWorkload
-**Location:** `python-pulumi/src/ptd/workload.py`
-
-**Role:** Base class for all workload types (AWS, Azure). Loads configuration from YAML.
-
-**Key methods:**
-- `__init__(name, paths)`: Loads `ptd.yaml` from disk
-- `load_unique_config()`: Abstract method for cloud-specific config
-- `compound_name`: Property returning `"{true_name}-{environment}"`
-
-**Example:**
-```python
-class AbstractWorkload(ABC):
-    def __init__(self, name: str, paths: ptd.paths.Paths | None = None):
-        self.d = (paths or ptd.paths.Paths()).workloads / name
-        cfg_dict = yaml.safe_load(self.ptd_yaml.read_text())
-        self._load_common_config()
-        self.load_unique_config()
-```
-
----
-
-### AWSWorkload
-**Location:** `python-pulumi/src/ptd/aws_workload.py`
-
-**Role:** AWS-specific workload config loading, role name generation, naming conventions.
-
-**Key methods:**
-- `load_unique_config()`: Parses AWS-specific YAML into `AWSWorkloadConfig`
-- `team_operator_role_name()`: Returns IAM role name for Team Operator
-- `aws_assume_role()`: Returns temporary credentials for workload account
-- `managed_clusters_by_release()`: Returns cluster info for all releases
-
-**Example:**
-```python
-class AWSWorkload(AbstractWorkload):
-    cfg: AWSWorkloadConfig
-
-    def load_unique_config(self) -> None:
-        # Parse AWS-specific config from YAML
-        self.cfg = AWSWorkloadConfig(**self.spec)
-
-    @property
-    def team_operator_role_name(self) -> str:
-        return f"team-operator.{self.compound_name}.posit.team"
-```
-
----
-
-### AzureWorkload
-**Location:** `python-pulumi/src/ptd/azure_workload.py`
-
-**Role:** Azure-specific workload config loading, naming with strict character limits.
-
-**Key methods:**
-- `load_unique_config()`: Parses Azure-specific YAML into `AzureWorkloadConfig`
-- `resource_group_name`: Returns sanitized resource group name (`f"rsg-ptd-{name}"`)
-- `key_vault_name`: Returns Key Vault name with 24-char limit (`f"kv-ptd-{name[:17]}"`)
-- `storage_account_name`: Returns storage account name with NO hyphens (`f"stptd{name_no_hyphens[:19]}"`)
-- `cluster_name(release)`: Returns AKS cluster name (`f"{compound_name}-{release}"`)
-- `vnet_name`: Returns VNet name (`f"vnet-ptd-{compound_name}"`)
-
-**Example:**
-```python
-class AzureWorkload(AbstractWorkload):
-    cfg: AzureWorkloadConfig
-
-    def load_unique_config(self) -> None:
-        # Parse Azure-specific config from YAML
-        self.cfg = AzureWorkloadConfig(**self.spec)
-
-    @property
-    def storage_account_name(self) -> str:
-        name = self.compound_name.lower()
-        name = re.sub(r"[^a-z0-9-]", "-", name)
-        name = name.replace("-", "")  # Remove ALL hyphens
-        name = name[:19]
-        return f"stptd{name}"
-```
-
-**Note:** Both AKS (`lib/steps/aks.go`) and EKS (`lib/steps/eks.go`, `lib/aws/eks_cluster.go`) cluster creation are implemented in Go as inline Pulumi programs.
-
----
-
-### WorkloadConfig / AWSWorkloadConfig / AzureWorkloadConfig
-**Location:** `python-pulumi/src/ptd/__init__.py`, `python-pulumi/src/ptd/aws_workload.py`, `python-pulumi/src/ptd/azure_workload.py`
-
-**Role:** Frozen dataclasses holding parsed configuration.
-
-**Key fields:**
-```python
-@dataclasses.dataclass(frozen=True)
-class WorkloadConfig:
-    true_name: str
-    environment: str
-    region: str
-    control_room_account_id: str
-    control_room_cluster_name: str
-    network_trust: NetworkTrust
-
-@dataclasses.dataclass(frozen=True)
-class AWSWorkloadConfig(WorkloadConfig):
-    account_id: str
-    tailscale_enabled: bool
-    clusters: dict[str, AWSWorkloadClusterConfig]
-    # ... many more AWS-specific fields
-
-@dataclasses.dataclass(frozen=True)
-class AzureWorkloadConfig(WorkloadConfig):
-    subscription_id: str
-    tenant_id: str
-    client_id: str
-    network: NetworkConfig  # Nested dataclass for Azure
-    clusters: dict[str, AzureWorkloadClusterConfig]
-    # ... Azure-specific fields
-```
-
-**Usage:**
-```python
-# AWS
-workload = AWSWorkload("myworkload-staging")
-print(workload.cfg.account_id)  # "123456789012"
-print(workload.cfg.region)       # "us-east-1"
-
-# Azure
-workload = AzureWorkload("myworkload-staging")
-print(workload.cfg.subscription_id)  # "abc-123-def"
-print(workload.cfg.network.vnet_cidr)  # "10.0.0.0/16"
-```
-
----
-
-### pulumi.ComponentResource
-**Location:** Pulumi SDK
-
-**Role:** Base class for all PTD infrastructure modules.
-
-**Pattern:**
-```python
-class MyComponent(pulumi.ComponentResource):
-    def __init__(self, name, **kwargs):
-        super().__init__(
-            f"ptd:{self.__class__.__name__}",  # Type identifier
-            name,                                # Logical name
-            **kwargs
-        )
-        # Create child resources
-        self.register_outputs({})  # Optional: export outputs
-```
-
-**Why use it:**
-- Groups related resources together in Pulumi state
-- Provides encapsulation for complex infrastructure
-- Allows custom resource providers
+Pulumi automatically unwraps outputs when passed to resource constructors, so an output can be threaded into another resource's args without resolving it manually.
 
 ---
 
 ## Common mistakes to avoid
 
 ### 1. Changing logical names without planning
-**Mistake:**
-```python
-# Old code
-aws.s3.Bucket(f"{workload.compound_name}-loki", ...)
+Changing the first argument to a resource constructor (the logical name) renames the state key, which Pulumi treats as DELETE + CREATE. For stateful resources (RDS, S3 with data, VPCs) this is catastrophic. Use `pulumi state rename`, or create the new resource, migrate data, then delete the old one.
 
-# New code (accidentally changes logical name)
-aws.s3.Bucket(f"loki-bucket-{workload.compound_name}", ...)
-```
+### 2. Using outputs in string formatting
+`pulumi.Output[T]` values are not resolved synchronously. Use `ApplyT` / `pulumi.All(...).ApplyT(...)` to derive strings from them; do not `fmt.Sprintf` an output directly.
 
-**Impact:** Bucket is destroyed and recreated, losing all logs.
+### 3. Azure storage account names with hyphens (Azure-specific)
+Azure storage account names only allow lowercase alphanumeric characters (no hyphens, no underscores). Remove all hyphens and truncate to fit (`stptd{name_no_hyphens[:19]}`).
 
-**Fix:** Use `pulumi state rename` or create a resource with the new name, migrate data, then delete the old one.
-
----
-
-### 2. Using outputs in f-strings
-**Mistake:**
-```python
-bucket_name = bucket.id  # Output[str]
-key = f"s3://{bucket_name}/data"  # ❌ Won't work
-```
-
-**Fix:**
-```python
-key = bucket.id.apply(lambda name: f"s3://{name}/data")
-```
-
----
-
-### 3. Missing `autoload()` classmethod
-**Mistake:**
-```python
-class AWSWorkloadHelm(pulumi.ComponentResource):
-    def __init__(self, workload):
-        # No autoload() method
-        ...
-```
-
-**Impact:** Go-generated `__main__.py` calls `autoload()` and fails.
-
-**Fix:**
-```python
-@classmethod
-def autoload(cls) -> "AWSWorkloadHelm":
-    return cls(workload=ptd.aws_workload.AWSWorkload(pulumi.get_stack()))
-```
-
----
-
-### 4. Forgetting `register_outputs({})`
-**Mistake:**
-```python
-class MyComponent(pulumi.ComponentResource):
-    def __init__(self, name):
-        super().__init__(f"ptd:{self.__class__.__name__}", name)
-        # Create resources but forget to register outputs
-```
-
-**Impact:** Component works but doesn't export any outputs for `pulumi stack output`.
-
-**Fix:** Call `self.register_outputs({...})` at the end of `__init__`.
-
----
-
-### 5. Azure storage account names with hyphens (Azure-specific)
-**Mistake:**
-```python
-# ❌ WRONG - Azure storage accounts cannot have hyphens
-storage_account_name = f"stptd-{compound_name}"
-```
-
-**Impact:** Azure API rejects the resource creation with a validation error.
-
-**Fix:**
-```python
-# ✅ Correct - remove ALL hyphens
-name = compound_name.replace("-", "")
-storage_account_name = f"stptd{name[:19]}"
-```
-
-**Why this happens:** AI models trained on AWS patterns often add hyphens, but Azure storage accounts only allow lowercase alphanumeric characters (no hyphens, no underscores).
-
----
-
-### 6. Azure resource names exceeding character limits (Azure-specific)
-**Mistake:**
-```python
-# ❌ WRONG - Key Vault names can't exceed 24 chars
-key_vault_name = f"kv-ptd-{very_long_compound_name}"  # Could be 30+ chars
-```
-
-**Impact:** Azure API rejects the resource with a length validation error.
-
-**Fix:**
-```python
-# ✅ Correct - truncate to fit within limits
-name = compound_name[:17]  # Leave room for "kv-ptd-" prefix
-key_vault_name = f"kv-ptd-{name}"
-```
-
-**Azure character limits:**
-- Key Vault: 24 chars max
+### 4. Azure resource names exceeding character limits (Azure-specific)
+- Key Vault: 24 chars max (`kv-ptd-{name[:17]}`)
 - Storage Account: 24 chars max
 - Most other resources: 64-80 chars (more lenient)
 
----
-
-### 7. Incorrect Azure tag key format (Azure-specific)
-**Mistake:**
-```python
-# ❌ WRONG - Azure doesn't allow dots in tag keys
-tags = {"posit.team/environment": "staging"}
-```
-
-**Impact:** Azure silently converts or rejects the tags, leading to inconsistent tagging.
-
-**Fix:**
-```python
-# ✅ Correct - use azure_tag_key_format() helper
-tags = {
-    ptd.azure_tag_key_format("posit.team/environment"): "staging"
-}
-# Converts dots to forward slashes: "posit/team/environment"
-```
+### 5. Incorrect Azure tag key format (Azure-specific)
+Azure does not allow dots in tag keys. Convert `.` to `/` in tag keys (e.g. `posit.team/environment` becomes `posit/team/environment`).
 
 ---
 
 ## Testing Pulumi code
 
-### Unit tests with mocks
+Run library tests with `just test-lib`. Pure helpers (naming, config parsing, metric-filter extraction) have unit tests alongside them in `lib/steps` and `lib/aws`/`lib/azure`.
 
-```python
-import pulumi
-import pytest
-
-class MyMocks(pulumi.runtime.Mocks):
-    def new_resource(self, args: pulumi.runtime.MockResourceArgs):
-        return [args.name, args.inputs]
-
-    def call(self, args: pulumi.runtime.MockCallArgs):
-        return {}
-
-@pulumi.runtime.test
-def test_component():
-    pulumi.runtime.set_mocks(MyMocks())
-
-    # Outputs resolve synchronously in tests
-    bucket = aws.s3.Bucket("test-bucket")
-    assert bucket.id == "test-bucket"
-```
-
-### Integration tests
-
-Run `pulumi preview` to see planned changes without applying:
+To see planned changes without applying:
 
 ```bash
-export AWS_PROFILE=ptd-staging
 ptd ensure myworkload-staging --only-steps persistent --dry-run
 ```
 
 ---
 
 ## Related documentation
-- [Config Flow](./config-flow.md) - How configuration flows from YAML to Go to Python
+- [Config Flow](./config-flow.md) - How configuration flows from YAML into Go
 - [Step Dependencies](./step-dependencies.md) - How steps depend on each other

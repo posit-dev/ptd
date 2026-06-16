@@ -8,9 +8,6 @@
 /cmd/ @posit-dev/ptd-dev
 /lib/ @posit-dev/ptd-dev
 
-# Python Pulumi IaC
-/python-pulumi/ @posit-dev/ptd-dev
-
 # Documentation
 /docs/ @posit-dev/ptd-dev
 

@@ -37,9 +37,6 @@ type alloyConfigParams struct {
 	// filterControlRoomMetrics enables dynamic metric filtering before the control room remote_write.
 	// When true, only metrics extracted from grafana_alerts and grafana_dashboards are forwarded.
 	filterControlRoomMetrics bool
-	// ptdRoot is the repository root path (value of the TOP viper key).
-	// Required when filterControlRoomMetrics is true.
-	ptdRoot string
 }
 
 // ptdComponentForAlloy defines a PTD product component for blackbox health-check targets.
@@ -113,7 +110,7 @@ func buildAlloyConfig(params alloyConfigParams) string {
 			// at ensure time to derive the exact set of metrics to forward.
 			controlRoomForwardTo = "prometheus.relabel.control_room_filter.receiver,"
 
-			metricFilter, filterErr := BuildControlRoomMetricFilter(params.ptdRoot)
+			metricFilter, filterErr := BuildControlRoomMetricFilter()
 			if filterErr != nil {
 				// Fall back to forwarding all metrics rather than breaking the deploy.
 				// Reset controlRoomForwardTo to route directly to the remote_write (no filter).
