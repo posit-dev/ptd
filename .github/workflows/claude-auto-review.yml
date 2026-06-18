@@ -2,9 +2,51 @@ name: Claude Auto Review
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened]
+
+env:
+  PTD_AWS_ACCOUNT: ${{ secrets.PTD_AWS_ACCOUNT }}
 
 jobs:
-  review:
-    uses: posit-dev/ptd-workspace/.github/workflows/claude-auto-review.yml@main
-    secrets: inherit
+  auto-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.PTD_AWS_ACCOUNT }}:role/claude-code
+          role-session-name: gha-claude-code-action
+          aws-region: us-east-2
+
+      - name: Automatic PR Review
+        uses: anthropics/claude-code-action@v1.0.110
+        with:
+          use_bedrock: true
+          claude_args: |
+            --model us.anthropic.claude-sonnet-4-6-20250514-v1:0
+            --allowedTools "mcp__github__create_pending_pull_request_review,mcp__github__add_comment_to_pending_review,mcp__github__submit_pending_pull_request_review,mcp__github__get_pull_request_diff"
+          prompt: |
+            Please review this PR following the guidelines in `.claude/review-guidelines.md`. Use the GitHub review system:
+
+            1. **Start a review**: Use `mcp__github__create_pending_pull_request_review` to begin a pending review
+            2. **Get diff information**: Use `mcp__github__get_pull_request_diff` to understand the code changes and line numbers
+            3. **Add inline comments**: Use `mcp__github__add_comment_to_pending_review` for each specific piece of feedback on particular lines
+            4. **Submit the review**: Use `mcp__github__submit_pending_pull_request_review` with event type "COMMENT" (not "REQUEST_CHANGES") to publish all comments as a non-blocking review
+
+            Review priorities from guidelines:
+            - **Simplicity**: Code should be explicit, not clever. Functions do one thing. Names reveal intent.
+            - **Maintainability**: Follow existing patterns. New code should look like it belongs.
+            - **Security (elevated scrutiny)**: Extra attention for file system, network, credentials, RBAC, and IAM changes.
+
+            Provide constructive feedback with specific suggestions for improvement.
+            Don't be overly complimentary; focus on actionable insights and keep your comments concise.
+            Use inline comments to highlight specific areas of concern.
