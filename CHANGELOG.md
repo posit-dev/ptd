@@ -1,3 +1,10 @@
+# [1.32.0](https://github.com/posit-dev/ptd/compare/v1.31.2...v1.32.0) (2026-06-18)
+
+
+### Features
+
+* **attestation:** exclude retired steps from attestation output ([1e817fa](https://github.com/posit-dev/ptd/commit/1e817fa3026469d5a494b2592d6e57fde3eeb5ba))
+
 ## [1.31.2](https://github.com/posit-dev/ptd/compare/v1.31.1...v1.31.2) (2026-06-16)
 
 
