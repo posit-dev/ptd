@@ -162,6 +162,14 @@ var stackPurposes = map[string]map[string]string{
 	},
 }
 
+// retiredStepNames are steps that were removed from PTD but whose Pulumi
+// state may still linger in older workloads' state backends. They are
+// excluded from attestation output so the document reflects only
+// currently-supported steps.
+var retiredStepNames = map[string]bool{
+	"ecr-cache": true, // AWS ECR pull-through cache; removed from PTD
+}
+
 // StepNameFromProjectName extracts the step name from a Pulumi project name like "ptd-aws-workload-persistent".
 func StepNameFromProjectName(projectName string) string {
 	parts := strings.SplitN(projectName, "-", 4)
@@ -774,8 +782,9 @@ func DownloadStateFiles(ctx context.Context, creds types.Credentials, target typ
 }
 
 // summarizeStateFiles converts a map of state file keys to raw JSON into
-// StackSummary values, filtering out backup files (e.g. "name(1).json") and
-// stacks with zero managed resources.
+// StackSummary values, filtering out backup files (e.g. "name(1).json"),
+// stacks with zero managed resources, and retired steps whose stale state may
+// still linger in older workloads' backends (see retiredStepNames).
 func summarizeStateFiles(files map[string][]byte) ([]StackSummary, error) {
 	var summaries []StackSummary
 	for key, data := range files {
@@ -789,6 +798,11 @@ func summarizeStateFiles(files map[string][]byte) ([]StackSummary, error) {
 			return nil, fmt.Errorf("failed to process state file %s: %w", key, err)
 		}
 		if summary.ResourceCount == 0 {
+			continue
+		}
+		// Skip steps that were removed from PTD but whose Pulumi state may
+		// still exist in older workloads' state backends.
+		if retiredStepNames[summary.StepNameFromProject()] {
 			continue
 		}
 		summaries = append(summaries, summary)

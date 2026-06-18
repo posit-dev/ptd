@@ -653,4 +653,26 @@ func TestSummarizeStateFiles(t *testing.T) {
 			t.Errorf("got projects %v, want [ptd-azure-workload-aks ptd-azure-workload-clusters]", names)
 		}
 	})
+
+	t.Run("filters out retired steps even with resources", func(t *testing.T) {
+		files := map[string][]byte{
+			".pulumi/stacks/ptd-aws-workload-clusters/prod.json":  []byte(realStack),
+			".pulumi/stacks/ptd-aws-workload-ecr-cache/prod.json": []byte(realStack),
+		}
+		summaries, err := summarizeStateFiles(files)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(summaries) != 1 {
+			t.Fatalf("got %d summaries, want 1", len(summaries))
+		}
+		if summaries[0].ProjectName != "ptd-aws-workload-clusters" {
+			t.Errorf("ProjectName = %q, want %q", summaries[0].ProjectName, "ptd-aws-workload-clusters")
+		}
+		for _, s := range summaries {
+			if s.StepNameFromProject() == "ecr-cache" {
+				t.Errorf("retired step ecr-cache was not filtered out")
+			}
+		}
+	})
 }
