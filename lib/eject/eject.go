@@ -199,7 +199,7 @@ func writeEjectRecord(record EjectRecord, outputDir string) error {
 		return fmt.Errorf("failed to marshal eject record: %w", err)
 	}
 	data = append(data, '\n')
-	return os.WriteFile(filepath.Join(outputDir, "eject-record.json"), data, 0600)
+	return writeFileAtomic(filepath.Join(outputDir, "eject-record.json"), data, 0600)
 }
 
 func collectAndRenderHandoff(ctx context.Context, t types.Target, opts Options, crDetails *ControlRoomDetails) error {
