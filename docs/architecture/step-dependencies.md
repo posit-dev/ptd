@@ -4,7 +4,7 @@ This document explains the step execution pipeline for PTD deployments, includin
 
 ## Overview
 
-PTD organizes infrastructure deployment into sequential steps. Each step depends on resources that previous steps create. The Go CLI orchestrates step execution, while most steps use Python Pulumi to create cloud resources.
+PTD organizes infrastructure deployment into sequential steps. Each step depends on resources that previous steps create. The Go CLI orchestrates step execution; each step is an inline-Go Pulumi program (in `lib/steps`) that creates cloud resources.
 
 **Location:** `lib/steps/steps.go`
 
@@ -33,12 +33,13 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 
 ---
 
-### Step 2: persistent (Python) {#persistent-workload}
+### Step 2: persistent (Go) {#persistent-workload}
 **Implementation:**
-- AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_persistent.py`
-- Azure: `python-pulumi/src/ptd/pulumi_resources/azure_workload_persistent.py`
+- Dispatch: `lib/steps/persistent.go`
+- AWS: `lib/steps/persistent_aws.go`, `lib/steps/persistent_helpers.go`, `lib/aws/vpc.go`
+- Azure: `lib/steps/persistent_azure.go`
 
-**Language:** Python/Pulumi
+**Language:** Inline Go Pulumi
 **Proxy Required:** No
 
 **Creates:**
@@ -56,9 +57,8 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 
 ---
 
-### Step 3: postgres_config (Python) {#postgres-config}
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_workload_postgres_config.py`
-**Language:** Python/Pulumi
+### Step 3: postgres_config {#postgres-config}
+**Implementation:** `lib/steps/postgres_config.go`
 **Proxy Required:** Yes (connects to private RDS)
 
 **Creates:**
@@ -79,10 +79,10 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 
 ### Step 4: eks (AWS) or aks (Azure) (cloud-specific) {#eks-aks}
 **Implementation:**
-- AWS: `python-pulumi/src/ptd/pulumi_resources/aws_workload_eks.py` (Python)
+- AWS: `lib/steps/eks.go`, `lib/steps/eks_aws.go`, `lib/steps/eks_helpers.go`, `lib/aws/eks_cluster.go` (Go)
 - Azure: `lib/steps/aks.go` (Go)
 
-**Language:** Python (AWS), **Go (Azure)** - This is a key difference from most other steps
+**Language:** Go (both AWS and Azure)
 **Proxy Required:** No
 
 **Creates:**
@@ -106,7 +106,7 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 }),
 ```
 
-**Implementation note:** AKS is implemented in **Go** (`lib/steps/aks.go`) unlike EKS which uses Python. This is because AKS cluster creation logic is better handled in Go for this implementation.
+**Implementation note:** Both AKS (`lib/steps/aks.go`) and EKS (`lib/steps/eks.go`, `lib/steps/eks_aws.go`, `lib/aws/eks_cluster.go`) are implemented in **Go** as inline Pulumi programs.
 
 **Safe to re-run:** Yes, but cluster upgrades may cause downtime.
 
@@ -219,8 +219,8 @@ Control rooms use a simpler 4-step pipeline:
 workspaces → persistent → postgres_config → cluster
 ```
 
-### Step 1: workspaces (Python) {#workspaces}
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_control_room_workspaces.py`
+### Step 1: workspaces (Go) {#workspaces}
+**Implementation:** `lib/steps/workspaces.go`, `lib/steps/workspaces_aws.go`, `lib/steps/vpc_aws.go`
 **Proxy Required:** No
 
 **Creates:**
@@ -232,24 +232,24 @@ workspaces → persistent → postgres_config → cluster
 
 ---
 
-### Step 2: persistent (Python) {#persistent-control-room}
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_control_room_persistent.py`
+### Step 2: persistent (Go) {#persistent-control-room}
+**Implementation:** `lib/steps/persistent.go`, `lib/steps/persistent_aws.go`, `lib/steps/persistent_helpers.go`, `lib/aws/vpc.go`
 **Proxy Required:** No
 
 Same as workload persistent: VPC, RDS, S3, IAM roles, etc.
 
 ---
 
-### Step 3: postgres_config (Python) {#postgres-config-control-room}
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_control_room_postgres_config.py`
+### Step 3: postgres_config {#postgres-config-control-room}
+**Implementation:** `lib/steps/postgres_config.go`
 **Proxy Required:** Yes
 
 Same as workload postgres_config: database users, permissions, extensions.
 
 ---
 
-### Step 4: cluster (Python) {#cluster}
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_control_room_cluster.py`
+### Step 4: cluster (Go) {#cluster}
+**Implementation:** `lib/steps/cluster.go`, `lib/steps/cluster_aws.go`, `lib/steps/eks_helpers.go`, `lib/aws/eks_cluster.go`, `lib/aws/eks_cluster_cr.go`
 **Proxy Required:** Yes
 
 **Creates:**

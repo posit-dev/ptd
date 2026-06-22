@@ -14,12 +14,14 @@ import (
 
 var attestationOutputFile string
 var attestationFormat string
+var attestationTitle string
 
 func init() {
 	rootCmd.AddCommand(attestationCmd)
 
 	attestationCmd.Flags().StringVarP(&attestationOutputFile, "output", "o", "", "Output file path (default: attestation-<target>-<date>.<ext>)")
 	attestationCmd.Flags().StringVar(&attestationFormat, "format", "both", "Output format: markdown, pdf, or both")
+	attestationCmd.Flags().StringVar(&attestationTitle, "title", "", "Override the document title (default: \"Installation Confirmation — <target>\")")
 }
 
 var attestationCmd = &cobra.Command{
@@ -55,6 +57,10 @@ func runAttestation(cmd *cobra.Command, targetName string) {
 	if err != nil {
 		slog.Error("Failed to collect attestation data", "error", err)
 		return
+	}
+
+	if attestationTitle != "" {
+		data.Title = attestationTitle
 	}
 
 	dateStr := time.Now().Format("2006-01-02")

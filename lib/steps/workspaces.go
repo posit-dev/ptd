@@ -2,11 +2,13 @@ package steps
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/posit-dev/ptd/lib/pulumi"
 	"github.com/posit-dev/ptd/lib/types"
 )
 
+// WorkspacesStep provisions the AWS Workspaces environment for a control room.
+// This is an AWS-only step; Azure control rooms do not have a workspaces equivalent.
 type WorkspacesStep struct {
 	SrcTarget types.Target
 	DstTarget types.Target
@@ -28,9 +30,14 @@ func (s *WorkspacesStep) Set(t types.Target, controlRoomTarget types.Target, opt
 }
 
 func (s *WorkspacesStep) Run(ctx context.Context) error {
-	targetType := "control-room"
+	if s.DstTarget == nil {
+		return fmt.Errorf("workspaces step requires a destination target")
+	}
 
-	// get the credentials for the target
+	if !s.DstTarget.ControlRoom() {
+		return fmt.Errorf("workspaces step can only be run on control room targets")
+	}
+
 	creds, err := s.DstTarget.Credentials(ctx)
 	if err != nil {
 		return err
@@ -40,26 +47,10 @@ func (s *WorkspacesStep) Run(ctx context.Context) error {
 		return err
 	}
 
-	stack, err := pulumi.NewPythonPulumiStack(
-		ctx,
-		string(s.DstTarget.CloudProvider()), // ptd-<cloud>-<control-room/workload>-<stackname>
-		targetType,
-		"workspaces",
-		s.DstTarget.Name(),
-		s.DstTarget.Region(),
-		s.DstTarget.PulumiBackendUrl(),
-		s.DstTarget.PulumiSecretsProviderKey(),
-		envVars,
-		true,
-	)
-	if err != nil {
-		return err
+	switch s.DstTarget.CloudProvider() {
+	case types.AWS:
+		return s.runAWSInlineGo(ctx, creds, envVars)
+	default:
+		return fmt.Errorf("unsupported cloud provider for workspaces: %s", s.DstTarget.CloudProvider())
 	}
-
-	err = pulumiRefreshPreviewUpCancel(ctx, stack, s.Options)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

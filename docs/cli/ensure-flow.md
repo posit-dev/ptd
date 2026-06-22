@@ -45,7 +45,7 @@ Control rooms provide centralized management and monitoring for workloads.
 
 **Purpose**: Provision workspace infrastructure
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_control_room_workspaces.py`)
+**Implementation**: Inline Go Pulumi (`lib/steps/workspaces.go`, `lib/steps/workspaces_aws.go`, `lib/steps/vpc_aws.go`)
 
 Creates the infrastructure needed for administrative workspaces in the control room.
 
@@ -53,7 +53,7 @@ Creates the infrastructure needed for administrative workspaces in the control r
 
 **Purpose**: Create persistent infrastructure resources
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_control_room_persistent.py`)
+**Implementation**: Inline Go Pulumi (`lib/steps/persistent.go`, `lib/steps/persistent_aws.go`, `lib/steps/persistent_azure.go`, `lib/steps/persistent_helpers.go`, `lib/aws/vpc.go`)
 
 Provisions long-lived infrastructure components that persist across deployments. Outputs from this step are used by subsequent steps and stored in secrets for workload access.
 
@@ -78,7 +78,7 @@ Uses proxy connection (or Tailscale) to access the private database endpoint.
 
 **Proxy Required**: Yes
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_control_room_cluster.py`)
+**Implementation**: Inline Go Pulumi (`lib/steps/cluster.go`, `lib/steps/cluster_aws.go`, `lib/steps/eks_helpers.go`, `lib/aws/eks_cluster.go`, `lib/aws/eks_cluster_cr.go`)
 
 
 Provisions the Kubernetes cluster that hosts control room applications and monitoring tools.
@@ -118,7 +118,7 @@ Workloads host the Posit Team products (Connect, Workbench, Package Manager) for
 
 **Purpose**: Create persistent infrastructure resources
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_workload_persistent.py`)
+**Implementation**: Inline Go Pulumi (`lib/steps/persistent.go`, `lib/steps/persistent_aws.go`, `lib/steps/persistent_azure.go`, `lib/steps/persistent_helpers.go`, `lib/aws/vpc.go`)
 
 Creates the foundational infrastructure for the workload:
 
@@ -177,7 +177,7 @@ This step is selected based on the cloud provider:
 
 #### AWS - EKS step
 
-**Implementation**: Python Pulumi (`python-pulumi/src/ptd/pulumi_resources/aws_workload_eks.py`)
+**Implementation**: Inline Go Pulumi (`lib/steps/eks.go`, `lib/steps/eks_aws.go`, `lib/steps/eks_helpers.go`, `lib/aws/eks_cluster.go`)
 
 Creates EKS clusters:
 - EKS control plane with specified Kubernetes version
@@ -315,17 +315,9 @@ Pulumi stacks follow this naming convention:
 
 Example: `ptd-aws-workload-persistent` project with stack `organization/ptd-aws-workload-persistent/workload01`
 
-### Python Pulumi Integration
+### Inline-Go Pulumi Steps
 
-Go code dynamically generates a `__main__.py` file for each Python Pulumi stack:
-
-```python
-import ptd.pulumi_resources.<module>
-
-ptd.pulumi_resources.<module>.<Class>.autoload()
-```
-
-The `PTD_ROOT` environment variable is passed to Python, allowing it to locate target configurations.
+Each step is an inline-Go Pulumi program defined in `lib/steps` and compiled into the `ptd` binary. The CLI builds the stack workspace (project, stack name, backend, secrets provider) and runs the step's program directly via the Pulumi Automation API; there is no separate program file generated on disk.
 
 ## Error Handling
 

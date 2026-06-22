@@ -1,3 +1,182 @@
+# [1.32.0](https://github.com/posit-dev/ptd/compare/v1.31.2...v1.32.0) (2026-06-18)
+
+
+### Features
+
+* **attestation:** exclude retired steps from attestation output ([1e817fa](https://github.com/posit-dev/ptd/commit/1e817fa3026469d5a494b2592d6e57fde3eeb5ba))
+
+## [1.31.2](https://github.com/posit-dev/ptd/compare/v1.31.1...v1.31.2) (2026-06-16)
+
+
+### Bug Fixes
+
+* **alerts:** make RDS alerts identify the specific database ([2897125](https://github.com/posit-dev/ptd/commit/28971250839b34cb5d73d6aa89ba45df30f06ec4))
+
+## [1.31.1](https://github.com/posit-dev/ptd/compare/v1.31.0...v1.31.1) (2026-06-04)
+
+
+### Bug Fixes
+
+* **ci:** repoint team-operator version bump at Go default ([4ac73aa](https://github.com/posit-dev/ptd/commit/4ac73aae9196031a4b12c8619e5ead9168c4c85f)), closes [#237](https://github.com/posit-dev/ptd/issues/237)
+
+# [1.31.0](https://github.com/posit-dev/ptd/compare/v1.30.0...v1.31.0) (2026-06-03)
+
+
+### Bug Fixes
+
+* adopt Azure persistent resources faithfully (tags, protect, subnets, bastion) ([485c30b](https://github.com/posit-dev/ptd/commit/485c30b057d11a615b627952646f705d4518cde1))
+* adopt existing VPC subnets and private zones in persistent (AWS) ([eb6b4a2](https://github.com/posit-dev/ptd/commit/eb6b4a29ed4c95053e96f08ef6788503bc90fa8a))
+* ignore PrivateEndpoint subnet churn on azure-native provider upgrade ([bca5bd0](https://github.com/posit-dev/ptd/commit/bca5bd052d1e915f91b3ad5e844ee32b339751a3))
+* pin NetApp export-policy defaults to stop azure-native upgrade churn ([47a5be2](https://github.com/posit-dev/ptd/commit/47a5be25fdfd5a577a2e581193839e130bc236f5))
+* stop Azure persistent churn on DB admin secret and bastion NIC subnet ([a5ea7d3](https://github.com/posit-dev/ptd/commit/a5ea7d3231a28668c48ad15f5a082012834f9fdf))
+
+
+### Features
+
+* migrate persistent step from Python to inline Go Pulumi ([b0137c6](https://github.com/posit-dev/ptd/commit/b0137c6ab8d9e13c90f7a84f209169342f929490))
+
+# [1.30.0](https://github.com/posit-dev/ptd/compare/v1.29.0...v1.30.0) (2026-06-02)
+
+
+### Features
+
+* **karpenter:** add IAM permissions required for Karpenter 1.7–1.12 ([01258c0](https://github.com/posit-dev/ptd/commit/01258c09384938bd13c45176c17c32aa031e36c7))
+
+# [1.29.0](https://github.com/posit-dev/ptd/compare/v1.28.3...v1.29.0) (2026-05-30)
+
+
+### Features
+
+* port workspaces step and AWSVpc to inline Go ([4674c7b](https://github.com/posit-dev/ptd/commit/4674c7bb8441bd4392f2b2b83705d2351db46d5f))
+
+## [1.28.3](https://github.com/posit-dev/ptd/compare/v1.28.2...v1.28.3) (2026-05-28)
+
+
+### Bug Fixes
+
+* **proxy:** use OR-semantics for dual-PID IsRunning ([69d3823](https://github.com/posit-dev/ptd/commit/69d3823307311173c582f42b90b5ed70a84bbcd8))
+
+## [1.28.2](https://github.com/posit-dev/ptd/compare/v1.28.1...v1.28.2) (2026-05-26)
+
+
+### Bug Fixes
+
+* align attestation domainPrefix defaults with team-operator CRD ([d7b3258](https://github.com/posit-dev/ptd/commit/d7b32589462c22ebbfc69b75c805c65d2012c90e))
+
+## [1.28.1](https://github.com/posit-dev/ptd/compare/v1.28.0...v1.28.1) (2026-05-26)
+
+
+### Bug Fixes
+
+* rm -f stale az entry before writing wrapper ([be35ebb](https://github.com/posit-dev/ptd/commit/be35ebba21bcb1e856d65ed635208e2a7b62e01e))
+* use azurecli login for AKS kubeconfig and fix az symlink in symlink-binaries ([ed40c19](https://github.com/posit-dev/ptd/commit/ed40c19bfccce0fe214df660ba4cfd426a840170))
+
+# [1.28.0](https://github.com/posit-dev/ptd/compare/v1.27.4...v1.28.0) (2026-05-26)
+
+
+### Features
+
+* default secrets-store CSI to EKS addon and adopt CRDs cleanly ([ea85a98](https://github.com/posit-dev/ptd/commit/ea85a982867b5758a935dff34fc7008f225b2c76))
+
+## [1.27.4](https://github.com/posit-dev/ptd/compare/v1.27.3...v1.27.4) (2026-05-21)
+
+
+### Bug Fixes
+
+* keep control room EKS nodegroup launch template default version in sync ([c101d90](https://github.com/posit-dev/ptd/commit/c101d903f2a221acc8c909925d7d25ad8939681e))
+
+## [1.27.3](https://github.com/posit-dev/ptd/compare/v1.27.2...v1.27.3) (2026-05-20)
+
+
+### Bug Fixes
+
+* keep EKS nodegroup launch template default version in sync ([c910a1e](https://github.com/posit-dev/ptd/commit/c910a1e25c05a80bbd5932849b4114c50958f89e))
+
+## [1.27.2](https://github.com/posit-dev/ptd/compare/v1.27.1...v1.27.2) (2026-05-05)
+
+
+### Bug Fixes
+
+* tune Azure NetApp workbench-shared volumes and enable backup enforcement ([9cefeac](https://github.com/posit-dev/ptd/commit/9cefeac544cced276a8a563c0a9a7d35e6091dbc))
+
+## [1.27.1](https://github.com/posit-dev/ptd/compare/v1.27.0...v1.27.1) (2026-04-30)
+
+
+### Bug Fixes
+
+* configure metrics-server for EKS host networking ([f7aef61](https://github.com/posit-dev/ptd/commit/f7aef61291b71ee8970f32e9f42b1eb9796ee6a4))
+
+
+### Reverts
+
+* remove unneeded metrics-server values from control room path ([e4790ac](https://github.com/posit-dev/ptd/commit/e4790acd12afd172b9fdb2d1ae287463332c24d6))
+
+# [1.27.0](https://github.com/posit-dev/ptd/compare/v1.26.6...v1.27.0) (2026-04-29)
+
+
+### Bug Fixes
+
+* address review feedback on NetApp backup PR ([68ae95b](https://github.com/posit-dev/ptd/commit/68ae95b571f72522748cead25ccaca7291e26f32))
+
+
+### Features
+
+* add snapshot and backup protection to Azure NetApp volumes ([27e90a6](https://github.com/posit-dev/ptd/commit/27e90a65e752af6415c65fb8e4520ecfbc10859a))
+
+## [1.26.6](https://github.com/posit-dev/ptd/compare/v1.26.5...v1.26.6) (2026-04-28)
+
+
+### Bug Fixes
+
+* add CPU limits to Mimir store-gateway and Traefik ([09ba466](https://github.com/posit-dev/ptd/commit/09ba4661aa907522595b7b01a58a456750332335))
+
+## [1.26.5](https://github.com/posit-dev/ptd/compare/v1.26.4...v1.26.5) (2026-04-24)
+
+
+### Bug Fixes
+
+* default Karpenter NodePool weight to 100 when unset ([8f2de5e](https://github.com/posit-dev/ptd/commit/8f2de5ec66f9c4320c6617f8c5ae5e003f75f0ce))
+
+## [1.26.4](https://github.com/posit-dev/ptd/compare/v1.26.3...v1.26.4) (2026-04-24)
+
+
+### Bug Fixes
+
+* **clusters-azure:** use corev1.NewConfigMapPatch for CoreDNS forwarding ConfigMap ([d3f5297](https://github.com/posit-dev/ptd/commit/d3f529726353ff6936db4a682493124d34d53b5c))
+
+## [1.26.3](https://github.com/posit-dev/ptd/compare/v1.26.2...v1.26.3) (2026-04-24)
+
+
+### Bug Fixes
+
+* **azure:** use per-site domains for Traefik Ingress generation ([97c8c8b](https://github.com/posit-dev/ptd/commit/97c8c8b1190c1ae1d0e8390c1f1a33ca70969e44))
+
+## [1.26.2](https://github.com/posit-dev/ptd/compare/v1.26.1...v1.26.2) (2026-04-22)
+
+
+### Bug Fixes
+
+* remove min node count for azure user pools ([0c7f4fb](https://github.com/posit-dev/ptd/commit/0c7f4fb5c7825fcf51ae254dcdb57aaec2e70c51))
+
+## [1.26.1](https://github.com/posit-dev/ptd/compare/v1.26.0...v1.26.1) (2026-04-22)
+
+
+### Bug Fixes
+
+* default public_load_balancer to true (internet-facing) matching Python ([340fa4e](https://github.com/posit-dev/ptd/commit/340fa4ebf074478577ea1cae85b5b41252e6af42))
+* fetch Karpenter subnet/SG IDs from EKS cluster VPC config ([d64ee3b](https://github.com/posit-dev/ptd/commit/d64ee3bd3f6f6f7835f183bdca2220a1e3ae6c13))
+* match Python output details for Traefik ingress and Alloy values ([de10b28](https://github.com/posit-dev/ptd/commit/de10b2858bbd7f7d9f2b8e086da30bf2a5f57048))
+* remove EnableServerSideApply from k8s provider (not set in other migrated steps) ([f103837](https://github.com/posit-dev/ptd/commit/f1038377041c5a3f36900ab8eb02c366484e787b))
+* restore Alloy cluster label and k8s provider settings from Python ([66b3e57](https://github.com/posit-dev/ptd/commit/66b3e579ea1877c718e9867dea4e4f3bcc4e9b65))
+* retain Python naming conventions in AWS helm step migration ([39fdcb6](https://github.com/posit-dev/ptd/commit/39fdcb6e69c78c6d70bedfac2a6e13256957e4dc))
+* synthesize session taint in overprovisioning tolerations matching NodePool logic ([3ca8f49](https://github.com/posit-dev/ptd/commit/3ca8f499bb75acd297e8152835449c032851fc33))
+* use deterministic workload port instead of hardcoded 1080 for proxy ([99dfe02](https://github.com/posit-dev/ptd/commit/99dfe0282d16666c2047ade1ec46ed31203c4844))
+
+
+### Reverts
+
+* restore pulumi-kubernetes SDK to v4.21.1 to keep Azure provider stable ([51b33c0](https://github.com/posit-dev/ptd/commit/51b33c0710064aafa6fcd3510d96b8d70cd39ea4))
+
 # [1.26.0](https://github.com/posit-dev/ptd/compare/v1.25.1...v1.26.0) (2026-04-21)
 
 

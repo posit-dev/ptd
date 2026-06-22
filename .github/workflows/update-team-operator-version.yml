@@ -39,16 +39,17 @@ jobs:
           echo "Verifying chart exists at oci://ghcr.io/posit-dev/charts/team-operator:${VERSION}"
           helm show chart oci://ghcr.io/posit-dev/charts/team-operator --version "${VERSION}"
 
-      - name: Update DEFAULT_CHART_VERSION
+      - name: Update default chart version
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          FILE="python-pulumi/src/ptd/pulumi_resources/team_operator.py"
+          FILE="lib/steps/clusters.go"
 
-          # Update the version
-          sed -i "s/^DEFAULT_CHART_VERSION = .*/DEFAULT_CHART_VERSION = \"$VERSION\"/" "$FILE"
+          # Update the default chart version constant (tab-indented inside a const block,
+          # so the pattern is not anchored to start-of-line)
+          sed -i "s/clustersDefaultTeamOperatorChartVersion = .*/clustersDefaultTeamOperatorChartVersion = \"$VERSION\"/" "$FILE"
 
           # Verify the change
-          grep "DEFAULT_CHART_VERSION" "$FILE"
+          grep "clustersDefaultTeamOperatorChartVersion" "$FILE"
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7

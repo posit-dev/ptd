@@ -3,11 +3,11 @@ all: deps check test build
 
 # Check all
 [group('check')]
-check: check-python-pulumi
+check: check-go
 
 # Format all
 [group('format')]
-format: format-python-pulumi format-go
+format: format-go
 
 alias fmt := format
 
@@ -17,7 +17,7 @@ build: cli
 
 # Test all
 [group('test')]
-test: test-python-pulumi test-lib test-cmd
+test: test-lib test-cmd
 
 # Run the ptd CLI
 ptd *ARGS:
@@ -60,11 +60,7 @@ aws-unset:
 ############################################################################
 alias link-bins := symlink-binaries
 
-deps: python-deps check-session-manager-plugin symlink-binaries install-thumbprint install-git-hooks
-
-# install python dependencies (uv handles this automatically, but here if you need it)
-python-deps:
-  uv --directory python-pulumi sync
+deps: check-session-manager-plugin symlink-binaries install-git-hooks
 
 symlink-binaries:
   #!/usr/bin/env bash
@@ -72,7 +68,7 @@ symlink-binaries:
   mkdir -p $binlocal
 
   # Create or update symlinks, skipping binaries in our own .local/bin to avoid circular references
-  for binary in aws az pulumi; do
+  for binary in aws pulumi; do
     target="$(PATH="${PATH//$binlocal:/}" which "$binary" 2>/dev/null)"
     if [ -z "$target" ]; then
       printf 'WARNING: %s not found in PATH (excluding %s), skipping\n' "$binary" "$binlocal" >&2
@@ -81,11 +77,24 @@ symlink-binaries:
     ln -sf "$target" "$binlocal/$binary"
   done
 
-install-thumbprint:
-  #!/usr/bin/env bash
-  binlocal="{{ justfile_directory() }}/.local/bin"
-  mkdir -p $binlocal
-  CGO_ENABLED=0 GOBIN=$binlocal go install github.com/rstudio/goex/cmd/thumbprint@latest
+  # az uses a bash script that calculates its Python path relative to $BASH_SOURCE[0].
+  # A symlink breaks that calculation, so write a wrapper that calls Python directly.
+  az_real="$(PATH="${PATH//$binlocal:/}" which az 2>/dev/null)"
+  if [ -z "$az_real" ]; then
+    printf 'WARNING: az not found in PATH (excluding %s), skipping\n' "$binlocal" >&2
+  else
+    # Drop any pre-existing entry: `>` follows symlinks and would write through
+    # to a root-owned target on CI runners that pre-install az.
+    rm -f "$binlocal/az"
+    az_python="$(grep -o '/[^ ]*python3' "$az_real" 2>/dev/null | head -1)"
+    if [ -z "$az_python" ]; then
+      printf 'WARNING: could not determine az Python path from %s, falling back to symlink\n' "$az_real" >&2
+      ln -sf "$az_real" "$binlocal/az"
+    else
+      printf '#!/usr/bin/env bash\nAZ_INSTALLER=DEB %s -Im azure.cli "$@"\n' "$az_python" > "$binlocal/az"
+      chmod +x "$binlocal/az"
+    fi
+  fi
 
 check-session-manager-plugin:
   #!/bin/bash
@@ -133,10 +142,6 @@ workon-prompt:
 ############################################################################
 # Test targets
 ############################################################################
-
-[group('test')]
-test-python-pulumi *ARGS:
-  cd {{ justfile_directory() }}/python-pulumi && just test {{ARGS}}
 
 [group('test')]
 test-cmd *ARGS:
@@ -204,22 +209,15 @@ cli:
 # Check targets
 #############################################################################
 
+# Vet Go code
 [group('check')]
-check-python-pulumi:
-  cd {{ justfile_directory() }}/python-pulumi && just check
-
-# Validate Go↔Python config field sync
-[group('check')]
-validate-config-sync:
-  python3 {{ justfile_directory() }}/scripts/validate-config-sync.py
+check-go:
+  cd {{ justfile_directory() }}/lib && go vet ./...
+  cd {{ justfile_directory() }}/cmd && go vet ./...
 
 #############################################################################
 # Format targets
 #############################################################################
-
-[group('format')]
-format-python-pulumi:
-  cd {{ justfile_directory() }}/python-pulumi && just format
 
 # Format Go code
 [group('format')]

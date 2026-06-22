@@ -6,34 +6,51 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	ptdaws "github.com/posit-dev/ptd/lib/aws"
 	ptdazure "github.com/posit-dev/ptd/lib/azure"
+	"github.com/posit-dev/ptd/lib/consts"
 	"github.com/posit-dev/ptd/lib/customization"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/pulumistate"
+	"github.com/posit-dev/ptd/lib/secrets"
 	"github.com/posit-dev/ptd/lib/types"
 	"gopkg.in/yaml.v3"
 )
 
 // AttestationData contains all collected information about a workload deployment
 type AttestationData struct {
-	TargetName     string                 `json:"target_name"`
-	CloudProvider  string                 `json:"cloud_provider"`
-	Region         string                 `json:"region"`
-	AccountID      string                 `json:"account_id"`
-	Profile        string                 `json:"profile"`
-	GeneratedAt    time.Time              `json:"generated_at"`
-	Sites          []SiteInfo             `json:"sites"`
-	Stacks         []StackSummary         `json:"stacks"`
-	CustomSteps    []CustomStepInfo       `json:"custom_steps"`
-	ClusterConfig  map[string]interface{} `json:"cluster_config"`
-	Infra          *InfraConfig           `json:"infra"`
-	ProductSummary string                 `json:"product_summary"`
-	RawStateFiles  map[string][]byte      `json:"-"`
+	TargetName         string                 `json:"target_name"`
+	Title              string                 `json:"title,omitempty"`
+	CloudProvider      string                 `json:"cloud_provider"`
+	Region             string                 `json:"region"`
+	AccountID          string                 `json:"account_id"`
+	Profile            string                 `json:"profile"`
+	GeneratedAt        time.Time              `json:"generated_at"`
+	Sites              []SiteInfo             `json:"sites"`
+	Stacks             []StackSummary         `json:"stacks"`
+	BootstrapResources []ResourceDetail       `json:"bootstrap_resources"`
+	CustomSteps        []CustomStepInfo       `json:"custom_steps"`
+	ClusterConfig      map[string]interface{} `json:"cluster_config"`
+	Infra              *InfraConfig           `json:"infra"`
+	ProductSummary     string                 `json:"product_summary"`
+	StateBackendURL    string                 `json:"state_backend_url,omitempty"`
+	RawStateFiles      map[string][]byte      `json:"-"`
+}
+
+// DisplayTitle returns the title to render at the top of the attestation
+// document. When Title is set (e.g. via the --title CLI flag) it is used
+// verbatim; otherwise the default "Installation Confirmation — <target>" is
+// returned.
+func (a *AttestationData) DisplayTitle() string {
+	if a.Title != "" {
+		return a.Title
+	}
+	return fmt.Sprintf("%s — %s", docTitle, a.TargetName)
 }
 
 // SiteInfo contains information extracted from a site.yaml file
@@ -62,14 +79,66 @@ type AuthDetail struct {
 
 // StackSummary contains summary information from a Pulumi stack state file
 type StackSummary struct {
-	ProjectName   string    `json:"project_name"`
-	StackName     string    `json:"stack_name"`
-	Purpose       string    `json:"purpose"`
-	Timestamp     time.Time `json:"timestamp"`
-	PulumiVersion string    `json:"pulumi_version"`
-	ResourceCount int       `json:"resource_count"`
-	ResourceTypes []string  `json:"resource_types"`
-	StateKey      string    `json:"state_key"`
+	ProjectName       string             `json:"project_name"`
+	StackName         string             `json:"stack_name"`
+	Purpose           string             `json:"purpose"`
+	Timestamp         time.Time          `json:"timestamp"`
+	PulumiVersion     string             `json:"pulumi_version"`
+	ResourceCount     int                `json:"resource_count"`
+	ResourceTypes     []string           `json:"resource_types"`
+	Resources         []ResourceDetail   `json:"resources"`
+	KubernetesObjects []KubernetesObject `json:"kubernetes_objects"`
+	StateKey          string             `json:"state_key"`
+}
+
+// KubernetesObject describes a Kubernetes object managed in a Pulumi stack,
+// captured from the resource's state outputs for the Kubernetes appendix.
+type KubernetesObject struct {
+	Kind      string `json:"kind"`
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	UID       string `json:"uid"`
+}
+
+// DisplayNamespace returns the namespace, or "—" for cluster-scoped objects.
+func (k KubernetesObject) DisplayNamespace() string {
+	if k.Namespace == "" {
+		return "—"
+	}
+	return k.Namespace
+}
+
+// DisplayUID returns the cluster-assigned UID. Helm releases wrap multiple
+// objects and carry no single UID, so they render as "— (release)".
+func (k KubernetesObject) DisplayUID() string {
+	if k.UID != "" {
+		return k.UID
+	}
+	if k.Kind == "Helm Release" {
+		return "— (release)"
+	}
+	return "—"
+}
+
+// ResourceDetail describes a single managed resource within a Pulumi stack,
+// used to render the full resource appendix.
+type ResourceDetail struct {
+	Name string `json:"name"` // logical name (last segment of the URN)
+	Type string `json:"type"` // Pulumi resource type token
+	ID   string `json:"id"`   // cloud provider resource ID (empty for logical/component resources)
+	URN  string `json:"urn"`  // full Pulumi URN, used as the identifier when no cloud ID exists
+}
+
+// DisplayID returns the identifier to show in the resource inventory: the cloud
+// provider resource ID when one exists, otherwise the full Pulumi URN. Some
+// resources (e.g. component resources) carry no ID, and others report a literal
+// "none" (e.g. random.RandomPassword); in both cases the URN is the stable
+// identifier.
+func (r ResourceDetail) DisplayID() string {
+	if r.ID == "" || r.ID == "none" {
+		return r.URN
+	}
+	return r.ID
 }
 
 // stackPurposes returns human-readable descriptions for standard stack types, keyed by cloud
@@ -83,7 +152,7 @@ var stackPurposes = map[string]map[string]string{
 		"sites":           "Posit product deployments (TeamSite CRDs), ingress resources, site-specific configuration",
 	},
 	"azure": {
-		"persistent":      "VNet, Azure PostgreSQL, Storage accounts, NetApp Files, Key Vault, managed identities, NSGs",
+		"persistent":      "Network, PostgreSQL database, storage accounts, NetApp/Azure Files for product data, Key Vault, managed identities, network security groups",
 		"postgres-config": "PostgreSQL database users, databases, and grants",
 		"aks":             "AKS cluster, node pools, managed identity, storage classes",
 		"acr-cache":       "Azure Container Registry cache rules for container image pull-through",
@@ -91,6 +160,14 @@ var stackPurposes = map[string]map[string]string{
 		"helm":            "Helm chart deployments: monitoring (Loki, Grafana, Mimir, Alloy), cert-manager, Secrets Store CSI",
 		"sites":           "Posit product deployments (TeamSite CRDs), ingress resources, site-specific configuration",
 	},
+}
+
+// retiredStepNames are steps that were removed from PTD but whose Pulumi
+// state may still linger in older workloads' state backends. They are
+// excluded from attestation output so the document reflects only
+// currently-supported steps.
+var retiredStepNames = map[string]bool{
+	"ecr-cache": true, // AWS ECR pull-through cache; removed from PTD
 }
 
 // StepNameFromProjectName extracts the step name from a Pulumi project name like "ptd-aws-workload-persistent".
@@ -182,15 +259,16 @@ func Collect(ctx context.Context, target types.Target, workloadPath string) (*At
 
 	// Initialize attestation data
 	attestation := &AttestationData{
-		TargetName:    target.Name(),
-		CloudProvider: string(target.CloudProvider()),
-		Region:        target.Region(),
-		AccountID:     creds.AccountID(),
-		GeneratedAt:   time.Now().UTC(),
-		Sites:         []SiteInfo{},
-		Stacks:        []StackSummary{},
-		CustomSteps:   []CustomStepInfo{},
-		ClusterConfig: make(map[string]interface{}),
+		TargetName:      target.Name(),
+		CloudProvider:   string(target.CloudProvider()),
+		Region:          target.Region(),
+		AccountID:       creds.AccountID(),
+		GeneratedAt:     time.Now().UTC(),
+		Sites:           []SiteInfo{},
+		Stacks:          []StackSummary{},
+		CustomSteps:     []CustomStepInfo{},
+		ClusterConfig:   make(map[string]interface{}),
+		StateBackendURL: target.PulumiBackendUrl(),
 	}
 
 	// Extract cluster config and profile from ptd.yaml
@@ -238,6 +316,17 @@ func Collect(ctx context.Context, target types.Target, workloadPath string) (*At
 	}
 	attestation.Sites = sites
 
+	// Chronicle is optional; flag it on the infra config when any site configures
+	// it, so chronicle-specific prose (e.g. the Azure storage container) is only
+	// emitted when the telemetry is actually deployed.
+	for _, site := range sites {
+		for _, product := range site.Products {
+			if product.Name == "chronicle" {
+				infraCfg.ChronicleEnabled = true
+			}
+		}
+	}
+
 	// Read customizations/manifest.yaml
 	customSteps, err := collectCustomSteps(workloadPath)
 	if err != nil {
@@ -268,6 +357,10 @@ func Collect(ctx context.Context, target types.Target, workloadPath string) (*At
 		}
 	}
 	attestation.Stacks = stacks
+
+	// The bootstrap step runs imperatively and produces no Pulumi state, so its
+	// resources are synthesized from PTD's naming conventions.
+	attestation.BootstrapResources = collectBootstrapResources(target)
 
 	// Generate product summary paragraph
 	attestation.ProductSummary = GenerateProductSummary(infraCfg, sites)
@@ -335,9 +428,9 @@ func parseAWSInfraConfig(data []byte) (*InfraConfig, error) {
 			VpcAzCount                  int    `yaml:"vpc_az_count"`
 			FsxOpenzfsMultiAz           bool   `yaml:"fsx_openzfs_multi_az"`
 			KeycloakEnabled             bool   `yaml:"keycloak_enabled"`
-			ExternalDNSEnabled          bool   `yaml:"external_dns_enabled"`
+			ExternalDNSEnabled          *bool  `yaml:"external_dns_enabled"`
 			PublicLoadBalancer          bool   `yaml:"public_load_balancer"`
-			SecretsStoreAddonEnabled    bool   `yaml:"secrets_store_addon_enabled"`
+			SecretsStoreAddonEnabled    *bool  `yaml:"secrets_store_addon_enabled"`
 			HostedZoneManagementEnabled *bool  `yaml:"hosted_zone_management_enabled"`
 			CustomerManagedBastionId    string `yaml:"customer_managed_bastion_id"`
 			LoadBalancerPerSite         bool   `yaml:"load_balancer_per_site"`
@@ -368,9 +461,9 @@ func parseAWSInfraConfig(data []byte) (*InfraConfig, error) {
 		VpcAzCount:               raw.Spec.VpcAzCount,
 		FsxMultiAz:               raw.Spec.FsxOpenzfsMultiAz,
 		KeycloakEnabled:          raw.Spec.KeycloakEnabled,
-		ExternalDNSEnabled:       raw.Spec.ExternalDNSEnabled,
+		ExternalDNSEnabled:       raw.Spec.ExternalDNSEnabled == nil || *raw.Spec.ExternalDNSEnabled,
 		PublicLoadBalancer:       raw.Spec.PublicLoadBalancer,
-		SecretsStoreAddonEnabled: raw.Spec.SecretsStoreAddonEnabled,
+		SecretsStoreAddonEnabled: raw.Spec.SecretsStoreAddonEnabled == nil || *raw.Spec.SecretsStoreAddonEnabled,
 		CustomerManagedBastionID: raw.Spec.CustomerManagedBastionId,
 		LoadBalancerPerSite:      raw.Spec.LoadBalancerPerSite,
 		SiteDomains:              make(map[string]string),
@@ -411,13 +504,14 @@ func parseAzureInfraConfig(data []byte) (*InfraConfig, error) {
 			TenantID       string `yaml:"tenant_id"`
 			Region         string `yaml:"region"`
 			Network        struct {
-				VnetCidr          string `yaml:"vnet_cidr"`
-				ProvisionedVnetID string `yaml:"provisioned_vnet_id"`
-				VnetRsgName       string `yaml:"vnet_rsg_name"`
+				VnetCidr            string `yaml:"vnet_cidr"`
+				ProvisionedVnetID   string `yaml:"provisioned_vnet_id"`
+				ProvisionedVnetName string `yaml:"provisioned_vnet_name"`
+				VnetRsgName         string `yaml:"vnet_rsg_name"`
 			} `yaml:"network"`
-			KeycloakEnabled          bool `yaml:"keycloak_enabled"`
-			ExternalDNSEnabled       bool `yaml:"external_dns_enabled"`
-			SecretsStoreAddonEnabled bool `yaml:"secrets_store_addon_enabled"`
+			KeycloakEnabled          bool  `yaml:"keycloak_enabled"`
+			ExternalDNSEnabled       *bool `yaml:"external_dns_enabled"`
+			SecretsStoreAddonEnabled bool  `yaml:"secrets_store_addon_enabled"`
 			Clusters                 map[string]struct {
 				KubernetesVersion          string `yaml:"kubernetes_version"`
 				SystemNodePoolInstanceType string `yaml:"system_node_pool_instance_type"`
@@ -440,8 +534,9 @@ func parseAzureInfraConfig(data []byte) (*InfraConfig, error) {
 		Cloud:                    "azure",
 		VnetCidr:                 raw.Spec.Network.VnetCidr,
 		ProvisionedVnetID:        raw.Spec.Network.ProvisionedVnetID,
+		ProvisionedVnetName:      raw.Spec.Network.ProvisionedVnetName,
 		KeycloakEnabled:          raw.Spec.KeycloakEnabled,
-		ExternalDNSEnabled:       raw.Spec.ExternalDNSEnabled,
+		ExternalDNSEnabled:       raw.Spec.ExternalDNSEnabled == nil || *raw.Spec.ExternalDNSEnabled,
 		SecretsStoreAddonEnabled: raw.Spec.SecretsStoreAddonEnabled,
 		SiteDomains:              make(map[string]string),
 	}
@@ -515,7 +610,7 @@ func collectSites(workloadPath string, siteDomains map[string]string) ([]SiteInf
 				Image:        siteYAML.Spec.Connect.Image,
 				Version:      cleanVersion(siteYAML.Spec.Connect.Image),
 				Replicas:     siteYAML.Spec.Connect.Replicas,
-				DomainPrefix: defaultPrefix(siteYAML.Spec.Connect.DomainPrefix, "pub"),
+				DomainPrefix: defaultPrefix(siteYAML.Spec.Connect.DomainPrefix, "connect"),
 			}
 			if siteYAML.Spec.Connect.Auth != nil {
 				p.Auth = &AuthDetail{
@@ -532,7 +627,7 @@ func collectSites(workloadPath string, siteDomains map[string]string) ([]SiteInf
 				Image:        siteYAML.Spec.Workbench.Image,
 				Version:      cleanVersion(siteYAML.Spec.Workbench.Image),
 				Replicas:     siteYAML.Spec.Workbench.Replicas,
-				DomainPrefix: defaultPrefix(siteYAML.Spec.Workbench.DomainPrefix, "dev"),
+				DomainPrefix: defaultPrefix(siteYAML.Spec.Workbench.DomainPrefix, "workbench"),
 			}
 			if siteYAML.Spec.Workbench.Auth != nil {
 				p.Auth = &AuthDetail{
@@ -549,7 +644,7 @@ func collectSites(workloadPath string, siteDomains map[string]string) ([]SiteInf
 				Image:        siteYAML.Spec.PackageManager.Image,
 				Version:      cleanVersion(siteYAML.Spec.PackageManager.Image),
 				Replicas:     siteYAML.Spec.PackageManager.Replicas,
-				DomainPrefix: defaultPrefix(siteYAML.Spec.PackageManager.DomainPrefix, "pkg"),
+				DomainPrefix: defaultPrefix(siteYAML.Spec.PackageManager.DomainPrefix, "packagemanager"),
 			})
 		}
 
@@ -686,6 +781,35 @@ func DownloadStateFiles(ctx context.Context, creds types.Credentials, target typ
 	return files, nil
 }
 
+// summarizeStateFiles converts a map of state file keys to raw JSON into
+// StackSummary values, filtering out backup files (e.g. "name(1).json"),
+// stacks with zero managed resources, and retired steps whose stale state may
+// still linger in older workloads' backends (see retiredStepNames).
+func summarizeStateFiles(files map[string][]byte) ([]StackSummary, error) {
+	var summaries []StackSummary
+	for key, data := range files {
+		// Skip backup/renamed state files like "example01-production(1).json"
+		filename := filepath.Base(key)
+		if strings.Contains(strings.TrimSuffix(filename, ".json"), "(") {
+			continue
+		}
+		summary, err := parseStateFile(data, key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to process state file %s: %w", key, err)
+		}
+		if summary.ResourceCount == 0 {
+			continue
+		}
+		// Skip steps that were removed from PTD but whose Pulumi state may
+		// still exist in older workloads' state backends.
+		if retiredStepNames[summary.StepNameFromProject()] {
+			continue
+		}
+		summaries = append(summaries, summary)
+	}
+	return summaries, nil
+}
+
 // collectStackSummaries fetches Pulumi state files and extracts summaries.
 // Supports both AWS (S3) and Azure (Blob Storage) backends.
 func collectStackSummaries(ctx context.Context, creds types.Credentials, target types.Target) ([]StackSummary, map[string][]byte, error) {
@@ -693,14 +817,9 @@ func collectStackSummaries(ctx context.Context, creds types.Credentials, target 
 	if err != nil {
 		return nil, nil, err
 	}
-
-	var summaries []StackSummary
-	for key, data := range files {
-		summary, err := parseStateFile(data, key)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to process state file %s: %w", key, err)
-		}
-		summaries = append(summaries, summary)
+	summaries, err := summarizeStateFiles(files)
+	if err != nil {
+		return nil, nil, err
 	}
 	return summaries, files, nil
 }
@@ -719,16 +838,47 @@ func parseStateFile(data []byte, stateKey string) (StackSummary, error) {
 		timestamp = time.Time{}
 	}
 
-	// Count resources (excluding pulumi internal resources)
+	// Count resources (excluding pulumi internal resources) and capture the
+	// full per-resource detail for the appendix.
 	resourceCount := 0
 	resourceTypeSet := make(map[string]bool)
+	var resources []ResourceDetail
+	var k8sObjects []KubernetesObject
 	for _, resource := range state.Checkpoint.Latest.Resources {
 		if pulumistate.IsInternalResource(resource.Type) {
 			continue
 		}
 		resourceCount++
 		resourceTypeSet[resource.Type] = true
+		resources = append(resources, ResourceDetail{
+			Name: resourceNameFromURN(resource.URN),
+			Type: resource.Type,
+			ID:   resource.ID,
+			URN:  resource.URN,
+		})
+		if strings.HasPrefix(resource.Type, "kubernetes:") {
+			k8sObjects = append(k8sObjects, extractKubernetesObject(resource))
+		}
 	}
+
+	// Present resources in a stable order: by type, then by name.
+	sort.Slice(resources, func(i, j int) bool {
+		if resources[i].Type != resources[j].Type {
+			return resources[i].Type < resources[j].Type
+		}
+		return resources[i].Name < resources[j].Name
+	})
+
+	// Present Kubernetes objects by kind, then namespace, then name.
+	sort.Slice(k8sObjects, func(i, j int) bool {
+		if k8sObjects[i].Kind != k8sObjects[j].Kind {
+			return k8sObjects[i].Kind < k8sObjects[j].Kind
+		}
+		if k8sObjects[i].Namespace != k8sObjects[j].Namespace {
+			return k8sObjects[i].Namespace < k8sObjects[j].Namespace
+		}
+		return k8sObjects[i].Name < k8sObjects[j].Name
+	})
 
 	// Convert resource type set to sorted slice
 	var resourceTypes []string
@@ -747,12 +897,180 @@ func parseStateFile(data []byte, stateKey string) (StackSummary, error) {
 	}
 
 	return StackSummary{
-		ProjectName:   projectName,
-		StackName:     stackName,
-		Timestamp:     timestamp,
-		PulumiVersion: state.Checkpoint.Latest.Manifest.Version,
-		ResourceCount: resourceCount,
-		ResourceTypes: resourceTypes,
-		StateKey:      stateKey,
+		ProjectName:       projectName,
+		StackName:         stackName,
+		Timestamp:         timestamp,
+		PulumiVersion:     state.Checkpoint.Latest.Manifest.Version,
+		ResourceCount:     resourceCount,
+		ResourceTypes:     resourceTypes,
+		Resources:         resources,
+		KubernetesObjects: k8sObjects,
+		StateKey:          stateKey,
 	}, nil
+}
+
+// collectBootstrapResources synthesizes the resources created by the bootstrap
+// step. Bootstrap runs imperatively (it provisions the very state backend that
+// Pulumi later uses), so these resources never appear in a Pulumi state file.
+// Identifiers are derived from PTD's deterministic naming conventions rather
+// than queried from the cloud; the logic mirrors lib/steps/bootstrap.go.
+func collectBootstrapResources(target types.Target) []ResourceDetail {
+	var resources []ResourceDetail
+	switch target.CloudProvider() {
+	case types.Azure:
+		if t, ok := target.(ptdazure.Target); ok {
+			resources = bootstrapAzureResources(t)
+		} else {
+			fmt.Fprintf(os.Stderr, "Warning: target %q reports Azure but is not an *azure.Target; bootstrap inventory will be empty\n", target.Name())
+		}
+	case types.AWS:
+		if t, ok := target.(ptdaws.Target); ok {
+			resources = bootstrapAWSResources(t)
+		} else {
+			fmt.Fprintf(os.Stderr, "Warning: target %q reports AWS but is not an *aws.Target; bootstrap inventory will be empty\n", target.Name())
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "Warning: unrecognized cloud provider %q for target %q; bootstrap inventory will be empty\n", target.CloudProvider(), target.Name())
+	}
+	sort.Slice(resources, func(i, j int) bool {
+		if resources[i].Type != resources[j].Type {
+			return resources[i].Type < resources[j].Type
+		}
+		return resources[i].Name < resources[j].Name
+	})
+	return resources
+}
+
+// bootstrapAzureResources lists the Azure resources created by the bootstrap
+// step (see BootstrapStep.runAzure). Role-assignment IDs are random GUIDs that
+// cannot be derived, so the built-in role-definition GUID is shown instead.
+func bootstrapAzureResources(t ptdazure.Target) []ResourceDetail {
+	add := func(res *[]ResourceDetail, name, typ, id string) {
+		*res = append(*res, ResourceDetail{Name: name, Type: typ, ID: id})
+	}
+	var res []ResourceDetail
+
+	add(&res, t.ResourceGroupName(), "Azure Resource Group", t.ResourceGroupName())
+	add(&res, t.StateBucketName(), "Azure Storage Account (Pulumi state)", t.StateBucketName())
+	add(&res, t.BlobStorageName(), "Azure Blob Container (Pulumi state)", t.BlobStorageName())
+	add(&res, t.VaultName(), "Azure Key Vault", t.VaultName())
+	add(&res, consts.AzKeyName, "Azure Key Vault Key (state encryption)", consts.AzKeyName)
+
+	adminGroup := t.AdminGroupID()
+	add(&res, fmt.Sprintf("Key Vault Administrator → %s", adminGroup), "Azure Role Assignment", consts.KeyVaultAdminRoleId)
+	add(&res, fmt.Sprintf("Storage Blob Data Contributor → %s", adminGroup), "Azure Role Assignment", consts.StorageBlobDataContribRoleId)
+	add(&res, fmt.Sprintf("AKS RBAC Cluster Admin → %s", adminGroup), "Azure Role Assignment", consts.AksRbacClusterAdminRoleId)
+
+	for siteName := range t.Sites() {
+		for _, field := range bootstrapSiteSecretFields(siteName) {
+			name := fmt.Sprintf("%s-%s", siteName, field)
+			add(&res, name, "Azure Key Vault Secret", name)
+		}
+	}
+	return res
+}
+
+// bootstrapAWSResources lists the AWS resources created by the bootstrap step
+// (see BootstrapStep.runAws).
+func bootstrapAWSResources(t ptdaws.Target) []ResourceDetail {
+	add := func(res *[]ResourceDetail, name, typ string) {
+		*res = append(*res, ResourceDetail{Name: name, Type: typ, ID: name})
+	}
+	var res []ResourceDetail
+
+	add(&res, t.StateBucketName(), "AWS S3 Bucket (Pulumi state)")
+	add(&res, consts.KmsAlias, "AWS KMS Key (state encryption)")
+	if t.CreateAdminPolicyAsResource() {
+		add(&res, consts.PositTeamDedicatedAdminPolicyName, "AWS IAM Policy")
+	}
+	add(&res, fmt.Sprintf("%s.posit.team", t.Name()), "AWS Secrets Manager Secret")
+
+	for siteName := range t.Sites() {
+		add(&res, fmt.Sprintf("%s-%s.posit.team", t.Name(), siteName), "AWS Secrets Manager Secret")
+		add(&res, fmt.Sprintf("%s-%s.sessions.posit.team", t.Name(), siteName), "AWS Secrets Manager Secret")
+		add(&res, fmt.Sprintf("%s-%s-ssh-ppm-keys.posit.team", t.Name(), siteName), "AWS Secrets Manager Secret")
+	}
+	return res
+}
+
+// bootstrapSiteSecretFields returns the per-site secret field names that the
+// bootstrap step writes into the Key Vault, mirroring its logic: marshal the
+// NewSiteSecret template and emit one entry per populated field.
+func bootstrapSiteSecretFields(siteName string) []string {
+	siteSecret := secrets.NewSiteSecret(siteName)
+	data, err := json.Marshal(siteSecret)
+	if err != nil {
+		return nil
+	}
+	var fieldMap map[string]any
+	if err := json.Unmarshal(data, &fieldMap); err != nil {
+		return nil
+	}
+	var fields []string
+	for field, value := range fieldMap {
+		if fmt.Sprintf("%v", value) == "" {
+			continue
+		}
+		fields = append(fields, field)
+	}
+	sort.Strings(fields)
+	return fields
+}
+
+// extractKubernetesObject pulls the kind, namespace, name, and cluster-assigned
+// UID for a Kubernetes resource from its Pulumi state outputs. Helm releases
+// expose name/namespace at the top level and have no metadata.uid.
+func extractKubernetesObject(r pulumistate.PulumiResource) KubernetesObject {
+	obj := KubernetesObject{Kind: kubernetesKind(r.Type, r.Outputs)}
+
+	if md, ok := r.Outputs["metadata"].(map[string]interface{}); ok {
+		obj.Name = stateString(md, "name")
+		obj.Namespace = stateString(md, "namespace")
+		obj.UID = stateString(md, "uid")
+	}
+	// Helm releases (and similar) carry name/namespace at the top level.
+	if obj.Name == "" {
+		obj.Name = stateString(r.Outputs, "name")
+	}
+	if obj.Namespace == "" {
+		obj.Namespace = stateString(r.Outputs, "namespace")
+	}
+	if obj.Name == "" {
+		obj.Name = resourceNameFromURN(r.URN)
+	}
+	return obj
+}
+
+// kubernetesKind derives a human-readable Kubernetes kind from the resource's
+// state outputs, falling back to the last segment of the Pulumi type token.
+func kubernetesKind(resType string, outputs map[string]interface{}) string {
+	if strings.Contains(resType, "helm.sh") {
+		return "Helm Release"
+	}
+	if kind := stateString(outputs, "kind"); kind != "" {
+		return kind
+	}
+	if i := strings.LastIndex(resType, ":"); i >= 0 && i < len(resType)-1 {
+		return resType[i+1:]
+	}
+	return resType
+}
+
+// stateString safely reads a string field from a Pulumi state outputs map.
+func stateString(m map[string]interface{}, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// resourceNameFromURN extracts the logical resource name from a Pulumi URN.
+// URNs have the form urn:pulumi:{stack}::{project}::{type-chain}::{name};
+// the name is the final "::"-delimited segment.
+func resourceNameFromURN(urn string) string {
+	if urn == "" {
+		return ""
+	}
+	parts := strings.Split(urn, "::")
+	return parts[len(parts)-1]
 }

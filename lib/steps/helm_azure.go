@@ -11,6 +11,7 @@ import (
 	"github.com/posit-dev/ptd/lib/azure"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/kube"
+	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/posit-dev/ptd/lib/types"
 	azauthorization "github.com/pulumi/pulumi-azure-native-sdk/authorization/v3"
 	azmanagedidentity "github.com/pulumi/pulumi-azure-native-sdk/managedidentity/v3"
@@ -86,13 +87,15 @@ func (s *HelmStep) runAzureInlineGo(ctx context.Context, creds types.Credentials
 		if clusterErr != nil {
 			return fmt.Errorf("helm azure: failed to get AKS kubeconfig for %s: %w", clusterName, clusterErr)
 		}
+		proxyURL := ""
 		if !s.DstTarget.TailscaleEnabled() {
-			kubeconfigBytes, clusterErr = kube.AddProxyToKubeConfigBytes(kubeconfigBytes, "socks5://localhost:1080")
-			if clusterErr != nil {
-				return fmt.Errorf("helm azure: failed to add proxy to kubeconfig for %s: %w", clusterName, clusterErr)
-			}
+			proxyURL = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
 		}
-		kubeconfigsByCluster[release] = string(kubeconfigBytes)
+		kubeconfig, clusterErr := kube.BuildAKSKubeconfigString(kubeconfigBytes, proxyURL)
+		if clusterErr != nil {
+			return fmt.Errorf("helm azure: %w", clusterErr)
+		}
+		kubeconfigsByCluster[release] = kubeconfig
 
 		identityInfo, clusterErr := azure.GetClusterIdentityInfo(
 			ctx, azCreds, azureTarget.SubscriptionID(), azureTarget.ResourceGroupName(), clusterName,
@@ -217,8 +220,7 @@ func azureHelmDeploy(ctx *pulumi.Context, params azureHelmParams) error {
 		k8sProviderName := name + "-" + release
 		k8sProvider, err := kubernetes.NewProvider(ctx, k8sProviderName, &kubernetes.ProviderArgs{
 			Kubeconfig: pulumi.String(params.kubeconfigsByCluster[release]),
-		}, withAlias("pulumi:providers:kubernetes", k8sProviderName),
-			pulumi.IgnoreChanges([]string{"kubeconfig"}))
+		}, withAlias("pulumi:providers:kubernetes", k8sProviderName))
 		if err != nil {
 			return fmt.Errorf("helm azure: failed to create k8s provider for %s: %w", release, err)
 		}
@@ -762,12 +764,18 @@ func azureHelmMimir(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 			"mimir": map[string]interface{}{
 				"structuredConfig": structuredConfig,
 			},
-			"minio":         map[string]interface{}{"enabled": false},
-			"alertmanager":  map[string]interface{}{"enabled": false},
-			"ruler":         map[string]interface{}{"enabled": false},
-			"ingester":      map[string]interface{}{"persistentVolume": map[string]interface{}{"size": "20Gi"}},
-			"compactor":     map[string]interface{}{"persistentVolume": map[string]interface{}{"size": "20Gi"}},
-			"store_gateway": map[string]interface{}{"persistentVolume": map[string]interface{}{"size": "20Gi"}},
+			"minio":        map[string]interface{}{"enabled": false},
+			"alertmanager": map[string]interface{}{"enabled": false},
+			"ruler":        map[string]interface{}{"enabled": false},
+			"ingester":     map[string]interface{}{"persistentVolume": map[string]interface{}{"size": "20Gi"}},
+			"compactor":    map[string]interface{}{"persistentVolume": map[string]interface{}{"size": "20Gi"}},
+			"store_gateway": map[string]interface{}{
+				"persistentVolume": map[string]interface{}{"size": "20Gi"},
+				"resources": map[string]interface{}{
+					"requests": map[string]interface{}{"cpu": "100m", "memory": "512Mi"},
+					"limits":   map[string]interface{}{"cpu": "1", "memory": "4Gi"},
+				},
+			},
 			"gateway": map[string]interface{}{
 				"enabledNonEnterprise": true,
 				"nginx": map[string]interface{}{
@@ -958,6 +966,7 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 		resourceGroupName:          params.resourceGroupName,
 		clusterResourceGroupName:   clusterResourceGroupName,
 		publicSubnetCidr:           params.cfg.Network.PublicSubnetCidr,
+		filterControlRoomMetrics:   params.cfg.FilterControlRoomMetrics,
 	}
 	alloyConfigStr := buildAlloyConfig(alloyP)
 

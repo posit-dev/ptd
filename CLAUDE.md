@@ -5,8 +5,7 @@
 The project is organized into several key components:
 
 - **`./cmd`**: Contains the main CLI tool (Go implementation)
-- **`./lib`**: Common Go libraries and utilities
-- **`./python-pulumi`**: Python package with Pulumi infrastructure-as-code resources
+- **`./lib`**: Common Go libraries and utilities (including the inline-Go Pulumi infrastructure steps in `lib/steps`)
 - **`./examples`**: Example configurations for control rooms and workloads
 - **`./e2e`**: End-to-end tests
 - **`./docs`**: Documentation (see [docs/README.md](docs/README.md) for structure)
@@ -61,13 +60,6 @@ The targets configuration directory must contain:
 
 See [examples/](examples/) for example configurations.
 
-### Go→Python Integration
-
-The Go CLI communicates the infrastructure path to Python Pulumi stacks via the `PTD_ROOT` environment variable:
-- **Go**: Sets `PTD_ROOT` in `lib/pulumi/python.go` when invoking Python
-- **Python**: Reads `PTD_ROOT` in `python-pulumi/src/ptd/paths.py`
-- **Tests**: Python tests must set `PTD_ROOT` via `monkeypatch.setenv()`
-
 ## Build and Development Commands
 
 ### Overall Project Commands (from root Justfile)
@@ -80,7 +72,7 @@ The Go CLI communicates the infrastructure path to Python Pulumi stacks via the 
 
 #### Check Commands
 
-- `just check-python-pulumi`: Check Python Pulumi code
+- `just check-go`: Vet Go code (lib and cmd)
 
 #### Build Commands
 
@@ -91,7 +83,6 @@ The Go CLI communicates the infrastructure path to Python Pulumi stacks via the 
 - `just test-cmd`: Test command-line tool
 - `just test-e2e`: Run end-to-end tests (requires URL argument)
 - `just test-lib`: Test library code
-- `just test-python-pulumi`: Test Python Pulumi code
 
 #### AWS Development
 
@@ -209,7 +200,7 @@ Pod alerts (PodError, CrashLoopBackoff, DeploymentReplicaMismatch, etc.) are sco
 - CNI failure → Network breaks → Application pods fail → Alert fires for application namespace
 - Ingress failure → HTTP checks fail → `Healthchecks` alert fires
 
-**Alert Configuration**: Alert definitions are in `python-pulumi/src/ptd/grafana_alerts/*.yaml`. All pod-related alerts in `pods.yaml` include the namespace filter in their PromQL queries.
+**Alert Configuration**: Alert definitions are in `lib/steps/assets/grafana_alerts/*.yaml` (embedded into the binary via `go:embed`). All pod-related alerts in `pods.yaml` include the namespace filter in their PromQL queries.
 
 ## Contributing
 
@@ -227,9 +218,9 @@ When contributing to the project:
 ## Architecture Overview
 
 Brief pointer section:
-- **Config Flow**: How YAML config flows through Go to Python → See `docs/architecture/config-flow.md`
+- **Config Flow**: How YAML config is parsed by the Go CLI into `lib/types` structs → See `docs/architecture/config-flow.md`
 - **Step Dependencies**: Deployment pipeline ordering and why → See `docs/architecture/step-dependencies.md`
-- **Pulumi Conventions**: Resource naming, Output handling, autoload pattern → See `docs/architecture/pulumi-conventions.md`
+- **Pulumi Conventions**: Resource naming and Output handling → See `docs/architecture/pulumi-conventions.md`
 
 ## Danger Zones
 
@@ -239,16 +230,13 @@ Brief pointer section:
 - This applies to ALL resources: VPCs, RDS instances, S3 buckets, IAM roles, EKS clusters, etc.
 - If you need to rename a resource, discuss the state migration strategy first
 
-### Config Changes Require Both Languages
-- Adding/modifying a config option requires changes in BOTH:
-  - **Go**: Struct in `lib/types/workload.go` (with YAML struct tags)
-  - **Python**: Dataclass in `python-pulumi/src/ptd/aws_workload.py` or `python-pulumi/src/ptd/__init__.py`
-- Field names must match: Go YAML tags (snake_case) = Python dataclass field names
-- There is no automated validation between the two — mismatches fail at runtime
+### Config Is Defined Only in Go
+- The Go structs in `lib/types/*.go` (e.g. `lib/types/workload.go`) are the **sole source of truth** for ptd.yaml config. Add or modify a config option there, with the appropriate YAML struct tag (snake_case).
+- There is no longer a parallel Python dataclass to keep in sync. The Python config layer and the Go↔Python parity linter (`scripts/validate-config-sync.py`) were removed when Python was deleted from the repo.
 
 ### Builder Method Ordering
-- `AWSEKSCluster` uses a builder pattern where `with_*()` methods have ordering dependencies
-- Example: `with_node_role()` MUST be called before `with_node_group()` (sets `self.default_node_role`)
+- The Go `EKSCluster` builder (`lib/aws/eks_cluster.go`) uses `With*()` methods with ordering dependencies
+- Example: `WithNodeRole()` MUST be called before `WithNodeGroup()` (sets the default node role)
 - Check method dependencies before reordering calls
 
 ### Resource Naming Conventions
@@ -256,69 +244,57 @@ Brief pointer section:
 **AWS:**
 - IAM roles: `f"{purpose}.{compound_name}.posit.team"`
 - S3 buckets: `f"{compound_name}-{purpose}"`
-- EKS clusters: `f"default_{compound_name}-control-plane"`
-- All naming methods are on `AWSWorkload` class in `python-pulumi/src/ptd/aws_workload.py`
+- EKS cluster resource name (the `aws.eks.Cluster` first arg / `name`): workload = `{compound_name}-{release}`; control room = bare `{compound_name}`. **Do NOT use `default_{compound_name}-control-plane` for the cluster resource**: that string is the kubeconfig *context* name, not the cluster's name; using it as the resource name would replace the live control plane.
+- The naming helpers live in the Go cluster builder (`lib/aws/eks_cluster.go`), which produces these resource names verbatim for state adoption.
 
 **Azure:**
-- Resource Groups: `f"rsg-ptd-{sanitized_name}"`
-- Key Vault: `f"kv-ptd-{name[:17]}"` (max 24 chars)
-- Storage Accounts: `f"stptd{name_no_hyphens[:19]}"` (NO hyphens, max 24 chars)
-- VNets: `f"vnet-ptd-{compound_name}"`
-- All naming methods are on `AzureWorkload` class in `python-pulumi/src/ptd/azure_workload.py`
-- Azure tags must use `azure_tag_key_format()` which converts `.` to `/`
+- Resource Groups: `rsg-ptd-{sanitized_name}`
+- Key Vault: `kv-ptd-{name[:17]}` (max 24 chars)
+- Storage Accounts: `stptd{name_no_hyphens[:19]}` (NO hyphens, max 24 chars)
+- VNets: `vnet-ptd-{compound_name}`
+- The Azure naming helpers live in `lib/azure` (the Go workload/persistent implementations)
+- Azure tags must convert `.` to `/` in tag keys
 
 Do NOT introduce new naming patterns — follow existing conventions
 
 ## Key Patterns
 
-### The autoload Pattern
-Go generates `__main__.py` dynamically (see `lib/pulumi/python.go:WriteMainPy`):
-```python
-import ptd.pulumi_resources.<module>
-ptd.pulumi_resources.<module>.<Class>.autoload()
-```
-- Module: `{cloud}_{target_type}_{step_name}` (e.g., `aws_workload_persistent`)
-- Class: `{Cloud}{TargetType}{StepName}` (e.g., `AWSWorkloadPersistent`)
-- `__main__.py` is NOT in source control — it's generated at runtime
+### Inline-Go Pulumi Steps
+- All `ptd ensure` steps are inline Go Pulumi programs defined in `lib/steps`. There is no per-step program file on disk and no autoload indirection; the program is compiled into the `ptd` binary.
+- `ptd workon <target> <step>` opens a Go-runtime state workspace (no program) for manual `pulumi` state operations (`stack export/import`, `state unprotect/delete`). `pulumi preview/up` is not available from `workon`; use `ptd ensure` for those.
 
 ### AWS vs Azure Infrastructure Patterns
 
 **AWS (EKS):**
-- Uses builder pattern with `with_*()` methods
-- Builder methods have ordering dependencies (e.g., `with_node_role()` must come before `with_node_group()`)
-- EKS step is Python-based (`AWSEKSCluster` class)
+- Uses the Go `EKSCluster` builder (`lib/aws/eks_cluster.go`) with `With*()` methods
+- Builder methods have ordering dependencies (e.g., `WithNodeRole()` must come before `WithNodeGroup()`)
+- EKS step is Go-based (`lib/steps/eks.go`, `lib/steps/eks_aws.go`, `lib/aws/eks_cluster.go`); the AWS control-room `cluster` step shares the same builder (`lib/steps/cluster.go`, `lib/aws/eks_cluster_cr.go`)
 
 **Azure (AKS):**
-- AKS step is Go-based (`lib/steps/aks.go`) unlike the Python-based EKS step
-- Azure persistent resources use simple `_define_*()` methods (no builder pattern)
-- No ordering dependencies between `_define_*()` methods
+- AKS step is Go-based (`lib/steps/aks.go`), like the EKS step
+- Azure persistent resources are defined directly in the Go persistent step (no builder pattern)
 
 ### Pulumi Output[T]
-- Resource properties return `Output[T]`, not plain values
-- Use `.apply(lambda x: ...)` to transform; cannot use in f-strings directly
-- Combine with `pulumi.Output.all(a, b).apply(lambda args: ...)`
+- Resource properties return `pulumi.Output[T]` values, not plain values
+- Use `.ApplyT(func(...) ...)` to transform an output
+- Combine multiple outputs with `pulumi.All(a, b).ApplyT(func(args []interface{}) ... )`
 
 ### Step Execution
 Steps run sequentially via `ptd ensure`:
-1. `bootstrap` (Go) → 2. `persistent` (Python) → 3. `postgres_config` (Python) → 4. `eks`/`aks` → 5. `clusters` → 6. `helm` → 7. `sites` → 8. `persistent_reprise` (Go)
+1. `bootstrap` (Go) → 2. `persistent` (Go) → 3. `postgres_config` (Go) → 4. `eks`/`aks` → 5. `clusters` → 6. `helm` → 7. `sites` → 8. `persistent_reprise` (Go)
 
 Each step produces outputs consumed by later steps. See `docs/architecture/step-dependencies.md`.
 
-## Python Pulumi Development
+## Pulumi Step Development
 
 ### Testing
-- Use `pulumi.runtime.set_mocks()` for Pulumi resource tests
-- For Go→Python integration details, see the "Go→Python Integration" section above
-- Tests must set `PTD_ROOT` via `monkeypatch.setenv("PTD_ROOT", ...)`
-- See `python-pulumi/tests/` for examples
-- Run: `just test-python-pulumi`
+- Run library tests with `just test-lib` and CLI tests with `just test-cmd`
+- Step logic lives in `lib/steps`; pure helpers (naming, config parsing, metric-filter extraction) have unit tests alongside them
 
-### Adding a New Pulumi Resource Module
-1. Create `python-pulumi/src/ptd/pulumi_resources/<cloud>_<target_type>_<step_name>.py`
-2. Define a class inheriting from `pulumi.ComponentResource`
-3. Implement `@classmethod autoload(cls)` that reads stack name and constructs workload
-4. Add corresponding step in `lib/steps/`
-5. Register step in `WorkloadSteps` or `ControlRoomSteps` in `lib/steps/steps.go`
+### Adding a New Pulumi Step
+1. Add the step's inline-Go Pulumi program in `lib/steps/` (a function that builds resources on a `*pulumi.Context`)
+2. Wire it through the appropriate cloud-specific deploy function
+3. Register the step in `WorkloadSteps` or `ControlRoomSteps` in `lib/steps/steps.go`
 
 ### Large Files (>1000 lines)
 These files are large and require careful context management:
@@ -329,12 +305,7 @@ These files are large and require careful context management:
 - `helm_azure.go` (~1100 lines) — Azure helm deployments (ExternalDNS, Loki, Mimir, Grafana, Alloy, managed identities)
 - `helm_helpers.go` (~880 lines) — Shared Alloy River config generator (`buildAlloyConfig`)
 
-**AWS (Python):**
-- `pulumi_resources/aws_eks_cluster.py` (~2580 lines) — EKS cluster provisioning with builder pattern
-- `pulumi_resources/aws_workload_persistent.py` (~1454 lines) — VPC, RDS, S3, IAM
-- `__init__.py` (~1275 lines) — Base types, constants, utility functions
-- `aws_workload.py` (~815 lines) — AWS workload config and naming conventions
-
-**Azure (Python):**
-- `pulumi_resources/azure_workload_persistent.py` (~817 lines) — VNet, Postgres, Storage, ACR
-- `azure_workload.py` (~398 lines) — Azure workload config and naming with strict char limits
+**Go (lib/aws):**
+- `eks_cluster.go` (~1340 lines) — `EKSCluster` builder: control plane, IAM/OIDC, node groups, CSI drivers, storage classes (shared by the `eks` and `cluster` steps)
+- `eks_cluster_cr.go` (~1180 lines) — control-room `EKSCluster` builder extensions (control-room node group, LBC, Grafana/Mimir/dashboards, Traefik forward-auth)
+- `vpc.go` (~1148 lines) — `aws.NewVPC` builder (subnets, NAT, NACLs, flow logs, endpoints, existing-VPC adoption)

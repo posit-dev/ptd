@@ -1,10 +1,28 @@
 package types
 
-// EKSAccessEntriesConfig holds configuration for EKS Access Entries
+// EKSAccessEntriesConfig holds configuration for EKS Access Entries.
+//
+// Enabled is a pointer so an absent field can be distinguished from an explicit
+// false. The Python default is True (ptd.EKSAccessEntriesConfig.enabled = True),
+// so an unset Enabled (nil) must resolve to true — i.e. access entries are the
+// default auth path. A plain bool would resolve absent→false→legacy aws-auth,
+// which mismatches Python and would DELETE the live EKS access entries. Resolve
+// via IsEnabled / the spec-level UsesEksAccessEntries helpers (nil → true).
 type EKSAccessEntriesConfig struct {
-	Enabled                     bool                     `json:"enabled" yaml:"enabled"`
+	Enabled                     *bool                    `json:"enabled" yaml:"enabled"`
 	AdditionalEntries           []map[string]interface{} `json:"additional_entries" yaml:"additional_entries"`
 	IncludeSameAccountPoweruser bool                     `json:"include_same_account_poweruser" yaml:"include_same_account_poweruser"`
+}
+
+// IsEnabled resolves the access-entries Enabled flag (Python default True).
+// Returns true when the config is nil, when Enabled is unset (nil), or when
+// Enabled is explicitly true; returns false only when Enabled is explicitly
+// set to false.
+func (c *EKSAccessEntriesConfig) IsEnabled() bool {
+	if c == nil || c.Enabled == nil {
+		return true
+	}
+	return *c.Enabled
 }
 
 // TrustedUserIpAddress represents an IP address for a trusted user
@@ -56,4 +74,103 @@ type AWSControlRoomConfig struct {
 	TigeraOperatorVersion            string                  `json:"tigera_operator_version" yaml:"tigera_operator_version"`
 	TraefikForwardAuthVersion        string                  `json:"traefik_forward_auth_version" yaml:"traefik_forward_auth_version"`
 	TraefikVersion                   string                  `json:"traefik_version" yaml:"traefik_version"`
+	EbsCsiAddonVersion               string                  `json:"ebs_csi_addon_version" yaml:"ebs_csi_addon_version"`
+}
+
+// The following accessor methods return the value from config, or the Python
+// dataclass default (python-pulumi/src/ptd/aws_control_room.py) when the YAML
+// omits the field. Control-room ptd.yaml files do NOT pin these versions, so the
+// defaults must match Python verbatim or Pulumi would diff every chart/addon.
+
+func crStringDefault(v, def string) string {
+	if v == "" {
+		return def
+	}
+	return v
+}
+
+func crIntDefault(v, def int) int {
+	if v == 0 {
+		return def
+	}
+	return v
+}
+
+// EKSK8sVersion resolves the EKS Kubernetes version (Python default "1.30").
+func (c AWSControlRoomConfig) EKSK8sVersion() string {
+	if c.EksK8sVersion != nil && *c.EksK8sVersion != "" {
+		return *c.EksK8sVersion
+	}
+	return "1.30"
+}
+
+// UsesEksAccessEntries reports whether the EKS access-entries auth path should be
+// used (as opposed to the legacy aws-auth ConfigMap). Mirrors Python, where
+// EKSAccessEntriesConfig.enabled defaults to True and aws_control_room.py supplies
+// a default EKSAccessEntriesConfig when the block is absent. Net semantics:
+// nil block → true; block present with enabled unset → true; enabled: true → true;
+// only an explicit enabled: false selects legacy aws-auth.
+func (c AWSControlRoomConfig) UsesEksAccessEntries() bool {
+	return c.EksAccessEntries.IsEnabled()
+}
+
+// EKSNodeInstanceType resolves the node instance type (Python default "m6a.xlarge").
+func (c AWSControlRoomConfig) EKSNodeInstanceType() string {
+	return crStringDefault(c.EksNodeInstanceType, "m6a.xlarge")
+}
+
+// EKSNodeGroupMin resolves the node group min size (Python default 3).
+func (c AWSControlRoomConfig) EKSNodeGroupMin() int { return crIntDefault(c.EksNodeGroupMin, 3) }
+
+// EKSNodeGroupMax resolves the node group max size (Python default 3).
+func (c AWSControlRoomConfig) EKSNodeGroupMax() int { return crIntDefault(c.EksNodeGroupMax, 3) }
+
+// TraefikDeploymentReplicasOrDefault resolves the traefik replica count (Python default 3).
+func (c AWSControlRoomConfig) TraefikDeploymentReplicasOrDefault() int {
+	return crIntDefault(c.TraefikDeploymentReplicas, 3)
+}
+
+// EBSCsiAddonVersion resolves the EBS CSI addon version (Python default v1.41.0-eksbuild.1).
+func (c AWSControlRoomConfig) EBSCsiAddonVersion() string {
+	return crStringDefault(c.EbsCsiAddonVersion, "v1.41.0-eksbuild.1")
+}
+
+// AWSLbcVersion resolves the aws-load-balancer-controller version (Python default 1.6.0).
+func (c AWSControlRoomConfig) AWSLbcVersion() string {
+	return crStringDefault(c.AwsLbcVersion, "1.6.0")
+}
+
+// MetricsServerVersion resolves the metrics-server chart version (Python default 3.11.0).
+func (c AWSControlRoomConfig) MetricsServerVersionOrDefault() string {
+	return crStringDefault(c.MetricsServerVersion, "3.11.0")
+}
+
+// SecretStoreCsiVersionOrDefault resolves the secrets-store CSI chart version (Python default 1.3.4).
+func (c AWSControlRoomConfig) SecretStoreCsiVersionOrDefault() string {
+	return crStringDefault(c.SecretStoreCsiVersion, "1.3.4")
+}
+
+// SecretStoreCsiAwsProviderVersionOrDefault resolves the AWS provider chart version (Python default 0.3.5).
+func (c AWSControlRoomConfig) SecretStoreCsiAwsProviderVersionOrDefault() string {
+	return crStringDefault(c.SecretStoreCsiAwsProviderVersion, "0.3.5")
+}
+
+// TraefikForwardAuthVersionOrDefault resolves the traefik-forward-auth chart version (Python default 0.0.14).
+func (c AWSControlRoomConfig) TraefikForwardAuthVersionOrDefault() string {
+	return crStringDefault(c.TraefikForwardAuthVersion, "0.0.14")
+}
+
+// GrafanaVersionOrDefault resolves the grafana chart version (Python default 7.0.14).
+func (c AWSControlRoomConfig) GrafanaVersionOrDefault() string {
+	return crStringDefault(c.GrafanaVersion, "7.0.14")
+}
+
+// MimirVersionOrDefault resolves the mimir-distributed chart version (Python default 5.1.3).
+func (c AWSControlRoomConfig) MimirVersionOrDefault() string {
+	return crStringDefault(c.MimirVersion, "5.1.3")
+}
+
+// TraefikVersionOrDefault resolves the traefik chart version (Python default 24.0.0).
+func (c AWSControlRoomConfig) TraefikVersionOrDefault() string {
+	return crStringDefault(c.TraefikVersion, "24.0.0")
 }

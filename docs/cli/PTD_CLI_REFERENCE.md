@@ -960,7 +960,6 @@ clusters:
 - [Development Environment Guide](https://positpbc.atlassian.net/wiki/spaces/PTD/pages/1141997738/Development+Environment) - Setup prerequisites
 - [Justfile](./Justfile) - Build and development tasks
 - [Team Operator](./team-operator/README.md) - Kubernetes operator
-- [Python Pulumi (Legacy)](./python-pulumi/README.md) - Legacy Python CLI
 
 ---
 
