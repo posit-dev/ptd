@@ -3,6 +3,8 @@ package eject
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/posit-dev/ptd/lib/types"
@@ -14,6 +16,9 @@ import (
 
 type fakeSecretStore struct {
 	secrets map[string]string
+	// getErr, when set, is returned from GetSecretValue regardless of the
+	// requested secret name (used to simulate permission/transient failures).
+	getErr error
 }
 
 func (f *fakeSecretStore) SecretExists(_ context.Context, _ types.Credentials, secretName string) bool {
@@ -22,7 +27,14 @@ func (f *fakeSecretStore) SecretExists(_ context.Context, _ types.Credentials, s
 }
 
 func (f *fakeSecretStore) GetSecretValue(_ context.Context, _ types.Credentials, secretName string) (string, error) {
-	return f.secrets[secretName], nil
+	if f.getErr != nil {
+		return "", f.getErr
+	}
+	val, ok := f.secrets[secretName]
+	if !ok {
+		return "", fmt.Errorf("%w: %s", types.ErrSecretNotFound, secretName)
+	}
+	return val, nil
 }
 
 func (f *fakeSecretStore) PutSecretValue(_ context.Context, _ types.Credentials, secretName string, secretString string) error {
@@ -90,6 +102,21 @@ func TestRemoveWorkloadMimirPassword_SecretDoesNotExist(t *testing.T) {
 
 	err := RemoveWorkloadMimirPassword(context.Background(), target, "workload-a")
 	assert.NoError(t, err)
+}
+
+func TestRemoveWorkloadMimirPassword_AccessDeniedReturnsError(t *testing.T) {
+	// A non-NotFound error (e.g. AccessDenied) must surface as an error so the
+	// caller records the removal as failed, rather than being swallowed as a
+	// successful no-op.
+	store := &fakeSecretStore{
+		secrets: map[string]string{},
+		getErr:  errors.New("AccessDenied: not authorized to perform secretsmanager:GetSecretValue"),
+	}
+	target := controlRoomTarget("ctrl", store)
+
+	err := RemoveWorkloadMimirPassword(context.Background(), target, "workload-a")
+	require.Error(t, err)
+	assert.False(t, errors.Is(err, types.ErrSecretNotFound))
 }
 
 func TestRemoveWorkloadMimirPassword_WorkloadNotInMap(t *testing.T) {
