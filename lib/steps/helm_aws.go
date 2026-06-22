@@ -1373,52 +1373,25 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 	// running against stale, hand-applied CRDs.
 	//
 	// Adoption of pre-existing CRDs: every cluster created before this change
-	// already has the Karpenter CRDs applied WITHOUT Helm ownership metadata, so a
-	// fresh karpenter-crd install would fail with "exists and cannot be imported
-	// into the current release — invalid ownership metadata". The pinned
-	// helm-controller (v0.16.10) does not yet expose spec.takeOwnership, so we
-	// pre-stamp the Helm ownership label + annotations onto each CRD (the same
-	// helm-adopt pattern used for the Calico FelixConfiguration in eks_helpers.go).
-	// The stamp is a no-op on greenfield clusters where the CRD does not yet exist
-	// (the patch simply has nothing to adopt and the chart creates it cleanly).
-	// The release name/namespace must match the karpenter-crd HelmChart release:
-	// for a helm.cattle.io/v1 HelmChart the release name is metadata.name and the
-	// release namespace is targetNamespace.
-	const karpenterCRDReleaseName = "karpenter-crd"
-	karpenterCRDNames := []string{
-		"nodepools.karpenter.sh",
-		"nodeclaims.karpenter.sh",
-		"nodeoverlays.karpenter.sh",
-		"ec2nodeclasses.karpenter.k8s.aws",
-	}
-	adoptDeps := make([]pulumi.Resource, 0, len(karpenterCRDNames))
-	for _, crdName := range karpenterCRDNames {
-		adoptResourceName := compoundName + "-karpenter-crd-helm-adopt-" + crdName
-		adopt, err := apiextensions.NewCustomResourcePatch(ctx, adoptResourceName, &apiextensions.CustomResourcePatchArgs{
-			ApiVersion: pulumi.String("apiextensions.k8s.io/v1"),
-			Kind:       pulumi.String("CustomResourceDefinition"),
-			Metadata: &metav1.ObjectMetaArgs{
-				Name:   pulumi.String(crdName),
-				Labels: pulumi.StringMap{"app.kubernetes.io/managed-by": pulumi.String("Helm")},
-				Annotations: pulumi.StringMap{
-					"meta.helm.sh/release-name":      pulumi.String(karpenterCRDReleaseName),
-					"meta.helm.sh/release-namespace": pulumi.String(clustersKubeSystemNamespace),
-				},
-			},
-		}, k8sOpt, pulumi.IgnoreChanges([]string{"metadata"}),
-			withAlias("kubernetes:apiextensions.k8s.io/v1:CustomResourceDefinitionPatch", adoptResourceName))
-		if err != nil {
-			return err
-		}
-		adoptDeps = append(adoptDeps, adopt)
-	}
-
+	// already has the Karpenter CRDs installed (the controller chart's bundled
+	// crds/ created them) WITHOUT karpenter-crd Helm ownership metadata, so a
+	// fresh karpenter-crd install would otherwise fail with "exists and cannot be
+	// imported into the current release — invalid ownership metadata". We adopt
+	// them via the helm-controller's native spec.takeOwnership, which maps to
+	// `helm upgrade --take-ownership`: it rewrites the ownership label +
+	// release-name/namespace annotations on the existing objects so the
+	// karpenter-crd release becomes their owner. This is scoped to exactly the
+	// CRDs this chart renders, and is a no-op on greenfield clusters where the
+	// CRDs do not yet exist (the chart simply creates them cleanly).
+	// Requires helm-controller ≥ v0.16.14 (adds spec.takeOwnership) and Helm
+	// ≥ 3.17 in the job image (--take-ownership); both are satisfied by PTD's
+	// pinned versions.
 	crdChartResourceName := compoundName + "-karpenter-crd-helm-release"
 	crdChart, err := apiextensions.NewCustomResource(ctx, crdChartResourceName, &apiextensions.CustomResourceArgs{
 		ApiVersion: pulumi.String("helm.cattle.io/v1"),
 		Kind:       pulumi.String("HelmChart"),
 		Metadata: metav1.ObjectMetaArgs{
-			Name:      pulumi.String(karpenterCRDReleaseName),
+			Name:      pulumi.String("karpenter-crd"),
 			Namespace: pulumi.String(clustersHelmControllerNamespace),
 			Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
 		},
@@ -1427,9 +1400,10 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 				"chart":           pulumi.String("oci://public.ecr.aws/karpenter/karpenter-crd"),
 				"targetNamespace": pulumi.String(clustersKubeSystemNamespace),
 				"version":         pulumi.String(version),
+				"takeOwnership":   pulumi.Bool(true),
 			},
 		},
-	}, k8sOpt, pulumi.DependsOn(adoptDeps),
+	}, k8sOpt,
 		withAlias("kubernetes:helm.cattle.io/v1:HelmChart", crdChartResourceName))
 	if err != nil {
 		return err
