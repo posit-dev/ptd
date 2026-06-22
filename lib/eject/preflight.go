@@ -101,16 +101,11 @@ func checkControlRoomConfigured(result *PreflightResult, config interface{}) {
 }
 
 func checkCredentials(ctx context.Context, result *PreflightResult, t types.Target) {
-	creds, err := t.Credentials(ctx)
-	if err != nil {
+	// Target.Credentials already refreshes the credentials internally, so a
+	// successful return validates them; no separate Refresh call is needed.
+	if _, err := t.Credentials(ctx); err != nil {
 		result.addCheck("workload_credentials", CheckFail,
 			fmt.Sprintf("Failed to get workload credentials: %v", err))
-		return
-	}
-
-	if err := creds.Refresh(ctx); err != nil {
-		result.addCheck("workload_credentials", CheckFail,
-			fmt.Sprintf("Workload credentials failed validation: %v", err))
 		return
 	}
 
@@ -118,16 +113,11 @@ func checkCredentials(ctx context.Context, result *PreflightResult, t types.Targ
 }
 
 func checkControlRoomCredentials(ctx context.Context, result *PreflightResult, controlRoom types.Target) {
-	creds, err := controlRoom.Credentials(ctx)
-	if err != nil {
+	// Target.Credentials already refreshes the credentials internally, so a
+	// successful return validates them; no separate Refresh call is needed.
+	if _, err := controlRoom.Credentials(ctx); err != nil {
 		result.addCheck("control_room_reachable", CheckFail,
 			fmt.Sprintf("Failed to get control room credentials: %v", err))
-		return
-	}
-
-	if err := creds.Refresh(ctx); err != nil {
-		result.addCheck("control_room_reachable", CheckFail,
-			fmt.Sprintf("Control room credentials failed validation: %v", err))
 		return
 	}
 

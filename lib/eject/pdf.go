@@ -205,12 +205,12 @@ func RenderHandoffPDF(outputPath string, data *HandoffData) error {
 		}
 		m.AddRows(row.New(4))
 
-		// Severance Plan
-		att.PdfSection(m, "Severance Plan")
+		// Eject Plan
+		att.PdfSection(m, "Eject Plan")
 		if data.DryRun {
-			att.PdfParagraph(m, severancePlanDryRunText())
+			att.PdfParagraph(m, ejectPlanDryRunText())
 		} else {
-			att.PdfParagraph(m, severancePlanLiveText())
+			att.PdfParagraph(m, ejectPlanLiveText())
 		}
 		m.AddRows(row.New(3))
 

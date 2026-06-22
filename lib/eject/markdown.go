@@ -44,8 +44,8 @@ var handoffFuncMap = template.FuncMap{
 	},
 	"overviewText":           overviewText,
 	"ownershipOptionsText":   func() string { return ownershipOptionsText() },
-	"severancePlanDryRun":    func() string { return severancePlanDryRunText() },
-	"severancePlanLive":      func() string { return severancePlanLiveText() },
+	"ejectPlanDryRun":        func() string { return ejectPlanDryRunText() },
+	"ejectPlanLive":          func() string { return ejectPlanLiveText() },
 	"pulumiOwnershipText":    pulumiOwnershipText,
 	"pulumiImportText":       func() string { return pulumiImportText() },
 	"terraformMigrationText": func() string { return terraformMigrationText() },
@@ -189,12 +189,12 @@ This workload is connected to a control room in account {{ .ControlRoom.AccountI
 | {{ .Category }} | ` + "`" + `{{ .Resource }}` + "`" + ` | {{ .Description }} |
 {{ end }}
 
-## Severance Plan
+## Eject Plan
 
 {{ if .DryRun -}}
-{{ severancePlanDryRun }}
+{{ ejectPlanDryRun }}
 {{ else -}}
-{{ severancePlanLive }}
+{{ ejectPlanLive }}
 {{ end }}
 
 | Category | Action |

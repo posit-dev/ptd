@@ -100,11 +100,11 @@ func TestCheckCredentials_GetFails(t *testing.T) {
 }
 
 func TestCheckCredentials_RefreshFails(t *testing.T) {
+	// Target.Credentials refreshes internally, so a refresh failure surfaces
+	// as an error from Credentials rather than via a separate Refresh call.
 	result := &PreflightResult{}
 	target := &typestest.MockTarget{}
-	creds := &typestest.MockCredentials{}
-	creds.On("Refresh", mock.Anything).Return(fmt.Errorf("expired"))
-	target.On("Credentials", mock.Anything).Return(creds, nil)
+	target.On("Credentials", mock.Anything).Return((*typestest.MockCredentials)(nil), fmt.Errorf("expired"))
 
 	checkCredentials(context.Background(), result, target)
 
