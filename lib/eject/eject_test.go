@@ -300,6 +300,12 @@ func TestRun_Eject_NoControlRoomTarget(t *testing.T) {
 	json.Unmarshal(recordData, &record)
 	assert.True(t, record.ConfigStripped)
 	assert.False(t, record.MimirSecretRemoved)
+
+	// The snapshot taken before the destructive strip must be persisted in
+	// the eject record so the original control_room_* values can be recovered.
+	require.NotNil(t, record.ControlRoomSnapshot)
+	assert.Equal(t, "ctrl.posit.team", record.ControlRoomSnapshot.Get("control_room_domain"))
+	assert.Equal(t, "us-east-1", record.ControlRoomSnapshot.Get("control_room_region"))
 }
 
 func TestRun_Eject_MimirDeletionFailsContinues(t *testing.T) {
@@ -349,6 +355,11 @@ func TestRun_Eject_MimirDeletionFailsContinues(t *testing.T) {
 	require.NoError(t, json.Unmarshal(recordData, &record))
 	assert.True(t, record.ConfigStripped)
 	assert.False(t, record.MimirSecretRemoved)
+
+	// The snapshot must survive even when a post-strip step (Mimir removal)
+	// fails, so the stripped control_room_* values remain recoverable.
+	require.NotNil(t, record.ControlRoomSnapshot)
+	assert.Equal(t, "ctrl.posit.team", record.ControlRoomSnapshot.Get("control_room_domain"))
 }
 
 type failingSecretStore struct{}

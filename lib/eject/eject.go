@@ -149,10 +149,26 @@ func runEjectSteps(ctx context.Context, t types.Target, opts Options, crDetails 
 	}
 	slog.Info("Snapshotted control room config", "fields", len(snapshot.Fields))
 
+	// Persist the snapshot to the eject-record BEFORE any destructive step.
+	// If the process dies after the strip but before the final record is
+	// written, the snapshot survives on disk so a re-run can recover. The
+	// steps are marked not-yet-done; the record is rewritten with final
+	// outcomes once the steps complete.
+	record := EjectRecord{
+		EjectedAt:           time.Now().UTC().Format(time.RFC3339),
+		ControlRoomSnapshot: snapshot,
+		MimirSecretRemoved:  false,
+		ConfigStripped:      false,
+	}
+	if err := writeEjectRecord(record, opts.OutputDir); err != nil {
+		return fmt.Errorf("failed to write initial eject record: %w", err)
+	}
+
 	// Step 2: Strip control room fields from ptd.yaml
 	if err := StripControlRoomFields(ptdYaml); err != nil {
 		return fmt.Errorf("failed to strip control room fields: %w", err)
 	}
+	record.ConfigStripped = true
 	slog.Info("Stripped control room fields from ptd.yaml")
 
 	// Step 3: Delete Mimir password from control room
@@ -170,13 +186,9 @@ func runEjectSteps(ctx context.Context, t types.Target, opts Options, crDetails 
 		slog.Warn("No control room target available; skipping Mimir password removal")
 	}
 
-	// Step 4: Write eject record
-	record := EjectRecord{
-		EjectedAt:           time.Now().UTC().Format(time.RFC3339),
-		ControlRoomSnapshot: snapshot,
-		MimirSecretRemoved:  mimirRemoved,
-		ConfigStripped:      true,
-	}
+	// Step 4: Rewrite the eject record with the final per-step outcomes.
+	record.EjectedAt = time.Now().UTC().Format(time.RFC3339)
+	record.MimirSecretRemoved = mimirRemoved
 	if err := writeEjectRecord(record, opts.OutputDir); err != nil {
 		return fmt.Errorf("failed to write eject record: %w", err)
 	}
@@ -184,7 +196,7 @@ func runEjectSteps(ctx context.Context, t types.Target, opts Options, crDetails 
 	// --- Summary ---
 	slog.Info("Eject complete",
 		"target", opts.TargetName,
-		"config_stripped", true,
+		"config_stripped", record.ConfigStripped,
 		"mimir_secret_removed", mimirRemoved,
 		"snapshot_fields", len(snapshot.Fields),
 	)
