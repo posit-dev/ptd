@@ -83,11 +83,7 @@ func Run(ctx context.Context, t types.Target, opts Options) error {
 	}
 
 	// --- Bundle generation (always) ---
-	controlRoomName := ""
-	if opts.ControlRoomTarget != nil {
-		controlRoomName = opts.ControlRoomTarget.Name()
-	}
-	crDetails, err := CollectControlRoomDetails(config, t.Name(), controlRoomName)
+	crDetails, err := CollectControlRoomDetails(config, t.Name())
 	if err != nil {
 		return fmt.Errorf("failed to collect control room details: %w", err)
 	}

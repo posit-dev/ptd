@@ -21,7 +21,7 @@ type ControlRoomDetails struct {
 	Connections []ControlRoomConnection `json:"connections"`
 }
 
-func CollectControlRoomDetails(config interface{}, targetName string, controlRoomName string) (*ControlRoomDetails, error) {
+func CollectControlRoomDetails(config interface{}, targetName string) (*ControlRoomDetails, error) {
 	var accountID, clusterName, domain, region string
 
 	switch cfg := config.(type) {
@@ -46,12 +46,12 @@ func CollectControlRoomDetails(config interface{}, targetName string, controlRoo
 		Region:      region,
 	}
 
-	details.Connections = buildConnections(details, controlRoomName)
+	details.Connections = buildConnections(details)
 
 	return details, nil
 }
 
-func buildConnections(details *ControlRoomDetails, controlRoomName string) []ControlRoomConnection {
+func buildConnections(details *ControlRoomDetails) []ControlRoomConnection {
 	var conns []ControlRoomConnection
 
 	if details.AccountID != "" {
@@ -72,8 +72,11 @@ func buildConnections(details *ControlRoomDetails, controlRoomName string) []Con
 			RemovalAction: "Remove the prometheus.remote_write \"control_room\" block from Alloy config",
 		})
 
-		// The mimir password secret lives in the control room's secret store
-		secretName := fmt.Sprintf("%s.mimir-auth.posit.team", controlRoomName)
+		// The mimir password secret lives in the control room's secret store.
+		// Derive its name from the control room cluster name (populated in both
+		// dry-run and live paths), not a separately-threaded control room
+		// target name which is empty in dry-run.
+		secretName := fmt.Sprintf("%s.mimir-auth.posit.team", details.ClusterName)
 		conns = append(conns, ControlRoomConnection{
 			Category:      "Secret Sync",
 			Description:   "Mimir authentication password is synced to the control room's secret store",
