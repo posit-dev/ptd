@@ -1366,26 +1366,11 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 		},
 	}
 
-	// ── Karpenter CRDs ─────────────────────────────────────────────────────────
-	// Manage the Karpenter CRDs in lockstep with the controller via the
-	// karpenter-crd chart, pinned to the SAME `version` (single source of truth —
-	// both driven by `karpenter_version`). This prevents a controller bump from
-	// running against stale, hand-applied CRDs.
-	//
-	// Adoption of pre-existing CRDs: every cluster created before this change
-	// already has the Karpenter CRDs installed (the controller chart's bundled
-	// crds/ created them) WITHOUT karpenter-crd Helm ownership metadata, so a
-	// fresh karpenter-crd install would otherwise fail with "exists and cannot be
-	// imported into the current release — invalid ownership metadata". We adopt
-	// them via the helm-controller's native spec.takeOwnership, which maps to
-	// `helm upgrade --take-ownership`: it rewrites the ownership label +
-	// release-name/namespace annotations on the existing objects so the
-	// karpenter-crd release becomes their owner. This is scoped to exactly the
-	// CRDs this chart renders, and is a no-op on greenfield clusters where the
-	// CRDs do not yet exist (the chart simply creates them cleanly).
-	// Requires helm-controller ≥ v0.16.14 (adds spec.takeOwnership) and Helm
-	// ≥ 3.17 in the job image (--take-ownership); both are satisfied by PTD's
-	// pinned versions.
+	// Manage the Karpenter CRDs via the karpenter-crd chart, pinned to the same
+	// karpenter_version as the controller so they never drift. takeOwnership adopts
+	// the controller chart's pre-existing, Helm-unowned CRDs (needs helm-controller
+	// >= v0.16.14 and Helm >= 3.17 in the job image).
+	// Full rationale: docs/infrastructure/karpenter-crds.md
 	crdChartResourceName := compoundName + "-karpenter-crd-helm-release"
 	crdChart, err := apiextensions.NewCustomResource(ctx, crdChartResourceName, &apiextensions.CustomResourceArgs{
 		ApiVersion: pulumi.String("helm.cattle.io/v1"),
