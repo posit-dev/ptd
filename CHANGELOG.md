@@ -1,3 +1,11 @@
+## [1.32.1](https://github.com/posit-dev/ptd/compare/v1.32.0...v1.32.1) (2026-06-23)
+
+
+### Bug Fixes
+
+* correct Bedrock model ID to Sonnet 4.5 ([2c2a9ac](https://github.com/posit-dev/ptd/commit/2c2a9acff0b797f4f5117eea8350742a03bb7e25))
+* use correct Sonnet 4.6 Bedrock inference profile ID ([f6812e4](https://github.com/posit-dev/ptd/commit/f6812e4658fd4782445f528ded88e4226dbfec02))
+
 # [1.32.0](https://github.com/posit-dev/ptd/compare/v1.31.2...v1.32.0) (2026-06-18)
 
 
