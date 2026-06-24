@@ -71,11 +71,9 @@ func buildConnections(details *ControlRoomDetails) []ControlRoomConnection {
 			Resource:      mimirEndpoint,
 			RemovalAction: "Remove the prometheus.remote_write \"control_room\" block from Alloy config",
 		})
+	}
 
-		// The mimir password secret lives in the control room's secret store.
-		// Derive its name from the control room cluster name (populated in both
-		// dry-run and live paths), not a separately-threaded control room
-		// target name which is empty in dry-run.
+	if details.ClusterName != "" {
 		secretName := fmt.Sprintf("%s.mimir-auth.posit.team", details.ClusterName)
 		conns = append(conns, ControlRoomConnection{
 			Category:      "Secret Sync",

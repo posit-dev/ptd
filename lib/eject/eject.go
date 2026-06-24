@@ -165,6 +165,11 @@ func runEjectSteps(ctx context.Context, t types.Target, opts Options, crDetails 
 		return fmt.Errorf("failed to strip control room fields: %w", err)
 	}
 	record.ConfigStripped = true
+	// Flush the updated status before the network-bound Mimir step so the
+	// on-disk record stays accurate if the process dies mid-deletion.
+	if err := writeEjectRecord(record, opts.OutputDir); err != nil {
+		return fmt.Errorf("failed to update eject record after config strip: %w", err)
+	}
 	slog.Info("Stripped control room fields from ptd.yaml")
 
 	// Step 3: Delete Mimir password from control room
@@ -183,7 +188,6 @@ func runEjectSteps(ctx context.Context, t types.Target, opts Options, crDetails 
 	}
 
 	// Step 4: Rewrite the eject record with the final per-step outcomes.
-	record.EjectedAt = time.Now().UTC().Format(time.RFC3339)
 	record.MimirSecretRemoved = mimirRemoved
 	if err := writeEjectRecord(record, opts.OutputDir); err != nil {
 		return fmt.Errorf("failed to write eject record: %w", err)

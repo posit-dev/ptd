@@ -150,6 +150,23 @@ func TestBuildConnections_DomainAndClusterName(t *testing.T) {
 	assert.Equal(t, "ctrl-cluster.mimir-auth.posit.team", conns[1].Resource)
 }
 
+func TestBuildConnections_DomainWithoutClusterName(t *testing.T) {
+	// Domain set but no cluster name: the Mimir endpoint is still listed, but
+	// the Secret Sync entry must be omitted rather than emit a malformed
+	// ".mimir-auth.posit.team" resource name.
+	details := &ControlRoomDetails{
+		Domain: "ctrl.example.com",
+	}
+
+	conns := buildConnections(details)
+
+	assert.Len(t, conns, 1)
+	assert.Equal(t, "Observability", conns[0].Category)
+	for _, conn := range conns {
+		assert.NotEqual(t, "Secret Sync", conn.Category, "Secret Sync entry should be omitted without a cluster name")
+	}
+}
+
 func TestBuildConnections_RemovalActions(t *testing.T) {
 	details := &ControlRoomDetails{
 		AccountID:   "123456789012",
