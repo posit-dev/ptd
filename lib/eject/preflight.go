@@ -13,33 +13,31 @@ type CheckStatus string
 const (
 	CheckPass CheckStatus = "pass"
 	CheckFail CheckStatus = "fail"
-	CheckWarn CheckStatus = "warn"
 	CheckSkip CheckStatus = "skip"
 )
 
 type CheckResult struct {
-	Name    string      `json:"name"`
-	Status  CheckStatus `json:"status"`
-	Message string      `json:"message"`
+	Name    string
+	Status  CheckStatus
+	Message string
 }
 
 type PreflightResult struct {
-	Checks []CheckResult `json:"checks"`
-	Passed bool          `json:"passed"`
+	Checks []CheckResult
 }
 
 func (r *PreflightResult) addCheck(name string, status CheckStatus, message string) {
 	r.Checks = append(r.Checks, CheckResult{Name: name, Status: status, Message: message})
 }
 
-func (r *PreflightResult) computePassed() {
-	r.Passed = true
+// Passed reports whether every check passed (no CheckFail). Warn/skip do not fail.
+func (r *PreflightResult) Passed() bool {
 	for _, c := range r.Checks {
 		if c.Status == CheckFail {
-			r.Passed = false
-			return
+			return false
 		}
 	}
+	return true
 }
 
 // PreflightOptions configures which checks to run.
@@ -49,7 +47,7 @@ type PreflightOptions struct {
 }
 
 // RunPreflightChecks validates the workload is in a good state before eject.
-func RunPreflightChecks(ctx context.Context, t types.Target, opts PreflightOptions) (*PreflightResult, error) {
+func RunPreflightChecks(ctx context.Context, t types.Target, opts PreflightOptions) *PreflightResult {
 	result := &PreflightResult{}
 
 	checkControlRoomConfigured(result, opts.Config)
@@ -61,19 +59,15 @@ func RunPreflightChecks(ctx context.Context, t types.Target, opts PreflightOptio
 		result.addCheck("control_room_reachable", CheckSkip, "No control room target provided; skipping")
 	}
 
-	result.computePassed()
-
 	for _, c := range result.Checks {
 		lvl := slog.LevelInfo
 		if c.Status == CheckFail {
 			lvl = slog.LevelError
-		} else if c.Status == CheckWarn {
-			lvl = slog.LevelWarn
 		}
 		slog.Log(ctx, lvl, "Preflight check", "name", c.Name, "status", c.Status, "message", c.Message)
 	}
 
-	return result, nil
+	return result
 }
 
 func checkControlRoomConfigured(result *PreflightResult, config interface{}) {

@@ -70,14 +70,11 @@ func Run(ctx context.Context, t types.Target, opts Options) error {
 
 	// --- Pre-flight checks (eject only) ---
 	if !opts.DryRun {
-		pfResult, err := RunPreflightChecks(ctx, t, PreflightOptions{
+		pfResult := RunPreflightChecks(ctx, t, PreflightOptions{
 			Config:            config,
 			ControlRoomTarget: opts.ControlRoomTarget,
 		})
-		if err != nil {
-			return fmt.Errorf("preflight checks failed: %w", err)
-		}
-		if !pfResult.Passed {
+		if !pfResult.Passed() {
 			return fmt.Errorf("preflight checks did not pass; aborting eject")
 		}
 	}
@@ -137,49 +134,31 @@ func Run(ctx context.Context, t types.Target, opts Options) error {
 func runEjectSteps(ctx context.Context, t types.Target, opts Options, crDetails *ControlRoomDetails) error {
 	slog.Info("Starting control room disconnection", "target", opts.TargetName)
 
-	// Step 1: Snapshot control room config before stripping
 	ptdYaml := opts.ptdYamlPath()
+
+	// Capture the pre-strip control room config for the audit record. The
+	// original values also survive in the bundle's config/ptd.yaml copy.
 	snapshot, err := SnapshotControlRoomFields(ptdYaml)
 	if err != nil {
 		return fmt.Errorf("failed to snapshot control room fields: %w", err)
 	}
 	slog.Info("Snapshotted control room config", "fields", len(snapshot.Fields))
 
-	// Persist the snapshot to the eject-record BEFORE any destructive step.
-	// If the process dies after the strip but before the final record is
-	// written, the snapshot survives on disk so a re-run can recover. The
-	// steps are marked not-yet-done; the record is rewritten with final
-	// outcomes once the steps complete.
-	record := EjectRecord{
-		EjectedAt:           time.Now().UTC().Format(time.RFC3339),
-		ControlRoomSnapshot: snapshot,
-		MimirSecretRemoved:  false,
-		ConfigStripped:      false,
-	}
-	if err := writeEjectRecord(record, opts.OutputDir); err != nil {
-		return fmt.Errorf("failed to write initial eject record: %w", err)
-	}
-
-	// Step 2: Strip control room fields from ptd.yaml
+	// Strip control room fields from ptd.yaml. The write is atomic, so a
+	// failure here leaves the original file intact.
 	if err := StripControlRoomFields(ptdYaml); err != nil {
 		return fmt.Errorf("failed to strip control room fields: %w", err)
 	}
-	record.ConfigStripped = true
-	// Flush the updated status before the network-bound Mimir step so the
-	// on-disk record stays accurate if the process dies mid-deletion.
-	if err := writeEjectRecord(record, opts.OutputDir); err != nil {
-		return fmt.Errorf("failed to update eject record after config strip: %w", err)
-	}
 	slog.Info("Stripped control room fields from ptd.yaml")
 
-	// Step 3: Delete Mimir password from control room
+	// Delete Mimir password from control room. Fault-tolerant: the config is
+	// already stripped, so a failure here is a recoverable partial success.
 	mimirRemoved := false
 	if opts.ControlRoomTarget != nil {
 		if err := RemoveWorkloadMimirPassword(ctx, opts.ControlRoomTarget, opts.TargetName); err != nil {
 			slog.Error("Failed to remove Mimir password from control room — the workload config has already been stripped. "+
 				"The orphaned secret can be cleaned up manually or by re-running eject.",
 				"error", err)
-			// Continue — config is already stripped, this is a recoverable partial failure
 		} else {
 			mimirRemoved = true
 		}
@@ -187,8 +166,16 @@ func runEjectSteps(ctx context.Context, t types.Target, opts Options, crDetails 
 		slog.Warn("No control room target available; skipping Mimir password removal")
 	}
 
-	// Step 4: Rewrite the eject record with the final per-step outcomes.
-	record.MimirSecretRemoved = mimirRemoved
+	// Write the audit record once, after the steps complete. The eject record
+	// is a pure audit artifact; the original control_room_* values are already
+	// preserved in the bundle's config/ptd.yaml copy, and StripControlRoomFields
+	// writes atomically so a failure there leaves ptd.yaml intact.
+	record := EjectRecord{
+		EjectedAt:           time.Now().UTC().Format(time.RFC3339),
+		ControlRoomSnapshot: snapshot,
+		ConfigStripped:      true,
+		MimirSecretRemoved:  mimirRemoved,
+	}
 	if err := writeEjectRecord(record, opts.OutputDir); err != nil {
 		return fmt.Errorf("failed to write eject record: %w", err)
 	}

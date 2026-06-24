@@ -138,31 +138,28 @@ func TestCheckControlRoomCredentials_Fails(t *testing.T) {
 	assert.Contains(t, result.Checks[0].Message, "access denied")
 }
 
-func TestPreflightResult_ComputePassed_AllPass(t *testing.T) {
+func TestPreflightResult_Passed_AllPass(t *testing.T) {
 	result := &PreflightResult{}
 	result.addCheck("a", CheckPass, "ok")
 	result.addCheck("b", CheckPass, "ok")
-	result.addCheck("c", CheckWarn, "meh")
+	result.addCheck("c", CheckSkip, "skipped-warn")
 	result.addCheck("d", CheckSkip, "skipped")
-	result.computePassed()
 
-	assert.True(t, result.Passed)
+	assert.True(t, result.Passed())
 }
 
-func TestPreflightResult_ComputePassed_HasFail(t *testing.T) {
+func TestPreflightResult_Passed_HasFail(t *testing.T) {
 	result := &PreflightResult{}
 	result.addCheck("a", CheckPass, "ok")
 	result.addCheck("b", CheckFail, "bad")
-	result.computePassed()
 
-	assert.False(t, result.Passed)
+	assert.False(t, result.Passed())
 }
 
-func TestPreflightResult_ComputePassed_Empty(t *testing.T) {
+func TestPreflightResult_Passed_Empty(t *testing.T) {
 	result := &PreflightResult{}
-	result.computePassed()
 
-	assert.True(t, result.Passed)
+	assert.True(t, result.Passed())
 }
 
 func TestRunPreflightChecks_SkipsControlRoomWhenNil(t *testing.T) {
@@ -170,12 +167,10 @@ func TestRunPreflightChecks_SkipsControlRoomWhenNil(t *testing.T) {
 	creds := typestest.DefaultCredentials()
 	target.On("Credentials", mock.Anything).Return(creds, nil)
 
-	result, err := RunPreflightChecks(context.Background(), target, PreflightOptions{
+	result := RunPreflightChecks(context.Background(), target, PreflightOptions{
 		Config:            types.AWSWorkloadConfig{ControlRoomDomain: "ctrl.example.com"},
 		ControlRoomTarget: nil,
 	})
-
-	require.NoError(t, err)
 
 	var crCheck *CheckResult
 	for _, c := range result.Checks {
@@ -196,7 +191,7 @@ func TestRunPreflightChecks_AllPass(t *testing.T) {
 	crTarget := &typestest.MockTarget{}
 	crTarget.On("Credentials", mock.Anything).Return(creds, nil)
 
-	result, err := RunPreflightChecks(context.Background(), target, PreflightOptions{
+	result := RunPreflightChecks(context.Background(), target, PreflightOptions{
 		Config: types.AWSWorkloadConfig{
 			ControlRoomAccountID: "123456789012",
 			ControlRoomDomain:    "ctrl.example.com",
@@ -204,8 +199,7 @@ func TestRunPreflightChecks_AllPass(t *testing.T) {
 		ControlRoomTarget: crTarget,
 	})
 
-	require.NoError(t, err)
-	assert.True(t, result.Passed)
+	assert.True(t, result.Passed())
 	assert.Len(t, result.Checks, 3)
 }
 
@@ -214,10 +208,9 @@ func TestRunPreflightChecks_FailsOnEmptyConfig(t *testing.T) {
 	creds := typestest.DefaultCredentials()
 	target.On("Credentials", mock.Anything).Return(creds, nil)
 
-	result, err := RunPreflightChecks(context.Background(), target, PreflightOptions{
+	result := RunPreflightChecks(context.Background(), target, PreflightOptions{
 		Config: types.AWSWorkloadConfig{},
 	})
 
-	require.NoError(t, err)
-	assert.False(t, result.Passed)
+	assert.False(t, result.Passed())
 }
