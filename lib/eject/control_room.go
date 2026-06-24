@@ -74,7 +74,7 @@ func buildConnections(details *ControlRoomDetails) []ControlRoomConnection {
 	}
 
 	if details.ClusterName != "" {
-		secretName := fmt.Sprintf("%s.mimir-auth.posit.team", details.ClusterName)
+		secretName := mimirAuthSecretName(details.ClusterName)
 		conns = append(conns, ControlRoomConnection{
 			Category:      "Secret Sync",
 			Description:   "Mimir authentication password is synced to the control room's secret store",

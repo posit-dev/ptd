@@ -10,13 +10,17 @@ import (
 	"github.com/posit-dev/ptd/lib/types"
 )
 
+func mimirAuthSecretName(clusterName string) string {
+	return fmt.Sprintf("%s.mimir-auth.posit.team", clusterName)
+}
+
 func RemoveWorkloadMimirPassword(ctx context.Context, controlRoomTarget types.Target, workloadName string) error {
 	creds, err := controlRoomTarget.Credentials(ctx)
 	if err != nil {
 		return fmt.Errorf("getting control room credentials: %w", err)
 	}
 
-	secretName := fmt.Sprintf("%s.mimir-auth.posit.team", controlRoomTarget.Name())
+	secretName := mimirAuthSecretName(controlRoomTarget.Name())
 
 	// Read the secret directly and inspect the error. We must not rely on
 	// SecretExists here: provider implementations return false on ANY error
