@@ -142,8 +142,7 @@ func TestPreflightResult_Passed_AllPass(t *testing.T) {
 	result := &PreflightResult{}
 	result.addCheck("a", CheckPass, "ok")
 	result.addCheck("b", CheckPass, "ok")
-	result.addCheck("c", CheckSkip, "skipped-warn")
-	result.addCheck("d", CheckSkip, "skipped")
+	result.addCheck("c", CheckSkip, "skipped")
 
 	assert.True(t, result.Passed())
 }
