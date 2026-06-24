@@ -9,11 +9,12 @@ import (
 	"regexp"
 )
 
-var controlRoomFieldPattern = regexp.MustCompile(`(?m)^(\s*control_room_\w+:.*)$`)
+var controlRoomFieldPattern = regexp.MustCompile(`(?m)^(\s*)(control_room_\w+:.*)$`)
 
 // CopyWorkloadConfig copies the entire workload directory into the eject
-// bundle's config/ directory. The copied ptd.yaml is annotated with comments
-// on control_room_* fields indicating they'll be cleared during eject.
+// bundle's config/ directory. In the copied ptd.yaml the control_room_* fields
+// are commented out (their original values preserved for reference), since the
+// bundle is a reference snapshot rather than an operational config.
 func CopyWorkloadConfig(workloadPath string, outputDir string) error {
 	configDir := filepath.Join(outputDir, "config")
 
@@ -39,11 +40,13 @@ func annotatePtdYaml(configDir string) error {
 	return os.WriteFile(path, []byte(annotated), 0644)
 }
 
-// AnnotateControlRoomFields adds a comment to each control_room_* field
-// indicating it will be cleared during eject.
+// AnnotateControlRoomFields comments out each control_room_* field, preserving
+// the original value for reference. The eject bundle's config/ptd.yaml is a
+// reference snapshot, not a live config, so the fields are made inert rather
+// than left as active YAML with a trailing comment.
 func AnnotateControlRoomFields(yaml string) string {
 	return controlRoomFieldPattern.ReplaceAllString(yaml,
-		"$1  # EJECT: cleared during eject")
+		"${1}# ${2}  # EJECT: cleared during eject")
 }
 
 func copyFile(src, dst string) error {
