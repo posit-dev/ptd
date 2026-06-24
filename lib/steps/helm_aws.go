@@ -1366,12 +1366,45 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 		},
 	}
 
+	// Manage the Karpenter CRDs via the karpenter-crd chart, pinned to the same
+	// karpenter_version as the controller so they never drift. takeOwnership adopts
+	// the controller chart's pre-existing, Helm-unowned CRDs (needs helm-controller
+	// >= v0.16.14 and Helm >= 3.17 in the job image).
+	// Full rationale: docs/infrastructure/karpenter-crds.md
+	crdChartResourceName := compoundName + "-karpenter-crd-helm-release"
+	crdChart, err := apiextensions.NewCustomResource(ctx, crdChartResourceName, &apiextensions.CustomResourceArgs{
+		ApiVersion: pulumi.String("helm.cattle.io/v1"),
+		Kind:       pulumi.String("HelmChart"),
+		Metadata: metav1.ObjectMetaArgs{
+			Name:      pulumi.String("karpenter-crd"),
+			Namespace: pulumi.String(clustersHelmControllerNamespace),
+			Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
+		},
+		OtherFields: kubernetes.UntypedArgs{
+			"spec": pulumi.Map{
+				"chart":           pulumi.String("oci://public.ecr.aws/karpenter/karpenter-crd"),
+				"targetNamespace": pulumi.String(clustersKubeSystemNamespace),
+				"version":         pulumi.String(version),
+				"takeOwnership":   pulumi.Bool(true),
+			},
+		},
+	}, k8sOpt,
+		withAlias("kubernetes:helm.cattle.io/v1:HelmChart", crdChartResourceName))
+	if err != nil {
+		return err
+	}
+
 	chartResourceName := compoundName + "-karpenter-helm-release"
 	valuesYAML, err := marshalYAML(values)
 	if err != nil {
 		return err
 	}
 
+	// The controller chart depends on the CRD chart so Pulumi creates the CRD
+	// HelmChart CR first. Note: helm-controller reconciles HelmChart CRs
+	// asynchronously, so dependsOn orders CR *creation*, not the underlying helm
+	// jobs — see PR notes on the mitigation (CRDs are additive/backward-compatible,
+	// and the controller chart re-templates CRs that retry until the CRDs exist).
 	_, err = apiextensions.NewCustomResource(ctx, chartResourceName, &apiextensions.CustomResourceArgs{
 		ApiVersion: pulumi.String("helm.cattle.io/v1"),
 		Kind:       pulumi.String("HelmChart"),
@@ -1388,7 +1421,8 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 				"valuesContent":   pulumi.String(string(valuesYAML)),
 			},
 		},
-	}, k8sOpt, withAlias("kubernetes:helm.cattle.io/v1:HelmChart", chartResourceName))
+	}, k8sOpt, pulumi.DependsOn([]pulumi.Resource{crdChart}),
+		withAlias("kubernetes:helm.cattle.io/v1:HelmChart", chartResourceName))
 	if err != nil {
 		return err
 	}
@@ -1502,7 +1536,8 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 			OtherFields: kubernetes.UntypedArgs{
 				"spec": nodepoolSpec,
 			},
-		}, k8sOpt, withAlias("kubernetes:karpenter.sh/v1:NodePool", npResourceName))
+		}, k8sOpt, pulumi.DependsOn([]pulumi.Resource{crdChart}),
+			withAlias("kubernetes:karpenter.sh/v1:NodePool", npResourceName))
 		if err != nil {
 			return err
 		}
@@ -1549,7 +1584,8 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 					},
 				},
 			},
-		}, k8sOpt, withAlias("kubernetes:karpenter.k8s.aws/v1:EC2NodeClass", ec2ResourceName))
+		}, k8sOpt, pulumi.DependsOn([]pulumi.Resource{crdChart}),
+			withAlias("kubernetes:karpenter.k8s.aws/v1:EC2NodeClass", ec2ResourceName))
 		if err != nil {
 			return err
 		}
