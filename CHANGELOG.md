@@ -1,3 +1,10 @@
+## [1.32.2](https://github.com/posit-dev/ptd/compare/v1.32.1...v1.32.2) (2026-06-24)
+
+
+### Bug Fixes
+
+* **azure:** resolve bastion NSG subnet from any agent pool profile ([8f6dd05](https://github.com/posit-dev/ptd/commit/8f6dd053b9a8dd76b6a9b10968bbfb4a907113fd))
+
 ## [1.32.1](https://github.com/posit-dev/ptd/compare/v1.32.0...v1.32.1) (2026-06-23)
 
 
