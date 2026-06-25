@@ -1,3 +1,11 @@
+## [1.32.3](https://github.com/posit-dev/ptd/compare/v1.32.2...v1.32.3) (2026-06-25)
+
+
+### Bug Fixes
+
+* grant pull-requests write permission so Claude can post reviews ([9b3988c](https://github.com/posit-dev/ptd/commit/9b3988c133a7756a7d4a027bf82adc233e7bd76f))
+* **sites:** stop copying cloud resource tags onto Site k8s labels ([08c80d3](https://github.com/posit-dev/ptd/commit/08c80d3900741e884960ec3ed7fbd7c706dd83e7))
+
 ## [1.32.2](https://github.com/posit-dev/ptd/compare/v1.32.1...v1.32.2) (2026-06-24)
 
 
