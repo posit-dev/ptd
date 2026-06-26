@@ -163,11 +163,17 @@ func (s *BootstrapStep) runAzure(ctx context.Context, c types.Credentials, _ str
 	// resource group at creation time (below). These mirror the tags the persistent
 	// step places on child resources.
 	var resourceTags map[string]string
-	if rawConfig, cfgErr := helpers.ConfigForTarget(s.DstTarget); cfgErr == nil {
-		if cfg, ok := rawConfig.(types.AzureWorkloadConfig); ok {
-			resourceTags = cfg.ResourceTags
-		}
+	if rawConfig, cfgErr := helpers.ConfigForTarget(s.DstTarget); cfgErr != nil {
+		// Don't fail bootstrap on this; the RG is still created (untagged), matching
+		// the previous behavior. But warn so a missing/malformed config doesn't
+		// silently drop compliance tags.
+		s.Log.Warn("could not load workload config for resource_tags; resource group will be created untagged", "err", cfgErr)
+	} else if cfg, ok := rawConfig.(types.AzureWorkloadConfig); ok {
+		resourceTags = cfg.ResourceTags
 	}
+	// Note: runAzure is only invoked for Azure workload targets, so the assertion
+	// above always holds here. Control-room targets won't satisfy AzureWorkloadConfig
+	// and would fall through with no tags, which is the intended no-op for them.
 
 	// ensure pulumi state resource group
 	s.Log.Info("Creating resource group for pulumi state if it doesn't exist", "resourceGroup", azureTarget.ResourceGroupName())

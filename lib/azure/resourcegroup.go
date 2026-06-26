@@ -12,10 +12,10 @@ import (
 
 // FormatTagKey converts a PTD tag key to a valid Azure tag key. Azure tag keys
 // cannot contain '/', so we replace '/' with ':' (e.g. posit.team/environment ->
-// posit.team:environment). This mirrors the Python azure_tag_key_format helper and
-// is the single source of truth for the key-format rule shared by the persistent
-// step (azureTagMap) and resource-group creation, so tags applied at RG creation
-// match the tags placed on child resources and do not churn.
+// posit.team:environment). It is the single source of truth for the key-format
+// rule shared by the persistent step (azureTagMap) and resource-group creation,
+// so tags applied at RG creation match the tags placed on child resources and do
+// not churn.
 func FormatTagKey(key string) string {
 	return strings.ReplaceAll(key, "/", ":")
 }
@@ -33,12 +33,17 @@ func ResourceGroupExists(ctx context.Context, credentials *Credentials, subscrip
 	return true
 }
 
-// CreateResourceGroup creates the resource group, applying tags at creation time.
-// Tag keys are run through FormatTagKey so they match the keys placed on child
-// resources by the persistent step (azureTagMap), preventing tag churn. Note that
-// this only tags the RG on creation; existing resource groups are backfilled with
-// tags manually out-of-band (the caller guards this with an existence check), so
-// changing a workload's resource_tags will not retroactively retag an existing RG.
+// CreateResourceGroup creates (or updates) the resource group, applying tags at
+// creation time. Tag keys are run through FormatTagKey so they match the keys
+// placed on child resources by the persistent step (azureTagMap), preventing tag
+// churn.
+//
+// This wraps ARM's CreateOrUpdate, which is idempotent but WILL overwrite the tags
+// of an already-existing resource group. Callers that must not retag an existing
+// RG (e.g. to leave manually backfilled tags intact) must guard the call with
+// ResourceGroupExists, as bootstrap does. Consequently a change to a workload's
+// resource_tags is applied only to newly created RGs, never retroactively to
+// existing ones.
 func CreateResourceGroup(ctx context.Context, credentials *Credentials, subscriptionId string, region string, name string, tags map[string]string) error {
 	rgClient, err := armresources.NewResourceGroupsClient(subscriptionId, credentials.credentials, nil)
 	if err != nil {
