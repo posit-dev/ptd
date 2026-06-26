@@ -9,6 +9,7 @@ import (
 	"github.com/posit-dev/ptd/lib/aws"
 	"github.com/posit-dev/ptd/lib/azure"
 	"github.com/posit-dev/ptd/lib/consts"
+	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/secrets"
 	"github.com/posit-dev/ptd/lib/types"
 )
@@ -158,11 +159,29 @@ func (s *BootstrapStep) runAzure(ctx context.Context, c types.Credentials, _ str
 
 	azureTarget := s.DstTarget.(azure.Target)
 
+	// Load the workload's configured resource_tags so they can be applied to the
+	// resource group at creation time (below). These mirror the tags the persistent
+	// step places on child resources.
+	var resourceTags map[string]string
+	if rawConfig, cfgErr := helpers.ConfigForTarget(s.DstTarget); cfgErr != nil {
+		// Don't fail bootstrap on this; the RG is still created (untagged), matching
+		// the previous behavior. But warn so a missing/malformed config doesn't
+		// silently drop compliance tags.
+		s.Log.Warn("could not load workload config for resource_tags; resource group will be created untagged", "err", cfgErr)
+	} else if cfg, ok := rawConfig.(types.AzureWorkloadConfig); ok {
+		resourceTags = cfg.ResourceTags
+	}
+	// Note: runAzure is only invoked for Azure workload targets, so the assertion
+	// above always holds here. Control-room targets won't satisfy AzureWorkloadConfig
+	// and would fall through with no tags, which is the intended no-op for them.
+
 	// ensure pulumi state resource group
 	s.Log.Info("Creating resource group for pulumi state if it doesn't exist", "resourceGroup", azureTarget.ResourceGroupName())
 	exists := azure.ResourceGroupExists(ctx, azureCreds, azureTarget.SubscriptionID(), azureTarget.Region(), azureTarget.ResourceGroupName())
 	if !exists {
-		err := azure.CreateResourceGroup(ctx, azureCreds, azureTarget.SubscriptionID(), azureTarget.Region(), azureTarget.ResourceGroupName())
+		// Tags are only applied on creation; existing RGs are not retroactively
+		// retagged here (backfilled manually out-of-band).
+		err := azure.CreateResourceGroup(ctx, azureCreds, azureTarget.SubscriptionID(), azureTarget.Region(), azureTarget.ResourceGroupName(), resourceTags)
 		if err != nil {
 			return err
 		}

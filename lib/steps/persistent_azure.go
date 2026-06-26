@@ -429,12 +429,13 @@ func protectOpt(protect bool) pulumi.ResourceOption {
 func azureTagMap(tags map[string]string) pulumi.StringMap {
 	out := pulumi.StringMap{}
 	for k, v := range tags {
-		// Azure tag keys cannot contain '/'. Mirror Python azure_tag_key_format,
-		// which replaces '/' with ':' (e.g. posit.team/environment ->
-		// posit.team:environment). Without this every Azure resource's tags churn.
-		// See CLAUDE.md "Resource Naming Conventions / Azure tags"
-		// (azure_tag_key_format) for the canonical key-format rule.
-		out[strings.ReplaceAll(k, "/", ":")] = pulumi.String(v)
+		// Azure tag keys cannot contain '/'. azure.FormatTagKey replaces '/' with
+		// ':' (e.g. posit.team/environment -> posit.team:environment). Without this
+		// every Azure resource's tags churn. It is the single source of truth for the
+		// key-format rule, shared with resource-group creation (CreateResourceGroup)
+		// so RG tags match child-resource tags. See CLAUDE.md "Resource Naming
+		// Conventions / Azure tags" (azure_tag_key_format).
+		out[azure.FormatTagKey(k)] = pulumi.String(v)
 	}
 	return out
 }
