@@ -1,3 +1,23 @@
+# [1.33.0](https://github.com/posit-dev/ptd/compare/v1.32.3...v1.33.0) (2026-06-26)
+
+
+### Bug Fixes
+
+* address eject review comments ([b6fe798](https://github.com/posit-dev/ptd/commit/b6fe798e23fb03f875f44334e96390617240fd7d))
+* derive mimir secret name from cluster name in handoff ([12a579d](https://github.com/posit-dev/ptd/commit/12a579d96d5048484c2c3e9476063892b2f47323))
+* distinguish secret-not-found from permission errors in mimir cleanup ([23fa2ef](https://github.com/posit-dev/ptd/commit/23fa2ef2a1220e31a29cf313de29f257bac9ae83))
+* expand allowedTools so Claude can read PR context ([2c97680](https://github.com/posit-dev/ptd/commit/2c97680b029fdc4ec5b5004c4bbe4ec8ce0da2b7))
+* expand claude.yml allowedTools, add ANTHROPIC_DEFAULT_HAIKU_MODEL ([39b0c05](https://github.com/posit-dev/ptd/commit/39b0c052a44be36ed36e628d444b95a1c53a5039))
+* persist eject-record before destructive config strip ([4f890c0](https://github.com/posit-dev/ptd/commit/4f890c0730223ed852a8ae7ebd03cdd91dbdb479))
+* remove ANTHROPIC_DEFAULT_HAIKU_MODEL, not needed ([7be31a1](https://github.com/posit-dev/ptd/commit/7be31a18ce88111cbd4b8c758e9e4375f8901406))
+* remove dead Bundle struct and check test WriteFile errors ([ecaaf70](https://github.com/posit-dev/ptd/commit/ecaaf703b4fa0e98939ec68d84f4d72fa74e1e03))
+* write ptd.yaml and eject-record atomically ([0b33da2](https://github.com/posit-dev/ptd/commit/0b33da2a274f0e2a8acd54be2c8f93dae76c1c44))
+
+
+### Features
+
+* orchestrate eject with preflight checks, config strip, and Mimir cleanup ([779ba03](https://github.com/posit-dev/ptd/commit/779ba03421660fa776ec587d0cc9f8b45c256941)), closes [#248](https://github.com/posit-dev/ptd/issues/248)
+
 ## [1.32.3](https://github.com/posit-dev/ptd/compare/v1.32.2...v1.32.3) (2026-06-25)
 
 
