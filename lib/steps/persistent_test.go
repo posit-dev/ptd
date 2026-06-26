@@ -557,6 +557,21 @@ func TestAzureWorkloadPersistentDeploy_PerSiteZones(t *testing.T) {
 	assert.Equal(t, 2, mocks.typeCount("azure-native:dns:Zone"), "one zone per site")
 }
 
+func TestAzureTagMapFormatsKeys(t *testing.T) {
+	// azureTagMap must apply azure.FormatTagKey ('/' -> ':') so that child-resource
+	// tags match the tags applied to the resource group at creation time (which run
+	// through the same helper); otherwise every Azure resource's tags would churn.
+	out := azureTagMap(map[string]string{
+		"posit.team/environment": "staging",
+		"CostCenter":             "rnd",
+	})
+	assert.Equal(t, pulumi.String("staging"), out["posit.team:environment"])
+	assert.Equal(t, pulumi.String("rnd"), out["CostCenter"])
+	// The unformatted key must not be present.
+	_, hasUnformatted := out["posit.team/environment"]
+	assert.False(t, hasUnformatted, "tag key with '/' must be reformatted to ':'")
+}
+
 func TestAzureNamingHelpers(t *testing.T) {
 	// acr_registry: "crptd" + parts[0] + lower(parts[1:]).
 	assert.Equal(t, "crptddemo01staging", azureACRRegistryName("demo01-staging"))

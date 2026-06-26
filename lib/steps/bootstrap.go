@@ -9,6 +9,7 @@ import (
 	"github.com/posit-dev/ptd/lib/aws"
 	"github.com/posit-dev/ptd/lib/azure"
 	"github.com/posit-dev/ptd/lib/consts"
+	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/secrets"
 	"github.com/posit-dev/ptd/lib/types"
 )
@@ -158,11 +159,23 @@ func (s *BootstrapStep) runAzure(ctx context.Context, c types.Credentials, _ str
 
 	azureTarget := s.DstTarget.(azure.Target)
 
+	// Load the workload's configured resource_tags so they can be applied to the
+	// resource group at creation time (below). These mirror the tags the persistent
+	// step places on child resources.
+	var resourceTags map[string]string
+	if rawConfig, cfgErr := helpers.ConfigForTarget(s.DstTarget); cfgErr == nil {
+		if cfg, ok := rawConfig.(types.AzureWorkloadConfig); ok {
+			resourceTags = cfg.ResourceTags
+		}
+	}
+
 	// ensure pulumi state resource group
 	s.Log.Info("Creating resource group for pulumi state if it doesn't exist", "resourceGroup", azureTarget.ResourceGroupName())
 	exists := azure.ResourceGroupExists(ctx, azureCreds, azureTarget.SubscriptionID(), azureTarget.Region(), azureTarget.ResourceGroupName())
 	if !exists {
-		err := azure.CreateResourceGroup(ctx, azureCreds, azureTarget.SubscriptionID(), azureTarget.Region(), azureTarget.ResourceGroupName())
+		// Tags are only applied on creation; existing RGs are not retroactively
+		// retagged here (backfilled manually out-of-band).
+		err := azure.CreateResourceGroup(ctx, azureCreds, azureTarget.SubscriptionID(), azureTarget.Region(), azureTarget.ResourceGroupName(), resourceTags)
 		if err != nil {
 			return err
 		}
