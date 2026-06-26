@@ -3,11 +3,16 @@ package eject
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"github.com/posit-dev/ptd/lib/types"
 )
+
+func mimirAuthSecretName(clusterName string) string {
+	return fmt.Sprintf("%s.mimir-auth.posit.team", clusterName)
+}
 
 func RemoveWorkloadMimirPassword(ctx context.Context, controlRoomTarget types.Target, workloadName string) error {
 	creds, err := controlRoomTarget.Credentials(ctx)
@@ -15,15 +20,20 @@ func RemoveWorkloadMimirPassword(ctx context.Context, controlRoomTarget types.Ta
 		return fmt.Errorf("getting control room credentials: %w", err)
 	}
 
-	secretName := fmt.Sprintf("%s.mimir-auth.posit.team", controlRoomTarget.Name())
+	secretName := mimirAuthSecretName(controlRoomTarget.Name())
 
-	if !controlRoomTarget.SecretStore().SecretExists(ctx, creds, secretName) {
-		slog.Info("Mimir auth secret does not exist, nothing to remove", "secret", secretName)
-		return nil
-	}
-
+	// Read the secret directly and inspect the error. We must not rely on
+	// SecretExists here: provider implementations return false on ANY error
+	// (including AccessDenied/throttling), which would let a transient or
+	// permission failure masquerade as a successful no-op. Only a genuine
+	// "not found" is a legitimate no-op success; any other error is returned
+	// so the caller records the removal as failed.
 	val, err := controlRoomTarget.SecretStore().GetSecretValue(ctx, creds, secretName)
 	if err != nil {
+		if errors.Is(err, types.ErrSecretNotFound) {
+			slog.Info("Mimir auth secret does not exist, nothing to remove", "secret", secretName)
+			return nil
+		}
 		return fmt.Errorf("getting mimir auth secret: %w", err)
 	}
 

@@ -23,7 +23,12 @@ func TestCollectControlRoomDetails_AWS(t *testing.T) {
 	assert.Equal(t, "ctrl-cluster", details.ClusterName)
 	assert.Equal(t, "ctrl.example.com", details.Domain)
 	assert.Equal(t, "us-east-1", details.Region)
-	assert.Len(t, details.Connections, 5)
+	assert.Len(t, details.Connections, 3)
+
+	// The mimir secret name is derived from the control room cluster name,
+	// not from a separately-threaded control room target name (which is empty
+	// in the dry-run path).
+	assert.Equal(t, "ctrl-cluster.mimir-auth.posit.team", details.Connections[2].Resource)
 }
 
 func TestCollectControlRoomDetails_Azure(t *testing.T) {
@@ -41,6 +46,33 @@ func TestCollectControlRoomDetails_Azure(t *testing.T) {
 	assert.Equal(t, "ctrl-aks", details.ClusterName)
 	assert.Equal(t, "ctrl.azure.example.com", details.Domain)
 	assert.Equal(t, "eastus", details.Region)
+}
+
+// TestCollectControlRoomDetails_DryRunSecretName reproduces the dry-run path:
+// the command does not load a control room target, so historically an empty
+// control room name produced a malformed ".mimir-auth.posit.team" secret name
+// in the customer-facing handoff. The name must now derive from the cluster
+// name populated in the workload config in both dry-run and live paths.
+func TestCollectControlRoomDetails_DryRunSecretName(t *testing.T) {
+	config := types.AWSWorkloadConfig{
+		ControlRoomAccountID:   "123456789012",
+		ControlRoomClusterName: "ctrl-prod",
+		ControlRoomDomain:      "ctrl.example.com",
+		ControlRoomRegion:      "us-east-1",
+	}
+
+	details, err := CollectControlRoomDetails(config, "test-workload")
+	require.NoError(t, err)
+
+	var secretConn *ControlRoomConnection
+	for i := range details.Connections {
+		if details.Connections[i].Category == "Secret Sync" {
+			secretConn = &details.Connections[i]
+		}
+	}
+	require.NotNil(t, secretConn, "expected a Secret Sync connection")
+	assert.Equal(t, "ctrl-prod.mimir-auth.posit.team", secretConn.Resource)
+	assert.NotEqual(t, ".mimir-auth.posit.team", secretConn.Resource)
 }
 
 func TestCollectControlRoomDetails_UnsupportedConfig(t *testing.T) {
@@ -68,9 +100,9 @@ func TestBuildConnections_AllFieldsPopulated(t *testing.T) {
 		Region:      "us-east-1",
 	}
 
-	conns := buildConnections(details, "test-workload")
+	conns := buildConnections(details)
 
-	assert.Len(t, conns, 5)
+	assert.Len(t, conns, 3)
 
 	// IAM Trust
 	assert.Equal(t, "IAM Trust", conns[0].Category)
@@ -80,23 +112,15 @@ func TestBuildConnections_AllFieldsPopulated(t *testing.T) {
 	assert.Equal(t, "Observability", conns[1].Category)
 	assert.Equal(t, "https://mimir.ctrl.example.com/api/v1/push", conns[1].Resource)
 
-	// Loki remote_write
-	assert.Equal(t, "Observability", conns[2].Category)
-	assert.Equal(t, "https://loki.ctrl.example.com/loki/api/v1/push", conns[2].Resource)
-
-	// Mimir secret sync
-	assert.Equal(t, "Secret Sync", conns[3].Category)
-	assert.Equal(t, "test-workload.mimir-auth.posit.team", conns[3].Resource)
-
-	// Team Operator
-	assert.Equal(t, "Team Operator", conns[4].Category)
-	assert.Contains(t, conns[4].Resource, "ctrl-cluster")
+	// Mimir secret sync — derived from the control room cluster name
+	assert.Equal(t, "Secret Sync", conns[2].Category)
+	assert.Equal(t, "ctrl-cluster.mimir-auth.posit.team", conns[2].Resource)
 }
 
 func TestBuildConnections_NoControlRoom(t *testing.T) {
 	details := &ControlRoomDetails{}
 
-	conns := buildConnections(details, "test-workload")
+	conns := buildConnections(details)
 
 	assert.Empty(t, conns)
 }
@@ -106,27 +130,44 @@ func TestBuildConnections_PartialConfig(t *testing.T) {
 		AccountID: "123456789012",
 	}
 
-	conns := buildConnections(details, "test-workload")
+	conns := buildConnections(details)
 
 	assert.Len(t, conns, 1)
 	assert.Equal(t, "IAM Trust", conns[0].Category)
 }
 
-func TestBuildConnections_DomainOnly(t *testing.T) {
+func TestBuildConnections_DomainAndClusterName(t *testing.T) {
+	details := &ControlRoomDetails{
+		Domain:      "ctrl.example.com",
+		ClusterName: "ctrl-cluster",
+	}
+
+	conns := buildConnections(details)
+
+	assert.Len(t, conns, 2)
+	assert.Equal(t, "Observability", conns[0].Category)
+	assert.Equal(t, "Secret Sync", conns[1].Category)
+	assert.Equal(t, "ctrl-cluster.mimir-auth.posit.team", conns[1].Resource)
+}
+
+func TestBuildConnections_DomainWithoutClusterName(t *testing.T) {
+	// Domain set but no cluster name: the Mimir endpoint is still listed, but
+	// the Secret Sync entry must be omitted rather than emit a malformed
+	// ".mimir-auth.posit.team" resource name.
 	details := &ControlRoomDetails{
 		Domain: "ctrl.example.com",
 	}
 
-	conns := buildConnections(details, "my-workload")
+	conns := buildConnections(details)
 
-	assert.Len(t, conns, 3)
+	assert.Len(t, conns, 1)
 	assert.Equal(t, "Observability", conns[0].Category)
-	assert.Equal(t, "Observability", conns[1].Category)
-	assert.Equal(t, "Secret Sync", conns[2].Category)
-	assert.Equal(t, "my-workload.mimir-auth.posit.team", conns[2].Resource)
+	for _, conn := range conns {
+		assert.NotEqual(t, "Secret Sync", conn.Category, "Secret Sync entry should be omitted without a cluster name")
+	}
 }
 
-func TestBuildConnections_SeverActions(t *testing.T) {
+func TestBuildConnections_RemovalActions(t *testing.T) {
 	details := &ControlRoomDetails{
 		AccountID:   "123456789012",
 		ClusterName: "ctrl-cluster",
@@ -134,10 +175,10 @@ func TestBuildConnections_SeverActions(t *testing.T) {
 		Region:      "us-east-1",
 	}
 
-	conns := buildConnections(details, "test-workload")
+	conns := buildConnections(details)
 
 	for _, conn := range conns {
-		assert.NotEmpty(t, conn.SeverAction, "connection %s should have a sever action", conn.Category)
+		assert.NotEmpty(t, conn.RemovalAction, "connection %s should have a removal action", conn.Category)
 		assert.NotEmpty(t, conn.Description, "connection %s should have a description", conn.Category)
 	}
 }
