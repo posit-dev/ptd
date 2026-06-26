@@ -2,7 +2,6 @@ package eject
 
 import (
 	"fmt"
-	"io"
 	"strings"
 	"text/template"
 )
@@ -55,6 +54,7 @@ ptd ensure {{.WorkloadName}} --only-steps <step>
 | clusters | Namespace, RBAC, operator, or ingress controller changes | K8s namespaces, network policies, IAM-to-K8s bindings, Team Operator, Traefik |
 | helm | Monitoring, cert-manager, or CSI driver changes | Loki, Grafana, Mimir, Alloy, cert-manager, Secrets Store CSI |
 | sites | Product deployment, ingress, or site config changes | TeamSite CRDs, ingress resources, site-specific configuration |
+| persistent_reprise | After eks/cluster changes; run as the final pass | Second persistent pass — completes IRSA trust policies against the cluster OIDC issuer and refreshes the workload secret |
 {{- else}}
 | bootstrap | Initial setup only; rarely re-run | Blob state container, Key Vault encryption key |
 | persistent | VNet, PostgreSQL, storage, Key Vault, or identity changes | VNet, Azure PostgreSQL, storage accounts, NetApp Files, Key Vault, managed identities, NSGs |
@@ -63,6 +63,7 @@ ptd ensure {{.WorkloadName}} --only-steps <step>
 | clusters | Namespace, RBAC, operator, or ingress controller changes | K8s namespaces, network policies, workload identity bindings, Team Operator, Traefik |
 | helm | Monitoring, cert-manager, or CSI driver changes | Loki, Grafana, Mimir, Alloy, cert-manager, Secrets Store CSI |
 | sites | Product deployment, ingress, or site config changes | TeamSite CRDs, ingress resources, site-specific configuration |
+| persistent_reprise | After aks/cluster changes; run as the final pass | Second persistent pass — completes workload identity federation against the cluster OIDC issuer and refreshes the workload secret |
 {{- end}}
 
 ## Scaling Product Replicas
@@ -521,14 +522,4 @@ func renderTemplate(tmpl *template.Template, data *RunbookData) (string, error) 
 		return "", err
 	}
 	return buf.String(), nil
-}
-
-// RenderDayToDayOps writes the day-to-day operations runbook to the given writer.
-func RenderDayToDayOps(w io.Writer, data *RunbookData) error {
-	return dayToDayOpsTemplate.Execute(w, data)
-}
-
-// RenderDisasterRecovery writes the disaster recovery runbook to the given writer.
-func RenderDisasterRecovery(w io.Writer, data *RunbookData) error {
-	return disasterRecoveryTemplate.Execute(w, data)
 }

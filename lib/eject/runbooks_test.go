@@ -218,7 +218,7 @@ func TestRunbook_DayToDayOps_AWS_StepTable(t *testing.T) {
 
 	ops := results["day-to-day-ops.md"]
 
-	for _, step := range []string{"bootstrap", "persistent", "postgres_config", "eks", "clusters", "helm", "sites"} {
+	for _, step := range []string{"bootstrap", "persistent", "postgres_config", "eks", "clusters", "helm", "sites", "persistent_reprise"} {
 		assert.Contains(t, ops, "| "+step+" |", "step table should contain %s", step)
 	}
 }
@@ -229,26 +229,24 @@ func TestRunbook_DayToDayOps_Azure_StepTable(t *testing.T) {
 
 	ops := results["day-to-day-ops.md"]
 
-	for _, step := range []string{"bootstrap", "persistent", "postgres_config", "aks", "clusters", "helm", "sites"} {
+	for _, step := range []string{"bootstrap", "persistent", "postgres_config", "aks", "clusters", "helm", "sites", "persistent_reprise"} {
 		assert.Contains(t, ops, "| "+step+" |", "step table should contain %s", step)
 	}
 	assert.NotContains(t, ops, "| eks |", "Azure runbook should not contain eks step")
 }
 
-func TestRunbook_RenderDayToDayOps_WritesToWriter(t *testing.T) {
-	var buf strings.Builder
-	err := RenderDayToDayOps(&buf, awsRunbookData())
-
+func TestRunbook_DayToDayOps_Azure_ContainsHeader(t *testing.T) {
+	results, err := GenerateRunbooks(azureRunbookData())
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "Day-to-Day Operations")
+
+	assert.Contains(t, results["day-to-day-ops.md"], "Day-to-Day Operations")
 }
 
-func TestRunbook_RenderDisasterRecovery_WritesToWriter(t *testing.T) {
-	var buf strings.Builder
-	err := RenderDisasterRecovery(&buf, azureRunbookData())
-
+func TestRunbook_DisasterRecovery_Azure_ContainsHeader(t *testing.T) {
+	results, err := GenerateRunbooks(azureRunbookData())
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "Disaster Recovery")
+
+	assert.Contains(t, results["disaster-recovery.md"], "Disaster Recovery")
 }
 
 func TestRunbook_DayToDayOps_PtdWorkonCommands(t *testing.T) {

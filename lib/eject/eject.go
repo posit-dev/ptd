@@ -8,13 +8,12 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/posit-dev/ptd/lib/attestation"
+	"github.com/posit-dev/ptd/lib/azure"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/types"
 )
@@ -306,7 +305,7 @@ func buildRunbookData(config interface{}, targetName string) (*RunbookData, erro
 	case types.AzureWorkloadConfig:
 		data.Cloud = "azure"
 		data.Region = cfg.Region
-		data.ResourceGroup = fmt.Sprintf("rsg-ptd-%s", sanitizeName(targetName))
+		data.ResourceGroup = fmt.Sprintf("rsg-ptd-%s", azure.SanitizedName(targetName))
 		data.ClusterName = azureClusterName(targetName, cfg.Clusters)
 		data.Sites = sortedSites(cfg.Sites)
 	default:
@@ -325,14 +324,6 @@ func sortedSites(sites map[string]types.SiteConfig) []SiteData {
 	return out
 }
 
-// sanitizeName mirrors the Azure naming convention: lowercase, non-alphanumeric
-// characters replaced with hyphens.
-func sanitizeName(name string) string {
-	s := strings.ToLower(name)
-	re := regexp.MustCompile(`[^a-z0-9-]`)
-	return re.ReplaceAllString(s, "-")
-}
-
 func awsClusterName(targetName string, clusters map[string]types.AWSWorkloadClusterConfig) string {
 	releases := slices.Sorted(maps.Keys(clusters))
 	if len(releases) == 0 {
@@ -344,7 +335,7 @@ func awsClusterName(targetName string, clusters map[string]types.AWSWorkloadClus
 func azureClusterName(targetName string, clusters map[string]types.AzureWorkloadClusterConfig) string {
 	releases := slices.Sorted(maps.Keys(clusters))
 	if len(releases) == 0 {
-		return sanitizeName(targetName)
+		return azure.SanitizedName(targetName)
 	}
-	return fmt.Sprintf("%s-%s", sanitizeName(targetName), releases[0])
+	return fmt.Sprintf("%s-%s", azure.SanitizedName(targetName), releases[0])
 }
