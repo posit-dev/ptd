@@ -82,6 +82,43 @@ func TestRunbook_DayToDayOps_AWS_Content(t *testing.T) {
 	assert.Contains(t, ops, "ptd ensure acme-prod")
 }
 
+func TestRunbook_DayToDayOps_AWS_TLSSection(t *testing.T) {
+	results, err := GenerateRunbooks(awsRunbookData())
+	require.NoError(t, err)
+
+	ops := results["day-to-day-ops.md"]
+
+	// AWS terminates TLS at the ALB via ACM and documents the BYO-cert fields.
+	assert.Contains(t, ops, "certificate_arn")
+	assert.Contains(t, ops, "certificate_validation_enabled")
+	assert.Contains(t, ops, "hosted_zone_management_enabled")
+	// The cert ARN is applied in the helm step, not sites.
+	assert.Contains(t, ops, "--only-steps helm")
+
+	// cert-manager is Azure-only; its renewal guidance must not leak into the AWS runbook.
+	assert.NotContains(t, ops, "kubectl delete certificate")
+	assert.NotContains(t, ops, "-n traefik")
+	assert.NotContains(t, ops, "Let's Encrypt")
+}
+
+func TestRunbook_DayToDayOps_Azure_TLSSection(t *testing.T) {
+	results, err := GenerateRunbooks(azureRunbookData())
+	require.NoError(t, err)
+
+	ops := results["day-to-day-ops.md"]
+
+	// Azure terminates TLS at Traefik via cert-manager + Let's Encrypt.
+	assert.Contains(t, ops, "cert-manager")
+	assert.Contains(t, ops, "Let's Encrypt")
+	// Certificates live in the traefik namespace, and forced renewal deletes the object.
+	assert.Contains(t, ops, "kubectl delete certificate")
+	assert.Contains(t, ops, "-n traefik")
+
+	// ACM / BYO-cert guidance is AWS-only and must not leak into the Azure runbook.
+	assert.NotContains(t, ops, "ACM")
+	assert.NotContains(t, ops, "certificate_arn")
+}
+
 func TestRunbook_DayToDayOps_Azure_Content(t *testing.T) {
 	results, err := GenerateRunbooks(azureRunbookData())
 	require.NoError(t, err)

@@ -52,7 +52,7 @@ ptd ensure {{.WorkloadName}} --only-steps <step>
 | postgres_config | Database user/grant changes | PostgreSQL users, databases, grants |
 | eks | Cluster or node group changes | EKS cluster, managed node groups, OIDC provider, storage classes |
 | clusters | Namespace, RBAC, operator, or ingress controller changes | K8s namespaces, network policies, IAM-to-K8s bindings, Team Operator, Traefik |
-| helm | Monitoring, cert-manager, or CSI driver changes | Loki, Grafana, Mimir, Alloy, cert-manager, Secrets Store CSI |
+| helm | Monitoring or CSI driver changes | Loki, Grafana, Mimir, Alloy, Secrets Store CSI |
 | sites | Product deployment, ingress, or site config changes | TeamSite CRDs, ingress resources, site-specific configuration |
 | persistent_reprise | After eks/cluster changes; run as the final pass | Second persistent pass — completes IRSA trust policies against the cluster OIDC issuer and refreshes the workload secret |
 {{- else}}
@@ -60,8 +60,8 @@ ptd ensure {{.WorkloadName}} --only-steps <step>
 | persistent | VNet, PostgreSQL, storage, Key Vault, or identity changes | VNet, Azure PostgreSQL, storage accounts, NetApp Files, Key Vault, managed identities, NSGs |
 | postgres_config | Database user/grant changes | PostgreSQL users, databases, grants |
 | aks | Cluster or node pool changes | AKS cluster, node pools, managed identity, storage classes |
-| clusters | Namespace, RBAC, operator, or ingress controller changes | K8s namespaces, network policies, workload identity bindings, Team Operator, Traefik |
-| helm | Monitoring, cert-manager, or CSI driver changes | Loki, Grafana, Mimir, Alloy, cert-manager, Secrets Store CSI |
+| clusters | Namespace, RBAC, operator, ingress controller, or cert-manager changes | K8s namespaces, network policies, workload identity bindings, Team Operator, Traefik, cert-manager (when ` + "`use_lets_encrypt`" + ` is enabled) |
+| helm | Monitoring or CSI driver changes | Loki, Grafana, Mimir, Alloy, Secrets Store CSI |
 | sites | Product deployment, ingress, or site config changes | TeamSite CRDs, ingress resources, site-specific configuration |
 | persistent_reprise | After aks/cluster changes; run as the final pass | Second persistent pass — completes workload identity federation against the cluster OIDC issuer and refreshes the workload secret |
 {{- end}}
@@ -112,43 +112,78 @@ ptd workon {{.WorkloadName}} -- kubectl rollout status deployment -n posit-team 
 
 ## Rotating TLS Certificates
 
-### ACM/Azure-Managed Certificates
-
 {{- if eq .Cloud "aws"}}
 
-ACM certificates auto-renew when DNS validation records are in place. To change the certificate:
+This workload terminates customer-facing TLS at the AWS load balancer (ALB) using **AWS Certificate Manager (ACM)** certificates. cert-manager is **not** deployed on AWS, so the cert-manager instructions you may see elsewhere do not apply here.
 
-1. Update the certificate configuration in ` + "`ptd.yaml`" + `.
-2. Re-run the persistent and sites steps:
+How a certificate is managed depends on the workload-level ` + "`hosted_zone_management_enabled`" + ` flag (default ` + "`true`" + `):
+
+**PTD-managed certificates (default — ` + "`hosted_zone_management_enabled: true`" + `)**
+
+PTD creates one ACM certificate per site domain and validates it via DNS records in the Route53 zone it manages. ACM auto-renews these certificates as long as the validation records stay in place — **no operator action is required for routine renewal**.
+
+To change the domain on a site, edit its ` + "`domain`" + ` under ` + "`sites`" + ` in ` + "`ptd.yaml`" + ` (this replaces the certificate, since the ACM cert is keyed to the domain):
+
+` + "```" + `yaml
+sites:
+  <site>:
+    spec:
+      domain: connect.example.com   # new domain → new ACM certificate
+` + "```" + `
+
+**Customer-managed certificate (bring-your-own — ` + "`hosted_zone_management_enabled: false`" + `)**
+
+When PTD does not manage the hosted zone, you supply an existing ACM certificate instead. Set these fields under the site in ` + "`ptd.yaml`" + `:
+
+` + "```" + `yaml
+sites:
+  <site>:
+    spec:
+      domain: connect.example.com
+      certificate_arn: arn:aws:acm:{{.Region}}:<account-id>:certificate/<cert-id>
+      certificate_validation_enabled: false   # you own validation/renewal in ACM
+` + "```" + `
+
+- ` + "`certificate_arn`" + ` — ARN of the ACM certificate to attach to the ALB. Issue or replace the certificate in ACM yourself, then update this value.
+- ` + "`certificate_validation_enabled: false`" + ` — disables PTD-driven DNS validation; you are responsible for validating and renewing the certificate in ACM.
+
+**Apply the change (either case):** re-run the ` + "`persistent`" + ` step (creates/updates the ACM cert and publishes its ARN) followed by the ` + "`helm`" + ` step (applies the ARN to the ALB ingress via the ` + "`alb.ingress.kubernetes.io/certificate-arn`" + ` annotation):
 
 ` + "```" + `bash
 ptd ensure {{.WorkloadName}} --only-steps persistent
-ptd ensure {{.WorkloadName}} --only-steps sites
+ptd ensure {{.WorkloadName}} --only-steps helm
 ` + "```" + `
 
 {{- else}}
 
-Azure-managed certificates are handled by the platform. To change the certificate configuration:
+This workload terminates customer-facing TLS at the Traefik ingress using **Let's Encrypt certificates issued by cert-manager** (enabled by ` + "`use_lets_encrypt: true`" + ` on the cluster). There are no Azure platform-managed certificates involved.
 
-1. Update the certificate configuration in ` + "`ptd.yaml`" + `.
-2. Re-run the persistent and sites steps:
+cert-manager requests a certificate per site domain through a Let's Encrypt ` + "`ClusterIssuer`" + ` (named ` + "`letsencrypt-<domain>`" + `) and stores it in a TLS secret in the ` + "`traefik`" + ` namespace. It **auto-renews each certificate roughly 30 days before expiry — no operator action is required for routine renewal**.
+
+**Force renewal** (e.g., after a mis-issued or revoked certificate) by deleting the Certificate object; cert-manager re-issues it immediately:
 
 ` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps persistent
+# Inspect certificates, their readiness, and expiry
+ptd workon {{.WorkloadName}} -- kubectl get certificate -n traefik
+# Delete one to force re-issuance
+ptd workon {{.WorkloadName}} -- kubectl delete certificate <cert-name> -n traefik
+` + "```" + `
+
+**Change the domain** on a site by editing its ` + "`domain`" + ` under ` + "`sites`" + ` in ` + "`ptd.yaml`" + ` (or set ` + "`root_domain`" + ` to share a single issuer domain across all sites). Re-run the ` + "`clusters`" + ` step (updates the issuer and ingress) followed by the ` + "`sites`" + ` step:
+
+` + "```" + `yaml
+sites:
+  <site>:
+    spec:
+      domain: connect.example.com
+` + "```" + `
+
+` + "```" + `bash
+ptd ensure {{.WorkloadName}} --only-steps clusters
 ptd ensure {{.WorkloadName}} --only-steps sites
 ` + "```" + `
 
 {{- end}}
-
-### cert-manager Certificates
-
-cert-manager automatically renews certificates before expiry. To force renewal:
-
-` + "```" + `bash
-ptd workon {{.WorkloadName}} -- kubectl delete certificate <cert-name> -n posit-team
-` + "```" + `
-
-cert-manager will detect the missing certificate and issue a new one.
 
 ## Rotating Secrets
 
