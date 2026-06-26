@@ -177,6 +177,8 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 			"agentPoolProfiles[*].powerState",
 			"privateLinkResources",
 			"windowsProfile",
+			// Customer-enabled out-of-band (Defender for Cloud); we never set this field.
+			"securityProfile.defender",
 		}
 
 		// Always ignore agentPoolProfiles when using separate AgentPool resources
@@ -432,23 +434,16 @@ func getPersistentStackOutputs(ctx context.Context, target types.Target) (auto.O
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare env vars: %w", err)
 	}
-	persistentStack, err := ptdpulumi.NewPythonPulumiStack(
+	outputs, err := ptdpulumi.ReadStackOutputs(
 		ctx,
 		string(target.CloudProvider()),
 		string(target.Type()),
 		"persistent",
 		target.Name(),
-		target.Region(),
 		target.PulumiBackendUrl(),
 		target.PulumiSecretsProviderKey(),
 		envVars,
-		false,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create persistent stack: %w", err)
-	}
-
-	outputs, err := persistentStack.Outputs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve persistent stack outputs: %w", err)
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/posit-dev/ptd/lib/aws"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/kube"
+	"github.com/posit-dev/ptd/lib/proxy"
 	ptdpulumi "github.com/posit-dev/ptd/lib/pulumi"
 	"github.com/posit-dev/ptd/lib/types"
 	awscloudwatch "github.com/pulumi/pulumi-aws/sdk/v6/go/aws/cloudwatch"
@@ -30,7 +31,6 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/spf13/viper"
-	yaml "gopkg.in/yaml.v3"
 )
 
 // --- AWS ---
@@ -100,19 +100,15 @@ func (s *ClustersStep) runAWSInlineGo(ctx context.Context, creds types.Credentia
 		if clusterErr != nil {
 			return fmt.Errorf("clusters: failed to get cluster info for %s: %w", clusterName, clusterErr)
 		}
-		token, clusterErr := aws.GetEKSToken(ctx, awsCreds, s.DstTarget.Region(), clusterName)
-		if clusterErr != nil {
-			return fmt.Errorf("clusters: failed to get EKS token for %s: %w", clusterName, clusterErr)
-		}
-		config := kube.BuildEKSKubeConfig(endpoint, caCert, token, clusterName)
+		proxyURL := ""
 		if !cfg.TailscaleEnabled {
-			config.Clusters[0].Cluster.ProxyURL = "socks5://localhost:1080"
+			proxyURL = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
 		}
-		data, marshalErr := yaml.Marshal(config)
-		if marshalErr != nil {
-			return fmt.Errorf("clusters: failed to marshal kubeconfig for %s: %w", clusterName, marshalErr)
+		kubeconfig, clusterErr := kube.BuildEKSKubeconfigString(endpoint, caCert, clusterName, s.DstTarget.Region(), proxyURL)
+		if clusterErr != nil {
+			return fmt.Errorf("clusters: %w", clusterErr)
 		}
-		kubeconfigsByCluster[release] = string(data)
+		kubeconfigsByCluster[release] = kubeconfig
 
 		// Store the live OIDC issuer URL for this cluster (used by Karpenter controller role creation).
 		// Prefer the live URL from the cluster over the one in the config.
@@ -192,23 +188,16 @@ func (s *ClustersStep) runAWSInlineGo(ctx context.Context, creds types.Credentia
 
 // getPostgresConfigStackOutputs reads outputs from the postgres_config stack for the given target.
 func getPostgresConfigStackOutputs(ctx context.Context, target types.Target, envVars map[string]string) (auto.OutputMap, error) {
-	pgStack, err := ptdpulumi.NewPythonPulumiStack(
+	outputs, err := ptdpulumi.ReadStackOutputs(
 		ctx,
 		string(target.CloudProvider()),
 		string(target.Type()),
 		"postgres_config",
 		target.Name(),
-		target.Region(),
 		target.PulumiBackendUrl(),
 		target.PulumiSecretsProviderKey(),
 		envVars,
-		false,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create postgres_config stack handle: %w", err)
-	}
-
-	outputs, err := pgStack.Outputs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get postgres_config outputs: %w", err)
 	}
@@ -281,7 +270,7 @@ func awsClustersDeploy(ctx *pulumi.Context, _ types.Target, params awsClustersPa
 		k8sProviderName := name + "-" + release + "-k8s"
 		k8sProvider, err := kubernetes.NewProvider(ctx, k8sProviderName, &kubernetes.ProviderArgs{
 			Kubeconfig: pulumi.String(params.kubeconfigsByCluster[release]),
-		}, withAlias(), pulumi.IgnoreChanges([]string{"kubeconfig"}))
+		}, withAlias())
 		if err != nil {
 			return fmt.Errorf("clusters: failed to create K8s provider for %s: %w", release, err)
 		}
@@ -855,7 +844,7 @@ func awsClustersDeploy(ctx *pulumi.Context, _ types.Target, params awsClustersPa
 
 		// ── Custom K8s resources (optional, per-cluster) ─────────────────────────
 		if err := createCustomK8sResources(ctx, params.workloadDir, release,
-			params.clusters[release].Spec.CustomK8sResources, k8sProviderOpt, withAlias()); err != nil {
+			params.clusters[release].Spec.CustomK8sResources, k8sProviderOpt); err != nil {
 			return err
 		}
 	}
@@ -1986,6 +1975,8 @@ func buildKarpenterControllerPolicy(clusterName, accountID, region, queueName st
 					fmt.Sprintf("arn:aws:ec2:%s:*:security-group/*", region),
 					fmt.Sprintf("arn:aws:ec2:%s:*:subnet/*", region),
 					fmt.Sprintf("arn:aws:ec2:%s:*:capacity-reservation/*", region),
+					// placement-group/* added in upstream Karpenter v1.11 for placement group support
+					fmt.Sprintf("arn:aws:ec2:%s:*:placement-group/*", region),
 				},
 				"Action": []string{"ec2:RunInstances", "ec2:CreateFleet"},
 			},
@@ -2097,6 +2088,8 @@ func buildKarpenterControllerPolicy(clusterName, accountID, region, queueName st
 					"ec2:DescribeInstanceTypeOfferings",
 					"ec2:DescribeInstanceTypes",
 					"ec2:DescribeLaunchTemplates",
+					// ec2:DescribePlacementGroups added in upstream Karpenter v1.11 for placement group support
+					"ec2:DescribePlacementGroups",
 					"ec2:DescribeSecurityGroups",
 					"ec2:DescribeSpotPriceHistory",
 					"ec2:DescribeSubnets",
@@ -2199,6 +2192,27 @@ func buildKarpenterControllerPolicy(clusterName, accountID, region, queueName st
 				"Action":   []string{"iam:GetInstanceProfile"},
 			},
 			{
+				// Required since upstream Karpenter v1.7 — Karpenter discovers
+				// existing instance profiles by path/tag to avoid duplicate
+				// creation and to garbage-collect orphans. iam:ListInstanceProfiles
+				// cannot be resource-scoped (it lists across the account); scope
+				// is provided by the boundary policy PositTeamDedicatedAdmin.
+				"Sid":      "AllowUnscopedInstanceProfileListAction",
+				"Effect":   "Allow",
+				"Resource": []string{"*"},
+				"Action":   []string{"iam:ListInstanceProfiles"},
+			},
+			{
+				// Required since upstream Karpenter v1.12 — used for EC2 instance
+				// status health checks. Upstream uses a separate Sid (rather than
+				// folding into AllowRegionalReadActions) because they do not put
+				// a RequestedRegion condition on this action.
+				"Sid":      "AllowUnscopedEC2DescribeInstanceStatus",
+				"Effect":   "Allow",
+				"Resource": []string{"*"},
+				"Action":   []string{"ec2:DescribeInstanceStatus"},
+			},
+			{
 				"Sid":    "AllowAPIServerEndpointDiscovery",
 				"Effect": "Allow",
 				"Resource": []string{
@@ -2206,6 +2220,15 @@ func buildKarpenterControllerPolicy(clusterName, accountID, region, queueName st
 				},
 				"Action": []string{"eks:DescribeCluster"},
 			},
+			// NOTE: upstream v1.12 also defines AllowZonalShiftStatusReadOnly
+			// granting arc-zonal-shift:GetManagedResource. We do NOT include it
+			// here because:
+			//   (1) it is only needed if AWS ARC Zonal Shift is opted into for
+			//       the cluster (off by default in PTD), and
+			//   (2) arc-zonal-shift:* is not in the PositTeamDedicatedAdmin
+			//       boundary policy (see lib/aws/iam.go), so the boundary would
+			//       deny it regardless. If we adopt Zonal Shift, both this
+			//       policy and PositTeamDedicatedAdmin need updating.
 		},
 	}
 	b, _ := json.Marshal(doc)

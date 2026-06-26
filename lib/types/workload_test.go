@@ -47,7 +47,7 @@ func TestAWSWorkloadConfigSerialization(t *testing.T) {
 		KeycloakEnabled:    true,
 		VpcCidr:            "10.0.0.0/16",
 		VpcAzCount:         3,
-		PublicLoadBalancer: true,
+		PublicLoadBalancer: boolPtr(true),
 		ResourceTags: map[string]string{
 			"Environment": "test",
 			"Owner":       "team",
@@ -370,4 +370,39 @@ func TestAzureWorkloadClusterConfig_ForceMaintenanceOmittedWhenFalse(t *testing.
 	// Verify the YAML does NOT contain force_maintenance (omitempty)
 	yamlString := string(yamlData)
 	assert.NotContains(t, yamlString, "force_maintenance")
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func TestUsesEksAccessEntries(t *testing.T) {
+	cases := []struct {
+		name string
+		cfg  *EKSAccessEntriesConfig
+		want bool
+	}{
+		{name: "nil block defaults to access entries", cfg: nil, want: true},
+		{name: "block present, enabled unset defaults to access entries", cfg: &EKSAccessEntriesConfig{}, want: true},
+		{name: "enabled true uses access entries", cfg: &EKSAccessEntriesConfig{Enabled: boolPtr(true)}, want: true},
+		{name: "enabled explicit false uses aws-auth", cfg: &EKSAccessEntriesConfig{Enabled: boolPtr(false)}, want: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// IsEnabled directly.
+			if got := tc.cfg.IsEnabled(); got != tc.want {
+				t.Errorf("IsEnabled() = %v, want %v", got, tc.want)
+			}
+			// Workload spec resolver.
+			wl := AWSWorkloadClusterSpec{EksAccessEntries: tc.cfg}
+			if got := wl.UsesEksAccessEntries(); got != tc.want {
+				t.Errorf("AWSWorkloadClusterSpec.UsesEksAccessEntries() = %v, want %v", got, tc.want)
+			}
+			// Control-room resolver.
+			cr := AWSControlRoomConfig{EksAccessEntries: tc.cfg}
+			if got := cr.UsesEksAccessEntries(); got != tc.want {
+				t.Errorf("AWSControlRoomConfig.UsesEksAccessEntries() = %v, want %v", got, tc.want)
+			}
+		})
+	}
 }

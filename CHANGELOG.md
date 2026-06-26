@@ -1,3 +1,337 @@
+# [1.33.0](https://github.com/posit-dev/ptd/compare/v1.32.3...v1.33.0) (2026-06-26)
+
+
+### Bug Fixes
+
+* address eject review comments ([b6fe798](https://github.com/posit-dev/ptd/commit/b6fe798e23fb03f875f44334e96390617240fd7d))
+* derive mimir secret name from cluster name in handoff ([12a579d](https://github.com/posit-dev/ptd/commit/12a579d96d5048484c2c3e9476063892b2f47323))
+* distinguish secret-not-found from permission errors in mimir cleanup ([23fa2ef](https://github.com/posit-dev/ptd/commit/23fa2ef2a1220e31a29cf313de29f257bac9ae83))
+* expand allowedTools so Claude can read PR context ([2c97680](https://github.com/posit-dev/ptd/commit/2c97680b029fdc4ec5b5004c4bbe4ec8ce0da2b7))
+* expand claude.yml allowedTools, add ANTHROPIC_DEFAULT_HAIKU_MODEL ([39b0c05](https://github.com/posit-dev/ptd/commit/39b0c052a44be36ed36e628d444b95a1c53a5039))
+* persist eject-record before destructive config strip ([4f890c0](https://github.com/posit-dev/ptd/commit/4f890c0730223ed852a8ae7ebd03cdd91dbdb479))
+* remove ANTHROPIC_DEFAULT_HAIKU_MODEL, not needed ([7be31a1](https://github.com/posit-dev/ptd/commit/7be31a18ce88111cbd4b8c758e9e4375f8901406))
+* remove dead Bundle struct and check test WriteFile errors ([ecaaf70](https://github.com/posit-dev/ptd/commit/ecaaf703b4fa0e98939ec68d84f4d72fa74e1e03))
+* write ptd.yaml and eject-record atomically ([0b33da2](https://github.com/posit-dev/ptd/commit/0b33da2a274f0e2a8acd54be2c8f93dae76c1c44))
+
+
+### Features
+
+* orchestrate eject with preflight checks, config strip, and Mimir cleanup ([779ba03](https://github.com/posit-dev/ptd/commit/779ba03421660fa776ec587d0cc9f8b45c256941)), closes [#248](https://github.com/posit-dev/ptd/issues/248)
+
+## [1.32.3](https://github.com/posit-dev/ptd/compare/v1.32.2...v1.32.3) (2026-06-25)
+
+
+### Bug Fixes
+
+* grant pull-requests write permission so Claude can post reviews ([9b3988c](https://github.com/posit-dev/ptd/commit/9b3988c133a7756a7d4a027bf82adc233e7bd76f))
+* **sites:** stop copying cloud resource tags onto Site k8s labels ([08c80d3](https://github.com/posit-dev/ptd/commit/08c80d3900741e884960ec3ed7fbd7c706dd83e7))
+
+## [1.32.2](https://github.com/posit-dev/ptd/compare/v1.32.1...v1.32.2) (2026-06-24)
+
+
+### Bug Fixes
+
+* **azure:** resolve bastion NSG subnet from any agent pool profile ([8f6dd05](https://github.com/posit-dev/ptd/commit/8f6dd053b9a8dd76b6a9b10968bbfb4a907113fd))
+
+## [1.32.1](https://github.com/posit-dev/ptd/compare/v1.32.0...v1.32.1) (2026-06-23)
+
+
+### Bug Fixes
+
+* correct Bedrock model ID to Sonnet 4.5 ([2c2a9ac](https://github.com/posit-dev/ptd/commit/2c2a9acff0b797f4f5117eea8350742a03bb7e25))
+* use correct Sonnet 4.6 Bedrock inference profile ID ([f6812e4](https://github.com/posit-dev/ptd/commit/f6812e4658fd4782445f528ded88e4226dbfec02))
+
+# [1.32.0](https://github.com/posit-dev/ptd/compare/v1.31.2...v1.32.0) (2026-06-18)
+
+
+### Features
+
+* **attestation:** exclude retired steps from attestation output ([1e817fa](https://github.com/posit-dev/ptd/commit/1e817fa3026469d5a494b2592d6e57fde3eeb5ba))
+
+## [1.31.2](https://github.com/posit-dev/ptd/compare/v1.31.1...v1.31.2) (2026-06-16)
+
+
+### Bug Fixes
+
+* **alerts:** make RDS alerts identify the specific database ([2897125](https://github.com/posit-dev/ptd/commit/28971250839b34cb5d73d6aa89ba45df30f06ec4))
+
+## [1.31.1](https://github.com/posit-dev/ptd/compare/v1.31.0...v1.31.1) (2026-06-04)
+
+
+### Bug Fixes
+
+* **ci:** repoint team-operator version bump at Go default ([4ac73aa](https://github.com/posit-dev/ptd/commit/4ac73aae9196031a4b12c8619e5ead9168c4c85f)), closes [#237](https://github.com/posit-dev/ptd/issues/237)
+
+# [1.31.0](https://github.com/posit-dev/ptd/compare/v1.30.0...v1.31.0) (2026-06-03)
+
+
+### Bug Fixes
+
+* adopt Azure persistent resources faithfully (tags, protect, subnets, bastion) ([485c30b](https://github.com/posit-dev/ptd/commit/485c30b057d11a615b627952646f705d4518cde1))
+* adopt existing VPC subnets and private zones in persistent (AWS) ([eb6b4a2](https://github.com/posit-dev/ptd/commit/eb6b4a29ed4c95053e96f08ef6788503bc90fa8a))
+* ignore PrivateEndpoint subnet churn on azure-native provider upgrade ([bca5bd0](https://github.com/posit-dev/ptd/commit/bca5bd052d1e915f91b3ad5e844ee32b339751a3))
+* pin NetApp export-policy defaults to stop azure-native upgrade churn ([47a5be2](https://github.com/posit-dev/ptd/commit/47a5be25fdfd5a577a2e581193839e130bc236f5))
+* stop Azure persistent churn on DB admin secret and bastion NIC subnet ([a5ea7d3](https://github.com/posit-dev/ptd/commit/a5ea7d3231a28668c48ad15f5a082012834f9fdf))
+
+
+### Features
+
+* migrate persistent step from Python to inline Go Pulumi ([b0137c6](https://github.com/posit-dev/ptd/commit/b0137c6ab8d9e13c90f7a84f209169342f929490))
+
+# [1.30.0](https://github.com/posit-dev/ptd/compare/v1.29.0...v1.30.0) (2026-06-02)
+
+
+### Features
+
+* **karpenter:** add IAM permissions required for Karpenter 1.7–1.12 ([01258c0](https://github.com/posit-dev/ptd/commit/01258c09384938bd13c45176c17c32aa031e36c7))
+
+# [1.29.0](https://github.com/posit-dev/ptd/compare/v1.28.3...v1.29.0) (2026-05-30)
+
+
+### Features
+
+* port workspaces step and AWSVpc to inline Go ([4674c7b](https://github.com/posit-dev/ptd/commit/4674c7bb8441bd4392f2b2b83705d2351db46d5f))
+
+## [1.28.3](https://github.com/posit-dev/ptd/compare/v1.28.2...v1.28.3) (2026-05-28)
+
+
+### Bug Fixes
+
+* **proxy:** use OR-semantics for dual-PID IsRunning ([69d3823](https://github.com/posit-dev/ptd/commit/69d3823307311173c582f42b90b5ed70a84bbcd8))
+
+## [1.28.2](https://github.com/posit-dev/ptd/compare/v1.28.1...v1.28.2) (2026-05-26)
+
+
+### Bug Fixes
+
+* align attestation domainPrefix defaults with team-operator CRD ([d7b3258](https://github.com/posit-dev/ptd/commit/d7b32589462c22ebbfc69b75c805c65d2012c90e))
+
+## [1.28.1](https://github.com/posit-dev/ptd/compare/v1.28.0...v1.28.1) (2026-05-26)
+
+
+### Bug Fixes
+
+* rm -f stale az entry before writing wrapper ([be35ebb](https://github.com/posit-dev/ptd/commit/be35ebba21bcb1e856d65ed635208e2a7b62e01e))
+* use azurecli login for AKS kubeconfig and fix az symlink in symlink-binaries ([ed40c19](https://github.com/posit-dev/ptd/commit/ed40c19bfccce0fe214df660ba4cfd426a840170))
+
+# [1.28.0](https://github.com/posit-dev/ptd/compare/v1.27.4...v1.28.0) (2026-05-26)
+
+
+### Features
+
+* default secrets-store CSI to EKS addon and adopt CRDs cleanly ([ea85a98](https://github.com/posit-dev/ptd/commit/ea85a982867b5758a935dff34fc7008f225b2c76))
+
+## [1.27.4](https://github.com/posit-dev/ptd/compare/v1.27.3...v1.27.4) (2026-05-21)
+
+
+### Bug Fixes
+
+* keep control room EKS nodegroup launch template default version in sync ([c101d90](https://github.com/posit-dev/ptd/commit/c101d903f2a221acc8c909925d7d25ad8939681e))
+
+## [1.27.3](https://github.com/posit-dev/ptd/compare/v1.27.2...v1.27.3) (2026-05-20)
+
+
+### Bug Fixes
+
+* keep EKS nodegroup launch template default version in sync ([c910a1e](https://github.com/posit-dev/ptd/commit/c910a1e25c05a80bbd5932849b4114c50958f89e))
+
+## [1.27.2](https://github.com/posit-dev/ptd/compare/v1.27.1...v1.27.2) (2026-05-05)
+
+
+### Bug Fixes
+
+* tune Azure NetApp workbench-shared volumes and enable backup enforcement ([9cefeac](https://github.com/posit-dev/ptd/commit/9cefeac544cced276a8a563c0a9a7d35e6091dbc))
+
+## [1.27.1](https://github.com/posit-dev/ptd/compare/v1.27.0...v1.27.1) (2026-04-30)
+
+
+### Bug Fixes
+
+* configure metrics-server for EKS host networking ([f7aef61](https://github.com/posit-dev/ptd/commit/f7aef61291b71ee8970f32e9f42b1eb9796ee6a4))
+
+
+### Reverts
+
+* remove unneeded metrics-server values from control room path ([e4790ac](https://github.com/posit-dev/ptd/commit/e4790acd12afd172b9fdb2d1ae287463332c24d6))
+
+# [1.27.0](https://github.com/posit-dev/ptd/compare/v1.26.6...v1.27.0) (2026-04-29)
+
+
+### Bug Fixes
+
+* address review feedback on NetApp backup PR ([68ae95b](https://github.com/posit-dev/ptd/commit/68ae95b571f72522748cead25ccaca7291e26f32))
+
+
+### Features
+
+* add snapshot and backup protection to Azure NetApp volumes ([27e90a6](https://github.com/posit-dev/ptd/commit/27e90a65e752af6415c65fb8e4520ecfbc10859a))
+
+## [1.26.6](https://github.com/posit-dev/ptd/compare/v1.26.5...v1.26.6) (2026-04-28)
+
+
+### Bug Fixes
+
+* add CPU limits to Mimir store-gateway and Traefik ([09ba466](https://github.com/posit-dev/ptd/commit/09ba4661aa907522595b7b01a58a456750332335))
+
+## [1.26.5](https://github.com/posit-dev/ptd/compare/v1.26.4...v1.26.5) (2026-04-24)
+
+
+### Bug Fixes
+
+* default Karpenter NodePool weight to 100 when unset ([8f2de5e](https://github.com/posit-dev/ptd/commit/8f2de5ec66f9c4320c6617f8c5ae5e003f75f0ce))
+
+## [1.26.4](https://github.com/posit-dev/ptd/compare/v1.26.3...v1.26.4) (2026-04-24)
+
+
+### Bug Fixes
+
+* **clusters-azure:** use corev1.NewConfigMapPatch for CoreDNS forwarding ConfigMap ([d3f5297](https://github.com/posit-dev/ptd/commit/d3f529726353ff6936db4a682493124d34d53b5c))
+
+## [1.26.3](https://github.com/posit-dev/ptd/compare/v1.26.2...v1.26.3) (2026-04-24)
+
+
+### Bug Fixes
+
+* **azure:** use per-site domains for Traefik Ingress generation ([97c8c8b](https://github.com/posit-dev/ptd/commit/97c8c8b1190c1ae1d0e8390c1f1a33ca70969e44))
+
+## [1.26.2](https://github.com/posit-dev/ptd/compare/v1.26.1...v1.26.2) (2026-04-22)
+
+
+### Bug Fixes
+
+* remove min node count for azure user pools ([0c7f4fb](https://github.com/posit-dev/ptd/commit/0c7f4fb5c7825fcf51ae254dcdb57aaec2e70c51))
+
+## [1.26.1](https://github.com/posit-dev/ptd/compare/v1.26.0...v1.26.1) (2026-04-22)
+
+
+### Bug Fixes
+
+* default public_load_balancer to true (internet-facing) matching Python ([340fa4e](https://github.com/posit-dev/ptd/commit/340fa4ebf074478577ea1cae85b5b41252e6af42))
+* fetch Karpenter subnet/SG IDs from EKS cluster VPC config ([d64ee3b](https://github.com/posit-dev/ptd/commit/d64ee3bd3f6f6f7835f183bdca2220a1e3ae6c13))
+* match Python output details for Traefik ingress and Alloy values ([de10b28](https://github.com/posit-dev/ptd/commit/de10b2858bbd7f7d9f2b8e086da30bf2a5f57048))
+* remove EnableServerSideApply from k8s provider (not set in other migrated steps) ([f103837](https://github.com/posit-dev/ptd/commit/f1038377041c5a3f36900ab8eb02c366484e787b))
+* restore Alloy cluster label and k8s provider settings from Python ([66b3e57](https://github.com/posit-dev/ptd/commit/66b3e579ea1877c718e9867dea4e4f3bcc4e9b65))
+* retain Python naming conventions in AWS helm step migration ([39fdcb6](https://github.com/posit-dev/ptd/commit/39fdcb6e69c78c6d70bedfac2a6e13256957e4dc))
+* synthesize session taint in overprovisioning tolerations matching NodePool logic ([3ca8f49](https://github.com/posit-dev/ptd/commit/3ca8f499bb75acd297e8152835449c032851fc33))
+* use deterministic workload port instead of hardcoded 1080 for proxy ([99dfe02](https://github.com/posit-dev/ptd/commit/99dfe0282d16666c2047ade1ec46ed31203c4844))
+
+
+### Reverts
+
+* restore pulumi-kubernetes SDK to v4.21.1 to keep Azure provider stable ([51b33c0](https://github.com/posit-dev/ptd/commit/51b33c0710064aafa6fcd3510d96b8d70cd39ea4))
+
+# [1.26.0](https://github.com/posit-dev/ptd/compare/v1.25.1...v1.26.0) (2026-04-21)
+
+
+### Bug Fixes
+
+* **proxy:** kill surviving processes when pruning stale registry entries ([2793946](https://github.com/posit-dev/ptd/commit/27939467b50f5d54195969686023e50cc3e8a9cf))
+* **proxy:** replace hardcoded port 1080 in all steps with WorkloadPort ([01869e7](https://github.com/posit-dev/ptd/commit/01869e7e5201bd8cd301bbd65ba701e4a10f084a))
+* **proxy:** replace hardcoded port 1080 in Python Pulumi code and remove dead Go fallbacks ([8d4a3be](https://github.com/posit-dev/ptd/commit/8d4a3be8fb8acc9dfad53e65919f7ae399104ec9))
+* **proxy:** set ALL_PROXY in helm step and update docs for new port behavior ([ddbb595](https://github.com/posit-dev/ptd/commit/ddbb595081b5892cb6e717b5f1e89a660cbc5ac5))
+* **proxy:** thread proxy port through SetupKubeConfig so kubeconfig uses the correct SOCKS5 port ([77f1c0f](https://github.com/posit-dev/ptd/commit/77f1c0fde4fdc851996580b01db2e62227b755b4))
+* **proxy:** use context.Background() in daemon mode so subprocess survives ptd exit ([a2ec568](https://github.com/posit-dev/ptd/commit/a2ec568a9a7bc025bb707749a58c0bcd123e6212))
+
+
+### Features
+
+* **proxy:** add locked registry, deterministic ports, and new management commands ([d28ee37](https://github.com/posit-dev/ptd/commit/d28ee370407a37c7c6a46ab7b45920e6321e8aad))
+
+## [1.25.1](https://github.com/posit-dev/ptd/compare/v1.25.0...v1.25.1) (2026-04-21)
+
+
+### Bug Fixes
+
+* add dual aliases for AWS provider, AlloyConfig ConfigMap, and mimir-auth Secret ([2dcd6a7](https://github.com/posit-dev/ptd/commit/2dcd6a7c6f3b6098eef2939d564ccb430dfa991f))
+* correct Alloy ConfigMap alias and YAML indentation in helm chart CRs ([5c01ca9](https://github.com/posit-dev/ptd/commit/5c01ca9423a88c0c1ab225152eae9da0cb14d230))
+* correct Alloy ConfigMap Pulumi alias to include AlloyConfig parent type ([d3f16b4](https://github.com/posit-dev/ptd/commit/d3f16b42ca873ad5fa9ed92bf2ff1a150af08412))
+* mainDomain should use site named "main", not first alphabetically ([4715421](https://github.com/posit-dev/ptd/commit/4715421e3823623dcc5ce386a86efa337cb70c13))
+* use yaml.v2 for Traefik and Karpenter values, harden alias URNs and error handling ([a33cb77](https://github.com/posit-dev/ptd/commit/a33cb77125c37600c24c826ef33cd8ade2975c68))
+* use yaml.v2 in marshalYAML and correct Azure helm diffs vs Python state ([0e50fc1](https://github.com/posit-dev/ptd/commit/0e50fc1ee20b6510a1b9105d6c27c6ead4c21177))
+
+# [1.25.0](https://github.com/posit-dev/ptd/compare/v1.24.0...v1.25.0) (2026-04-21)
+
+
+### Features
+
+* add unit tests for handoff helpers and fix resource categorization ([0be41ce](https://github.com/posit-dev/ptd/commit/0be41ce97d5d88bf041e6101ed9fca4ddc0621e3))
+* generate eject handoff PDF and markdown document ([0a67c38](https://github.com/posit-dev/ptd/commit/0a67c386f156e599e8fca511fa81d3f953671f5a)), closes [#216](https://github.com/posit-dev/ptd/issues/216)
+
+# [1.24.0](https://github.com/posit-dev/ptd/compare/v1.23.0...v1.24.0) (2026-04-17)
+
+
+### Bug Fixes
+
+* conditionally emit control_room remote_write when control_room_domain is set ([951a412](https://github.com/posit-dev/ptd/commit/951a41279ac1e0d7e39950bffb4bbbf64d92cbc1)), closes [#252](https://github.com/posit-dev/ptd/issues/252)
+
+
+### Features
+
+* add Azure nvidia device plugin helm deployment ([c1ed84d](https://github.com/posit-dev/ptd/commit/c1ed84dc2fa84ab1ac1ffe3738985d3091e3a322))
+
+# [1.23.0](https://github.com/posit-dev/ptd/compare/v1.22.1...v1.23.0) (2026-04-17)
+
+
+### Features
+
+* mirror nvidia device plugin for azure ([f09c491](https://github.com/posit-dev/ptd/commit/f09c49164196a70ef752e928a790f31fcd24e9b0))
+
+## [1.22.1](https://github.com/posit-dev/ptd/compare/v1.22.0...v1.22.1) (2026-04-17)
+
+
+### Bug Fixes
+
+* **proxy:** kill subprocess group on stop to avoid Azure tunnel orphan ([1c40215](https://github.com/posit-dev/ptd/commit/1c40215c89dd015e411f03ae193142acd4d58ccc))
+
+# [1.22.0](https://github.com/posit-dev/ptd/compare/v1.21.0...v1.22.0) (2026-04-17)
+
+
+### Features
+
+* add automation for assigning aks rbac role ([0f3a5df](https://github.com/posit-dev/ptd/commit/0f3a5df60004fbc067edbf70648e0e6e5913bc08))
+
+# [1.21.0](https://github.com/posit-dev/ptd/compare/v1.20.0...v1.21.0) (2026-04-16)
+
+
+### Bug Fixes
+
+* code review suggestions ([e21cb06](https://github.com/posit-dev/ptd/commit/e21cb06ef6b5015e4624b47b692f82629abc091d))
+
+
+### Features
+
+* **eject:** add metadata.json, README, and config copy to bundle ([9d495b5](https://github.com/posit-dev/ptd/commit/9d495b58f4bf5c9a7506d930c67910acabfda483)), closes [#219](https://github.com/posit-dev/ptd/issues/219)
+
+# [1.20.0](https://github.com/posit-dev/ptd/compare/v1.19.0...v1.20.0) (2026-04-16)
+
+
+### Bug Fixes
+
+* make snapshot dynamic, handle numeric IDs, add edge case tests ([84768b8](https://github.com/posit-dev/ptd/commit/84768b8fb439b107558283284a5899d4c80267ad))
+
+
+### Features
+
+* add config strip and snapshot for eject severance ([9d931b0](https://github.com/posit-dev/ptd/commit/9d931b0af3e696d4bc9fca2a0a74dda11103246d))
+
+# [1.19.0](https://github.com/posit-dev/ptd/compare/v1.18.0...v1.19.0) (2026-04-16)
+
+
+### Features
+
+* conditionally include control room remote_write in Alloy config ([9a141df](https://github.com/posit-dev/ptd/commit/9a141dfafa66525839cd578f8d67ae3ff80fc2ef))
+
+# [1.18.0](https://github.com/posit-dev/ptd/compare/v1.17.0...v1.18.0) (2026-04-16)
+
+
+### Features
+
+* add IAM trust removal runbook for eject bundle ([09fd47e](https://github.com/posit-dev/ptd/commit/09fd47ecb2d62c0ec2772563dfa1b99849f7f66c))
+* add re-adopt runbook generator for eject bundle ([9986433](https://github.com/posit-dev/ptd/commit/99864332054da0185dfa0ebc3922078ddea29280))
+* add RemoveWorkloadMimirPassword for eject severance ([5cafed5](https://github.com/posit-dev/ptd/commit/5cafed59643084cebb315f820696e3a2832e0242))
+* cloud-specific access removal runbooks, wire into eject ([e544235](https://github.com/posit-dev/ptd/commit/e544235431e3bacc43a2aaf78ee84dc6ad794d05))
+* tolerate nil control room target in ensure steps ([bc3e99a](https://github.com/posit-dev/ptd/commit/bc3e99af1d0b07acacd953f964bac65fa3bb104d))
+
 # [1.17.0](https://github.com/posit-dev/ptd/compare/v1.16.0...v1.17.0) (2026-04-15)
 
 

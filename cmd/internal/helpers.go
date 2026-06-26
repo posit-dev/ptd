@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 func DataDir() string {
@@ -23,4 +24,8 @@ func ConfigDir() string {
 		configDir = os.ExpandEnv("$HOME/.config/ptd")
 	}
 	return configDir
+}
+
+func RegistryFilePath() string {
+	return filepath.Join(DataDir(), "proxies.json")
 }

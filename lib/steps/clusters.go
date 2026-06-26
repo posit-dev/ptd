@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/posit-dev/ptd/lib/types"
 )
 
@@ -16,7 +17,7 @@ const (
 	// clustersTeamOperatorServiceAccount is the Helm chart default service account name.
 	clustersTeamOperatorServiceAccount = "team-operator-controller-manager"
 	// clustersDefaultTeamOperatorChartVersion is used when no chart version is configured.
-	clustersDefaultTeamOperatorChartVersion = "v1.23.0"
+	clustersDefaultTeamOperatorChartVersion = "v1.26.0"
 	// clustersTraefikForwardAuthSA matches the Python Roles.TRAEFIK_FORWARD_AUTH value.
 	clustersTraefikForwardAuthSA = "traefik-forward-auth.posit.team"
 
@@ -70,7 +71,7 @@ func (s *ClustersStep) Run(ctx context.Context) error {
 
 	// clusters step always needs proxy for K8s connectivity
 	if !s.DstTarget.TailscaleEnabled() {
-		envVars["ALL_PROXY"] = "socks5://localhost:1080"
+		envVars["ALL_PROXY"] = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
 	}
 
 	switch s.DstTarget.CloudProvider() {

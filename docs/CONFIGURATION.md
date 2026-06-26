@@ -80,7 +80,7 @@ spec:
   vpc_az_count: 2  # Number of availability zones (default: 3, max: 3)
 
   # RDS PostgreSQL configuration
-  db_engine_version: "15.12"
+  db_engine_version: "15.18"
   db_instance_class: db.m5d.large
   db_performance_insights_enabled: true
   db_deletion_protection: true

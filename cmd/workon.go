@@ -5,14 +5,15 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
+	"strconv"
 
 	"github.com/posit-dev/ptd/cmd/internal"
 	"github.com/posit-dev/ptd/cmd/internal/legacy"
 	"github.com/posit-dev/ptd/lib/customization"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/kube"
+	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/posit-dev/ptd/lib/pulumi"
 	"github.com/posit-dev/ptd/lib/steps"
 	"github.com/spf13/cobra"
@@ -92,11 +93,14 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 
 	credEnvVars := creds.EnvVars()
 
+	// PTD_ROOT is exported into the workon shell below for custom (user-defined)
+	// steps, which may be Python-based and resolve their resources relative to it.
+	// Built-in steps are inline Go and no longer read it.
 	ptdRoot := helpers.GetTargetsConfigPath()
 
 	// Start proxy if needed (non-fatal)
-	proxyFile := path.Join(internal.DataDir(), "proxy.json")
-	stopProxy, err := kube.StartProxy(cmd.Context(), t, proxyFile)
+	port := strconv.Itoa(proxy.WorkloadPort(t.Name()))
+	stopProxy, err := kube.StartProxy(cmd.Context(), t, port, internal.RegistryFilePath())
 	if err != nil {
 		slog.Warn("Failed to start proxy", "error", err)
 	} else {
@@ -104,7 +108,7 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 	}
 
 	// Set up kubeconfig (non-fatal)
-	kubeconfigPath, err := kube.SetupKubeConfig(cmd.Context(), t, creds)
+	kubeconfigPath, err := kube.SetupKubeConfig(cmd.Context(), t, creds, port)
 	if err != nil {
 		slog.Warn("Failed to setup kubeconfig, kubectl commands may not work", "error", err)
 	}
@@ -140,18 +144,20 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 			pulumiStackName = stack.Name()
 
 		} else if steps.ValidStep(step, t.ControlRoom()) {
-			// Handle standard step
-			stack, err := pulumi.NewPythonPulumiStack(
+			// Handle standard step. Built-in steps are inline-Go Pulumi programs, so
+			// `pulumi preview/up` is not possible from here (the program is compiled
+			// into the binary). This Go-runtime state workspace exists for the manual
+			// state-cutover runbooks: `pulumi stack export/import`,
+			// `state unprotect/delete`, etc., which read state and need no program.
+			stack, err := pulumi.NewStateWorkspaceStack(
 				cmd.Context(),
 				string(t.CloudProvider()), // ptd-<cloud>-<control-room/workload>-<stackname>
 				targetType,
 				step,
 				t.Name(),
-				t.Region(),
 				t.PulumiBackendUrl(),
 				t.PulumiSecretsProviderKey(),
 				credEnvVars,
-				true,
 			)
 			if err != nil {
 				slog.Error("Failed to create Pulumi stack", "error", err)
@@ -159,6 +165,7 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 			}
 
 			workDir = stack.Workspace().WorkDir()
+			pulumiStackName = stack.Name()
 		} else {
 			slog.Error("Invalid step provided", "step", step)
 			return

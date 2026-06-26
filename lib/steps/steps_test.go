@@ -73,3 +73,6 @@ func (m *MockStep) ProxyRequired() bool {
 	args := m.Called()
 	return args.Bool(0)
 }
+
+// boolPtr returns a pointer to b, for constructing pointer-typed config fields in tests.
+func boolPtr(b bool) *bool { return &b }

@@ -14,7 +14,7 @@ var funcMap = template.FuncMap{
 		return t.Format("2006-01-02")
 	},
 	"upper":       strings.ToUpper,
-	"productName": productDisplayName,
+	"productName": ProductDisplayName,
 	"totalResources": func(stacks []StackSummary) int {
 		total := 0
 		for _, s := range stacks {
@@ -37,15 +37,19 @@ var funcMap = template.FuncMap{
 		return false
 	},
 	"stackProse": func(stack StackSummary, infra *InfraConfig) string {
-		stepName := stack.stepNameFromProject()
+		stepName := stack.StepNameFromProject()
 		return GenerateStackProse(stepName, infra)
 	},
 	"purposeText":      func(cloud string) string { return purposeTextFor(cloud) },
 	"infraSummaryText": func(cloud string) string { return infraSummaryTextFor(cloud) },
 	"verificationText": func(cloud string) string { return verificationTextFor(cloud) },
 	"encryptionText":   func(cloud string) string { return encryptionTextFor(cloud) },
-	"accountLabel":     accountLabel,
+	"accountLabel":     AccountLabel,
 	"stateBackend": func(data *AttestationData) string {
+		if data.StateBackendURL != "" {
+			return data.StateBackendURL
+		}
+		// fallback for tests/older code paths
 		if data.Infra != nil && data.Infra.Cloud == "azure" {
 			return fmt.Sprintf("azblob://<container>?storage_account=%s", data.TargetName)
 		}
@@ -67,7 +71,7 @@ var funcMap = template.FuncMap{
 
 var markdownTemplate = template.Must(template.New("attestation").Funcs(funcMap).Parse(
 	`{{- $cloud := cloudName .Infra -}}
-# ` + docTitle + ` — {{ .TargetName }}
+# {{ .DisplayTitle }}
 
 **Environment:** {{ .TargetName }}
 **{{ accountLabel $cloud }}:** {{ .AccountID }}
@@ -199,24 +203,54 @@ The Git history for the ` + "`" + `{{ .TargetName }}/` + "`" + ` directory provi
 
 ` + confirmationText + `
 
+_Generated: {{ .GeneratedAt | formatDate }}_
+
 ## Sign-Off
 
 | | Name | Date |
 |---|---|---|
-| Prepared By | | |
+| Prepared By | | {{ .GeneratedAt | formatDate }} |
+
+## Appendix A — Full Resource Inventory
+
+The following table enumerates every managed resource across all Pulumi stacks, as reported by the state files at the time of generation. Pulumi-internal resources (the stack object and provider instances) are excluded. The ` + "`" + `bootstrap` + "`" + ` step provisions the Pulumi state backend itself and therefore runs outside Pulumi; its resources are listed from PTD's naming conventions rather than from state.
+
+| Pulumi Stack | Name | Type | Cloud / Logical Resource ID |
+|---|---|---|---|
+{{ range .BootstrapResources -}}
+| bootstrap | ` + "`" + `{{ .Name }}` + "`" + ` | {{ .Type }} | ` + "`" + `{{ .DisplayID }}` + "`" + ` |
+{{ end -}}
+{{ range .Stacks -}}
+{{ $project := .ProjectName -}}
+{{ range .Resources -}}
+| ` + "`" + `{{ $project }}` + "`" + ` | ` + "`" + `{{ .Name }}` + "`" + ` | ` + "`" + `{{ .Type }}` + "`" + ` | ` + "`" + `{{ .DisplayID }}` + "`" + ` |
+{{ end -}}
+{{ end }}
+## Appendix B — Kubernetes Objects
+
+This table lists the Kubernetes objects PTD configures across the cluster, together with the cluster-assigned ` + "`" + `metadata.uid` + "`" + ` recorded in Pulumi state at the time of the last deployment. The UID is assigned by Kubernetes when an object is admitted, so it confirms the object was actually created in the cluster. Helm releases wrap multiple objects and therefore carry no single UID.
+
+| Pulumi Stack | Kind | Namespace | Name | UID |
+|---|---|---|---|---|
+{{ range .Stacks -}}
+{{ $project := .ProjectName -}}
+{{ range .KubernetesObjects -}}
+| ` + "`" + `{{ $project }}` + "`" + ` | {{ .Kind }} | {{ .DisplayNamespace }} | ` + "`" + `{{ .Name }}` + "`" + ` | ` + "`" + `{{ .DisplayUID }}` + "`" + ` |
+{{ end -}}
+{{ end }}
 `))
 
 // RenderMarkdown writes the attestation data as a Markdown document to the given writer.
 func RenderMarkdown(w io.Writer, data *AttestationData) error {
 	sort.Slice(data.Stacks, func(i, j int) bool {
-		return stackOrder(data.Stacks[i].ProjectName) < stackOrder(data.Stacks[j].ProjectName)
+		return StackOrder(data.Stacks[i].ProjectName) < StackOrder(data.Stacks[j].ProjectName)
 	})
 
 	return markdownTemplate.Execute(w, data)
 }
 
-// stackOrder returns a sort key for known stack names to present them in deployment order
-func stackOrder(name string) int {
+// StackOrder returns a sort key for known stack names to present them in deployment order.
+func StackOrder(name string) int {
 	order := map[string]int{
 		"persistent":      1,
 		"postgres-config": 2,

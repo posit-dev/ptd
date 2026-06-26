@@ -1,0 +1,382 @@
+# To delete these alerts, simply removing the configMap that uses this method will not work.
+# Replace file contents with the following and apply in order to delete the alerts
+# (repeat the deleteRules entry for each uid listed below):
+# apiVersion: 1
+# deleteRules:
+#   - orgId: 1
+#     uid: rds_cpu_utilization_high
+#   - orgId: 1
+#     uid: rds_free_storage_low_warning
+#   - orgId: 1
+#     uid: rds_free_storage_low_critical
+#   - orgId: 1
+#     uid: rds_freeable_memory_low
+#   - orgId: 1
+#     uid: rds_database_connections_high
+#
+# See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+#
+# Note: alert annotations reference {{$labels.cluster}}. For CloudWatch-sourced metrics,
+# this label is injected by the prometheus.relabel.default block in lib/steps/helm_helpers.go (buildAlloyConfig).
+# If Alloy is not running or relabeling is misconfigured, the label will be absent and
+# the annotation will render as "in cluster " (blank).
+apiVersion: 1
+deleteRules:
+    - orgId: 1
+      uid: rds_read_latency_high
+    - orgId: 1
+      uid: rds_free_storage_low
+groups:
+    - orgId: 1
+      name: RDS
+      folder: Posit Alerts
+      interval: 5m
+      rules:
+        - uid: rds_cpu_utilization_high
+          title: RDS CPU Utilization High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_rds_cpuutilization_average{job="integrations/cloudwatch", dimension_DBInstanceIdentifier!=""}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 80
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 10m
+          annotations:
+            summary: "🟡 WARNING: RDS CPU Utilization High"
+            description: |
+              RDS instance CPU utilization is elevated
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_DBInstanceIdentifier }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      CPU Utilization
+              Current:     > 80%
+              Threshold:   80%
+              Duration:    10 minutes
+
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: rds_free_storage_low_warning
+          title: RDS Free Storage Low (Warning)
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_rds_free_storage_space_average{job="integrations/cloudwatch", dimension_DBInstanceIdentifier!=""}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            # 10 GiB in bytes
+                            - 10737418240
+                        type: lt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: Alerting
+          execErrState: Error
+          for: 5m
+          annotations:
+            summary: "🟡 WARNING: RDS Free Storage Low"
+            description: |
+              RDS instance storage capacity is running low
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_DBInstanceIdentifier }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Free Storage Space
+              Current:     < 10 GiB free
+              Threshold:   10 GiB
+              Duration:    5 minutes
+
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: rds_free_storage_low_critical
+          title: RDS Free Storage Low (Critical)
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_rds_free_storage_space_average{job="integrations/cloudwatch", dimension_DBInstanceIdentifier!=""}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            # 5 GiB in bytes
+                            - 5368709120
+                        type: lt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: Alerting
+          execErrState: Error
+          for: 5m
+          annotations:
+            summary: "🔴 CRITICAL: RDS Free Storage Critical"
+            description: |
+              RDS instance storage capacity is critically low
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_DBInstanceIdentifier }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Free Storage Space
+              Current:     < 5 GiB free
+              Threshold:   5 GiB
+              Duration:    5 minutes
+
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: rds_freeable_memory_low
+          title: RDS Freeable Memory Low
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_rds_freeable_memory_average{job="integrations/cloudwatch", dimension_DBInstanceIdentifier!=""}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            # 256 MiB in bytes
+                            - 268435456
+                        type: lt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: Alerting
+          execErrState: Error
+          for: 10m
+          annotations:
+            summary: "🟡 WARNING: RDS Freeable Memory Low"
+            description: |
+              RDS instance freeable memory is low
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_DBInstanceIdentifier }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Freeable Memory
+              Current:     < 256 MiB free
+              Threshold:   256 MiB
+              Duration:    10 minutes
+
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: rds_database_connections_high
+          title: RDS Database Connections High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_rds_database_connections_average{job="integrations/cloudwatch", dimension_DBInstanceIdentifier!=""}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 80
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            summary: "🟡 WARNING: RDS Database Connections High"
+            description: |
+              RDS instance has high number of database connections
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_DBInstanceIdentifier }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Database Connections
+              Current:     > 80 connections
+              Threshold:   80
+              Duration:    5 minutes
+
+          labels:
+            opsgenie: "1"
+          isPaused: false

@@ -10,6 +10,7 @@ import (
 	"github.com/posit-dev/ptd/lib/azure"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/kube"
+	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/posit-dev/ptd/lib/types"
 	azauthorization "github.com/pulumi/pulumi-azure-native-sdk/authorization/v3"
 	azmanagedidentity "github.com/pulumi/pulumi-azure-native-sdk/managedidentity/v3"
@@ -42,10 +43,16 @@ type azureClustersParams struct {
 	// certManagerDomains is the list of domains used for Let's Encrypt CertManager ClusterIssuers.
 	// Mirrors Python: root_domain if set, else all site domains.
 	certManagerDomains []string
+	// siteDomains is always the per-site domains (one per site), independent of root_domain.
+	// Used for Traefik Ingresses, which must be created for every site domain.
+	siteDomains []string
 	// thirdPartyTelemetryEnabled controls whether Traefik telemetry arguments are suppressed.
 	thirdPartyTelemetryEnabled bool
 	// workloadDir is the path to the workload's config directory (contains ptd.yaml, custom_k8s_resources/, etc.)
 	workloadDir string
+	// rootDomain is the dereferenced value of cfg.RootDomain, or empty string if nil.
+	// Used to select the correct ClusterIssuer name in Traefik Ingress annotations.
+	rootDomain string
 }
 
 func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credentials, envVars map[string]string) error {
@@ -79,13 +86,15 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 		if err != nil {
 			return fmt.Errorf("clusters: failed to get AKS kubeconfig for %s: %w", clusterName, err)
 		}
+		proxyURL := ""
 		if !s.DstTarget.TailscaleEnabled() {
-			kubeconfigBytes, err = kube.AddProxyToKubeConfigBytes(kubeconfigBytes, "socks5://localhost:1080")
-			if err != nil {
-				return fmt.Errorf("clusters: failed to add proxy to kubeconfig for %s: %w", clusterName, err)
-			}
+			proxyURL = fmt.Sprintf("socks5://localhost:%d", proxy.WorkloadPort(s.DstTarget.Name()))
 		}
-		kubeconfigsByCluster[release] = string(kubeconfigBytes)
+		kubeconfig, err := kube.BuildAKSKubeconfigString(kubeconfigBytes, proxyURL)
+		if err != nil {
+			return fmt.Errorf("clusters: %w", err)
+		}
+		kubeconfigsByCluster[release] = kubeconfig
 
 		identityInfo, err := azure.GetClusterIdentityInfo(
 			ctx, azCreds, azTarget.SubscriptionID(), azTarget.ResourceGroupName(), clusterName,
@@ -108,6 +117,14 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 		sort.Strings(certManagerDomains)
 	}
 
+	// siteDomains is always the per-site domains, independent of root_domain.
+	// Used for Traefik Ingresses, which must be created for every site domain.
+	var siteDomains []string
+	for _, siteCfg := range cfg.Sites {
+		siteDomains = append(siteDomains, siteCfg.Spec.Domain)
+	}
+	sort.Strings(siteDomains)
+
 	// Azure files storage account name: "stptdfiles" + first 14 chars of sanitized compound name.
 	// Mirrors python: AzureWorkload.azure_files_storage_account_name
 	sanitizedName := strings.ReplaceAll(s.DstTarget.Name(), "-", "")
@@ -128,8 +145,15 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 		azureFilesStorageAccountName: azureFilesStorageAccountName,
 		clusterIdentityByCluster:     clusterIdentityByCluster,
 		certManagerDomains:           certManagerDomains,
+		siteDomains:                  siteDomains,
 		thirdPartyTelemetryEnabled:   cfg.ThirdPartyTelemetryEnabled == nil || *cfg.ThirdPartyTelemetryEnabled,
 		workloadDir:                  filepath.Join(helpers.GetTargetsConfigPath(), helpers.WorkDir, s.DstTarget.Name()),
+		rootDomain: func() string {
+			if cfg.RootDomain != nil {
+				return *cfg.RootDomain
+			}
+			return ""
+		}(),
 	}
 
 	stack, err := createStack(ctx, s.Name(), s.DstTarget, func(pctx *pulumi.Context, target types.Target) error {
@@ -186,7 +210,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 		k8sProviderName := name + "-" + release
 		k8sProvider, err := kubernetes.NewProvider(ctx, k8sProviderName, &kubernetes.ProviderArgs{
 			Kubeconfig: pulumi.String(params.kubeconfigsByCluster[release]),
-		}, withAlias(), pulumi.IgnoreChanges([]string{"kubeconfig"}))
+		}, withAlias())
 		if err != nil {
 			return fmt.Errorf("clusters: failed to create K8s provider for %s: %w", release, err)
 		}
@@ -655,8 +679,10 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 			}
 		}
 
-		// extraObjects: redirect middleware + one Ingress per domain.
+		// extraObjects: redirect middleware + one Ingress per site domain.
 		// Mirrors azure_traefik.py _define_redirect_middleware() and _define_ingresses().
+		// Ingresses iterate over siteDomains (all site domains), not certManagerDomains,
+		// because a root_domain collapses cert-manager issuers but not per-site Ingresses.
 		extraObjects := pulumi.Array{
 			pulumi.Map{
 				"apiVersion": pulumi.String("traefik.io/v1alpha1"),
@@ -673,12 +699,16 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				},
 			},
 		}
-		for _, domain := range params.certManagerDomains {
+		for _, domain := range params.siteDomains {
 			ingressAnnotations := pulumi.Map{
 				"traefik.ingress.kubernetes.io/router.middlewares": pulumi.String("traefik-redirect-https@kubernetescrd"),
 			}
 			if clusterCfg.UseLetsEncrypt {
-				ingressAnnotations["cert-manager.io/cluster-issuer"] = pulumi.String(fmt.Sprintf("letsencrypt-%s", domain))
+				issuerDomain := domain
+				if params.rootDomain != "" {
+					issuerDomain = params.rootDomain
+				}
+				ingressAnnotations["cert-manager.io/cluster-issuer"] = pulumi.String(fmt.Sprintf("letsencrypt-%s", issuerDomain))
 			}
 			extraObjects = append(extraObjects, pulumi.Map{
 				"apiVersion": pulumi.String("networking.k8s.io/v1"),
@@ -831,7 +861,6 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 
 		// ── CoreDNS forwarding (optional) ──────────────────────────────────────
 		// Python: uses kubernetes.core.v1.ConfigMapPatch with replace_on_changes=[].
-		// In Go Pulumi SDK, we use a custom K8s resource with server-side apply semantics.
 		// DNS forwarding entries are direct children of AzureWorkloadClusters.
 		if len(params.dnsForwardDomains) > 0 {
 			dnsData := pulumi.StringMap{}
@@ -840,18 +869,14 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				val := fmt.Sprintf("%s:53 {\n  errors\n  cache 30\n  forward . %s\n}\n", domain.Host, domain.IP)
 				dnsData[key] = pulumi.String(val)
 			}
-			_, err = apiextensions.NewCustomResource(ctx,
+			_, err = corev1.NewConfigMapPatch(ctx,
 				fmt.Sprintf("%s-%s-coredns-forward", name, release),
-				&apiextensions.CustomResourceArgs{
-					ApiVersion: pulumi.String("v1"),
-					Kind:       pulumi.String("ConfigMap"),
-					Metadata: &metav1.ObjectMetaArgs{
-						Name:      pulumi.String("coredns-custom"),
-						Namespace: pulumi.String(clustersKubeSystemNamespace),
+				&corev1.ConfigMapPatchArgs{
+					Metadata: &metav1.ObjectMetaPatchArgs{
+						Name:      pulumi.StringPtr("coredns-custom"),
+						Namespace: pulumi.StringPtr(clustersKubeSystemNamespace),
 					},
-					OtherFields: kubernetes.UntypedArgs{
-						"data": dnsData,
-					},
+					Data: dnsData,
 				}, k8sProviderOpt, withAlias())
 			if err != nil {
 				return fmt.Errorf("clusters: failed to create coredns forwarding configmap for %s: %w", release, err)
@@ -862,7 +887,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 
 		// ── Custom K8s resources (optional, per-cluster) ─────────────────────────
 		if err := createCustomK8sResources(ctx, params.workloadDir, release,
-			params.clusters[release].CustomK8sResources, k8sProviderOpt, withAlias()); err != nil {
+			params.clusters[release].CustomK8sResources, k8sProviderOpt); err != nil {
 			return err
 		}
 	}

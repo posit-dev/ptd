@@ -42,6 +42,9 @@ func (s *BootstrapStep) Run(ctx context.Context) error {
 		return err
 	}
 
+	// NOTE: lib/attestation.collectBootstrapResources synthesizes this same
+	// resource list from PTD's naming conventions (bootstrap produces no Pulumi
+	// state). Keep the two in sync if the provisioned resources change here.
 	switch s.DstTarget.CloudProvider() {
 	case types.AWS:
 		err = s.runAws(ctx, creds, s.DstTarget.Name())
@@ -222,6 +225,19 @@ func (s *BootstrapStep) runAzure(ctx context.Context, c types.Credentials, _ str
 	s.Log.Info("Creating blob container for pulumi state if it doesn't exist", "containerName", azureTarget.BlobStorageName())
 	if !azure.BlobContainerExists(ctx, azureCreds, azureTarget.SubscriptionID(), azureTarget.ResourceGroupName(), azureTarget.StateBucketName(), azureTarget.BlobStorageName()) {
 		err = azure.CreateBlobContainer(ctx, azureCreds, azureTarget.SubscriptionID(), azureTarget.ResourceGroupName(), azureTarget.StateBucketName(), azureTarget.BlobStorageName())
+		if err != nil {
+			return err
+		}
+	}
+
+	// Ensure AKS RBAC Cluster Admin role assignment exists for admin group
+	s.Log.Info("Ensuring AKS RBAC Cluster Admin role assignment exists", "adminGroupId", azureTarget.AdminGroupID())
+	aksRbacExists, err := azure.RoleAssignmentExists(ctx, azureCreds, azureTarget.SubscriptionID(), azureTarget.ResourceGroupName(), azureTarget.AdminGroupID(), consts.AksRbacClusterAdminRoleId)
+	if err != nil {
+		return err
+	}
+	if !aksRbacExists {
+		err = azure.CreateRoleAssignment(ctx, azureCreds, azureTarget.SubscriptionID(), azureTarget.ResourceGroupName(), azureTarget.AdminGroupID(), consts.AksRbacClusterAdminRoleId)
 		if err != nil {
 			return err
 		}

@@ -1,0 +1,303 @@
+# To delete these alerts, simply removing the configMap that uses this method will not work.
+# Replace file contents with the following and apply in order to delete the alerts
+# (repeat the deleteRules entry for each uid listed below):
+# apiVersion: 1
+# deleteRules:
+#   - orgId: 1
+#     uid: alb_target_5xx_errors_high
+#   - orgId: 1
+#     uid: alb_unhealthy_targets
+#   - orgId: 1
+#     uid: nlb_unhealthy_targets
+#   - orgId: 1
+#     uid: alb_response_latency_high
+#
+# See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+#
+# Note: alert annotations reference {{$labels.cluster}}. For CloudWatch-sourced metrics,
+# this label is injected by the prometheus.relabel.default block in lib/steps/helm_helpers.go (buildAlloyConfig).
+# If Alloy is not running or relabeling is misconfigured, the label will be absent and
+# the annotation will render as "in cluster " (blank).
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: LoadBalancer
+      folder: Posit Alerts
+      interval: 5m
+      rules:
+        - uid: alb_target_5xx_errors_high
+          title: ALB Target 5XX Errors High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_applicationelb_httpcode_target_5_xx_count_sum{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 10  # Absolute count, not an error rate. High-traffic ALBs may never breach this; low-traffic ALBs may page on transient spikes. Consider a rate-based alert if traffic volume varies significantly across environments.
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            summary: "🟡 WARNING: ALB Target 5XX Errors High"
+            description: |
+              Application Load Balancer has elevated 5XX errors
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_LoadBalancer }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Target 5XX Count
+              Current:     > 10 errors
+              Threshold:   10
+              Duration:    5 minutes
+
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: alb_unhealthy_targets
+          title: ALB Unhealthy Targets
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_applicationelb_un_healthy_host_count_average{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            summary: "🟡 WARNING: ALB Unhealthy Targets"
+            description: |
+              Application Load Balancer has unhealthy targets
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_LoadBalancer }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Unhealthy Host Count
+              Current:     > 0
+              Threshold:   0
+              Duration:    5 minutes
+
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: nlb_unhealthy_targets
+          title: NLB Unhealthy Targets
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_networkelb_un_healthy_host_count_average{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            summary: "🟡 WARNING: NLB Unhealthy Targets"
+            description: |
+              Network Load Balancer has unhealthy targets
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_LoadBalancer }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Unhealthy Host Count
+              Current:     > 0
+              Threshold:   0
+              Duration:    5 minutes
+
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: alb_response_latency_high
+          title: ALB Response Latency High
+          condition: B
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: aws_applicationelb_target_response_time_average{job="integrations/cloudwatch"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 5  # 5 seconds
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - A
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: B
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 10m
+          annotations:
+            summary: "🟡 WARNING: ALB Response Latency High"
+            description: |
+              Application Load Balancer response time is elevated
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Resource:    {{ $labels.dimension_LoadBalancer }}
+              Region:      {{ $labels.region }}
+
+              ─── DETAILS ─────────────────────────
+              Metric:      Target Response Time
+              Current:     > 5 seconds
+              Threshold:   5 seconds
+              Duration:    10 minutes
+
+          labels:
+            opsgenie: "1"
+          isPaused: false

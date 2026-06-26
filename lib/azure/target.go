@@ -185,23 +185,16 @@ func (t Target) BastionInfo(ctx context.Context) (*BastionInfo, error) {
 		return nil, err
 	}
 
-	persistentStack, err := pulumi.NewPythonPulumiStack(
+	outputs, err := pulumi.ReadStackOutputs(
 		ctx,
 		"azure",
 		"workload",
 		"persistent",
 		t.Name(),
-		t.Region(),
 		t.PulumiBackendUrl(),
 		t.PulumiSecretsProviderKey(),
 		envVars,
-		false,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	outputs, err := persistentStack.Outputs(ctx)
 	if err != nil {
 		return nil, err
 	}
