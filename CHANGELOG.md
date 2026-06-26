@@ -1,3 +1,10 @@
+# [1.34.0](https://github.com/posit-dev/ptd/compare/v1.33.0...v1.34.0) (2026-06-26)
+
+
+### Features
+
+* **azure:** tag resource group with workload resource_tags on creation ([3eebad0](https://github.com/posit-dev/ptd/commit/3eebad0fe479dc65dc8653f6b38a71c62e969776))
+
 # [1.33.0](https://github.com/posit-dev/ptd/compare/v1.32.3...v1.33.0) (2026-06-26)
 
 
