@@ -327,15 +327,15 @@ func sortedSites(sites map[string]types.SiteConfig) []SiteData {
 func awsClusterName(targetName string, clusters map[string]types.AWSWorkloadClusterConfig) string {
 	releases := slices.Sorted(maps.Keys(clusters))
 	if len(releases) == 0 {
-		return fmt.Sprintf("default_%s-control-plane", targetName)
+		return targetName
 	}
-	return fmt.Sprintf("default_%s-%s-control-plane", targetName, releases[0])
+	return fmt.Sprintf("%s-%s", targetName, releases[0])
 }
 
 func azureClusterName(targetName string, clusters map[string]types.AzureWorkloadClusterConfig) string {
 	releases := slices.Sorted(maps.Keys(clusters))
 	if len(releases) == 0 {
-		return azure.SanitizedName(targetName)
+		return targetName
 	}
-	return fmt.Sprintf("%s-%s", azure.SanitizedName(targetName), releases[0])
+	return fmt.Sprintf("%s-%s", targetName, releases[0])
 }

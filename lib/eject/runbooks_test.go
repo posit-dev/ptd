@@ -14,7 +14,7 @@ func awsRunbookData() *RunbookData {
 		WorkloadName: "acme-prod",
 		Cloud:        "aws",
 		Region:       "us-east-1",
-		ClusterName:  "default_acme-prod-control-plane",
+		ClusterName:  "acme-prod",
 		Sites: []SiteData{
 			{Name: "main", Domain: "connect.acme.com"},
 			{Name: "secondary", Domain: "dev.acme.com"},
@@ -314,7 +314,7 @@ func TestRunbook_AWS_ClusterNameRendered(t *testing.T) {
 	require.NoError(t, err)
 
 	ops := results["day-to-day-ops.md"]
-	assert.Contains(t, ops, "aws eks update-kubeconfig --name default_acme-prod-control-plane --region us-east-1")
+	assert.Contains(t, ops, "aws eks update-kubeconfig --name acme-prod --region us-east-1")
 }
 
 func TestRunbook_Azure_ClusterNameRendered(t *testing.T) {
@@ -375,7 +375,7 @@ func TestBuildRunbookData_AWS_ClusterName(t *testing.T) {
 	data, err := buildRunbookData(config, "acme-prod")
 	require.NoError(t, err)
 
-	assert.Equal(t, "default_acme-prod-20240601-control-plane", data.ClusterName)
+	assert.Equal(t, "acme-prod-20240601", data.ClusterName)
 }
 
 func TestBuildRunbookData_Azure_ClusterName(t *testing.T) {
@@ -389,5 +389,5 @@ func TestBuildRunbookData_Azure_ClusterName(t *testing.T) {
 	data, err := buildRunbookData(config, "Contoso-Staging")
 	require.NoError(t, err)
 
-	assert.Equal(t, "contoso-staging-20240601", data.ClusterName)
+	assert.Equal(t, "Contoso-Staging-20240601", data.ClusterName)
 }
