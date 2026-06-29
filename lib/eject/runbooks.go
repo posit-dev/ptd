@@ -271,14 +271,15 @@ var disasterRecoveryTemplate = template.Must(template.New("disaster-recovery").F
 
 {{- end}}
 
-The state bucket does not have object versioning enabled. If Pulumi state is corrupted or lost, recovery options are:
+The state bucket does not have object versioning enabled. Recovery depends on whether the state is drifted or corrupted (still present) versus lost entirely:
 
-1. **Re-run ` + "`ptd ensure`" + `** — Pulumi will detect drift between state and actual infrastructure and reconcile. This is the primary recovery path.
-2. **Use the eject bundle resource inventory** — ` + "`state/resource-inventory.json`" + ` lists every managed resource with its physical ID. This can guide manual re-import if needed.
+1. **State drifted or corrupted (still present)** — re-run the affected step with ` + "`--refresh`" + ` so Pulumi reconciles its state against the actual cloud resources before applying. This is the primary recovery path whenever state still exists:
 
 ` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps <step>
+ptd ensure {{.WorkloadName}} --only-steps <step> --refresh
 ` + "```" + `
+
+2. **State lost entirely** — with no state, Pulumi has no record of the existing resources, so a plain re-run would try to create duplicates of resources that already exist (and fail). Recovery requires re-importing the existing resources into a fresh stack. The "Resource Inventory" section of the handoff document (` + "`../{{.WorkloadName}}_handoff.md`" + `) lists every managed resource with its physical ID to guide that re-import.
 
 **Prevention:** Consider enabling versioning on the state bucket post-eject so you can recover from accidental state overwrites.
 
@@ -326,11 +327,19 @@ az postgres flexible-server restore \
 
 ### Post-Restore Steps
 
-1. Update the database endpoint in the secret store ({{if eq .Cloud "aws"}}Secrets Manager{{else}}Key Vault{{end}}) if the restored instance has a new hostname.
-2. Re-run the persistent step to reconcile Pulumi state with the new database:
+A point-in-time or snapshot restore creates a **new** {{if eq .Cloud "aws"}}instance{{else}}server{{end}} with a new identifier and hostname that Pulumi state does not track — state still references the original. Products do not read the database host directly: the Team Operator reads it from the ` + "`main-database-url`" + ` key of the workload secret ({{if eq .Cloud "aws"}}` + "`{{.WorkloadName}}.posit.team`" + ` in Secrets Manager{{else}}the workload secret in Key Vault{{end}}) at reconcile time and renders it into each product's configuration. The persistent step writes that secret value from the database resource it tracks in state. Repointing the workload is therefore:
+
+1. Bring the restored {{if eq .Cloud "aws"}}instance{{else}}server{{end}} under Pulumi management by importing it into the persistent stack — a manual state operation via ` + "`ptd workon {{.WorkloadName}} persistent`" + ` (see Pulumi State Recovery). Do **not** simply re-run persistent against the old state: it keeps writing the original hostname, or — if the original is gone — provisions a new, empty {{if eq .Cloud "aws"}}instance{{else}}server{{end}}.
+2. Re-run the persistent step so it writes the restored endpoint into the workload secret:
 
 ` + "```" + `bash
 ptd ensure {{.WorkloadName}} --only-steps persistent
+` + "```" + `
+
+3. Restart the Team Operator so it reconciles, re-reads ` + "`main-database-url`" + `, re-renders each product's database configuration, and rolls the product pods. Re-running the sites step alone does **not** trigger this — the Site spec references the secret by name, so its generation is unchanged and the operator does not reconcile.
+
+` + "```" + `bash
+ptd workon {{.WorkloadName}} -- kubectl rollout restart deployment/team-operator-controller-manager -n posit-team-system
 ` + "```" + `
 
 ## Storage Recovery
@@ -353,7 +362,14 @@ Restore from a backup (creates a new filesystem):
 aws fsx create-file-system-from-backup --backup-id <backup-id> --region {{.Region}}
 ` + "```" + `
 
-After restore, update the FSx DNS name in the workload secret and re-run the persistent step.
+A restored filesystem has a new ID and DNS name that Pulumi state does not track. As with the database, import it into the persistent stack — a manual state operation via ` + "`ptd workon {{.WorkloadName}} persistent`" + ` (see Pulumi State Recovery) — rather than re-running persistent against the old state. Then re-run persistent followed by the sites step:
+
+` + "```" + `bash
+ptd ensure {{.WorkloadName}} --only-steps persistent
+ptd ensure {{.WorkloadName}} --only-steps sites
+` + "```" + `
+
+The persistent step writes the new ` + "`fs-dns-name`" + ` into the workload secret. Unlike the database hostname, the filesystem DNS name is written **into** the TeamSite spec by the sites step, so re-running sites changes the spec and the Team Operator reconciles automatically — remounting products on the restored filesystem (no operator restart needed).
 
 ### S3 Buckets
 
@@ -375,18 +391,21 @@ Azure storage accounts (file shares, blob containers) do not have soft delete or
 
 ### Total Cluster Loss
 
-Persistent data (database, storage) survives cluster loss. Rebuild the cluster and redeploy:
+Persistent data (database, storage) survives cluster loss. Rebuild the cluster and redeploy. Each step is run with ` + "`--refresh`" + ` because Pulumi state still records the now-deleted cluster resources as existing; refresh reconciles state against reality (resources gone) so the apply recreates them. Each step previews and prompts before applying:
 
 ` + "```" + `bash
 {{- if eq .Cloud "aws"}}
-ptd ensure {{.WorkloadName}} --only-steps eks
+ptd ensure {{.WorkloadName}} --only-steps eks --refresh
 {{- else}}
-ptd ensure {{.WorkloadName}} --only-steps aks
+ptd ensure {{.WorkloadName}} --only-steps aks --refresh
 {{- end}}
-ptd ensure {{.WorkloadName}} --only-steps clusters
-ptd ensure {{.WorkloadName}} --only-steps helm
-ptd ensure {{.WorkloadName}} --only-steps sites
+ptd ensure {{.WorkloadName}} --only-steps clusters --refresh
+ptd ensure {{.WorkloadName}} --only-steps helm --refresh
+ptd ensure {{.WorkloadName}} --only-steps sites --refresh
+ptd ensure {{.WorkloadName}} --only-steps persistent_reprise --refresh
 ` + "```" + `
+
+A rebuilt cluster has a new OIDC issuer, so the final ` + "`persistent_reprise`" + ` step is required to re-establish {{if eq .Cloud "aws"}}IRSA trust policies{{else}}workload identity federation{{end}} against the new issuer and refresh the workload secret.
 
 ### Partial Failure (Node Groups)
 
@@ -455,10 +474,25 @@ ptd workon {{.WorkloadName}} -- kubectl describe ingressroute -n posit-team
 
 4. Check TLS certificates:
 
+{{- if eq .Cloud "aws"}}
+
+Customer-facing TLS terminates at the ALB using ACM certificates (cert-manager is not deployed on AWS), so check the certificate in ACM rather than in the cluster:
+
 ` + "```" + `bash
-ptd workon {{.WorkloadName}} -- kubectl get certificate -n posit-team
-ptd workon {{.WorkloadName}} -- kubectl describe certificate -n posit-team
+aws acm list-certificates --region {{.Region}}
+aws acm describe-certificate --certificate-arn <cert-arn> --region {{.Region}}
 ` + "```" + `
+
+{{- else}}
+
+cert-manager issues certificates into the ` + "`traefik`" + ` namespace, alongside the ingress that references them:
+
+` + "```" + `bash
+ptd workon {{.WorkloadName}} -- kubectl get certificate -n traefik
+ptd workon {{.WorkloadName}} -- kubectl describe certificate -n traefik
+` + "```" + `
+
+{{- end}}
 
 5. If DNS or ingress is misconfigured, re-run the sites step:
 
