@@ -104,12 +104,6 @@ spec:
 ptd ensure {{.WorkloadName}} --only-steps sites
 ` + "```" + `
 
-3. Verify pods roll to the new version:
-
-` + "```" + `bash
-ptd workon {{.WorkloadName}} -- kubectl rollout status deployment -n posit-team -l app.kubernetes.io/managed-by=team-operator
-` + "```" + `
-
 ## Rotating TLS Certificates
 
 {{- if eq .Cloud "aws"}}
