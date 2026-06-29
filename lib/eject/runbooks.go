@@ -191,7 +191,7 @@ ptd workon {{.WorkloadName}} -- kubectl rollout restart deployment/<site>-<produ
 
 ### RSA Keys
 
-**Warning:** Rotating RSA keys for Connect or Package Manager will invalidate all content signed with the previous key. Plan accordingly.
+**Warning:** Rotating these keys makes data the product encrypted with the previous key (e.g. stored credentials and variables) unrecoverable. Plan accordingly.
 
 Update the key in the secret store and restart the affected product.
 
