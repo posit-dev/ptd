@@ -1,3 +1,10 @@
+## [1.34.2](https://github.com/posit-dev/ptd/compare/v1.34.1...v1.34.2) (2026-06-29)
+
+
+### Bug Fixes
+
+* **deps:** bump golang.org/x/image to v0.43.0 ([743cb7f](https://github.com/posit-dev/ptd/commit/743cb7f23a65249cabf553722f48cb88eb8f254f))
+
 ## [1.34.1](https://github.com/posit-dev/ptd/compare/v1.34.0...v1.34.1) (2026-06-26)
 
 
