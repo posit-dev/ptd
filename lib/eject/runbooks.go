@@ -186,7 +186,7 @@ ptd ensure {{.WorkloadName}} --only-steps sites
 Update the license key in the secret store ({{if eq .Cloud "aws"}}Secrets Manager{{else}}Key Vault{{end}}) and restart the affected product:
 
 ` + "```" + `bash
-ptd workon {{.WorkloadName}} -- kubectl rollout restart deployment/<product>-deployment -n posit-team
+ptd workon {{.WorkloadName}} -- kubectl rollout restart deployment/<site>-<product> -n posit-team
 ` + "```" + `
 
 ### RSA Keys
@@ -229,23 +229,29 @@ kubectl get ingressroute -n posit-team
 
 ## Restarting Products
 
+Product deployments are named ` + "`<site>-<product>`" + ` (e.g. ` + "`main-connect`" + `, ` + "`main-workbench`" + `, ` + "`main-packagemanager`" + `). List them with:
+
+` + "```" + `bash
+ptd workon {{.WorkloadName}} -- kubectl get deploy -n posit-team -l app.kubernetes.io/managed-by=team-operator
+` + "```" + `
+
 Restart a product deployment:
 
 ` + "```" + `bash
-ptd workon {{.WorkloadName}} -- kubectl rollout restart deployment/<product>-deployment -n posit-team
+ptd workon {{.WorkloadName}} -- kubectl rollout restart deployment/<site>-<product> -n posit-team
 ` + "```" + `
 
 Monitor the rollout:
 
 ` + "```" + `bash
-ptd workon {{.WorkloadName}} -- kubectl rollout status deployment/<product>-deployment -n posit-team
+ptd workon {{.WorkloadName}} -- kubectl rollout status deployment/<site>-<product> -n posit-team
 ` + "```" + `
 
 Using kubectl directly:
 
 ` + "```" + `bash
-kubectl rollout restart deployment/<product>-deployment -n posit-team
-kubectl rollout status deployment/<product>-deployment -n posit-team
+kubectl rollout restart deployment/<site>-<product> -n posit-team
+kubectl rollout status deployment/<site>-<product> -n posit-team
 ` + "```" + `
 `))
 
