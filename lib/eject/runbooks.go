@@ -181,34 +181,6 @@ ptd ensure {{.WorkloadName}} --only-steps sites
 
 ## Rotating Secrets
 
-### Database Passwords
-
-{{- if eq .Cloud "aws"}}
-
-Database passwords are stored in AWS Secrets Manager. To rotate:
-
-1. Update the password value in the relevant secret in Secrets Manager.
-2. Update the password on the PostgreSQL server to match.
-3. Re-run the persistent step to reconcile:
-
-` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps persistent
-` + "```" + `
-
-{{- else}}
-
-Database passwords are stored in Azure Key Vault. To rotate:
-
-1. Update the password value in the relevant Key Vault secret.
-2. Update the password on the PostgreSQL server to match.
-3. Re-run the persistent step to reconcile:
-
-` + "```" + `bash
-ptd ensure {{.WorkloadName}} --only-steps persistent
-` + "```" + `
-
-{{- end}}
-
 ### Product Licenses
 
 Update the license key in the secret store ({{if eq .Cloud "aws"}}Secrets Manager{{else}}Key Vault{{end}}) and restart the affected product:
