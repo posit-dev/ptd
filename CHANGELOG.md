@@ -1,3 +1,18 @@
+# [1.35.0](https://github.com/posit-dev/ptd/compare/v1.34.2...v1.35.0) (2026-06-29)
+
+
+### Bug Fixes
+
+* address runbook review comments ([3afbb77](https://github.com/posit-dev/ptd/commit/3afbb774edb2562f6149852b7c505e0be9af7a51))
+* correct DR runbook assumptions, remove redundant --dry-run ([86a723d](https://github.com/posit-dev/ptd/commit/86a723d1ed68c588ed820fb8576d9bccf4ea2c9b))
+* **eject:** use real cluster names in operational runbooks ([14d56ea](https://github.com/posit-dev/ptd/commit/14d56eac5da51db4f04ecd83c1a16305434f3c61))
+* wire up ClusterName, sort sites, sanitize Azure resource group ([b98318d](https://github.com/posit-dev/ptd/commit/b98318de7f4c62475120906852a75a17128c098c))
+
+
+### Features
+
+* generate operational runbooks in eject bundle ([#218](https://github.com/posit-dev/ptd/issues/218)) ([5b38622](https://github.com/posit-dev/ptd/commit/5b38622aa5f87fdd06681d0de6cdaa2839513fbf))
+
 ## [1.34.2](https://github.com/posit-dev/ptd/compare/v1.34.1...v1.34.2) (2026-06-29)
 
 
