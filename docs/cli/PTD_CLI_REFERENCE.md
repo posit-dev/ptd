@@ -262,9 +262,6 @@ Common workload steps (in order):
    - Configures individual Posit Team sites
    - Requires: Kubernetes cluster access
    - Requires: Proxy connection
-10. `persistent_reprise` - Final persistent resource updates
-    - Re-runs persistent step to update secrets with final state
-    - Updates workload secrets and control room mimir passwords
 
 Common control room steps (in order):
 1. `workspaces` - Workspace configuration

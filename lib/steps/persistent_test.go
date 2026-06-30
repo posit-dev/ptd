@@ -83,12 +83,10 @@ func baseAWSWorkloadPersistentParams() awsWorkloadPersistentParams {
 		compoundName:        cn,
 		prefix:              "ptd",
 		accountID:           "123456789012",
-		callerARN:           "arn:aws:sts::123456789012:assumed-role/admin/x",
 		region:              "us-east-2",
 		environment:         "staging",
 		vpcCIDR:             "10.42.0.0/16",
 		iamPermissionsBound: "arn:aws:iam::123456789012:policy/PositTeamDedicatedAdmin",
-		oidcURLTails:        []string{"oidc.eks.us-east-2.amazonaws.com/id/ABCDEF"},
 		requiredTags: map[string]string{
 			"posit.team/true-name":   "demo01",
 			"posit.team/environment": "staging",
@@ -157,21 +155,33 @@ func TestAWSWorkloadPersistentDeploy_GreenfieldMultiAZ(t *testing.T) {
 		cn + "-" + cn + "-loki-bucket",
 		cn + "-mimir",
 		params.teamOperatorPolicyName,
-		params.lbcRoleName,
-		params.lbcPolicyName,
-		params.externalDNSRoleName,
-		params.traefikForwardAuthRoleName,
-		params.mimirRoleName,
-		params.lokiRoleName,
-		params.ebsCsiRoleName,
-		params.alloyRoleName,
 		params.fsxNfsSGName,
 		"eks-nodes-fsx-nfs.posit.team",
-		"aws-fsx-openzfs-csi-driver.posit.team",
 		cn + "-filesystem", // multi-AZ default → MULTI_AZ_1
 		cn + "-bastion",
 	} {
 		assert.Truef(t, names[want], "expected resource with logical name %q to be created", want)
+	}
+
+	// The 8 workload-scoped IRSA roles moved to the eks step — persistent must no
+	// longer create them (see deployWorkloadIRSARoles in eks_irsa_aws.go).
+	for _, gone := range []string{
+		"aws-fsx-openzfs-csi-driver.posit.team", // FSx role logical name
+		params.lbcRoleName,
+		params.lbcPolicyName,
+		params.externalDNSRoleName,
+		params.dnsUpdatePolicyName,
+		params.traefikForwardAuthRoleName,
+		params.traefikForwardAuthReadSecretsPolicy,
+		params.mimirRoleName,
+		params.mimirS3BucketPolicyName,
+		params.lokiRoleName,
+		params.lokiS3BucketPolicyName,
+		params.ebsCsiRoleName,
+		params.alloyRoleName,
+		params.alloyPolicyName,
+	} {
+		assert.Falsef(t, names[gone], "IRSA resource %q must NOT be created by persistent (moved to eks)", gone)
 	}
 }
 

@@ -34,7 +34,6 @@ var WorkloadSteps = []Step{
 	&ClustersStep{},
 	&HelmStep{},
 	&SitesStep{},
-	&PersistentRepriseStep{},
 }
 
 func Names(steps []Step) (names []string) {

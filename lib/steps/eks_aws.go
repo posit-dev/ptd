@@ -71,6 +71,16 @@ type awsEKSParams struct {
 	tailscaleEnabled           bool
 	// accountID is the workload AWS account id (for IRSA + admin/poweruser ARNs).
 	accountID string
+	// callerARN is the deploying identity's ARN (aws.GetCallerIdentity().Arn). It
+	// is the fallback Principal.AWS for the IRSA trust policy when no OIDC issuer
+	// is available; in the eks step the cluster always exists, so this is only a
+	// parity safeguard. Mirrors the persistent step's callerARN.
+	callerARN string
+	// workloadIRSA holds the data needed to build the 8 workload-scoped IRSA roles
+	// (FSx, LBC, ExternalDNS, TraefikForwardAuth, Mimir, Loki, EBS-CSI, Alloy) in
+	// phase 2 of the deploy, after every cluster's OIDC provider is created. These
+	// roles moved here from the persistent step (see persistent_reprise removal).
+	workloadIRSA workloadIRSAParams
 	// region is duplicated above; credentials is needed for the EFS mount-target
 	// SG attach side effect.
 	credentials *aws.Credentials
@@ -263,6 +273,16 @@ func (s *EKSStep) runAWSInlineGo(ctx context.Context) error {
 		adminRoleARN = cfg.CustomRole.RoleArn
 	}
 
+	// callerARN: the deploying identity's ARN, used only as the IRSA trust
+	// fallback principal when no OIDC issuer is available (mirrors the persistent
+	// step). Best-effort: an empty string is harmless because the eks cluster
+	// always produces an OIDC issuer, so the fallback branch is never taken.
+	caller, callerErr := aws.GetCallerIdentity(ctx)
+	callerARN := ""
+	if callerErr == nil && caller.Arn != nil {
+		callerARN = *caller.Arn
+	}
+
 	// protect_persistent_resources defaults True in Python (aws_eks_cluster.py) and
 	// is never set false in any ptd.yaml. The Go config field is a plain bool, so an
 	// absent value would resolve to false and UNPROTECT the OIDC provider — force it
@@ -284,7 +304,17 @@ func (s *EKSStep) runAWSInlineGo(ctx context.Context) error {
 		thirdPartyTelemetry:        cfg.IsThirdPartyTelemetryEnabled(),
 		clusters:                   cfg.Clusters,
 		perCluster:                 perCluster,
+		callerARN:                  callerARN,
 	}
+	// Source ExternalDNS hosted-zone ids from the persistent step's
+	// hosted_zone_name_servers stack output (the created/adopted zone ids it
+	// already exports), so the workload IRSA ExternalDNS policy ARNs are
+	// byte-identical to persistent's with no route53 lookup. persistent always
+	// runs (and writes this output) before eks; a missing output is surfaced as an
+	// error in the phase-2 ExternalDNS builder (mirrors the bastion_id ordering
+	// constraint). Pre-fetched here, NOT inside the pulumi program.
+	siteZoneIDs, zonesPresent := persistentSiteZoneIDs(ctx, s.DstTarget)
+	params.workloadIRSA = buildWorkloadIRSAParams(params, irsaConfigFromWorkload(cfg), siteZoneIDs, zonesPresent)
 
 	stack, err := createStack(ctx, s.Name(), s.DstTarget, func(pctx *awspulumi.Context, target types.Target) error {
 		return awsEKSDeploy(pctx, target, params)
@@ -332,6 +362,10 @@ func awsEKSDeploy(ctx *awspulumi.Context, _ types.Target, params awsEKSParams) e
 		releases = append(releases, r)
 	}
 	sort.Strings(releases)
+
+	// Phase 1 accumulates each cluster's OIDC provider URL so the workload-scoped
+	// IRSA roles (phase 2) can build their trust policy from the cluster issuers.
+	var oidcURLs []awspulumi.StringOutput
 
 	for _, release := range releases {
 		spec := params.clusters[release].Spec
@@ -471,6 +505,26 @@ func awsEKSDeploy(ctx *awspulumi.Context, _ types.Target, params awsEKSParams) e
 		if err := eksCluster.Err(); err != nil {
 			return err
 		}
+
+		// Accumulate this cluster's OIDC provider URL for the phase-2 IRSA trust.
+		if oidc := eksCluster.OidcProvider(); oidc != nil {
+			oidcURLs = append(oidcURLs, oidc.Url)
+		}
+	}
+
+	// Append any extra_cluster_oidc_urls (configured external issuers). persistent
+	// previously folded these into the IRSA trust (cfg.ExtraClusterOidcUrls); the
+	// trust builder strips scheme + sorts, so adding them here keeps the trust
+	// deterministic and byte-identical for workloads that set the field.
+	for _, u := range params.workloadIRSA.extraClusterOidcURLs {
+		oidcURLs = append(oidcURLs, awspulumi.String(u).ToStringOutput())
+	}
+
+	// Phase 2: create the 8 workload-scoped IRSA roles ONCE, with a trust policy
+	// built from every cluster's OIDC issuer. These roles moved here from the
+	// persistent step (persistent_reprise removal).
+	if err := deployWorkloadIRSARoles(ctx, params.workloadIRSA, oidcURLs); err != nil {
+		return err
 	}
 
 	return nil
