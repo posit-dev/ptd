@@ -273,15 +273,19 @@ func (s *EKSStep) runAWSInlineGo(ctx context.Context) error {
 		adminRoleARN = cfg.CustomRole.RoleArn
 	}
 
-	// callerARN: the deploying identity's ARN, used only as the IRSA trust
-	// fallback principal when no OIDC issuer is available (mirrors the persistent
-	// step). Best-effort: an empty string is harmless because the eks cluster
-	// always produces an OIDC issuer, so the fallback branch is never taken.
+	// callerARN: the deploying identity's ARN, used as the IRSA trust fallback
+	// principal when no OIDC issuer is available (mirrors the persistent step). A
+	// failed lookup (or a nil ARN) is a hard error: an empty Principal ARN would
+	// produce an invalid IAM trust policy, so we refuse to proceed rather than
+	// emit one.
 	caller, callerErr := aws.GetCallerIdentity(ctx)
-	callerARN := ""
-	if callerErr == nil && caller.Arn != nil {
-		callerARN = *caller.Arn
+	if callerErr != nil {
+		return fmt.Errorf("eks: failed to get caller identity: %w", callerErr)
 	}
+	if caller.Arn == nil {
+		return fmt.Errorf("eks: caller identity returned a nil ARN")
+	}
+	callerARN := *caller.Arn
 
 	// protect_persistent_resources defaults True in Python (aws_eks_cluster.py) and
 	// is never set false in any ptd.yaml. The Go config field is a plain bool, so an

@@ -515,6 +515,57 @@ func TestAWSEKSDeployWorkloadIRSAExternalDNSMissingOutput(t *testing.T) {
 	assert.Contains(t, err.Error(), "hosted_zone_name_servers")
 }
 
+// TestAWSEKSDeployWorkloadIRSAExternalDNSHostedZoneManagementOff locks the
+// documented hosted-zone-management-off state: with ExternalDNS enabled but
+// HostedZoneManagementEnabled=false (and the persistent zone output present but
+// empty), the external-dns role + dns-update policy are still created, but the
+// policy's route53:ChangeResourceRecordSets statement grants NO zone ARNs — its
+// Resource is an empty list (present, not null/missing).
+func TestAWSEKSDeployWorkloadIRSAExternalDNSHostedZoneManagementOff(t *testing.T) {
+	params := newTestEKSParams()
+	// zoneOutputPresent=true (export exists) but empty, and hosted-zone management
+	// off → persistent created no zones, so ChangeResourceRecordSets lists nothing.
+	params.workloadIRSA = buildWorkloadIRSAParams(params, awsWorkloadConfigForIRSA{
+		ExternalDNSEnabled:          true,
+		HostedZoneManagementEnabled: false,
+	}, map[string]string{}, true)
+
+	mocks := &eksStepMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return awsEKSDeploy(ctx, mockAWSWorkloadTarget("wl01-staging"), params)
+	}, pulumi.WithMocks("ptd-aws-workload-eks", "wl01-staging", mocks))
+	require.NoError(t, err)
+
+	// The external-dns role and dns-update policy ARE created even with hosted-zone
+	// management off (they just grant no zone ARNs).
+	assert.NotNil(t, mocks.findResource("external-dns.wl01-staging.posit.team"))
+	dnsPolicy := mocks.findResource("dns-update.wl01-staging.posit.team")
+	require.NotNil(t, dnsPolicy)
+
+	// Parse the policy and assert the ChangeResourceRecordSets statement's Resource
+	// is an empty list — present (not null/missing), with zero ARNs.
+	var doc struct {
+		Statement []struct {
+			Action   []string `json:"Action"`
+			Resource []string `json:"Resource"`
+		} `json:"Statement"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(dnsPolicy.Inputs["policy"].StringValue()), &doc))
+
+	var found bool
+	for _, st := range doc.Statement {
+		if len(st.Action) == 1 && st.Action[0] == "route53:ChangeResourceRecordSets" {
+			found = true
+			require.NotNil(t, st.Resource, "ChangeResourceRecordSets Resource must be present (empty list, not null)")
+			assert.Empty(t, st.Resource, "ChangeResourceRecordSets Resource must be an empty list when hosted-zone management is off")
+		}
+	}
+	require.True(t, found, "expected a route53:ChangeResourceRecordSets statement in the dns-update policy")
+
+	// The empty list serializes as "Resource":[] (present, not null/absent).
+	assert.Contains(t, dnsPolicy.Inputs["policy"].StringValue(), `"Resource":[]`)
+}
+
 // TestAWSEKSDeployWorkloadIRSATrustBoundToOIDC confirms an IRSA role's trust
 // policy is built from the cluster OIDC issuer (the Output-aware path), federating
 // the OIDC provider and constraining the expected service-account subject.

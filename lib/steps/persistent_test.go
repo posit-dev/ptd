@@ -106,24 +106,10 @@ func baseAWSWorkloadPersistentParams() awsWorkloadPersistentParams {
 			},
 			Clusters: map[string]types.AWSWorkloadClusterConfig{},
 		},
-		teamOperatorPolicyName:              "team-operator." + cn + ".posit.team",
-		fsxOpenzfsRoleName:                  "aws-fsx-openzfs-csi-driver." + cn + ".posit.team",
-		fsxNfsSGName:                        "fsx-nfs." + cn + ".posit.team",
-		lbcRoleName:                         "aws-load-balancer-controller." + cn + ".posit.team",
-		lbcPolicyName:                       "lbc." + cn + ".posit.team",
-		externalDNSRoleName:                 "external-dns." + cn + ".posit.team",
-		dnsUpdatePolicyName:                 "dns-update." + cn + ".posit.team",
-		traefikForwardAuthRoleName:          "traefik-forward-auth." + cn + ".posit.team",
-		traefikForwardAuthReadSecretsPolicy: "traefik-forward-auth-read-secrets." + cn + ".posit.team",
-		mimirRoleName:                       "mimir." + cn + ".posit.team",
-		mimirS3BucketName:                   cn + "-mimir",
-		mimirS3BucketPolicyName:             "mimir-s3-bucket." + cn + ".posit.team",
-		lokiRoleName:                        "loki." + cn + ".posit.team",
-		lokiS3BucketName:                    cn + "-loki",
-		lokiS3BucketPolicyName:              "loki-s3-bucket." + cn + ".posit.team",
-		ebsCsiRoleName:                      "aws-ebs-csi." + cn + ".posit.team",
-		alloyRoleName:                       "alloy." + cn + ".posit.team",
-		alloyPolicyName:                     "alloy." + cn + ".posit.team",
+		teamOperatorPolicyName: "team-operator." + cn + ".posit.team",
+		fsxNfsSGName:           "fsx-nfs." + cn + ".posit.team",
+		mimirS3BucketName:      cn + "-mimir",
+		lokiS3BucketName:       cn + "-loki",
 	}
 }
 
@@ -164,22 +150,25 @@ func TestAWSWorkloadPersistentDeploy_GreenfieldMultiAZ(t *testing.T) {
 	}
 
 	// The 8 workload-scoped IRSA roles moved to the eks step — persistent must no
-	// longer create them (see deployWorkloadIRSARoles in eks_irsa_aws.go).
+	// longer create them (see deployWorkloadIRSARoles in eks_irsa_aws.go). The
+	// IRSA role/policy name fields were removed from awsWorkloadPersistentParams
+	// along with the roles, so the expected names are spelled out as literals here
+	// (they must match the names the eks step now uses in eks_irsa_aws.go).
 	for _, gone := range []string{
-		"aws-fsx-openzfs-csi-driver.posit.team", // FSx role logical name
-		params.lbcRoleName,
-		params.lbcPolicyName,
-		params.externalDNSRoleName,
-		params.dnsUpdatePolicyName,
-		params.traefikForwardAuthRoleName,
-		params.traefikForwardAuthReadSecretsPolicy,
-		params.mimirRoleName,
-		params.mimirS3BucketPolicyName,
-		params.lokiRoleName,
-		params.lokiS3BucketPolicyName,
-		params.ebsCsiRoleName,
-		params.alloyRoleName,
-		params.alloyPolicyName,
+		"aws-fsx-openzfs-csi-driver.posit.team",                   // FSx role logical name
+		"aws-fsx-openzfs-csi-driver." + cn + ".posit.team",        // FSx CSI driver role
+		"aws-load-balancer-controller." + cn + ".posit.team",      // lbc role
+		"lbc." + cn + ".posit.team",                               // lbc policy
+		"external-dns." + cn + ".posit.team",                      // external-dns role
+		"dns-update." + cn + ".posit.team",                        // dns-update policy
+		"traefik-forward-auth." + cn + ".posit.team",              // traefik-forward-auth role
+		"traefik-forward-auth-read-secrets." + cn + ".posit.team", // traefik-forward-auth read-secrets policy
+		"mimir." + cn + ".posit.team",                             // mimir role
+		"mimir-s3-bucket." + cn + ".posit.team",                   // mimir s3 bucket policy
+		"loki." + cn + ".posit.team",                              // loki role
+		"loki-s3-bucket." + cn + ".posit.team",                    // loki s3 bucket policy
+		"aws-ebs-csi." + cn + ".posit.team",                       // ebs-csi role
+		"alloy." + cn + ".posit.team",                             // alloy role + policy (same name)
 	} {
 		assert.Falsef(t, names[gone], "IRSA resource %q must NOT be created by persistent (moved to eks)", gone)
 	}

@@ -70,25 +70,14 @@ type awsWorkloadPersistentParams struct {
 
 	vpcCIDR string // resolved VPC CIDR string
 
-	// IAM resource names (from AWSWorkload naming properties)
-	teamOperatorPolicyName              string
-	fsxOpenzfsRoleName                  string
-	fsxNfsSGName                        string
-	lbcRoleName                         string
-	lbcPolicyName                       string
-	externalDNSRoleName                 string
-	dnsUpdatePolicyName                 string
-	traefikForwardAuthRoleName          string
-	traefikForwardAuthReadSecretsPolicy string
-	mimirRoleName                       string
-	mimirS3BucketName                   string
-	mimirS3BucketPolicyName             string
-	lokiRoleName                        string
-	lokiS3BucketName                    string
-	lokiS3BucketPolicyName              string
-	ebsCsiRoleName                      string
-	alloyRoleName                       string
-	alloyPolicyName                     string
+	// IAM / S3 resource names still consumed by the persistent deploy. The IRSA
+	// role/policy name fields moved to the eks step (eks_irsa_aws.go) along with the
+	// roles themselves; only the team-operator policy, the FSx NFS SG, and the
+	// Mimir/Loki S3 bucket names (the buckets persistent still owns) remain here.
+	teamOperatorPolicyName string
+	fsxNfsSGName           string
+	mimirS3BucketName      string
+	lokiS3BucketName       string
 }
 
 // existingPersistentDBIdentifier reads this target's persistent stack "db"
@@ -213,35 +202,21 @@ func (s *PersistentStep) runAWSInlineGo(ctx context.Context, creds types.Credent
 	}
 
 	params := awsWorkloadPersistentParams{
-		compoundName:                        compoundName,
-		prefix:                              "ptd",
-		accountID:                           accountID,
-		region:                              s.DstTarget.Region(),
-		environment:                         environment,
-		existingDBIdentifier:                existingPersistentDBIdentifier(ctx, s.DstTarget),
-		resolvedPrivateSubnetIDs:            resolvedPrivateSubnetIDs,
-		cfg:                                 cfg,
-		requiredTags:                        requiredTags,
-		iamPermissionsBound:                 fmt.Sprintf("arn:aws:iam::%s:policy/PositTeamDedicatedAdmin", accountID),
-		vpcCIDR:                             vpcCIDR,
-		teamOperatorPolicyName:              fmt.Sprintf("team-operator.%s.posit.team", compoundName),
-		fsxOpenzfsRoleName:                  fmt.Sprintf("aws-fsx-openzfs-csi-driver.%s.posit.team", compoundName),
-		fsxNfsSGName:                        fmt.Sprintf("fsx-nfs.%s.posit.team", compoundName),
-		lbcRoleName:                         fmt.Sprintf("aws-load-balancer-controller.%s.posit.team", compoundName),
-		lbcPolicyName:                       fmt.Sprintf("lbc.%s.posit.team", compoundName),
-		externalDNSRoleName:                 fmt.Sprintf("external-dns.%s.posit.team", compoundName),
-		dnsUpdatePolicyName:                 fmt.Sprintf("dns-update.%s.posit.team", compoundName),
-		traefikForwardAuthRoleName:          fmt.Sprintf("traefik-forward-auth.%s.posit.team", compoundName),
-		traefikForwardAuthReadSecretsPolicy: fmt.Sprintf("traefik-forward-auth-read-secrets.%s.posit.team", compoundName),
-		mimirRoleName:                       fmt.Sprintf("mimir.%s.posit.team", compoundName),
-		mimirS3BucketName:                   fmt.Sprintf("%s-mimir", compoundName),
-		mimirS3BucketPolicyName:             fmt.Sprintf("mimir-s3-bucket.%s.posit.team", compoundName),
-		lokiRoleName:                        fmt.Sprintf("loki.%s.posit.team", compoundName),
-		lokiS3BucketName:                    fmt.Sprintf("%s-loki", compoundName),
-		lokiS3BucketPolicyName:              fmt.Sprintf("loki-s3-bucket.%s.posit.team", compoundName),
-		ebsCsiRoleName:                      fmt.Sprintf("aws-ebs-csi.%s.posit.team", compoundName),
-		alloyRoleName:                       fmt.Sprintf("alloy.%s.posit.team", compoundName),
-		alloyPolicyName:                     fmt.Sprintf("alloy.%s.posit.team", compoundName),
+		compoundName:             compoundName,
+		prefix:                   "ptd",
+		accountID:                accountID,
+		region:                   s.DstTarget.Region(),
+		environment:              environment,
+		existingDBIdentifier:     existingPersistentDBIdentifier(ctx, s.DstTarget),
+		resolvedPrivateSubnetIDs: resolvedPrivateSubnetIDs,
+		cfg:                      cfg,
+		requiredTags:             requiredTags,
+		iamPermissionsBound:      fmt.Sprintf("arn:aws:iam::%s:policy/PositTeamDedicatedAdmin", accountID),
+		vpcCIDR:                  vpcCIDR,
+		teamOperatorPolicyName:   fmt.Sprintf("team-operator.%s.posit.team", compoundName),
+		fsxNfsSGName:             fmt.Sprintf("fsx-nfs.%s.posit.team", compoundName),
+		mimirS3BucketName:        fmt.Sprintf("%s-mimir", compoundName),
+		lokiS3BucketName:         fmt.Sprintf("%s-loki", compoundName),
 	}
 
 	stack, err := createStack(ctx, s.Name(), s.DstTarget, func(pctx *pulumi.Context, target types.Target) error {
