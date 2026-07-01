@@ -50,11 +50,10 @@ ptd ensure {{.WorkloadName}} --only-steps <step>
 | bootstrap | Initial setup only; rarely re-run | S3 state bucket, KMS key, IAM bootstrap roles |
 | persistent | VPC, RDS, S3, FSx, IAM, DNS, or TLS changes | VPC, subnets, RDS instance, S3 buckets, FSx filesystem, IAM roles, Route53 zones, ACM certificates |
 | postgres_config | Database user/grant changes | PostgreSQL users, databases, grants |
-| eks | Cluster or node group changes | EKS cluster, managed node groups, OIDC provider, storage classes |
+| eks | Cluster, node group, or workload IRSA role changes | EKS cluster, managed node groups, OIDC provider, storage classes, workload IRSA roles + policies |
 | clusters | Namespace, RBAC, operator, or ingress controller changes | K8s namespaces, network policies, IAM-to-K8s bindings, Team Operator, Traefik |
 | helm | Monitoring or CSI driver changes | Loki, Grafana, Mimir, Alloy, Secrets Store CSI |
 | sites | Product deployment, ingress, or site config changes | TeamSite CRDs, ingress resources, site-specific configuration |
-| persistent_reprise | After eks/cluster changes; run as the final pass | Second persistent pass — completes IRSA trust policies against the cluster OIDC issuer and refreshes the workload secret |
 {{- else}}
 | bootstrap | Initial setup only; rarely re-run | Blob state container, Key Vault encryption key |
 | persistent | VNet, PostgreSQL, storage, Key Vault, or identity changes | VNet, Azure PostgreSQL, storage accounts, NetApp Files, Key Vault, managed identities, NSGs |
@@ -63,7 +62,6 @@ ptd ensure {{.WorkloadName}} --only-steps <step>
 | clusters | Namespace, RBAC, operator, ingress controller, or cert-manager changes | K8s namespaces, network policies, workload identity bindings, Team Operator, Traefik, cert-manager (when ` + "`use_lets_encrypt`" + ` is enabled) |
 | helm | Monitoring or CSI driver changes | Loki, Grafana, Mimir, Alloy, Secrets Store CSI |
 | sites | Product deployment, ingress, or site config changes | TeamSite CRDs, ingress resources, site-specific configuration |
-| persistent_reprise | After aks/cluster changes; run as the final pass | Second persistent pass — completes workload identity federation against the cluster OIDC issuer and refreshes the workload secret |
 {{- end}}
 
 ## Scaling Product Replicas
@@ -408,10 +406,9 @@ ptd ensure {{.WorkloadName}} --only-steps aks --refresh
 ptd ensure {{.WorkloadName}} --only-steps clusters --refresh
 ptd ensure {{.WorkloadName}} --only-steps helm --refresh
 ptd ensure {{.WorkloadName}} --only-steps sites --refresh
-ptd ensure {{.WorkloadName}} --only-steps persistent_reprise --refresh
 ` + "```" + `
 
-A rebuilt cluster has a new OIDC issuer, so the final ` + "`persistent_reprise`" + ` step is required to re-establish {{if eq .Cloud "aws"}}IRSA trust policies{{else}}workload identity federation{{end}} against the new issuer and refresh the workload secret.
+A rebuilt cluster has a new OIDC issuer. {{if eq .Cloud "aws"}}The workload IRSA roles now live in the ` + "`eks`" + ` step and build their trust policy from the cluster OIDC provider, so ` + "`eks --refresh`" + ` above re-establishes IRSA trust against the new issuer.{{else}}Workload identity federation is established by the ` + "`clusters`" + ` and ` + "`helm`" + ` steps above, which bind the federated credentials to the new issuer.{{end}} No separate final pass is needed (the former ` + "`persistent_reprise`" + ` step was removed).
 
 ### Partial Failure (Node Groups)
 

@@ -255,7 +255,7 @@ func TestRunbook_DayToDayOps_AWS_StepTable(t *testing.T) {
 
 	ops := results["day-to-day-ops.md"]
 
-	for _, step := range []string{"bootstrap", "persistent", "postgres_config", "eks", "clusters", "helm", "sites", "persistent_reprise"} {
+	for _, step := range []string{"bootstrap", "persistent", "postgres_config", "eks", "clusters", "helm", "sites"} {
 		assert.Contains(t, ops, "| "+step+" |", "step table should contain %s", step)
 	}
 }
@@ -266,7 +266,7 @@ func TestRunbook_DayToDayOps_Azure_StepTable(t *testing.T) {
 
 	ops := results["day-to-day-ops.md"]
 
-	for _, step := range []string{"bootstrap", "persistent", "postgres_config", "aks", "clusters", "helm", "sites", "persistent_reprise"} {
+	for _, step := range []string{"bootstrap", "persistent", "postgres_config", "aks", "clusters", "helm", "sites"} {
 		assert.Contains(t, ops, "| "+step+" |", "step table should contain %s", step)
 	}
 	assert.NotContains(t, ops, "| eks |", "Azure runbook should not contain eks step")
