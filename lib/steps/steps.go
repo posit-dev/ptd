@@ -81,7 +81,7 @@ func ResolveStackStep(step string, controlRoom bool, cloudProvider types.CloudPr
 			continue
 		}
 
-		name, ok := sel.NameForProvider(cloudProvider)
+		name, ok := sel.nameForProvider(cloudProvider)
 		if !ok {
 			continue
 		}

@@ -27,10 +27,10 @@ func (s *selector) Name() string {
 	return s.name
 }
 
-// NameForProvider returns the name of the underlying step delegated to for
+// nameForProvider returns the name of the underlying step delegated to for
 // the given cloud provider, e.g. resolving the "kubernetes" selector to
 // "eks" or "aks" depending on the target.
-func (s *selector) NameForProvider(cloudProvider types.CloudProvider) (string, bool) {
+func (s *selector) nameForProvider(cloudProvider types.CloudProvider) (string, bool) {
 	step, ok := s.steps[cloudProvider]
 	if !ok {
 		return "", false
