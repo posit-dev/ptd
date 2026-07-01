@@ -61,6 +61,43 @@ func ValidStep(step string, controlRoom bool) bool {
 	return false
 }
 
+// ResolveStackStep resolves a step name to the name of the step that actually
+// owns the Pulumi stack for the given cloud provider. Most steps map to
+// themselves, but selector-based steps (e.g. "kubernetes") delegate to a
+// different underlying step per cloud provider (e.g. "eks" or "aks"). Naming
+// the underlying step directly (e.g. "eks") also resolves to itself.
+func ResolveStackStep(step string, controlRoom bool, cloudProvider types.CloudProvider) (string, bool) {
+	standardSteps := WorkloadSteps
+	if controlRoom {
+		standardSteps = ControlRoomSteps
+	}
+
+	for _, s := range standardSteps {
+		sel, ok := s.(*selector)
+		if !ok {
+			if s.Name() == step {
+				return s.Name(), true
+			}
+			continue
+		}
+
+		name, ok := sel.nameForProvider(cloudProvider)
+		if !ok {
+			continue
+		}
+
+		// Match either the selector's own name (e.g. "kubernetes") or the
+		// name of the step it resolves to for this cloud provider (e.g.
+		// "eks" on AWS, "aks" on Azure). Naming a step for the wrong cloud
+		// provider (e.g. "eks" on an Azure target) does not resolve.
+		if s.Name() == step || name == step {
+			return name, true
+		}
+	}
+
+	return "", false
+}
+
 func InvalidSteps(steps []string, controlRoom bool) error {
 	for _, step := range steps {
 		if !ValidStep(step, controlRoom) {
