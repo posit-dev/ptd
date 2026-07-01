@@ -1,3 +1,10 @@
+## [1.35.1](https://github.com/posit-dev/ptd/compare/v1.35.0...v1.35.1) (2026-07-01)
+
+
+### Bug Fixes
+
+* resolve kubernetes step alias to eks/aks in workon ([983c0b1](https://github.com/posit-dev/ptd/commit/983c0b1009f73769151c0ae88740016104e173dc))
+
 # [1.35.0](https://github.com/posit-dev/ptd/compare/v1.34.2...v1.35.0) (2026-06-29)
 
 
