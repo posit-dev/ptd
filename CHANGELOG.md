@@ -1,3 +1,10 @@
+## [1.35.2](https://github.com/posit-dev/ptd/compare/v1.35.1...v1.35.2) (2026-07-06)
+
+
+### Bug Fixes
+
+* **lib:** bump pdfcpu to v0.13.0 to remediate uncontrolled-recursion advisories ([aefb2a3](https://github.com/posit-dev/ptd/commit/aefb2a30309d41fcb7f661e71924326ce4eea4a2)), closes [Hi#severity](https://github.com/Hi/issues/severity)
+
 ## [1.35.1](https://github.com/posit-dev/ptd/compare/v1.35.0...v1.35.1) (2026-07-01)
 
 
