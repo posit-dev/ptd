@@ -139,6 +139,108 @@ groups:
           labels:
             opsgenie: "1"
           isPaused: false
+        - uid: launcher_pod_pending
+          title: Launcher Pod Pending
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                datasource:
+                    type: prometheus
+                    uid: mimir
+                editorMode: code
+                expr: count by (cluster, namespace, pod, label_launcher_instance_id)((kube_pod_status_phase{namespace="posit-team",phase="Pending"} == 1) * on (namespace, pod) group_left(label_launcher_instance_id) kube_pod_labels{label_launcher_instance_id=~".+"})
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params: []
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - B
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                reducer: last
+                refId: B
+                type: reduce
+            - refId: C
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: B
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: OK
+          execErrState: Error
+          for: 5m
+          annotations:
+            summary: "🟡 WARNING: Launcher Pod Pending"
+            description: |
+              A launcher-spawned pod (Workbench session or Connect content) has
+              been stuck in Pending for 5+ minutes. Likely unschedulable —
+              insufficient node resources / failed scale-up, or a blocked PVC /
+              volume mount.
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+              Namespace:   {{ $labels.namespace }}
+              Pod:         {{ $labels.pod }}
+              Launcher:    {{ $labels.label_launcher_instance_id }}
+
+              ─── DETAILS ─────────────────────────
+              Status:      Pending
+              Duration:    5 minutes
+              Triage:      kubectl describe pod {{ $labels.pod }} -n {{ $labels.namespace }}
+                           (check Events for FailedScheduling / volume errors)
+
+          isPaused: false
         - uid: DeploymentReplicaMismatch
           title: Deployment Replicas Mismatch
           condition: C
