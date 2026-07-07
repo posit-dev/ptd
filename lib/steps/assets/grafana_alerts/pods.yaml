@@ -34,6 +34,8 @@ deleteRules:
       uid: PodNotHealthy
     - orgId: 1
       uid: PodRestarts
+    - orgId: 1
+      uid: launcher_pod_pending
 groups:
     - orgId: 1
       name: Pods
@@ -240,6 +242,8 @@ groups:
               Triage:      kubectl describe pod {{ $labels.pod }} -n {{ $labels.namespace }}
                            (check Events for FailedScheduling / volume errors)
 
+          labels:
+            opsgenie: "1"
           isPaused: false
         - uid: DeploymentReplicaMismatch
           title: Deployment Replicas Mismatch
