@@ -346,7 +346,7 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 					SecurityProfile: &containerservice.AgentPoolSecurityProfileArgs{
 						EnableSecureBoot: pulumi.Bool(false),
 						EnableVTPM:       pulumi.Bool(false),
-						SshAccess:        pulumi.String("LocalUser"),
+						SshAccess:        pulumi.String(containerservice.AgentPoolSSHAccessLocalUser),
 					},
 					Tags: buildResourceTags(config.ResourceTags),
 					Type: pulumi.String(containerservice.AgentPoolTypeVirtualMachineScaleSets),
