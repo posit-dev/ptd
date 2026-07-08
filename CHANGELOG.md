@@ -1,3 +1,15 @@
+# [1.36.0](https://github.com/posit-dev/ptd/compare/v1.35.2...v1.36.0) (2026-07-08)
+
+
+### Bug Fixes
+
+* **alerts:** add deleteRules entry and opsgenie label for launcher_pod_pending ([5572b9d](https://github.com/posit-dev/ptd/commit/5572b9df8f9d9729f11d66a695f806b7ea8dadb0))
+
+
+### Features
+
+* **alerts:** add Launcher Pod Pending alert for stuck session/content pods ([aaf14fd](https://github.com/posit-dev/ptd/commit/aaf14fd3cf969d63670091642f8c85dd898017ea))
+
 ## [1.35.2](https://github.com/posit-dev/ptd/compare/v1.35.1...v1.35.2) (2026-07-06)
 
 
