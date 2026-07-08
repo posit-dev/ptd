@@ -22,6 +22,7 @@ import (
 	helmv3 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/helm/v3"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	rbacv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/rbac/v1"
+	schedulingv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/scheduling/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -625,12 +626,40 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 		}
 
 		// Traefik Helm release values — mirrors azure_traefik.py _define_helm_release
+		traefikReplicas := clusterCfg.Components.ResolveAzureComponents().TraefikDeploymentReplicas
 		traefikValues := pulumi.Map{
 			"logs": pulumi.Map{
 				"general": pulumi.Map{
 					"level": pulumi.String("DEBUG"),
 				},
 			},
+			// HA hardening: run multiple replicas spread across nodes with resource
+			// requests (Burstable QoS) and a PDB so no single node failure/saturation
+			// takes down the workload edge. The resource requests mirror the
+			// control-room Traefik; the PDB, topology-spread, and priority class are
+			// new HA hardening beyond it.
+			"deployment": pulumi.Map{
+				"replicas": pulumi.Int(traefikReplicas),
+			},
+			"resources": pulumi.Map{
+				"requests": pulumi.Map{"cpu": pulumi.String("200m"), "memory": pulumi.String("256Mi")},
+				"limits":   pulumi.Map{"cpu": pulumi.String("1000m"), "memory": pulumi.String("512Mi")},
+			},
+			"topologySpreadConstraints": pulumi.Array{
+				pulumi.Map{
+					"maxSkew":           pulumi.Int(1),
+					"topologyKey":       pulumi.String("kubernetes.io/hostname"),
+					"whenUnsatisfiable": pulumi.String("ScheduleAnyway"),
+					"labelSelector": pulumi.Map{
+						"matchLabels": pulumi.Map{"app.kubernetes.io/name": pulumi.String("traefik")},
+					},
+				},
+			},
+			"podDisruptionBudget": pulumi.Map{
+				"enabled":        pulumi.Bool(true),
+				"maxUnavailable": pulumi.Int(1),
+			},
+			"priorityClassName": pulumi.String("traefik-critical"),
 			"ports": pulumi.Map{
 				"web": pulumi.Map{
 					"redirections": pulumi.Map{
@@ -752,6 +781,25 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 		}
 		traefikValues["extraObjects"] = extraObjects
 
+		// Dedicated cluster-scoped PriorityClass so Traefik ingress pods resist
+		// eviction under node pressure. Value sits below the reserved system-*
+		// range (system-cluster-critical = 2000000000) but outranks ordinary
+		// workload pods. system-cluster-critical cannot be reused: admission
+		// restricts it to the kube-system namespace.
+		traefikPC, err := schedulingv1.NewPriorityClass(ctx, fmt.Sprintf("%s-%s-traefik-critical-priority", name, release), &schedulingv1.PriorityClassArgs{
+			Metadata: metav1.ObjectMetaArgs{
+				Name:   pulumi.String("traefik-critical"),
+				Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.azure_workload_clusters")},
+			},
+			Value:            pulumi.Int(1000000000),
+			GlobalDefault:    pulumi.Bool(false),
+			Description:      pulumi.StringPtr("High priority for workload Traefik ingress pods so they resist eviction under node pressure"),
+			PreemptionPolicy: pulumi.StringPtr("PreemptLowerPriority"),
+		}, k8sProviderOpt)
+		if err != nil {
+			return fmt.Errorf("clusters: failed to create traefik priority class for %s: %w", release, err)
+		}
+
 		_, err = helmv3.NewRelease(ctx, fmt.Sprintf("%s-%s-traefik", name, release), &helmv3.ReleaseArgs{
 			Name:      pulumi.String("traefik"),
 			Chart:     pulumi.String("traefik"),
@@ -762,7 +810,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 			},
 			Atomic: pulumi.Bool(true),
 			Values: traefikValues,
-		}, k8sProviderOpt, withTraefikAlias())
+		}, k8sProviderOpt, withTraefikAlias(), pulumi.DependsOn([]pulumi.Resource{traefikPC}))
 		if err != nil {
 			return fmt.Errorf("clusters: failed to create traefik helm release for %s: %w", release, err)
 		}

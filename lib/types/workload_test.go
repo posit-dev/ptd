@@ -376,6 +376,28 @@ func boolPtr(b bool) *bool {
 	return &b
 }
 
+func TestResolveAWSComponentsTraefikDeploymentReplicas(t *testing.T) {
+	// Default: nil components resolve to 3 replicas (HA).
+	var components AWSWorkloadClusterComponents
+	assert.Equal(t, 3, components.ResolveAWSComponents().TraefikDeploymentReplicas)
+
+	// Override: explicit value is honored.
+	five := 5
+	components.TraefikDeploymentReplicas = &five
+	assert.Equal(t, 5, components.ResolveAWSComponents().TraefikDeploymentReplicas)
+}
+
+func TestResolveAzureComponentsTraefikDeploymentReplicas(t *testing.T) {
+	// Default: unset resolves to 3 replicas (HA).
+	var components AzureWorkloadClusterComponentConfig
+	assert.Equal(t, 3, components.ResolveAzureComponents().TraefikDeploymentReplicas)
+
+	// Override: explicit value is honored.
+	two := 2
+	components.TraefikDeploymentReplicas = &two
+	assert.Equal(t, 2, components.ResolveAzureComponents().TraefikDeploymentReplicas)
+}
+
 func TestUsesEksAccessEntries(t *testing.T) {
 	cases := []struct {
 		name string

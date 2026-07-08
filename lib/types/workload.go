@@ -195,6 +195,7 @@ type AWSWorkloadClusterComponents struct {
 	// deployed in the clusters step (lib/steps/clusters_aws.go).
 	TraefikForwardAuthVersion *string `json:"traefik_forward_auth_version" yaml:"traefik_forward_auth_version"`
 	TraefikVersion            *string `json:"traefik_version" yaml:"traefik_version"`
+	TraefikDeploymentReplicas *int    `json:"traefik_deployment_replicas" yaml:"traefik_deployment_replicas"`
 	// TigeraOperatorVersion pins the Calico/Tigera operator chart version. Consumed by
 	// the eks step (Calico CNI). Mirrors Python WorkloadClusterComponentConfig.tigera_operator_version
 	// (default "3.31.4"). Resolve via TigeraOperatorVersionOrDefault.
@@ -227,6 +228,7 @@ type ResolvedAWSComponents struct {
 	SecretStoreCsiDriverVersion            string
 	SecretStoreCsiDriverAwsProviderVersion string
 	TraefikVersion                         string
+	TraefikDeploymentReplicas              int
 }
 
 func resolveString(ptr *string, def string) string {
@@ -262,6 +264,7 @@ func (c *AWSWorkloadClusterComponents) ResolveAWSComponents() ResolvedAWSCompone
 		SecretStoreCsiDriverVersion:            resolveString(c.SecretStoreCsiDriverVersion, "1.3.4"),
 		SecretStoreCsiDriverAwsProviderVersion: resolveString(c.SecretStoreCsiDriverAwsProviderVersion, "0.3.5"),
 		TraefikVersion:                         resolveString(c.TraefikVersion, "37.1.2"),
+		TraefikDeploymentReplicas:              resolveInt(c.TraefikDeploymentReplicas, 3),
 	}
 }
 
@@ -586,6 +589,9 @@ type AzureWorkloadClusterComponentConfig struct {
 	LokiVersion                              *string `yaml:"loki_version"`
 	MimirVersion                             *string `yaml:"mimir_version"`
 	NvidiaDevicePluginVersion                *string `yaml:"nvidia_device_plugin_version"`
+	// TraefikDeploymentReplicas sets the number of workload Traefik ingress replicas.
+	// Defaults to 3 for high availability (resolve via ResolveAzureComponents).
+	TraefikDeploymentReplicas *int `yaml:"traefik_deployment_replicas"`
 }
 
 // ResolvedAzureComponents is the result of resolving AzureWorkloadClusterComponentConfig with defaults applied.
@@ -597,6 +603,7 @@ type ResolvedAzureComponents struct {
 	LokiVersion               string
 	MimirVersion              string
 	NvidiaDevicePluginVersion string
+	TraefikDeploymentReplicas int
 }
 
 // ResolveAzureComponents returns the component versions with defaults applied.
@@ -609,6 +616,7 @@ func (c *AzureWorkloadClusterComponentConfig) ResolveAzureComponents() ResolvedA
 		LokiVersion:               resolveString(c.LokiVersion, "5.42.0"),
 		MimirVersion:              resolveString(c.MimirVersion, "5.2.1"),
 		NvidiaDevicePluginVersion: resolveString(c.NvidiaDevicePluginVersion, "0.17.1"),
+		TraefikDeploymentReplicas: resolveInt(c.TraefikDeploymentReplicas, 3),
 	}
 }
 
