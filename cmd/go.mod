@@ -156,7 +156,7 @@ require (
 	github.com/pulumi/pulumi-azure-native-sdk/authorization/v3 v3.16.0 // indirect
 	github.com/pulumi/pulumi-azure-native-sdk/compute/v3 v3.16.0 // indirect
 	github.com/pulumi/pulumi-azure-native-sdk/containerregistry/v3 v3.16.0 // indirect
-	github.com/pulumi/pulumi-azure-native-sdk/containerservice/v3 v3.6.1 // indirect
+	github.com/pulumi/pulumi-azure-native-sdk/containerservice/v3 v3.16.0 // indirect
 	github.com/pulumi/pulumi-azure-native-sdk/dbforpostgresql/v3 v3.16.0 // indirect
 	github.com/pulumi/pulumi-azure-native-sdk/dns/v3 v3.16.0 // indirect
 	github.com/pulumi/pulumi-azure-native-sdk/keyvault/v3 v3.14.0 // indirect

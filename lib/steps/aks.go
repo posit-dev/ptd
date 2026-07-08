@@ -174,7 +174,6 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 			"networkProfile.podCidrs",
 			"networkProfile.serviceCidrs",
 			"nodeResourceGroup",
-			"agentPoolProfiles[*].powerState",
 			"privateLinkResources",
 			"windowsProfile",
 			// Customer-enabled out-of-band (Defender for Cloud); we never set this field.
@@ -344,8 +343,13 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 					OsSKU:               pulumi.String(containerservice.OSSKUUbuntu),
 					OsType:              pulumi.String(containerservice.OSTypeLinux),
 					ScaleDownMode:       pulumi.String(containerservice.ScaleDownModeDelete),
-					Tags:                buildResourceTags(config.ResourceTags),
-					Type:                pulumi.String(containerservice.AgentPoolTypeVirtualMachineScaleSets),
+					SecurityProfile: &containerservice.AgentPoolSecurityProfileArgs{
+						EnableSecureBoot: pulumi.Bool(false),
+						EnableVTPM:       pulumi.Bool(false),
+						SshAccess:        pulumi.String(containerservice.AgentPoolSSHAccessLocalUser),
+					},
+					Tags: buildResourceTags(config.ResourceTags),
+					Type: pulumi.String(containerservice.AgentPoolTypeVirtualMachineScaleSets),
 					UpgradeSettings: &containerservice.AgentPoolUpgradeSettingsArgs{
 						MaxSurge: pulumi.String("10%"),
 					},
