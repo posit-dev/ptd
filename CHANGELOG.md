@@ -1,3 +1,11 @@
+## [1.36.1](https://github.com/posit-dev/ptd/compare/v1.36.0...v1.36.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **aks:** restore user node pool SecurityProfile and drop conflicting powerState ignore ([41d66ce](https://github.com/posit-dev/ptd/commit/41d66cedd0a871771447d39b78bcf1ff2a496913))
+* **aks:** use typed AgentPoolSSHAccess constant for SshAccess ([0ae84fc](https://github.com/posit-dev/ptd/commit/0ae84fc1e69d65749c193b1ff04e3871f2a30a48))
+
 # [1.36.0](https://github.com/posit-dev/ptd/compare/v1.35.2...v1.36.0) (2026-07-08)
 
 
