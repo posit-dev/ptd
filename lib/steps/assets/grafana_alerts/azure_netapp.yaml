@@ -82,9 +82,9 @@ groups:
               NetApp Files volume capacity utilization is above 80%
 
               ─── WHERE ───────────────────────────
-              Tenant:      {{ $labels.tenant_name }}
-              Cluster:     {{ $labels.cluster }}
-              Volume:      {{ $labels.volume }}
+              Tenant:         {{ $labels.tenant_name }}
+              Cluster:        {{ $labels.cluster }}
+              Volume:         {{ $labels.volume }}
               Resource group: {{ $labels.resourceGroup }}
 
               ─── DETAILS ─────────────────────────
@@ -154,9 +154,9 @@ groups:
               NetApp Files volume read latency is above 500ms
 
               ─── WHERE ───────────────────────────
-              Tenant:      {{ $labels.tenant_name }}
-              Cluster:     {{ $labels.cluster }}
-              Volume:      {{ $labels.volume }}
+              Tenant:         {{ $labels.tenant_name }}
+              Cluster:        {{ $labels.cluster }}
+              Volume:         {{ $labels.volume }}
               Resource group: {{ $labels.resourceGroup }}
 
               ─── DETAILS ─────────────────────────
@@ -224,9 +224,9 @@ groups:
               NetApp Files volume write latency is above 500ms
 
               ─── WHERE ───────────────────────────
-              Tenant:      {{ $labels.tenant_name }}
-              Cluster:     {{ $labels.cluster }}
-              Volume:      {{ $labels.volume }}
+              Tenant:         {{ $labels.tenant_name }}
+              Cluster:        {{ $labels.cluster }}
+              Volume:         {{ $labels.volume }}
               Resource group: {{ $labels.resourceGroup }}
 
               ─── DETAILS ─────────────────────────
