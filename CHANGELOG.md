@@ -1,3 +1,10 @@
+## [1.37.1](https://github.com/posit-dev/ptd/compare/v1.37.0...v1.37.1) (2026-07-09)
+
+
+### Bug Fixes
+
+* default team-operator chart to v1.29.0 ([e83f02d](https://github.com/posit-dev/ptd/commit/e83f02d10b031b8814bc732c81e456ba67229738))
+
 # [1.37.0](https://github.com/posit-dev/ptd/compare/v1.36.3...v1.37.0) (2026-07-09)
 
 
