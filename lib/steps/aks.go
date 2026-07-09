@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/pulumi/pulumi-azure-native-sdk/containerservice/v3"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
@@ -195,12 +194,17 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 		// Configure upgrade settings - use ForceUpgrade to bypass PDBs during maintenance
 		var upgradeSettings *containerservice.ClusterUpgradeSettingsArgs
 		if clusterConfig.ForceMaintenance {
-			// ForceUpgrade bypasses PDB constraints during cluster upgrades
-			// The 'Until' field sets when the override expires (required for it to take effect)
+			// ForceUpgrade bypasses PDB constraints during cluster upgrades.
+			// The 'Until' field sets when the override expires and must be a
+			// future timestamp for AKS to honor the override. Use a fixed
+			// far-future constant rather than a now-relative value: a stable
+			// value converges and avoids a perpetual preview diff on
+			// upgradeSettings.overrideSettings.until, while keeping ForceUpgrade
+			// permanently armed so PDBs never block a maintenance upgrade.
 			upgradeSettings = &containerservice.ClusterUpgradeSettingsArgs{
 				OverrideSettings: &containerservice.UpgradeOverrideSettingsArgs{
 					ForceUpgrade: pulumi.Bool(true),
-					Until:        pulumi.String(time.Now().Add(24 * time.Hour).Format(time.RFC3339)),
+					Until:        pulumi.String("2035-01-01T00:00:00Z"),
 				},
 			}
 		}
