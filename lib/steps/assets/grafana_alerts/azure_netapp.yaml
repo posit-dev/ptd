@@ -38,7 +38,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"}[5m])
+                expr: label_replace(last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"}[5m]), "volume", "$1", "resourceID", ".*/volumes/(.+)")
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -84,8 +84,8 @@ groups:
               ─── WHERE ───────────────────────────
               Tenant:      {{ $labels.tenant_name }}
               Cluster:     {{ $labels.cluster }}
-              Resource:    {{ $labels.resourceName}}
-              Location:    {{ $labels.location }}
+              Volume:      {{ $labels.volume }}
+              Resource group: {{ $labels.resourceGroup }}
 
               ─── DETAILS ─────────────────────────
               Metric:      Volume Capacity
@@ -110,7 +110,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagereadlatency_average_milliseconds{job="integrations/azure"}[5m])
+                expr: label_replace(last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagereadlatency_average_milliseconds{job="integrations/azure"}[5m]), "volume", "$1", "resourceID", ".*/volumes/(.+)")
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -156,8 +156,8 @@ groups:
               ─── WHERE ───────────────────────────
               Tenant:      {{ $labels.tenant_name }}
               Cluster:     {{ $labels.cluster }}
-              Resource:    {{ $labels.resourceName}}
-              Location:    {{ $labels.location }}
+              Volume:      {{ $labels.volume }}
+              Resource group: {{ $labels.resourceGroup }}
 
               ─── DETAILS ─────────────────────────
               Metric:      Read Latency
@@ -180,7 +180,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagewritelatency_average_milliseconds{job="integrations/azure"}[5m])
+                expr: label_replace(last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagewritelatency_average_milliseconds{job="integrations/azure"}[5m]), "volume", "$1", "resourceID", ".*/volumes/(.+)")
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -226,8 +226,8 @@ groups:
               ─── WHERE ───────────────────────────
               Tenant:      {{ $labels.tenant_name }}
               Cluster:     {{ $labels.cluster }}
-              Resource:    {{ $labels.resourceName}}
-              Location:    {{ $labels.location }}
+              Volume:      {{ $labels.volume }}
+              Resource group: {{ $labels.resourceGroup }}
 
               ─── DETAILS ─────────────────────────
               Metric:      Write Latency
