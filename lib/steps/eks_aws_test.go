@@ -364,6 +364,51 @@ func TestAWSEKSDeployTigeraAliasChain(t *testing.T) {
 		"urn:pulumi:"+stack+"::"+proj+"::ptd:AWSWorkloadEKS$ptd:TigeraOperator$kubernetes:core/v1:Namespace::wl01-staging-20250101-tigera-ns")
 }
 
+// TestAWSEKSDeployTigeraResourceRequests asserts the tigera-operator helm
+// release carries the Calico resource requests/limits following PTD's
+// memory-bounded, CPU-unbounded policy: memory request == limit and no CPU limit.
+func TestAWSEKSDeployTigeraResourceRequests(t *testing.T) {
+	mocks := &eksStepMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return awsEKSDeploy(ctx, mockAWSWorkloadTarget("wl01-staging"), newTestEKSParams())
+	}, pulumi.WithMocks("ptd-aws-workload-eks", "wl01-staging", mocks))
+	require.NoError(t, err)
+
+	rel := mocks.findResource("wl01-staging-20250101-tigera-operator")
+	require.NotNil(t, rel, "tigera-operator helm release not found")
+	values := rel.Inputs["values"].ObjectValue()
+
+	// containerResources digs out the resources block for the single container
+	// override under a component-deployment map (calicoNodeDaemonSet etc.).
+	containerResources := func(component resource.PropertyMap, key string) resource.PropertyMap {
+		containers := component[resource.PropertyKey(key)].ObjectValue()["spec"].ObjectValue()["template"].
+			ObjectValue()["spec"].ObjectValue()["containers"].ArrayValue()
+		require.Len(t, containers, 1)
+		return containers[0].ObjectValue()["resources"].ObjectValue()
+	}
+	// assertMemoryBounded checks CPU request set with no CPU limit, and memory
+	// request == limit at the expected value.
+	assertMemoryBounded := func(res resource.PropertyMap, wantCPU, wantMem string) {
+		requests := res["requests"].ObjectValue()
+		limits := res["limits"].ObjectValue()
+		assert.Equal(t, wantCPU, requests["cpu"].StringValue())
+		assert.Equal(t, wantMem, requests["memory"].StringValue())
+		assert.Equal(t, wantMem, limits["memory"].StringValue())
+		assert.NotContains(t, limits, resource.PropertyKey("cpu"), "CPU must be unbounded (no limit)")
+	}
+
+	installation := values["installation"].ObjectValue()
+	assertMemoryBounded(containerResources(installation, "calicoNodeDaemonSet"), "250m", "512Mi")
+	assertMemoryBounded(containerResources(installation, "typhaDeployment"), "100m", "256Mi")
+	assertMemoryBounded(containerResources(installation, "calicoKubeControllersDeployment"), "50m", "128Mi")
+
+	apiServer := values["apiServer"].ObjectValue()
+	assertMemoryBounded(containerResources(apiServer, "apiServerDeployment"), "100m", "256Mi")
+
+	// Operator pod itself.
+	assertMemoryBounded(values["resources"].ObjectValue(), "100m", "256Mi")
+}
+
 func TestAWSEKSDeployEfsEnabled(t *testing.T) {
 	params := newTestEKSParams()
 	params.clusters["20250101"] = types.AWSWorkloadClusterConfig{
