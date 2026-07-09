@@ -245,12 +245,16 @@ groups:
           data:
             - refId: A
               relativeTimeRange:
-                from: 600
+                from: 1800
                 to: 0
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_throughputlimitreached_average_count{job="integrations/azure"}[5m])
+                # avg_over_time(...[30m]) = fraction of the last 30m the volume was throttled.
+                # label_replace derives a real per-volume label from resourceID, because the
+                # exporter's resourceName label is the NetApp *account* (identical for every
+                # volume in the cluster), not the volume.
+                expr: label_replace(avg_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_throughputlimitreached_average_count{job="integrations/azure"}[30m]), "volume", "$1", "resourceID", ".*/volumes/(.+)")
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -259,14 +263,14 @@ groups:
                 refId: A
             - refId: B
               relativeTimeRange:
-                from: 600
+                from: 1800
                 to: 0
               datasourceUid: __expr__
               model:
                 conditions:
                     - evaluator:
                         params:
-                            - 0.5 # Fires when metric is 1 (limit reached)
+                            - 0.5 # Fires when throttled >50% of the 30m window (sustained, not a burst)
                         type: gt
                       operator:
                         type: and
@@ -291,17 +295,19 @@ groups:
           annotations:
             summary: "🔴 CRITICAL: Azure NetApp Files Throughput Limit Reached"
             description: |
-              NetApp Files volume has reached its throughput limit
+              NetApp Files volume has been at its throughput limit for the
+              majority of the last 30 minutes (sustained saturation, not a
+              transient burst).
 
               ─── WHERE ───────────────────────────
-              Tenant:      {{ $labels.tenant_name }}
-              Cluster:     {{ $labels.cluster }}
-              Resource:    {{ $labels.resourceName}}
-              Location:    {{ $labels.location }}
+              Tenant:         {{ $labels.tenant_name }}
+              Cluster:        {{ $labels.cluster }}
+              Volume:         {{ $labels.volume }}
+              Resource group: {{ $labels.resourceGroup }}
 
               ─── DETAILS ─────────────────────────
-              Metric:      Throughput Limit Reached (boolean)
-              Current:     Limit reached
+              Metric:      Throughput Limit Reached (fraction of 30m throttled)
+              Threshold:   >50% of a 30m window
               Duration:    5 minutes
 
               ─── ACTION ──────────────────────────
