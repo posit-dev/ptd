@@ -1,3 +1,10 @@
+## [1.36.2](https://github.com/posit-dev/ptd/compare/v1.36.1...v1.36.2) (2026-07-09)
+
+
+### Bug Fixes
+
+* **aks:** use stable far-future force-upgrade expiry to stop perpetual diff ([9bd4e0e](https://github.com/posit-dev/ptd/commit/9bd4e0e58a01592627c652b693f2f310d12b253e))
+
 ## [1.36.1](https://github.com/posit-dev/ptd/compare/v1.36.0...v1.36.1) (2026-07-08)
 
 
