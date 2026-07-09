@@ -33,7 +33,7 @@ jobs:
           use_bedrock: true
           claude_args: |
             --model us.anthropic.claude-sonnet-4-6
-            --allowedTools "Read,Glob,Grep,mcp__github__create_pending_pull_request_review,mcp__github__add_comment_to_pending_review,mcp__github__submit_pending_pull_request_review,mcp__github__get_pull_request_diff,mcp__github__get_pull_request,mcp__github__get_pull_request_files,mcp__github__get_pull_request_reviews,mcp__github__get_pull_request_review_comments"
+            --disallowedTools "Bash,Edit,Write,MultiEdit,NotebookEdit,WebFetch"
           prompt: |
             Please review this PR following the guidelines in `.claude/review-guidelines.md`. Use the GitHub review system:
 
