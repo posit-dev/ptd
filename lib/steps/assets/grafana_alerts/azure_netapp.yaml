@@ -321,27 +321,30 @@ groups:
           title: Azure NetApp Files Metrics Silent
           condition: C
           data:
-            # A cluster that was exporting NetApp metrics 24h ago but is now
-            # silent. Grouping by cluster/tenant means the fired alert *names*
-            # the cluster whose Azure Monitor scrape went dark — unlike the
-            # threshold rules above, whose NoData instances carry no labels.
-            # VolumeConsumedSizePercentage is used as the witness series because
-            # it is always present for every volume (not conditional like
-            # ThroughputLimitReached).
+            # Fires when a cluster reported NetApp metrics at some point in the
+            # last 24h (present_over_time[24h]) but has now been silent for 15m
+            # (present_over_time[15m] empty). Grouping by cluster/tenant means the
+            # alert *names* the cluster whose Azure Monitor scrape went dark —
+            # unlike the threshold rules above, whose NoData instances carry no
+            # labels. A windowed baseline (not `offset 24h`) is deliberate: a
+            # single-point offset can't cover clusters younger than 24h and would
+            # self-resolve once the outage itself is older than 24h. Volume-
+            # ConsumedSizePercentage is the witness series because it is always
+            # present for every volume (unlike the conditional ThroughputLimitReached).
             - refId: A
               relativeTimeRange:
-                from: 600
+                from: 86400
                 to: 0
               datasourceUid: mimir
               model:
                 editorMode: code
                 expr: |
                   count by (cluster, tenant_name, __tenant_id__) (
-                    azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"} offset 24h
+                    present_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"}[24h])
                   )
                   unless
                   count by (cluster, tenant_name, __tenant_id__) (
-                    azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"}
+                    present_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"}[15m])
                   )
                 instant: true
                 intervalMs: 1000
@@ -406,16 +409,17 @@ groups:
                 refId: C
                 type: threshold
           # noDataState: OK is correct here - an empty result means every cluster
-          # that reported 24h ago is still reporting (healthy). This is the
-          # attribution alert the label-less NoData pages could not provide.
+          # that reported within the last 24h is still reporting (healthy). This is
+          # the attribution alert the label-less NoData pages could not provide.
           noDataState: OK
           execErrState: Error
-          for: 10m
+          for: 5m
           annotations:
             summary: "🔴 CRITICAL: Azure NetApp Files Metrics Silent"
             description: |
-              NetApp Files metrics stopped arriving from a cluster that was
-              reporting them 24h ago. The Azure Monitor scrape (Alloy
+              NetApp Files metrics have stopped arriving from a cluster that was
+              reporting within the last 24h and has now been silent for 15+
+              minutes. The Azure Monitor scrape (Alloy
               prometheus.exporter.azure "netapp") is likely down, throttled,
               or missing credentials. While silent, the NetApp threshold
               alerts (capacity/latency/throughput) are blind for this cluster.
@@ -426,8 +430,8 @@ groups:
 
               ─── DETAILS ─────────────────────────
               Component:   Azure Monitor NetApp exporter
-              Issue:       Volume was reporting 24h ago but is now silent
-              Duration:    10 minutes
+              Issue:       Reported within 24h but now silent for 15m+
+              Duration:    silent ≥15m, sustained 5m
 
               ─── ACTION ──────────────────────────
               Check the Alloy pod on this cluster and the Azure Monitor
