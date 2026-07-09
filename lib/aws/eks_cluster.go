@@ -1108,9 +1108,15 @@ func (c *EKSCluster) WithEbsCsiDriver(roleName, version string) *EKSCluster {
 	// the default -> two default StorageClasses. Adopting the field as-is avoids the
 	// reconcile entirely. See the tracking issue for the proper long-term fix
 	// (stop using the addon's defaultStorageClass feature and own the SCs directly).
+	// serviceAccountRoleArn is also ignored: the AWS provider sets it on create/update
+	// but does not reliably read it back into state (terraform-provider-aws #19402), so
+	// Pulumi re-proposes it on every run. The role ARN is deterministic and set-once, so
+	// ignoring masks nothing real, and it avoids a per-apply addon reconcile (the same
+	// reconcile that re-asserts the default StorageClass, above). Creates are unaffected,
+	// so greenfield clusters still get the role.
 	addon, err := awseks.NewAddon(c.ctx, c.cfg.Name+"-ebs-csi", addonArgs,
 		c.clusterChildAlias("aws:eks/addon:Addon", c.cfg.Name+"-ebs-csi"),
-		pulumi.IgnoreChanges([]string{"configurationValues"}))
+		pulumi.IgnoreChanges([]string{"configurationValues", "serviceAccountRoleArn"}))
 	if err != nil {
 		c.err = fmt.Errorf("eks: failed to create EBS CSI addon for %s: %w", c.cfg.Name, err)
 		return c
@@ -1208,12 +1214,18 @@ func (c *EKSCluster) WithEfsCsiDriver(roleName string) *EKSCluster {
 		return c
 	}
 
+	// IgnoreChanges on serviceAccountRoleArn: the AWS provider sets it on create/update
+	// but does not reliably read it back into state (terraform-provider-aws #19402), so
+	// Pulumi re-proposes it on every run and each apply triggers an addon reconcile. The
+	// role ARN is deterministic and set-once, so ignoring masks nothing real. Creates are
+	// unaffected, so greenfield clusters still get the role.
 	_, err = awseks.NewAddon(c.ctx, c.cfg.Name+"-efs-csi", &awseks.AddonArgs{
 		AddonName:             pulumi.String("aws-efs-csi-driver"),
 		ClusterName:           pulumi.String(c.cfg.Name),
 		ServiceAccountRoleArn: saRole.Arn,
 		Tags:                  c.cluster.Tags,
-	}, c.clusterChildAlias("aws:eks/addon:Addon", c.cfg.Name+"-efs-csi"))
+	}, c.clusterChildAlias("aws:eks/addon:Addon", c.cfg.Name+"-efs-csi"),
+		pulumi.IgnoreChanges([]string{"serviceAccountRoleArn"}))
 	if err != nil {
 		c.err = fmt.Errorf("eks: failed to create EFS CSI addon for %s: %w", c.cfg.Name, err)
 		return c
