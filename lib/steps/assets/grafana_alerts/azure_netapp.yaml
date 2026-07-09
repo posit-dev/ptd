@@ -11,6 +11,8 @@
 #     uid: azure_netapp_write_latency_high
 #   - orgId: 1
 #     uid: azure_netapp_throughput_limit
+#   - orgId: 1
+#     uid: azure_netapp_metrics_silent
 #
 # See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
 #
@@ -305,6 +307,125 @@ groups:
               ─── ACTION ──────────────────────────
               Consider increasing the volume's service level or quota
               to provision more throughput capacity.
+
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: azure_netapp_metrics_silent
+          title: Azure NetApp Files Metrics Silent
+          condition: C
+          data:
+            # A cluster that was exporting NetApp metrics 24h ago but is now
+            # silent. Grouping by cluster/tenant means the fired alert *names*
+            # the cluster whose Azure Monitor scrape went dark — unlike the
+            # threshold rules above, whose NoData instances carry no labels.
+            # VolumeConsumedSizePercentage is used as the witness series because
+            # it is always present for every volume (not conditional like
+            # ThroughputLimitReached).
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: |
+                  count by (cluster, tenant_name, __tenant_id__) (
+                    azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"} offset 24h
+                  )
+                  unless
+                  count by (cluster, tenant_name, __tenant_id__) (
+                    azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"}
+                  )
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params: []
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - B
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                reducer: last
+                refId: B
+                type: reduce
+            - refId: C
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: B
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          # noDataState: OK is correct here - an empty result means every cluster
+          # that reported 24h ago is still reporting (healthy). This is the
+          # attribution alert the label-less NoData pages could not provide.
+          noDataState: OK
+          execErrState: Error
+          for: 10m
+          annotations:
+            summary: "🔴 CRITICAL: Azure NetApp Files Metrics Silent"
+            description: |
+              NetApp Files metrics stopped arriving from a cluster that was
+              reporting them 24h ago. The Azure Monitor scrape (Alloy
+              prometheus.exporter.azure "netapp") is likely down, throttled,
+              or missing credentials. While silent, the NetApp threshold
+              alerts (capacity/latency/throughput) are blind for this cluster.
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+
+              ─── DETAILS ─────────────────────────
+              Component:   Azure Monitor NetApp exporter
+              Issue:       Volume was reporting 24h ago but is now silent
+              Duration:    10 minutes
+
+              ─── ACTION ──────────────────────────
+              Check the Alloy pod on this cluster and the Azure Monitor
+              exporter credentials/permissions for the NetApp resource group.
 
           labels:
             opsgenie: "1"
