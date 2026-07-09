@@ -1,3 +1,10 @@
+# [1.37.0](https://github.com/posit-dev/ptd/compare/v1.36.3...v1.37.0) (2026-07-09)
+
+
+### Features
+
+* **traefik:** make workload ingress highly available and Burstable ([8acd581](https://github.com/posit-dev/ptd/commit/8acd581960dec0aa1f13f3b46da47a0a1cf13bfa))
+
 ## [1.36.3](https://github.com/posit-dev/ptd/compare/v1.36.2...v1.36.3) (2026-07-09)
 
 
