@@ -359,6 +359,92 @@ func TestAzureClustersDeployOneRelease(t *testing.T) {
 	assert.Contains(t, names, "myworkload-20250101-helm-controller-namespace")
 }
 
+// findTraefikRelease returns the traefik helm Release mock args for the given
+// resource name, or nil if not found.
+func findTraefikRelease(resources []pulumi.MockResourceArgs, name string) *pulumi.MockResourceArgs {
+	for i := range resources {
+		if resources[i].TypeToken == "kubernetes:helm.sh/v3:Release" && resources[i].Name == name {
+			return &resources[i]
+		}
+	}
+	return nil
+}
+
+func TestAzureClustersDeployTraefikHA(t *testing.T) {
+	mocks := &clustersMocks{}
+
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		params := minimalAzureClustersParams("myworkload", []string{"20250101"})
+		return azureClustersDeploy(ctx, nil, params)
+	}, pulumi.WithMocks("ptd-azure-workload-clusters", "myworkload", mocks))
+	require.NoError(t, err)
+
+	rel := findTraefikRelease(mocks.resources, "myworkload-20250101-traefik")
+	require.NotNil(t, rel, "traefik helm release not found")
+
+	values := rel.Inputs["values"].ObjectValue()
+
+	// deployment.replicas defaults to 3 (HA).
+	deployment := values["deployment"].ObjectValue()
+	assert.Equal(t, 3.0, deployment["replicas"].NumberValue())
+
+	// resources requests/limits present → Burstable QoS.
+	resources := values["resources"].ObjectValue()
+	requests := resources["requests"].ObjectValue()
+	assert.Equal(t, "200m", requests["cpu"].StringValue())
+	assert.Equal(t, "256Mi", requests["memory"].StringValue())
+	assert.Contains(t, resources, resource.PropertyKey("limits"))
+
+	// topologySpreadConstraints spread across hosts.
+	tsc := values["topologySpreadConstraints"].ArrayValue()
+	require.Len(t, tsc, 1)
+	assert.Equal(t, "kubernetes.io/hostname", tsc[0].ObjectValue()["topologyKey"].StringValue())
+
+	// podDisruptionBudget enabled.
+	pdb := values["podDisruptionBudget"].ObjectValue()
+	assert.True(t, pdb["enabled"].BoolValue())
+	assert.Equal(t, 1.0, pdb["maxUnavailable"].NumberValue())
+
+	// priorityClassName set.
+	assert.Equal(t, "traefik-critical", values["priorityClassName"].StringValue())
+
+	// Dedicated PriorityClass resource created (not an extraObject).
+	pc := findPriorityClass(mocks.resources)
+	require.NotNil(t, pc, "traefik-critical PriorityClass resource not found")
+	assert.Equal(t, "traefik-critical", pc.Inputs["metadata"].ObjectValue()["name"].StringValue())
+	assert.Equal(t, 1000000000.0, pc.Inputs["value"].NumberValue())
+}
+
+// findPriorityClass returns the first PriorityClass mock args, or nil if none.
+func findPriorityClass(resources []pulumi.MockResourceArgs) *pulumi.MockResourceArgs {
+	for i := range resources {
+		if resources[i].TypeToken == "kubernetes:scheduling.k8s.io/v1:PriorityClass" {
+			return &resources[i]
+		}
+	}
+	return nil
+}
+
+func TestAzureClustersDeployTraefikReplicasOverride(t *testing.T) {
+	mocks := &clustersMocks{}
+
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		params := minimalAzureClustersParams("myworkload", []string{"20250101"})
+		five := 5
+		cfg := params.clusters["20250101"]
+		cfg.Components.TraefikDeploymentReplicas = &five
+		params.clusters["20250101"] = cfg
+		return azureClustersDeploy(ctx, nil, params)
+	}, pulumi.WithMocks("ptd-azure-workload-clusters", "myworkload", mocks))
+	require.NoError(t, err)
+
+	rel := findTraefikRelease(mocks.resources, "myworkload-20250101-traefik")
+	require.NotNil(t, rel, "traefik helm release not found")
+
+	deployment := rel.Inputs["values"].ObjectValue()["deployment"].ObjectValue()
+	assert.Equal(t, 5.0, deployment["replicas"].NumberValue())
+}
+
 func TestAzureClustersDeployTwoReleases(t *testing.T) {
 	mocks := &clustersMocks{}
 
