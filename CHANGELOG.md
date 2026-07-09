@@ -1,3 +1,10 @@
+## [1.36.3](https://github.com/posit-dev/ptd/compare/v1.36.2...v1.36.3) (2026-07-09)
+
+
+### Bug Fixes
+
+* **eks:** ignore serviceAccountRoleArn on CSI-driver addons ([8b27364](https://github.com/posit-dev/ptd/commit/8b2736459bb2febb4b967ecd5a8b47e982111c9d)), closes [terraform-provider-aws#19402](https://github.com/terraform-provider-aws/issues/19402)
+
 ## [1.36.2](https://github.com/posit-dev/ptd/compare/v1.36.1...v1.36.2) (2026-07-09)
 
 
