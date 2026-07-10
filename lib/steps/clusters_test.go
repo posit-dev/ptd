@@ -445,6 +445,135 @@ func TestAzureClustersDeployTraefikReplicasOverride(t *testing.T) {
 	assert.Equal(t, 5.0, deployment["replicas"].NumberValue())
 }
 
+// --- Azure Traefik ingress TLS helper tests ---
+
+func TestTraefikIngressTLSEntriesDefault(t *testing.T) {
+	// Unset tls_secrets → single wildcard entry matching historical behavior.
+	entries := traefikIngressTLSEntries("myworkload", "example.com", nil)
+	require.Len(t, entries, 1)
+	assert.Equal(t, []string{"example.com", "*.example.com"}, entries[0].Hosts)
+	assert.Equal(t, "myworkload-example.com-tls", entries[0].SecretName)
+}
+
+func TestTraefikIngressTLSEntriesEmptySlice(t *testing.T) {
+	// An empty (non-nil) slice is treated the same as unset.
+	entries := traefikIngressTLSEntries("myworkload", "example.com", []types.SiteTLSSecret{})
+	require.Len(t, entries, 1)
+	assert.Equal(t, []string{"example.com", "*.example.com"}, entries[0].Hosts)
+	assert.Equal(t, "myworkload-example.com-tls", entries[0].SecretName)
+}
+
+func TestTraefikIngressTLSEntriesMultiple(t *testing.T) {
+	secrets := []types.SiteTLSSecret{
+		{Hosts: []string{"app.example.com"}, SecretName: "app-tls"},
+		{Hosts: []string{"api.example.com", "api2.example.com"}, SecretName: "api-tls"},
+		{Hosts: []string{"*.data.example.com"}, SecretName: "data-tls"},
+	}
+	entries := traefikIngressTLSEntries("myworkload", "example.com", secrets)
+	require.Len(t, entries, 3)
+
+	assert.Equal(t, []string{"app.example.com"}, entries[0].Hosts)
+	assert.Equal(t, "app-tls", entries[0].SecretName)
+
+	assert.Equal(t, []string{"api.example.com", "api2.example.com"}, entries[1].Hosts)
+	assert.Equal(t, "api-tls", entries[1].SecretName)
+
+	assert.Equal(t, []string{"*.data.example.com"}, entries[2].Hosts)
+	assert.Equal(t, "data-tls", entries[2].SecretName)
+}
+
+// findTraefikIngressExtraObject returns the Ingress extraObject (as a
+// PropertyMap) for the given site domain from a Traefik helm release, or nil.
+func findTraefikIngressExtraObject(rel *pulumi.MockResourceArgs, name, release, domain string) resource.PropertyMap {
+	extraObjects := rel.Inputs["values"].ObjectValue()["extraObjects"].ArrayValue()
+	want := fmt.Sprintf("%s-%s-%s", name, release, domain)
+	for _, obj := range extraObjects {
+		o := obj.ObjectValue()
+		kind, ok := o["kind"]
+		if !ok || kind.StringValue() != "Ingress" {
+			continue
+		}
+		if o["metadata"].ObjectValue()["name"].StringValue() == want {
+			return o
+		}
+	}
+	return nil
+}
+
+func TestAzureClustersDeployTraefikIngressDefaultTLS(t *testing.T) {
+	mocks := &clustersMocks{}
+
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		params := minimalAzureClustersParams("myworkload", []string{"20250101"})
+		params.siteDomains = []string{"example.com"}
+		return azureClustersDeploy(ctx, nil, params)
+	}, pulumi.WithMocks("ptd-azure-workload-clusters", "myworkload", mocks))
+	require.NoError(t, err)
+
+	rel := findTraefikRelease(mocks.resources, "myworkload-20250101-traefik")
+	require.NotNil(t, rel, "traefik helm release not found")
+
+	ingress := findTraefikIngressExtraObject(rel, "myworkload", "20250101", "example.com")
+	require.NotNil(t, ingress, "traefik ingress extraObject not found")
+
+	tls := ingress["spec"].ObjectValue()["tls"].ArrayValue()
+	require.Len(t, tls, 1)
+	entry := tls[0].ObjectValue()
+	hosts := entry["hosts"].ArrayValue()
+	require.Len(t, hosts, 2)
+	assert.Equal(t, "example.com", hosts[0].StringValue())
+	assert.Equal(t, "*.example.com", hosts[1].StringValue())
+	assert.Equal(t, "myworkload-example.com-tls", entry["secretName"].StringValue())
+}
+
+func TestAzureClustersDeployTraefikIngressMultipleTLS(t *testing.T) {
+	mocks := &clustersMocks{}
+
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		params := minimalAzureClustersParams("myworkload", []string{"20250101"})
+		params.siteDomains = []string{"example.com"}
+		params.siteTLSSecrets = map[string][]types.SiteTLSSecret{
+			"example.com": {
+				{Hosts: []string{"app.example.com"}, SecretName: "app-tls"},
+				{Hosts: []string{"api.example.com", "api2.example.com"}, SecretName: "api-tls"},
+				{Hosts: []string{"*.data.example.com"}, SecretName: "data-tls"},
+			},
+		}
+		return azureClustersDeploy(ctx, nil, params)
+	}, pulumi.WithMocks("ptd-azure-workload-clusters", "myworkload", mocks))
+	require.NoError(t, err)
+
+	rel := findTraefikRelease(mocks.resources, "myworkload-20250101-traefik")
+	require.NotNil(t, rel, "traefik helm release not found")
+
+	ingress := findTraefikIngressExtraObject(rel, "myworkload", "20250101", "example.com")
+	require.NotNil(t, ingress, "traefik ingress extraObject not found")
+
+	tls := ingress["spec"].ObjectValue()["tls"].ArrayValue()
+	require.Len(t, tls, 3)
+
+	assert.Equal(t, "app-tls", tls[0].ObjectValue()["secretName"].StringValue())
+	assert.Equal(t, []any{"app.example.com"},
+		propArrayToStrings(tls[0].ObjectValue()["hosts"].ArrayValue()))
+
+	assert.Equal(t, "api-tls", tls[1].ObjectValue()["secretName"].StringValue())
+	assert.Equal(t, []any{"api.example.com", "api2.example.com"},
+		propArrayToStrings(tls[1].ObjectValue()["hosts"].ArrayValue()))
+
+	assert.Equal(t, "data-tls", tls[2].ObjectValue()["secretName"].StringValue())
+	assert.Equal(t, []any{"*.data.example.com"},
+		propArrayToStrings(tls[2].ObjectValue()["hosts"].ArrayValue()))
+}
+
+// propArrayToStrings converts a PropertyValue array of strings into []any.
+func propArrayToStrings(arr []resource.PropertyValue) []any {
+	out := make([]any, len(arr))
+	for i, v := range arr {
+		out[i] = v.StringValue()
+	}
+	return out
+}
+
 func TestAzureClustersDeployTwoReleases(t *testing.T) {
 	mocks := &clustersMocks{}
 

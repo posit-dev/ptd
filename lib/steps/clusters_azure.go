@@ -47,6 +47,10 @@ type azureClustersParams struct {
 	// siteDomains is always the per-site domains (one per site), independent of root_domain.
 	// Used for Traefik Ingresses, which must be created for every site domain.
 	siteDomains []string
+	// siteTLSSecrets maps a site domain to its optional per-host TLS secrets.
+	// When a domain has a non-empty entry, the Traefik ingress terminates TLS
+	// with those secrets instead of the default single wildcard secret.
+	siteTLSSecrets map[string][]types.SiteTLSSecret
 	// thirdPartyTelemetryEnabled controls whether Traefik telemetry arguments are suppressed.
 	thirdPartyTelemetryEnabled bool
 	// workloadDir is the path to the workload's config directory (contains ptd.yaml, custom_k8s_resources/, etc.)
@@ -54,6 +58,52 @@ type azureClustersParams struct {
 	// rootDomain is the dereferenced value of cfg.RootDomain, or empty string if nil.
 	// Used to select the correct ClusterIssuer name in Traefik Ingress annotations.
 	rootDomain string
+}
+
+// traefikIngressTLSEntry is a plain representation of a single Traefik ingress
+// `tls` entry (hosts + secret name). It is the pure, unit-testable form of the
+// Pulumi `tls` array built by traefikIngressTLS.
+type traefikIngressTLSEntry struct {
+	Hosts      []string
+	SecretName string
+}
+
+// traefikIngressTLSEntries returns the ordered `tls` entries for a site's
+// Traefik ingress. When tlsSecrets is non-empty, it yields one entry per
+// configured secret (preserving order); otherwise it yields the default single
+// wildcard entry ([domain, *.domain] → "{name}-{domain}-tls"), matching the
+// historical behavior byte-for-byte.
+func traefikIngressTLSEntries(name, domain string, tlsSecrets []types.SiteTLSSecret) []traefikIngressTLSEntry {
+	if len(tlsSecrets) > 0 {
+		entries := make([]traefikIngressTLSEntry, 0, len(tlsSecrets))
+		for _, s := range tlsSecrets {
+			entries = append(entries, traefikIngressTLSEntry{Hosts: s.Hosts, SecretName: s.SecretName})
+		}
+		return entries
+	}
+	return []traefikIngressTLSEntry{
+		{
+			Hosts:      []string{domain, fmt.Sprintf("*.%s", domain)},
+			SecretName: fmt.Sprintf("%s-%s-tls", name, domain),
+		},
+	}
+}
+
+// traefikIngressTLS renders the Traefik ingress `spec.tls` value as a
+// pulumi.Array from the pure entries produced by traefikIngressTLSEntries.
+func traefikIngressTLS(name, domain string, tlsSecrets []types.SiteTLSSecret) pulumi.Array {
+	tls := pulumi.Array{}
+	for _, e := range traefikIngressTLSEntries(name, domain, tlsSecrets) {
+		hosts := make(pulumi.StringArray, 0, len(e.Hosts))
+		for _, h := range e.Hosts {
+			hosts = append(hosts, pulumi.String(h))
+		}
+		tls = append(tls, pulumi.Map{
+			"hosts":      hosts,
+			"secretName": pulumi.String(e.SecretName),
+		})
+	}
+	return tls
 }
 
 func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credentials, envVars map[string]string) error {
@@ -121,8 +171,12 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 	// siteDomains is always the per-site domains, independent of root_domain.
 	// Used for Traefik Ingresses, which must be created for every site domain.
 	var siteDomains []string
+	siteTLSSecrets := make(map[string][]types.SiteTLSSecret)
 	for _, siteCfg := range cfg.Sites {
 		siteDomains = append(siteDomains, siteCfg.Spec.Domain)
+		if len(siteCfg.Spec.TLSSecrets) > 0 {
+			siteTLSSecrets[siteCfg.Spec.Domain] = siteCfg.Spec.TLSSecrets
+		}
 	}
 	sort.Strings(siteDomains)
 
@@ -147,6 +201,7 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 		clusterIdentityByCluster:     clusterIdentityByCluster,
 		certManagerDomains:           certManagerDomains,
 		siteDomains:                  siteDomains,
+		siteTLSSecrets:               siteTLSSecrets,
 		thirdPartyTelemetryEnabled:   cfg.ThirdPartyTelemetryEnabled == nil || *cfg.ThirdPartyTelemetryEnabled,
 		workloadDir:                  filepath.Join(helpers.GetTargetsConfigPath(), helpers.WorkDir, s.DstTarget.Name()),
 		rootDomain: func() string {
@@ -750,12 +805,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				},
 				"spec": pulumi.Map{
 					"ingressClassName": pulumi.String("traefik"),
-					"tls": pulumi.Array{
-						pulumi.Map{
-							"hosts":      pulumi.StringArray{pulumi.String(domain), pulumi.String(fmt.Sprintf("*.%s", domain))},
-							"secretName": pulumi.String(fmt.Sprintf("%s-%s-tls", name, domain)),
-						},
-					},
+					"tls":              traefikIngressTLS(name, domain, params.siteTLSSecrets[domain]),
 					"rules": pulumi.Array{
 						pulumi.Map{
 							"http": pulumi.Map{
