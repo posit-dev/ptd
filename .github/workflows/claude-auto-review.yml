@@ -10,6 +10,7 @@ env:
 jobs:
   auto-review:
     runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
     timeout-minutes: 60
     permissions:
       contents: read
