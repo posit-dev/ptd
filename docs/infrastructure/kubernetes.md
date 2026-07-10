@@ -197,6 +197,7 @@ karpenter_config:
 - **Limits**: Cap the total resources Karpenter can provision for this pool
 - **Weight**: Priority for scheduling (default pool = 100, GPU pool = 10 typically)
 - **expireAfter**: How long nodes live before automatic replacement (reduces drift, applies security updates)
+- **system_nodes**: When `true`, nodes in this pool are labeled `posit.team/node-role=system`. This lets system workloads target these nodes and lets callers keep other workloads off them via node affinity — for example, the Team Operator image prepull daemonset can be configured to avoid system nodes so it does not pull session images onto them. Also available on managed node groups under `additional_node_groups.<name>.system_nodes`.
 
 **Example Multi-Pool Setup:**
 ```yaml

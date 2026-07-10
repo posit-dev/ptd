@@ -35,4 +35,14 @@ const (
 	POSIT_TEAM_ENVIRONMENT    = "posit.team/environment"
 	POSIT_TEAM_MANAGED_BY_TAG = "posit.team/managed-by"
 	POSIT_TEAM_TRUE_NAME      = "posit.team/true-name"
+
+	// Node labels
+
+	// PositTeamNodeRoleLabel is the Kubernetes node label that identifies the
+	// role of a node. When set to PositTeamNodeRoleSystem, the node is reserved
+	// for system workloads and callers (e.g. the team-operator image prepull
+	// daemonset) can use node affinity/anti-affinity to avoid it.
+	PositTeamNodeRoleLabel = "posit.team/node-role"
+	// PositTeamNodeRoleSystem is the value of PositTeamNodeRoleLabel for system nodes.
+	PositTeamNodeRoleSystem = "system"
 )

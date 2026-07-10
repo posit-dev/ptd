@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/posit-dev/ptd/lib/aws"
+	"github.com/posit-dev/ptd/lib/consts"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/kube"
 	"github.com/posit-dev/ptd/lib/proxy"
@@ -1489,6 +1490,17 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 
 		if nodePool.ExpireAfter != nil {
 			nodepoolSpec["template"].(map[string]interface{})["spec"].(map[string]interface{})["expireAfter"] = *nodePool.ExpireAfter
+		}
+
+		// System node pools label their nodes with posit.team/node-role=system so
+		// callers can target or avoid them with node affinity (e.g. keep the image
+		// prepull daemonset off them).
+		if nodePool.SystemNodes {
+			nodepoolSpec["template"].(map[string]interface{})["metadata"] = map[string]interface{}{
+				"labels": map[string]interface{}{
+					consts.PositTeamNodeRoleLabel: consts.PositTeamNodeRoleSystem,
+				},
+			}
 		}
 
 		// Build taints: start with explicitly listed taints, then add session taint if session_taints: true.

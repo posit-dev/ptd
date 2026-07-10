@@ -453,6 +453,7 @@ func awsEKSDeploy(ctx *awspulumi.Context, _ types.Target, params awsEKSParams) e
 				Version:          spec.EKSClusterVersion(),
 				Tags:             params.requiredTags,
 				Labels:           ng.Labels,
+				SystemNode:       ng.SystemNodes,
 				Taints:           taints,
 			})
 		}
