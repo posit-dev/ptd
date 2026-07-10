@@ -11,6 +11,8 @@
 #     uid: azure_netapp_write_latency_high
 #   - orgId: 1
 #     uid: azure_netapp_throughput_limit
+#   - orgId: 1
+#     uid: azure_netapp_metrics_silent
 #
 # See https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
 #
@@ -36,7 +38,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"}[5m])
+                expr: label_replace(last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"}[5m]), "volume", "$1", "resourceID", ".*/volumes/(.+)")
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -80,10 +82,10 @@ groups:
               NetApp Files volume capacity utilization is above 80%
 
               ─── WHERE ───────────────────────────
-              Tenant:      {{ $labels.tenant_name }}
-              Cluster:     {{ $labels.cluster }}
-              Resource:    {{ $labels.resourceName}}
-              Location:    {{ $labels.location }}
+              Tenant:         {{ $labels.tenant_name }}
+              Cluster:        {{ $labels.cluster }}
+              Volume:         {{ $labels.volume }}
+              Resource group: {{ $labels.resourceGroup }}
 
               ─── DETAILS ─────────────────────────
               Metric:      Volume Capacity
@@ -108,7 +110,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagereadlatency_average_milliseconds{job="integrations/azure"}[5m])
+                expr: label_replace(last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagereadlatency_average_milliseconds{job="integrations/azure"}[5m]), "volume", "$1", "resourceID", ".*/volumes/(.+)")
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -152,10 +154,10 @@ groups:
               NetApp Files volume read latency is above 500ms
 
               ─── WHERE ───────────────────────────
-              Tenant:      {{ $labels.tenant_name }}
-              Cluster:     {{ $labels.cluster }}
-              Resource:    {{ $labels.resourceName}}
-              Location:    {{ $labels.location }}
+              Tenant:         {{ $labels.tenant_name }}
+              Cluster:        {{ $labels.cluster }}
+              Volume:         {{ $labels.volume }}
+              Resource group: {{ $labels.resourceGroup }}
 
               ─── DETAILS ─────────────────────────
               Metric:      Read Latency
@@ -178,7 +180,7 @@ groups:
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagewritelatency_average_milliseconds{job="integrations/azure"}[5m])
+                expr: label_replace(last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_averagewritelatency_average_milliseconds{job="integrations/azure"}[5m]), "volume", "$1", "resourceID", ".*/volumes/(.+)")
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -222,10 +224,10 @@ groups:
               NetApp Files volume write latency is above 500ms
 
               ─── WHERE ───────────────────────────
-              Tenant:      {{ $labels.tenant_name }}
-              Cluster:     {{ $labels.cluster }}
-              Resource:    {{ $labels.resourceName}}
-              Location:    {{ $labels.location }}
+              Tenant:         {{ $labels.tenant_name }}
+              Cluster:        {{ $labels.cluster }}
+              Volume:         {{ $labels.volume }}
+              Resource group: {{ $labels.resourceGroup }}
 
               ─── DETAILS ─────────────────────────
               Metric:      Write Latency
@@ -243,12 +245,16 @@ groups:
           data:
             - refId: A
               relativeTimeRange:
-                from: 600
+                from: 1800
                 to: 0
               datasourceUid: mimir
               model:
                 editorMode: code
-                expr: last_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_throughputlimitreached_average_count{job="integrations/azure"}[5m])
+                # avg_over_time(...[30m]) = fraction of the last 30m the volume was throttled.
+                # label_replace derives a real per-volume label from resourceID, because the
+                # exporter's resourceName label is the NetApp *account* (identical for every
+                # volume in the cluster), not the volume.
+                expr: label_replace(avg_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_throughputlimitreached_average_count{job="integrations/azure"}[30m]), "volume", "$1", "resourceID", ".*/volumes/(.+)")
                 instant: true
                 intervalMs: 1000
                 legendFormat: __auto
@@ -257,14 +263,14 @@ groups:
                 refId: A
             - refId: B
               relativeTimeRange:
-                from: 600
+                from: 1800
                 to: 0
               datasourceUid: __expr__
               model:
                 conditions:
                     - evaluator:
                         params:
-                            - 0.5 # Fires when metric is 1 (limit reached)
+                            - 0.5 # Fires when throttled >50% of the 30m window (sustained, not a burst)
                         type: gt
                       operator:
                         type: and
@@ -289,22 +295,147 @@ groups:
           annotations:
             summary: "🔴 CRITICAL: Azure NetApp Files Throughput Limit Reached"
             description: |
-              NetApp Files volume has reached its throughput limit
+              NetApp Files volume has been at its throughput limit for the
+              majority of the last 30 minutes (sustained saturation, not a
+              transient burst).
 
               ─── WHERE ───────────────────────────
-              Tenant:      {{ $labels.tenant_name }}
-              Cluster:     {{ $labels.cluster }}
-              Resource:    {{ $labels.resourceName}}
-              Location:    {{ $labels.location }}
+              Tenant:         {{ $labels.tenant_name }}
+              Cluster:        {{ $labels.cluster }}
+              Volume:         {{ $labels.volume }}
+              Resource group: {{ $labels.resourceGroup }}
 
               ─── DETAILS ─────────────────────────
-              Metric:      Throughput Limit Reached (boolean)
-              Current:     Limit reached
+              Metric:      Throughput Limit Reached (fraction of 30m throttled)
+              Threshold:   >50% of a 30m window
               Duration:    5 minutes
 
               ─── ACTION ──────────────────────────
               Consider increasing the volume's service level or quota
               to provision more throughput capacity.
+
+          labels:
+            opsgenie: "1"
+          isPaused: false
+        - uid: azure_netapp_metrics_silent
+          title: Azure NetApp Files Metrics Silent
+          condition: C
+          data:
+            # Fires when a cluster reported NetApp metrics at some point in the
+            # last 24h (present_over_time[24h]) but has now been silent for 15m
+            # (present_over_time[15m] empty). Grouping by cluster/tenant means the
+            # alert *names* the cluster whose Azure Monitor scrape went dark —
+            # unlike the threshold rules above, whose NoData instances carry no
+            # labels. A windowed baseline (not `offset 24h`) is deliberate: a
+            # single-point offset can't cover clusters younger than 24h and would
+            # self-resolve once the outage itself is older than 24h. Volume-
+            # ConsumedSizePercentage is the witness series because it is always
+            # present for every volume (unlike the conditional ThroughputLimitReached).
+            - refId: A
+              relativeTimeRange:
+                from: 86400
+                to: 0
+              datasourceUid: mimir
+              model:
+                editorMode: code
+                expr: |
+                  count by (cluster, tenant_name, __tenant_id__) (
+                    present_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"}[24h])
+                  )
+                  unless
+                  count by (cluster, tenant_name, __tenant_id__) (
+                    present_over_time(azure_microsoft_netapp_netappaccounts_capacitypools_volumes_volumeconsumedsizepercentage_average_percent{job="integrations/azure"}[15m])
+                  )
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params: []
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - B
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                reducer: last
+                refId: B
+                type: reduce
+            - refId: C
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: B
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          # noDataState: OK is correct here - an empty result means every cluster
+          # that reported within the last 24h is still reporting (healthy). This is
+          # the attribution alert the label-less NoData pages could not provide.
+          noDataState: OK
+          execErrState: Error
+          for: 5m
+          annotations:
+            summary: "🔴 CRITICAL: Azure NetApp Files Metrics Silent"
+            description: |
+              NetApp Files metrics have stopped arriving from a cluster that was
+              reporting within the last 24h and has now been silent for 15+
+              minutes. The Azure Monitor scrape (Alloy
+              prometheus.exporter.azure "netapp") is likely down, throttled,
+              or missing credentials. While silent, the NetApp threshold
+              alerts (capacity/latency/throughput) are blind for this cluster.
+
+              ─── WHERE ───────────────────────────
+              Tenant:      {{ $labels.tenant_name }}
+              Cluster:     {{ $labels.cluster }}
+
+              ─── DETAILS ─────────────────────────
+              Component:   Azure Monitor NetApp exporter
+              Issue:       Reported within 24h but now silent for 15m+
+              Duration:    silent ≥15m, sustained 5m
+
+              ─── ACTION ──────────────────────────
+              Check the Alloy pod on this cluster and the Azure Monitor
+              exporter credentials/permissions for the NetApp resource group.
 
           labels:
             opsgenie: "1"
