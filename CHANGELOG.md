@@ -1,3 +1,15 @@
+## [1.37.2](https://github.com/posit-dev/ptd/compare/v1.37.1...v1.37.2) (2026-07-10)
+
+
+### Bug Fixes
+
+* **alerts:** apply volume attribution to all netapp rules; stop NLB NoData pages ([4b083dd](https://github.com/posit-dev/ptd/commit/4b083dd37d5d7fd98b96aed2bdc011d34f9f94c2))
+* **alerts:** make NetApp throughput rule volume-attributable and burst-tolerant ([a607b1f](https://github.com/posit-dev/ptd/commit/a607b1ff30c45ca42ddffba39eec6f85b0a6e7d5))
+* **alerts:** scrape NetApp throughput metric and add cluster-attributable silent alert ([98d05f5](https://github.com/posit-dev/ptd/commit/98d05f5a08ef2a8c337ff57e4c71ee4a688f47ca))
+* **alerts:** windowed baseline for netapp silent detection (not point-offset) ([36944b8](https://github.com/posit-dev/ptd/commit/36944b8a1448c575abd33db6270123e1234f2579))
+* trigger review on ready_for_review + allow Read/Glob/Grep ([37d12cb](https://github.com/posit-dev/ptd/commit/37d12cb77ee4e0f92827c981f9675f3bfb373c65))
+* use tool denylist instead of allowlist so review posts ([01f629d](https://github.com/posit-dev/ptd/commit/01f629df608f33426cdbc1d22c959c52de9d01b6))
+
 ## [1.37.1](https://github.com/posit-dev/ptd/compare/v1.37.0...v1.37.1) (2026-07-09)
 
 
