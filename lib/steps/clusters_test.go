@@ -553,21 +553,55 @@ func TestAzureClustersDeployTraefikIngressMultipleTLS(t *testing.T) {
 	require.Len(t, tls, 3)
 
 	assert.Equal(t, "app-tls", tls[0].ObjectValue()["secretName"].StringValue())
-	assert.Equal(t, []any{"app.example.com"},
+	assert.Equal(t, []string{"app.example.com"},
 		propArrayToStrings(tls[0].ObjectValue()["hosts"].ArrayValue()))
 
 	assert.Equal(t, "api-tls", tls[1].ObjectValue()["secretName"].StringValue())
-	assert.Equal(t, []any{"api.example.com", "api2.example.com"},
+	assert.Equal(t, []string{"api.example.com", "api2.example.com"},
 		propArrayToStrings(tls[1].ObjectValue()["hosts"].ArrayValue()))
 
 	assert.Equal(t, "data-tls", tls[2].ObjectValue()["secretName"].StringValue())
-	assert.Equal(t, []any{"*.data.example.com"},
+	assert.Equal(t, []string{"*.data.example.com"},
 		propArrayToStrings(tls[2].ObjectValue()["hosts"].ArrayValue()))
 }
 
-// propArrayToStrings converts a PropertyValue array of strings into []any.
-func propArrayToStrings(arr []resource.PropertyValue) []any {
-	out := make([]any, len(arr))
+func TestAzureClustersDeployTraefikIngressSingleTLS(t *testing.T) {
+	// A single tls_secrets entry must SUPPRESS the default wildcard entry:
+	// the ingress should carry exactly the one configured entry, not the
+	// [domain, *.domain] default.
+	mocks := &clustersMocks{}
+
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		params := minimalAzureClustersParams("myworkload", []string{"20250101"})
+		params.siteDomains = []string{"example.com"}
+		params.siteTLSSecrets = map[string][]types.SiteTLSSecret{
+			"example.com": {
+				{Hosts: []string{"app.example.com"}, SecretName: "app-tls"},
+			},
+		}
+		return azureClustersDeploy(ctx, nil, params)
+	}, pulumi.WithMocks("ptd-azure-workload-clusters", "myworkload", mocks))
+	require.NoError(t, err)
+
+	rel := findTraefikRelease(mocks.resources, "myworkload-20250101-traefik")
+	require.NotNil(t, rel, "traefik helm release not found")
+
+	ingress := findTraefikIngressExtraObject(rel, "myworkload", "20250101", "example.com")
+	require.NotNil(t, ingress, "traefik ingress extraObject not found")
+
+	tls := ingress["spec"].ObjectValue()["tls"].ArrayValue()
+	require.Len(t, tls, 1)
+	entry := tls[0].ObjectValue()
+	assert.Equal(t, "app-tls", entry["secretName"].StringValue())
+	assert.Equal(t, []string{"app.example.com"}, propArrayToStrings(entry["hosts"].ArrayValue()))
+	// Confirm the wildcard default is gone.
+	assert.NotEqual(t, "myworkload-example.com-tls", entry["secretName"].StringValue())
+}
+
+// propArrayToStrings converts a PropertyValue array of strings into []string.
+// StringValue panics on a non-string property, so a mistyped host fails loudly.
+func propArrayToStrings(arr []resource.PropertyValue) []string {
+	out := make([]string, len(arr))
 	for i, v := range arr {
 		out[i] = v.StringValue()
 	}

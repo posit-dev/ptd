@@ -82,6 +82,16 @@ spec:
         # Required when hosted_zone_management_enabled is false:
         # certificate_arn: arn:aws:acm:us-east-2:123456789012:certificate/example-id
         # certificate_validation_enabled: false
+        # Azure/Traefik only: terminate TLS with multiple certificates for this
+        # site. When set, this REPLACES the default single-wildcard tls entry
+        # ([domain, *.domain] -> "{name}-{domain}-tls") for this site's Traefik
+        # ingress. Each referenced secret must be a kubernetes.io/tls secret in
+        # the "traefik" namespace (same namespace as the ingress).
+        # tls_secrets:
+        #   - hosts: ["analytics.example.com"]
+        #     secret_name: analytics-tls
+        #   - hosts: ["api.analytics.example.com", "api2.analytics.example.com"]
+        #     secret_name: analytics-api-tls
     dev:
       spec:
         domain: analytics-dev.example.com
