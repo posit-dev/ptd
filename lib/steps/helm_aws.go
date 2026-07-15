@@ -1494,13 +1494,22 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 
 		// System node pools label their nodes with posit.team/node-role=system so
 		// callers can target or avoid them with node affinity (e.g. keep the image
-		// prepull daemonset off them).
+		// prepull daemonset off them). Merge into template.metadata.labels rather
+		// than overwriting, so any other metadata/labels a future field may set
+		// survive (same approach as ngTags merging in WithNodeGroup).
 		if nodePool.SystemNodes {
-			nodepoolSpec["template"].(map[string]interface{})["metadata"] = map[string]interface{}{
-				"labels": map[string]interface{}{
-					consts.PositTeamNodeRoleLabel: consts.PositTeamNodeRoleSystem,
-				},
+			template := nodepoolSpec["template"].(map[string]interface{})
+			metadata, ok := template["metadata"].(map[string]interface{})
+			if !ok {
+				metadata = map[string]interface{}{}
+				template["metadata"] = metadata
 			}
+			labels, ok := metadata["labels"].(map[string]interface{})
+			if !ok {
+				labels = map[string]interface{}{}
+				metadata["labels"] = labels
+			}
+			labels[consts.PositTeamNodeRoleLabel] = consts.PositTeamNodeRoleSystem
 		}
 
 		// Build taints: start with explicitly listed taints, then add session taint if session_taints: true.
