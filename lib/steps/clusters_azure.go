@@ -436,7 +436,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 									pulumi.String("--namespace"),
 									pulumi.String(clustersHelmControllerNamespace),
 									pulumi.String("--default-job-image"),
-									pulumi.String("ghcr.io/k3s-io/klipper-helm:latest"),
+									pulumi.String("ghcr.io/k3s-io/klipper-helm:v0.9.5-build20250306"),
 								},
 							},
 						},
