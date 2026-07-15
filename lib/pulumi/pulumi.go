@@ -32,6 +32,16 @@ func pulumiDebugLogging() *debug.LoggingOptions {
 	}
 }
 
+// shouldRunProgramOnRefresh reports whether a refresh should re-run the program
+// (optrefresh.RunProgram(true)) based on the stack's config. It returns true only
+// when aws:ignoreTags is set to a non-empty value, so the AWS provider is
+// reconfigured with ignoreTags during refresh (pulumi/pulumi#13860). Refresh
+// behavior is left unchanged for every stack that does not set ignoreTags.
+func shouldRunProgramOnRefresh(cfg map[string]auto.ConfigValue) bool {
+	v, ok := cfg["aws:ignoreTags"]
+	return ok && v.Value != ""
+}
+
 func RefreshStack(ctx context.Context, stack auto.Stack) (refreshResult auto.RefreshResult, err error) {
 	refreshOpts := []optrefresh.Option{
 		optrefresh.Color("always"),
@@ -40,6 +50,19 @@ func RefreshStack(ctx context.Context, stack auto.Stack) (refreshResult auto.Ref
 		optrefresh.SuppressOutputs(),
 		optrefresh.Diff(),
 		optrefresh.ClearPendingCreates(),
+	}
+
+	// When aws:ignoreTags is configured on this stack, run the program during
+	// refresh so the AWS provider is (re)configured with it. Without this,
+	// refresh reuses the provider config recorded at the last `up`
+	// (pulumi/pulumi#13860), so ignoreTags is not honored during refresh and
+	// ignored customer tags get pulled into state and diffed away on the next
+	// up. Scoped to stacks that set ignoreTags so refresh behavior is unchanged
+	// for every other workload.
+	if allCfg, cfgErr := stack.GetAllConfig(ctx); cfgErr == nil {
+		if shouldRunProgramOnRefresh(allCfg) {
+			refreshOpts = append(refreshOpts, optrefresh.RunProgram(true))
+		}
 	}
 
 	if debugOpts := pulumiDebugLogging(); debugOpts != nil {

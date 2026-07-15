@@ -393,17 +393,21 @@ type AWSWorkloadConfig struct {
 	PublicLoadBalancer               *bool              `json:"public_load_balancer" yaml:"public_load_balancer"`
 	Region                           string             `json:"region" yaml:"region"`
 	ResourceTags                     map[string]string  `json:"resource_tags" yaml:"resource_tags"`
-	RoleArn                          *string            `json:"role_arn" yaml:"role_arn"`
-	TailscaleEnabled                 bool               `json:"tailscale_enabled" yaml:"tailscale_enabled"`
-	SecretsStoreAddonEnabled         *bool              `json:"secrets_store_addon_enabled,omitempty" yaml:"secrets_store_addon_enabled,omitempty"`
-	TrustedPrincipals                []string           `json:"trusted_principals" yaml:"trusted_principals"`
-	HostedZoneID                     *string            `json:"hosted_zone_id" yaml:"hosted_zone_id"`
-	HostedZoneManagementEnabled      *bool              `json:"hosted_zone_management_enabled,omitempty" yaml:"hosted_zone_management_enabled,omitempty"`
-	VpcAzCount                       int                `json:"vpc_az_count" yaml:"vpc_az_count"`
-	VpcCidr                          string             `json:"vpc_cidr" yaml:"vpc_cidr"`
-	ThirdPartyTelemetryEnabled       *bool              `json:"third_party_telemetry_enabled,omitempty" yaml:"third_party_telemetry_enabled,omitempty"`
-	NetworkTrust                     string             `json:"network_trust" yaml:"network_trust"`
-	NvidiaGpuEnabled                 bool               `json:"nvidia_gpu_enabled" yaml:"nvidia_gpu_enabled"`
+	// IgnoreTags is a flat list of exact AWS tag keys that the Pulumi AWS provider should
+	// never add or remove on managed resources. Used so customer-applied tags are left
+	// untouched by our IaC. AWS-only; wired into the provider's ignoreTags.keys.
+	IgnoreTags                  []string `json:"ignore_tags" yaml:"ignore_tags"`
+	RoleArn                     *string  `json:"role_arn" yaml:"role_arn"`
+	TailscaleEnabled            bool     `json:"tailscale_enabled" yaml:"tailscale_enabled"`
+	SecretsStoreAddonEnabled    *bool    `json:"secrets_store_addon_enabled,omitempty" yaml:"secrets_store_addon_enabled,omitempty"`
+	TrustedPrincipals           []string `json:"trusted_principals" yaml:"trusted_principals"`
+	HostedZoneID                *string  `json:"hosted_zone_id" yaml:"hosted_zone_id"`
+	HostedZoneManagementEnabled *bool    `json:"hosted_zone_management_enabled,omitempty" yaml:"hosted_zone_management_enabled,omitempty"`
+	VpcAzCount                  int      `json:"vpc_az_count" yaml:"vpc_az_count"`
+	VpcCidr                     string   `json:"vpc_cidr" yaml:"vpc_cidr"`
+	ThirdPartyTelemetryEnabled  *bool    `json:"third_party_telemetry_enabled,omitempty" yaml:"third_party_telemetry_enabled,omitempty"`
+	NetworkTrust                string   `json:"network_trust" yaml:"network_trust"`
+	NvidiaGpuEnabled            bool     `json:"nvidia_gpu_enabled" yaml:"nvidia_gpu_enabled"`
 	// FilterControlRoomMetrics enables the per-workload metric filter before forwarding to the
 	// control room Mimir remote_write. When true, only metrics referenced by grafana_alerts and
 	// grafana_dashboards are forwarded. Defaults to false so rollout can be done per-workload.

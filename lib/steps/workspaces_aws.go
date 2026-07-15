@@ -40,6 +40,9 @@ type awsWorkspacesParams struct {
 	compoundName string
 	trustedUsers []types.TrustedUser
 	requiredTags map[string]string
+	// ignoreTags are exact AWS tag keys the explicit us-east-1 provider must leave
+	// untouched on managed resources. Threaded via params to match this file's convention.
+	ignoreTags []string
 }
 
 func (s *WorkspacesStep) runAWSInlineGo(ctx context.Context, creds types.Credentials, envVars map[string]string) error {
@@ -73,6 +76,7 @@ func (s *WorkspacesStep) runAWSInlineGo(ctx context.Context, creds types.Credent
 		compoundName: s.DstTarget.Name(),
 		trustedUsers: cfg.TrustedUsers,
 		requiredTags: requiredTags,
+		ignoreTags:   s.DstTarget.IgnoreTags(),
 	}
 
 	stack, err := createStack(ctx, s.Name(), s.DstTarget, func(pctx *pulumi.Context, target types.Target) error {
@@ -130,9 +134,15 @@ func awsWorkspacesDeploy(pctx *pulumi.Context, target types.Target, params awsWo
 
 	// Create an explicit us-east-1 provider so workspaces resources go to the
 	// right region regardless of the control room's native region.
-	use1Provider, err := awsprovider.NewProvider(pctx, "use1", &awsprovider.ProviderArgs{
+	use1Args := &awsprovider.ProviderArgs{
 		Region: pulumi.String("us-east-1"),
-	}, pulumi.Aliases([]pulumi.Alias{{
+	}
+	if len(params.ignoreTags) > 0 {
+		use1Args.IgnoreTags = &awsprovider.ProviderIgnoreTagsArgs{
+			Keys: pulumi.ToStringArray(params.ignoreTags),
+		}
+	}
+	use1Provider, err := awsprovider.NewProvider(pctx, "use1", use1Args, pulumi.Aliases([]pulumi.Alias{{
 		URN: pulumi.URN(fmt.Sprintf(
 			"urn:pulumi:%s::%s::pulumi:providers:aws::use1",
 			pctx.Stack(), workspacesProjectName,

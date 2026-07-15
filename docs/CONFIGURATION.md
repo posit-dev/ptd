@@ -55,6 +55,14 @@ spec:
     rs:owner: team@example.com
     rs:project: posit-team
     rs:environment: production
+
+  # AWS tag keys PTD must never add or remove on managed resources (AWS-only).
+  # Wired into the Pulumi AWS provider's ignoreTags.keys so customer-applied tags
+  # (e.g. from an org-wide tagging policy) are left untouched by our IaC. Exact key match.
+  # Honored on every `ptd ensure`, including `--refresh` (state is not polluted with ignored tags).
+  ignore_tags:
+    - customer:cost-center
+    - customer:owner
 ```
 
 ## Workload Configuration
@@ -116,6 +124,14 @@ spec:
         force_maintenance: false  # Enable to bypass PDBs during upgrades
         components:
           traefik_forward_auth_version: "0.0.14"
+
+  # AWS tag keys PTD must never add or remove on managed resources (AWS-only).
+  # Wired into the Pulumi AWS provider's ignoreTags.keys so customer-applied tags
+  # (e.g. from an org-wide tagging policy) are left untouched by our IaC. Exact key match.
+  # Honored on every `ptd ensure`, including `--refresh` (state is not polluted with ignored tags).
+  ignore_tags:
+    - customer:cost-center
+    - customer:owner
 
   # Sites in this workload
   sites:
