@@ -1,3 +1,13 @@
+## [1.37.3](https://github.com/posit-dev/ptd/compare/v1.37.2...v1.37.3) (2026-07-15)
+
+
+### Bug Fixes
+
+* align review config with claude-code-action's documented pattern ([02a9e26](https://github.com/posit-dev/ptd/commit/02a9e2656fae903642813c3f2a78d10faecc7ab9))
+* **clusters:** pin helm-controller klipper-helm job image ([fd8e217](https://github.com/posit-dev/ptd/commit/fd8e217fa08a0336ccb6d98c14685f27b2a0b81f))
+* set track_progress so the review actually posts ([7cb0ef4](https://github.com/posit-dev/ptd/commit/7cb0ef44a81100f5e49f87c8c9b7690c315c2de2))
+* skip auto-review on draft PRs ([c38604f](https://github.com/posit-dev/ptd/commit/c38604fd98ee6a56df3a1014ca43bfdff515eafe))
+
 ## [1.37.2](https://github.com/posit-dev/ptd/compare/v1.37.1...v1.37.2) (2026-07-10)
 
 
