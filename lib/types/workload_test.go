@@ -95,6 +95,47 @@ func TestAWSWorkloadConfigSerialization(t *testing.T) {
 	assert.Equal(t, config.Clusters["main"].Spec.NodeInstanceType, unmarshaledConfig.Clusters["main"].Spec.NodeInstanceType)
 }
 
+func TestSystemNodesConfigFromYAML(t *testing.T) {
+	// Verify the snake_case `system_nodes` tag decodes for both the managed
+	// node group (NodeGroupConfig) and the Karpenter node pool (KarpenterNodePool),
+	// and defaults to false when omitted.
+	raw := `
+additional_node_groups:
+  system:
+    min_size: 1
+    max_size: 1
+    system_nodes: true
+  workers:
+    min_size: 1
+    max_size: 3
+karpenter_config:
+  node_pools:
+    - name: system
+      system_nodes: true
+    - name: sessions
+      session_taints: true
+`
+	var spec AWSWorkloadClusterSpec
+	err := yaml.Unmarshal([]byte(raw), &spec)
+	assert.NoError(t, err)
+
+	assert.True(t, spec.AdditionalNodeGroups["system"].SystemNodes)
+	assert.False(t, spec.AdditionalNodeGroups["workers"].SystemNodes)
+
+	assert.Equal(t, "system", spec.KarpenterConfig.NodePools[0].Name)
+	assert.True(t, spec.KarpenterConfig.NodePools[0].SystemNodes)
+	assert.Equal(t, "sessions", spec.KarpenterConfig.NodePools[1].Name)
+	assert.False(t, spec.KarpenterConfig.NodePools[1].SystemNodes)
+
+	// Round-trip: marshal and unmarshal preserves the flag.
+	out, err := yaml.Marshal(spec)
+	assert.NoError(t, err)
+	var rt AWSWorkloadClusterSpec
+	assert.NoError(t, yaml.Unmarshal(out, &rt))
+	assert.True(t, rt.AdditionalNodeGroups["system"].SystemNodes)
+	assert.True(t, rt.KarpenterConfig.NodePools[0].SystemNodes)
+}
+
 func TestAzureWorkloadConfigSerialization(t *testing.T) {
 	// Create a minimal Azure workload config
 	config := AzureWorkloadConfig{

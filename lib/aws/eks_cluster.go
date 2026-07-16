@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/posit-dev/ptd/lib/consts"
 	awsec2 "github.com/pulumi/pulumi-aws/sdk/v6/go/aws/ec2"
 	awseks "github.com/pulumi/pulumi-aws/sdk/v6/go/aws/eks"
 	awsiam "github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
@@ -465,6 +466,10 @@ type NodeGroupParams struct {
 	// the node group).
 	Tags   map[string]string
 	Labels map[string]string
+	// SystemNode, when true, applies the posit.team/node-role=system Kubernetes
+	// node label to this node group so system workloads can target it and the
+	// image prepull daemonset can be kept off it via node affinity.
+	SystemNode bool
 	// Taints mirror the Python ptd.Taint list (effect/key/value).
 	Taints []NodeGroupTaint
 }
@@ -553,6 +558,16 @@ func (c *EKSCluster) WithNodeGroup(p NodeGroupParams) *EKSCluster {
 		})
 	}
 
+	// Kubernetes node labels (distinct from ngTags, which are AWS resource tags).
+	// System node groups get posit.team/node-role=system so callers can target
+	// or avoid them with node affinity (e.g. keep the prepull daemonset off them).
+	var nodeLabels pulumi.StringMap
+	if p.SystemNode {
+		nodeLabels = pulumi.StringMap{
+			consts.PositTeamNodeRoleLabel: pulumi.String(consts.PositTeamNodeRoleSystem),
+		}
+	}
+
 	// PULUMI STATE NAME — node group logical name MUST equal Python full_name.
 	ng, err := awseks.NewNodeGroup(c.ctx, p.Name, &awseks.NodeGroupArgs{
 		ClusterName: c.cluster.Name,
@@ -565,6 +580,7 @@ func (c *EKSCluster) WithNodeGroup(p NodeGroupParams) *EKSCluster {
 			MaxSize:     pulumi.Int(p.MaxSize),
 		},
 		AmiType: pulumi.String(p.AmiType),
+		Labels:  nodeLabels,
 		Tags:    ngTags,
 		LaunchTemplate: &awseks.NodeGroupLaunchTemplateArgs{
 			Id:      lt.ID(),

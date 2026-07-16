@@ -138,6 +138,10 @@ type NodeGroupConfig struct {
 	AmiType *string `json:"ami_type" yaml:"ami_type"`
 	// DesiredSize defaults to MinSize when nil (Python default None).
 	DesiredSize *int `json:"desired_size" yaml:"desired_size"`
+	// SystemNodes, when true, labels this node group's Kubernetes nodes with
+	// posit.team/node-role=system. System workloads can target these nodes and
+	// the image prepull daemonset can be kept off them via node affinity.
+	SystemNodes bool `json:"system_nodes" yaml:"system_nodes"`
 }
 
 // NGInstanceType resolves the node group instance type (Python default "t3.large").
@@ -330,6 +334,7 @@ type KarpenterNodePool struct {
 	Weight                        int                      `json:"weight" yaml:"weight"`
 	RootVolumeSize                string                   `json:"root_volume_size" yaml:"root_volume_size"`
 	SessionTaints                 bool                     `json:"session_taints" yaml:"session_taints"`
+	SystemNodes                   bool                     `json:"system_nodes" yaml:"system_nodes"`
 	ConsolidationPolicy           string                   `json:"consolidation_policy" yaml:"consolidation_policy"`
 	ConsolidateAfter              string                   `json:"consolidate_after" yaml:"consolidate_after"`
 	OverprovisioningReplicas      int                      `json:"overprovisioning_replicas" yaml:"overprovisioning_replicas"`
