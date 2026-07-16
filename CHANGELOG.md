@@ -1,3 +1,10 @@
+# [1.38.0](https://github.com/posit-dev/ptd/compare/v1.37.3...v1.38.0) (2026-07-16)
+
+
+### Features
+
+* **infra:** allow labeling system nodes with posit.team/node-role=system ([70ec09c](https://github.com/posit-dev/ptd/commit/70ec09cd1fdb4e96302753b338d812caea640367))
+
 ## [1.37.3](https://github.com/posit-dev/ptd/compare/v1.37.2...v1.37.3) (2026-07-15)
 
 
