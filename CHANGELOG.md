@@ -1,3 +1,10 @@
+## [1.38.1](https://github.com/posit-dev/ptd/compare/v1.38.0...v1.38.1) (2026-07-16)
+
+
+### Bug Fixes
+
+* **azure:** poll for bastion tunnel port instead of one-shot check ([1040c4b](https://github.com/posit-dev/ptd/commit/1040c4b6dd1a9158d103f321d14184754a14e4a6))
+
 # [1.38.0](https://github.com/posit-dev/ptd/compare/v1.37.3...v1.38.0) (2026-07-16)
 
 
