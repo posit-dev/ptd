@@ -1,3 +1,15 @@
+# [1.40.0](https://github.com/posit-dev/ptd/compare/v1.39.1...v1.40.0) (2026-07-17)
+
+
+### Bug Fixes
+
+* **aws:** warn when refresh can't read config; clarify ignore_tags config lifecycle ([eff9888](https://github.com/posit-dev/ptd/commit/eff9888e2968d18a86edfcad5274747d9e3c1b3b)), closes [pulumi/pulumi#13860](https://github.com/pulumi/pulumi/issues/13860)
+
+
+### Features
+
+* **aws:** add ignore_tags to preserve customer-applied resource tags ([c0ae44d](https://github.com/posit-dev/ptd/commit/c0ae44de3635c1022502d9366d6daea257c25702)), closes [pulumi/pulumi#13860](https://github.com/pulumi/pulumi/issues/13860)
+
 ## [1.39.1](https://github.com/posit-dev/ptd/compare/v1.39.0...v1.39.1) (2026-07-17)
 
 
