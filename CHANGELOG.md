@@ -1,3 +1,10 @@
+# [1.39.0](https://github.com/posit-dev/ptd/compare/v1.38.1...v1.39.0) (2026-07-17)
+
+
+### Features
+
+* **azure:** support multiple TLS secrets on Traefik site ingress ([d0de1ef](https://github.com/posit-dev/ptd/commit/d0de1ef87923d333bf18c78a57ac7f0ce17f2c94))
+
 ## [1.38.1](https://github.com/posit-dev/ptd/compare/v1.38.0...v1.38.1) (2026-07-16)
 
 
