@@ -645,6 +645,20 @@ type SiteConfigSpec struct {
 	VpcAssociations              []string `json:"vpc_associations" yaml:"vpc_associations"`
 	AutoAssociateProvisionedVpc  *bool    `json:"auto_associate_provisioned_vpc" yaml:"auto_associate_provisioned_vpc"`
 	CertificateValidationEnabled *bool    `json:"certificate_validation_enabled" yaml:"certificate_validation_enabled"`
+	// TLSSecrets, when set, replaces the default single wildcard `tls` entry for
+	// this site's Azure Traefik ingress with one entry per listed secret. Each
+	// entry maps a set of hosts to a pre-existing Kubernetes TLS secret, letting
+	// the ingress terminate TLS with multiple certificates instead of the single
+	// wildcard secret. Ignored on AWS (which uses per-site CertificateARN). When
+	// unset, the default single wildcard entry is emitted unchanged.
+	TLSSecrets []SiteTLSSecret `json:"tls_secrets,omitempty" yaml:"tls_secrets,omitempty"`
+}
+
+// SiteTLSSecret maps a set of hostnames to a Kubernetes TLS secret for an
+// Azure Traefik ingress. See SiteConfigSpec.TLSSecrets.
+type SiteTLSSecret struct {
+	Hosts      []string `yaml:"hosts" json:"hosts"`
+	SecretName string   `yaml:"secret_name" json:"secret_name"`
 }
 
 var ValidOutboundTypes = map[string]bool{
