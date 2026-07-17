@@ -32,6 +32,21 @@ func pulumiDebugLogging() *debug.LoggingOptions {
 	}
 }
 
+// shouldRunProgramOnRefresh reports whether a refresh should re-run the program
+// (optrefresh.RunProgram(true)) based on the stack's config. It returns true only
+// when aws:ignoreTags is set to a non-empty value, so the AWS provider is
+// reconfigured with ignoreTags during refresh (pulumi/pulumi#13860). Refresh
+// behavior is left unchanged for every stack that does not set ignoreTags.
+//
+// ConfigureStackRegion writes ignoreTags as nested path config
+// (aws:ignoreTags.keys[i]); this relies on GetAllConfig surfacing those entries
+// merged under the aggregated aws:ignoreTags key, which is asserted in
+// TestShouldRunProgramOnRefresh.
+func shouldRunProgramOnRefresh(cfg map[string]auto.ConfigValue) bool {
+	v, ok := cfg["aws:ignoreTags"]
+	return ok && v.Value != ""
+}
+
 func RefreshStack(ctx context.Context, stack auto.Stack) (refreshResult auto.RefreshResult, err error) {
 	refreshOpts := []optrefresh.Option{
 		optrefresh.Color("always"),
@@ -40,6 +55,24 @@ func RefreshStack(ctx context.Context, stack auto.Stack) (refreshResult auto.Ref
 		optrefresh.SuppressOutputs(),
 		optrefresh.Diff(),
 		optrefresh.ClearPendingCreates(),
+	}
+
+	// When aws:ignoreTags is configured on this stack, run the program during
+	// refresh so the AWS provider is (re)configured with it. Without this,
+	// refresh reuses the provider config recorded at the last `up`
+	// (pulumi/pulumi#13860), so ignoreTags is not honored during refresh and
+	// ignored customer tags get pulled into state and diffed away on the next
+	// up. Scoped to stacks that set ignoreTags so refresh behavior is unchanged
+	// for every other workload.
+	if allCfg, cfgErr := stack.GetAllConfig(ctx); cfgErr != nil {
+		// Don't silently degrade: if we can't read config we can't tell whether
+		// ignoreTags is set, so RunProgram is skipped and a stack that relies on
+		// ignoreTags would fall back to the broken refresh behavior
+		// (pulumi/pulumi#13860). Surface it so the operator knows why.
+		slog.Warn("could not read stack config to decide refresh RunProgram; ignoreTags may not be honored on this refresh",
+			"stack", stack.Name(), "error", cfgErr)
+	} else if shouldRunProgramOnRefresh(allCfg) {
+		refreshOpts = append(refreshOpts, optrefresh.RunProgram(true))
 	}
 
 	if debugOpts := pulumiDebugLogging(); debugOpts != nil {

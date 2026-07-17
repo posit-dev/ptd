@@ -22,6 +22,19 @@ spec:
   # AWS region for deployment
   region: us-east-2
 
+  # Tags applied to every managed AWS resource (cost tracking, ownership, etc.)
+  # resource_tags:
+  #   rs:owner: team@example.com
+  #   rs:project: posit-team
+
+  # AWS tag keys that PTD should never add or remove on managed resources.
+  # Use this for customer-applied tags (e.g. tags injected by an org-wide tagging
+  # policy) so our IaC leaves them untouched instead of reverting them on every run.
+  # Exact key match; AWS-only. Honored on every `ptd ensure`, including `--refresh`.
+  # ignore_tags:
+  #   - customer:cost-center
+  #   - customer:owner
+
   # RDS PostgreSQL configuration
   db_engine_version: "15.18"
   db_instance_class: db.m5d.large

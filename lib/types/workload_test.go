@@ -52,6 +52,7 @@ func TestAWSWorkloadConfigSerialization(t *testing.T) {
 			"Environment": "test",
 			"Owner":       "team",
 		},
+		IgnoreTags: []string{"customer:cost-center", "customer:owner"},
 		Sites: map[string]SiteConfig{
 			"main": {Spec: SiteConfigSpec{
 				ZoneID:                "Z123456789",
@@ -93,6 +94,9 @@ func TestAWSWorkloadConfigSerialization(t *testing.T) {
 	assert.Equal(t, config.Sites["main"].Spec.Domain, unmarshaledConfig.Sites["main"].Spec.Domain)
 	assert.Equal(t, config.Clusters["main"].Spec.ClusterName, unmarshaledConfig.Clusters["main"].Spec.ClusterName)
 	assert.Equal(t, config.Clusters["main"].Spec.NodeInstanceType, unmarshaledConfig.Clusters["main"].Spec.NodeInstanceType)
+
+	// IgnoreTags (AWS-only) must survive the round trip
+	assert.Equal(t, config.IgnoreTags, unmarshaledConfig.IgnoreTags)
 }
 
 func TestSystemNodesConfigFromYAML(t *testing.T) {
