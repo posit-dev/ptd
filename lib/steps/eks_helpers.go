@@ -43,6 +43,10 @@ func calicoResources(cpuRequest, memory string) pulumi.Map {
 // the name and resources need to be specified. Used under installation's
 // calicoNodeDaemonSet / typhaDeployment / calicoKubeControllersDeployment and
 // apiServer's apiServerDeployment.
+//
+// Only the main container is patched, not initContainers (e.g. calico-node's
+// install-cni). Init containers are ephemeral — they exit after CNI setup and
+// don't contribute to steady-state resource pressure — so they're left alone.
 func calicoComponentOverride(containerName, cpuRequest, memory string) pulumi.Map {
 	return pulumi.Map{
 		"spec": pulumi.Map{
@@ -169,8 +173,11 @@ func deployTigeraOperator(
 			// Resources for the tigera/operator pod itself. Same
 			// memory-bounded/CPU-unbounded policy as the dataplane components.
 			"resources": calicoResources("100m", "256Mi"),
-			// apiServer.enabled defaults to true in the chart; we merge in a
-			// resource override for the calico-apiserver container.
+			// calico-apiserver lives outside "installation": its resources map to
+			// the APIServer CR (apiServer.apiServerDeployment), a separate CR from
+			// the Installation, so the chart exposes it under a top-level apiServer
+			// key rather than under installation. apiServer.enabled defaults to true
+			// in the chart and PTD does not disable it, so this override is live.
 			"apiServer": pulumi.Map{
 				"apiServerDeployment": calicoComponentOverride("calico-apiserver", "100m", "256Mi"),
 			},
