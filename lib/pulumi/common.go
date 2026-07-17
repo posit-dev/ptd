@@ -96,6 +96,12 @@ func ConfigureStackRegion(ctx context.Context, stack auto.Stack, cloud string, r
 		if err := stack.SetConfig(ctx, "aws:region", auto.ConfigValue{Value: region}); err != nil {
 			return fmt.Errorf("failed to set AWS region: %w", err)
 		}
+		// Stack() creates an ephemeral workspace per invocation (auto.NewLocalWorkspace
+		// with an inline program and no WorkDir → a fresh temp dir), so the config
+		// below is rebuilt from scratch every run and always reflects exactly the
+		// current ignore_tags list. There are no stale keys[i] entries to clean up
+		// when the list shrinks. (If this ever moves to a persistent WorkDir, the
+		// aws:ignoreTags key would need to be removed before rewriting it.)
 		for _, entry := range awsIgnoreTagsConfig(ignoreTags) {
 			if err := stack.SetConfigWithOptions(ctx,
 				entry.Path,
