@@ -1,3 +1,10 @@
+## [1.39.1](https://github.com/posit-dev/ptd/compare/v1.39.0...v1.39.1) (2026-07-17)
+
+
+### Bug Fixes
+
+* **azure:** external-dns extraArgs must be a list, not a map ([099af64](https://github.com/posit-dev/ptd/commit/099af64f838ade04c60120d338756fbae0eb823d))
+
 # [1.39.0](https://github.com/posit-dev/ptd/compare/v1.38.1...v1.39.0) (2026-07-17)
 
 
