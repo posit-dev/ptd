@@ -281,15 +281,12 @@ func buildAWSSiteSpec(
 		}
 	}
 
-	// Karpenter session tolerations.
+	// Karpenter session placement: allow and direct both Workbench session pods and
+	// Connect content pods onto the session node pool.
 	if tolerations := sessionTolerations(clusterCfg.KarpenterConfig); len(tolerations) > 0 {
 		spec["workbench"] = map[string]interface{}{
 			"sessionTolerations": tolerations,
 		}
-	}
-
-	// Karpenter content placement: allow and direct Connect content pods onto the session node pool.
-	if tolerations := sessionTolerations(clusterCfg.KarpenterConfig); len(tolerations) > 0 {
 		connectSpec := map[string]interface{}{
 			"contentTolerations": tolerations,
 		}
