@@ -143,17 +143,21 @@ func runWorkOn(cmd *cobra.Command, target string, step string, execCmd []string)
 			workDir = programPath
 			pulumiStackName = stack.Name()
 
-		} else if steps.ValidStep(step, t.ControlRoom()) {
+		} else if stackStep, ok := steps.ResolveStackStep(step, t.ControlRoom(), t.CloudProvider()); ok {
 			// Handle standard step. Built-in steps are inline-Go Pulumi programs, so
 			// `pulumi preview/up` is not possible from here (the program is compiled
 			// into the binary). This Go-runtime state workspace exists for the manual
 			// state-cutover runbooks: `pulumi stack export/import`,
 			// `state unprotect/delete`, etc., which read state and need no program.
+			//
+			// Some step names (e.g. "kubernetes") are selectors that delegate to a
+			// different step per cloud provider (e.g. "eks" or "aks"); ResolveStackStep
+			// resolves to the step that actually owns the Pulumi stack.
 			stack, err := pulumi.NewStateWorkspaceStack(
 				cmd.Context(),
 				string(t.CloudProvider()), // ptd-<cloud>-<control-room/workload>-<stackname>
 				targetType,
-				step,
+				stackStep,
 				t.Name(),
 				t.PulumiBackendUrl(),
 				t.PulumiSecretsProviderKey(),

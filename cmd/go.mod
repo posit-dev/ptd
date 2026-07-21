@@ -1,6 +1,6 @@
 module github.com/posit-dev/ptd/cmd
 
-go 1.26.4
+go 1.26.5
 
 replace github.com/posit-dev/ptd/lib => ../lib
 
@@ -110,7 +110,8 @@ require (
 	github.com/hashicorp/hcl/v2 v2.24.0 // indirect
 	github.com/hdevalence/ed25519consensus v0.2.0 // indirect
 	github.com/hhrutter/lzw v1.0.0 // indirect
-	github.com/hhrutter/tiff v1.0.1 // indirect
+	github.com/hhrutter/pkcs7 v0.2.2 // indirect
+	github.com/hhrutter/tiff v1.0.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/iwdgo/sigintwindows v0.2.2 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
@@ -126,7 +127,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
-	github.com/mattn/go-runewidth v0.0.20 // indirect
+	github.com/mattn/go-runewidth v0.0.24 // indirect
 	github.com/mdlayher/netlink v1.7.3-0.20250113171957-fbb4dce95f42 // indirect
 	github.com/mdlayher/socket v0.5.0 // indirect
 	github.com/mitchellh/go-ps v1.0.0 // indirect
@@ -139,7 +140,7 @@ require (
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/opentracing/basictracer-go v1.1.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
-	github.com/pdfcpu/pdfcpu v0.6.0 // indirect
+	github.com/pdfcpu/pdfcpu v0.13.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pgavlin/fx v0.1.6 // indirect
 	github.com/pgavlin/fx/v2 v2.0.12 // indirect
@@ -155,7 +156,7 @@ require (
 	github.com/pulumi/pulumi-azure-native-sdk/authorization/v3 v3.16.0 // indirect
 	github.com/pulumi/pulumi-azure-native-sdk/compute/v3 v3.16.0 // indirect
 	github.com/pulumi/pulumi-azure-native-sdk/containerregistry/v3 v3.16.0 // indirect
-	github.com/pulumi/pulumi-azure-native-sdk/containerservice/v3 v3.6.1 // indirect
+	github.com/pulumi/pulumi-azure-native-sdk/containerservice/v3 v3.16.0 // indirect
 	github.com/pulumi/pulumi-azure-native-sdk/dbforpostgresql/v3 v3.16.0 // indirect
 	github.com/pulumi/pulumi-azure-native-sdk/dns/v3 v3.16.0 // indirect
 	github.com/pulumi/pulumi-azure-native-sdk/keyvault/v3 v3.14.0 // indirect
@@ -208,13 +209,13 @@ require (
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
 	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
-	golang.org/x/image v0.39.0 // indirect
-	golang.org/x/mod v0.35.0 // indirect
+	golang.org/x/image v0.43.0 // indirect
+	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
-	golang.org/x/tools v0.44.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/tools v0.45.0 // indirect
 	golang.zx2c4.com/wireguard/windows v0.5.3 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect

@@ -1,6 +1,16 @@
 package types
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+// ErrSecretNotFound is returned (wrapped) by SecretStore.GetSecretValue when a
+// secret does not exist. Callers can use errors.Is to distinguish a genuine
+// "not found" from permission/transient errors. Provider implementations are
+// responsible for wrapping their cloud-specific not-found errors with this
+// sentinel.
+var ErrSecretNotFound = errors.New("secret not found")
 
 type CloudProvider string
 
@@ -66,6 +76,9 @@ type Target interface {
 	StateBucketName() string
 	Sites() map[string]SiteConfig
 	TailscaleEnabled() bool
+	// IgnoreTags returns the list of exact AWS tag keys the Pulumi AWS provider should
+	// leave untouched on managed resources. AWS-only; Azure targets return nil.
+	IgnoreTags() []string
 	PulumiBackendUrl() string
 	PulumiSecretsProviderKey() string
 	HashName() string

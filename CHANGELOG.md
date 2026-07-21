@@ -1,3 +1,206 @@
+# [1.40.0](https://github.com/posit-dev/ptd/compare/v1.39.1...v1.40.0) (2026-07-17)
+
+
+### Bug Fixes
+
+* **aws:** warn when refresh can't read config; clarify ignore_tags config lifecycle ([eff9888](https://github.com/posit-dev/ptd/commit/eff9888e2968d18a86edfcad5274747d9e3c1b3b)), closes [pulumi/pulumi#13860](https://github.com/pulumi/pulumi/issues/13860)
+
+
+### Features
+
+* **aws:** add ignore_tags to preserve customer-applied resource tags ([c0ae44d](https://github.com/posit-dev/ptd/commit/c0ae44de3635c1022502d9366d6daea257c25702)), closes [pulumi/pulumi#13860](https://github.com/pulumi/pulumi/issues/13860)
+
+## [1.39.1](https://github.com/posit-dev/ptd/compare/v1.39.0...v1.39.1) (2026-07-17)
+
+
+### Bug Fixes
+
+* **azure:** external-dns extraArgs must be a list, not a map ([099af64](https://github.com/posit-dev/ptd/commit/099af64f838ade04c60120d338756fbae0eb823d))
+
+# [1.39.0](https://github.com/posit-dev/ptd/compare/v1.38.1...v1.39.0) (2026-07-17)
+
+
+### Features
+
+* **azure:** support multiple TLS secrets on Traefik site ingress ([d0de1ef](https://github.com/posit-dev/ptd/commit/d0de1ef87923d333bf18c78a57ac7f0ce17f2c94))
+
+## [1.38.1](https://github.com/posit-dev/ptd/compare/v1.38.0...v1.38.1) (2026-07-16)
+
+
+### Bug Fixes
+
+* **azure:** poll for bastion tunnel port instead of one-shot check ([1040c4b](https://github.com/posit-dev/ptd/commit/1040c4b6dd1a9158d103f321d14184754a14e4a6))
+
+# [1.38.0](https://github.com/posit-dev/ptd/compare/v1.37.3...v1.38.0) (2026-07-16)
+
+
+### Features
+
+* **infra:** allow labeling system nodes with posit.team/node-role=system ([70ec09c](https://github.com/posit-dev/ptd/commit/70ec09cd1fdb4e96302753b338d812caea640367))
+
+## [1.37.3](https://github.com/posit-dev/ptd/compare/v1.37.2...v1.37.3) (2026-07-15)
+
+
+### Bug Fixes
+
+* align review config with claude-code-action's documented pattern ([02a9e26](https://github.com/posit-dev/ptd/commit/02a9e2656fae903642813c3f2a78d10faecc7ab9))
+* **clusters:** pin helm-controller klipper-helm job image ([fd8e217](https://github.com/posit-dev/ptd/commit/fd8e217fa08a0336ccb6d98c14685f27b2a0b81f))
+* set track_progress so the review actually posts ([7cb0ef4](https://github.com/posit-dev/ptd/commit/7cb0ef44a81100f5e49f87c8c9b7690c315c2de2))
+* skip auto-review on draft PRs ([c38604f](https://github.com/posit-dev/ptd/commit/c38604fd98ee6a56df3a1014ca43bfdff515eafe))
+
+## [1.37.2](https://github.com/posit-dev/ptd/compare/v1.37.1...v1.37.2) (2026-07-10)
+
+
+### Bug Fixes
+
+* **alerts:** apply volume attribution to all netapp rules; stop NLB NoData pages ([4b083dd](https://github.com/posit-dev/ptd/commit/4b083dd37d5d7fd98b96aed2bdc011d34f9f94c2))
+* **alerts:** make NetApp throughput rule volume-attributable and burst-tolerant ([a607b1f](https://github.com/posit-dev/ptd/commit/a607b1ff30c45ca42ddffba39eec6f85b0a6e7d5))
+* **alerts:** scrape NetApp throughput metric and add cluster-attributable silent alert ([98d05f5](https://github.com/posit-dev/ptd/commit/98d05f5a08ef2a8c337ff57e4c71ee4a688f47ca))
+* **alerts:** windowed baseline for netapp silent detection (not point-offset) ([36944b8](https://github.com/posit-dev/ptd/commit/36944b8a1448c575abd33db6270123e1234f2579))
+* trigger review on ready_for_review + allow Read/Glob/Grep ([37d12cb](https://github.com/posit-dev/ptd/commit/37d12cb77ee4e0f92827c981f9675f3bfb373c65))
+* use tool denylist instead of allowlist so review posts ([01f629d](https://github.com/posit-dev/ptd/commit/01f629df608f33426cdbc1d22c959c52de9d01b6))
+
+## [1.37.1](https://github.com/posit-dev/ptd/compare/v1.37.0...v1.37.1) (2026-07-09)
+
+
+### Bug Fixes
+
+* default team-operator chart to v1.29.0 ([e83f02d](https://github.com/posit-dev/ptd/commit/e83f02d10b031b8814bc732c81e456ba67229738))
+
+# [1.37.0](https://github.com/posit-dev/ptd/compare/v1.36.3...v1.37.0) (2026-07-09)
+
+
+### Features
+
+* **traefik:** make workload ingress highly available and Burstable ([8acd581](https://github.com/posit-dev/ptd/commit/8acd581960dec0aa1f13f3b46da47a0a1cf13bfa))
+
+## [1.36.3](https://github.com/posit-dev/ptd/compare/v1.36.2...v1.36.3) (2026-07-09)
+
+
+### Bug Fixes
+
+* **eks:** ignore serviceAccountRoleArn on CSI-driver addons ([8b27364](https://github.com/posit-dev/ptd/commit/8b2736459bb2febb4b967ecd5a8b47e982111c9d)), closes [terraform-provider-aws#19402](https://github.com/terraform-provider-aws/issues/19402)
+
+## [1.36.2](https://github.com/posit-dev/ptd/compare/v1.36.1...v1.36.2) (2026-07-09)
+
+
+### Bug Fixes
+
+* **aks:** use stable far-future force-upgrade expiry to stop perpetual diff ([9bd4e0e](https://github.com/posit-dev/ptd/commit/9bd4e0e58a01592627c652b693f2f310d12b253e))
+
+## [1.36.1](https://github.com/posit-dev/ptd/compare/v1.36.0...v1.36.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **aks:** restore user node pool SecurityProfile and drop conflicting powerState ignore ([41d66ce](https://github.com/posit-dev/ptd/commit/41d66cedd0a871771447d39b78bcf1ff2a496913))
+* **aks:** use typed AgentPoolSSHAccess constant for SshAccess ([0ae84fc](https://github.com/posit-dev/ptd/commit/0ae84fc1e69d65749c193b1ff04e3871f2a30a48))
+
+# [1.36.0](https://github.com/posit-dev/ptd/compare/v1.35.2...v1.36.0) (2026-07-08)
+
+
+### Bug Fixes
+
+* **alerts:** add deleteRules entry and opsgenie label for launcher_pod_pending ([5572b9d](https://github.com/posit-dev/ptd/commit/5572b9df8f9d9729f11d66a695f806b7ea8dadb0))
+
+
+### Features
+
+* **alerts:** add Launcher Pod Pending alert for stuck session/content pods ([aaf14fd](https://github.com/posit-dev/ptd/commit/aaf14fd3cf969d63670091642f8c85dd898017ea))
+
+## [1.35.2](https://github.com/posit-dev/ptd/compare/v1.35.1...v1.35.2) (2026-07-06)
+
+
+### Bug Fixes
+
+* **lib:** bump pdfcpu to v0.13.0 to remediate uncontrolled-recursion advisories ([aefb2a3](https://github.com/posit-dev/ptd/commit/aefb2a30309d41fcb7f661e71924326ce4eea4a2)), closes [Hi#severity](https://github.com/Hi/issues/severity)
+
+## [1.35.1](https://github.com/posit-dev/ptd/compare/v1.35.0...v1.35.1) (2026-07-01)
+
+
+### Bug Fixes
+
+* resolve kubernetes step alias to eks/aks in workon ([983c0b1](https://github.com/posit-dev/ptd/commit/983c0b1009f73769151c0ae88740016104e173dc))
+
+# [1.35.0](https://github.com/posit-dev/ptd/compare/v1.34.2...v1.35.0) (2026-06-29)
+
+
+### Bug Fixes
+
+* address runbook review comments ([3afbb77](https://github.com/posit-dev/ptd/commit/3afbb774edb2562f6149852b7c505e0be9af7a51))
+* correct DR runbook assumptions, remove redundant --dry-run ([86a723d](https://github.com/posit-dev/ptd/commit/86a723d1ed68c588ed820fb8576d9bccf4ea2c9b))
+* **eject:** use real cluster names in operational runbooks ([14d56ea](https://github.com/posit-dev/ptd/commit/14d56eac5da51db4f04ecd83c1a16305434f3c61))
+* wire up ClusterName, sort sites, sanitize Azure resource group ([b98318d](https://github.com/posit-dev/ptd/commit/b98318de7f4c62475120906852a75a17128c098c))
+
+
+### Features
+
+* generate operational runbooks in eject bundle ([#218](https://github.com/posit-dev/ptd/issues/218)) ([5b38622](https://github.com/posit-dev/ptd/commit/5b38622aa5f87fdd06681d0de6cdaa2839513fbf))
+
+## [1.34.2](https://github.com/posit-dev/ptd/compare/v1.34.1...v1.34.2) (2026-06-29)
+
+
+### Bug Fixes
+
+* **deps:** bump golang.org/x/image to v0.43.0 ([743cb7f](https://github.com/posit-dev/ptd/commit/743cb7f23a65249cabf553722f48cb88eb8f254f))
+
+## [1.34.1](https://github.com/posit-dev/ptd/compare/v1.34.0...v1.34.1) (2026-06-26)
+
+
+### Bug Fixes
+
+* default team-operator chart to v1.27.1 ([fbe0026](https://github.com/posit-dev/ptd/commit/fbe0026297ac834405c59b8725e8145baa6b2cd0))
+
+# [1.34.0](https://github.com/posit-dev/ptd/compare/v1.33.0...v1.34.0) (2026-06-26)
+
+
+### Features
+
+* **azure:** tag resource group with workload resource_tags on creation ([3eebad0](https://github.com/posit-dev/ptd/commit/3eebad0fe479dc65dc8653f6b38a71c62e969776))
+
+# [1.33.0](https://github.com/posit-dev/ptd/compare/v1.32.3...v1.33.0) (2026-06-26)
+
+
+### Bug Fixes
+
+* address eject review comments ([b6fe798](https://github.com/posit-dev/ptd/commit/b6fe798e23fb03f875f44334e96390617240fd7d))
+* derive mimir secret name from cluster name in handoff ([12a579d](https://github.com/posit-dev/ptd/commit/12a579d96d5048484c2c3e9476063892b2f47323))
+* distinguish secret-not-found from permission errors in mimir cleanup ([23fa2ef](https://github.com/posit-dev/ptd/commit/23fa2ef2a1220e31a29cf313de29f257bac9ae83))
+* expand allowedTools so Claude can read PR context ([2c97680](https://github.com/posit-dev/ptd/commit/2c97680b029fdc4ec5b5004c4bbe4ec8ce0da2b7))
+* expand claude.yml allowedTools, add ANTHROPIC_DEFAULT_HAIKU_MODEL ([39b0c05](https://github.com/posit-dev/ptd/commit/39b0c052a44be36ed36e628d444b95a1c53a5039))
+* persist eject-record before destructive config strip ([4f890c0](https://github.com/posit-dev/ptd/commit/4f890c0730223ed852a8ae7ebd03cdd91dbdb479))
+* remove ANTHROPIC_DEFAULT_HAIKU_MODEL, not needed ([7be31a1](https://github.com/posit-dev/ptd/commit/7be31a18ce88111cbd4b8c758e9e4375f8901406))
+* remove dead Bundle struct and check test WriteFile errors ([ecaaf70](https://github.com/posit-dev/ptd/commit/ecaaf703b4fa0e98939ec68d84f4d72fa74e1e03))
+* write ptd.yaml and eject-record atomically ([0b33da2](https://github.com/posit-dev/ptd/commit/0b33da2a274f0e2a8acd54be2c8f93dae76c1c44))
+
+
+### Features
+
+* orchestrate eject with preflight checks, config strip, and Mimir cleanup ([779ba03](https://github.com/posit-dev/ptd/commit/779ba03421660fa776ec587d0cc9f8b45c256941)), closes [#248](https://github.com/posit-dev/ptd/issues/248)
+
+## [1.32.3](https://github.com/posit-dev/ptd/compare/v1.32.2...v1.32.3) (2026-06-25)
+
+
+### Bug Fixes
+
+* grant pull-requests write permission so Claude can post reviews ([9b3988c](https://github.com/posit-dev/ptd/commit/9b3988c133a7756a7d4a027bf82adc233e7bd76f))
+* **sites:** stop copying cloud resource tags onto Site k8s labels ([08c80d3](https://github.com/posit-dev/ptd/commit/08c80d3900741e884960ec3ed7fbd7c706dd83e7))
+
+## [1.32.2](https://github.com/posit-dev/ptd/compare/v1.32.1...v1.32.2) (2026-06-24)
+
+
+### Bug Fixes
+
+* **azure:** resolve bastion NSG subnet from any agent pool profile ([8f6dd05](https://github.com/posit-dev/ptd/commit/8f6dd053b9a8dd76b6a9b10968bbfb4a907113fd))
+
+## [1.32.1](https://github.com/posit-dev/ptd/compare/v1.32.0...v1.32.1) (2026-06-23)
+
+
+### Bug Fixes
+
+* correct Bedrock model ID to Sonnet 4.5 ([2c2a9ac](https://github.com/posit-dev/ptd/commit/2c2a9acff0b797f4f5117eea8350742a03bb7e25))
+* use correct Sonnet 4.6 Bedrock inference profile ID ([f6812e4](https://github.com/posit-dev/ptd/commit/f6812e4658fd4782445f528ded88e4226dbfec02))
+
 # [1.32.0](https://github.com/posit-dev/ptd/compare/v1.31.2...v1.32.0) (2026-06-18)
 
 

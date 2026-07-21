@@ -281,7 +281,7 @@ Do NOT introduce new naming patterns — follow existing conventions
 
 ### Step Execution
 Steps run sequentially via `ptd ensure`:
-1. `bootstrap` (Go) → 2. `persistent` (Go) → 3. `postgres_config` (Go) → 4. `eks`/`aks` → 5. `clusters` → 6. `helm` → 7. `sites` → 8. `persistent_reprise` (Go)
+1. `bootstrap` (Go) → 2. `persistent` (Go) → 3. `postgres_config` (Go) → 4. `eks`/`aks` → 5. `clusters` → 6. `helm` → 7. `sites`
 
 Each step produces outputs consumed by later steps. See `docs/architecture/step-dependencies.md`.
 

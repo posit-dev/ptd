@@ -177,7 +177,7 @@ This step is selected based on the cloud provider:
 
 #### AWS - EKS step
 
-**Implementation**: Inline Go Pulumi (`lib/steps/eks.go`, `lib/steps/eks_aws.go`, `lib/steps/eks_helpers.go`, `lib/aws/eks_cluster.go`)
+**Implementation**: Inline Go Pulumi (`lib/steps/eks.go`, `lib/steps/eks_aws.go`, `lib/steps/eks_irsa_aws.go`, `lib/steps/eks_helpers.go`, `lib/aws/eks_cluster.go`)
 
 Creates EKS clusters:
 - EKS control plane with specified Kubernetes version
@@ -185,6 +185,7 @@ Creates EKS clusters:
 - Creates node groups with EC2 launch templates
 - Configures security groups for cluster and node communication
 - Sets up OIDC identity provider for IAM roles for service accounts (IRSA)
+- Creates the 8 workload-scoped IRSA roles (FSx, Load Balancer Controller, ExternalDNS, Traefik Forward Auth, Mimir, Loki, EBS CSI, Alloy), with trust policies built declaratively from the cluster OIDC provider (`lib/steps/eks_irsa_aws.go`)
 - Optionally installs Tigera operator for network policies
 
 #### Azure - AKS step
@@ -251,18 +252,7 @@ Deploys resources for each Posit Team site:
 
 A "site" represents a complete deployment of Posit Team products (Connect, Workbench, Package Manager) with a specific configuration and domain.
 
-### 8. persistent_reprise
-
-**Purpose**: Update secrets with resources created by later steps
-
-**Implementation**: Go (`lib/steps/persistent_reprise.go`)
-
-Re-runs the persistent step to:
-- Refresh infrastructure outputs
-- Update secrets that depend on resources created in helm or sites steps
-- Ensure all secrets contain complete information for the running environment
-
-This is necessary because some secret values are only known after Kubernetes resources are deployed.
+> **Historical note:** Workloads previously ran an 8th step, `persistent_reprise`, which re-ran the `persistent` program after the cluster existed so the workload IRSA roles' trust policy could pick up the cluster OIDC issuer. Those roles moved to the `eks` step (where the trust is built directly from the cluster OIDC provider Output), so `persistent_reprise` was removed and the workload pipeline is now 7 steps.
 
 ## Step Options and Flags
 

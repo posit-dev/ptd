@@ -52,11 +52,10 @@ func (t Target) Name() string {
 }
 
 // Az naming conventions are inconsistent but most allow lowercase alphanumeric and hyphens at the least
-func (t Target) sanitizedName() string {
-	name := strings.ToLower(t.Name())
+func SanitizedName(name string) string {
+	name = strings.ToLower(name)
 	re := regexp.MustCompile(`[^a-z0-9-]`)
-	name = re.ReplaceAllString(name, "-")
-	return name
+	return re.ReplaceAllString(name, "-")
 }
 
 func (t Target) Credentials(ctx context.Context) (types.Credentials, error) {
@@ -107,7 +106,7 @@ func (t Target) Type() types.TargetType {
 
 // Azure storage accounts limited to 24 characters and actually don't allow hyphens for... reasons
 func (t Target) StateBucketName() string {
-	name := strings.ReplaceAll(t.sanitizedName(), "-", "")
+	name := strings.ReplaceAll(SanitizedName(t.Name()), "-", "")
 	if len(name) > 19 {
 		name = name[:19]
 	}
@@ -120,11 +119,11 @@ func (t Target) Sites() map[string]types.SiteConfig {
 }
 
 func (t Target) ResourceGroupName() string {
-	return fmt.Sprintf("rsg-ptd-%s", t.sanitizedName())
+	return fmt.Sprintf("rsg-ptd-%s", SanitizedName(t.Name()))
 }
 
 func (t Target) ClusterResourceGroupName(release string) string {
-	clusterName := fmt.Sprintf("%s-%s", t.sanitizedName(), release)
+	clusterName := fmt.Sprintf("%s-%s", SanitizedName(t.Name()), release)
 	return fmt.Sprintf("MC_%s_%s_%s", t.ResourceGroupName(), clusterName, t.Region())
 }
 
@@ -133,12 +132,12 @@ func (t Target) VnetRsgName() string {
 }
 
 func (t Target) BlobStorageName() string {
-	return fmt.Sprintf("blob-ptd-%s", t.sanitizedName())
+	return fmt.Sprintf("blob-ptd-%s", SanitizedName(t.Name()))
 }
 
 // Key Vault names are limited to 24 characters
 func (t Target) VaultName() string {
-	name := t.sanitizedName()
+	name := SanitizedName(t.Name())
 	if len(name) > 17 {
 		name = name[:17]
 	}
@@ -148,6 +147,11 @@ func (t Target) VaultName() string {
 func (t Target) TailscaleEnabled() bool {
 	// Azure doesn't support tailscale
 	return false
+}
+
+func (t Target) IgnoreTags() []string {
+	// ignore_tags is AWS-only; the Azure provider has no equivalent.
+	return nil
 }
 
 func (t Target) Clusters() map[string]types.AzureWorkloadClusterConfig {

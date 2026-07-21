@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/posit-dev/ptd/lib/aws"
+	"github.com/posit-dev/ptd/lib/consts"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/kube"
 	"github.com/posit-dev/ptd/lib/proxy"
@@ -279,7 +280,7 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 		}
 
 		// 5. Traefik (namespace + helmchart + ingress)
-		if err := awsHelmTraefik(ctx, k8sOpt, name, release, params, routingWeight, resolved.TraefikVersion, withAlias); err != nil {
+		if err := awsHelmTraefik(ctx, k8sOpt, name, release, params, routingWeight, resolved.TraefikVersion, resolved.TraefikDeploymentReplicas, withAlias); err != nil {
 			return err
 		}
 
@@ -532,7 +533,7 @@ func awsHelmSecretStoreCsiAws(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption,
 }
 
 func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName, release string,
-	params awsHelmParams, weight, version string,
+	params awsHelmParams, weight, version string, replicas int,
 	withAlias func(string, string) pulumi.ResourceOption) error {
 
 	nsName := compoundName + "-" + release + "-traefik-ns"
@@ -546,13 +547,56 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 		return fmt.Errorf("helm: failed to create traefik namespace: %w", err)
 	}
 
+	// Dedicated cluster-scoped PriorityClass so Traefik ingress pods are protected
+	// from eviction under node pressure. Value sits below the reserved system-*
+	// range (system-cluster-critical = 2000000000) but high enough to outrank
+	// ordinary workload pods. system-cluster-critical itself cannot be reused here:
+	// admission restricts it to the kube-system namespace.
+	pcResourceName := compoundName + "-" + release + "-traefik-critical-priority"
+	pc, err := schedulingv1.NewPriorityClass(ctx, pcResourceName, &schedulingv1.PriorityClassArgs{
+		Metadata: metav1.ObjectMetaArgs{
+			Name:   pulumi.String("traefik-critical"),
+			Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
+		},
+		Value:            pulumi.Int(1000000000),
+		GlobalDefault:    pulumi.Bool(false),
+		Description:      pulumi.StringPtr("High priority for workload Traefik ingress pods so they resist eviction under node pressure"),
+		PreemptionPolicy: pulumi.StringPtr("PreemptLowerPriority"),
+	}, k8sOpt, withAlias("kubernetes:scheduling.k8s.io/v1:PriorityClass", pcResourceName))
+	if err != nil {
+		return fmt.Errorf("helm: failed to create traefik priority class: %w", err)
+	}
+
 	traefikValues := map[string]interface{}{
 		"image": map[string]interface{}{
 			"registry": "ghcr.io/traefik",
 		},
 		"deployment": map[string]interface{}{
-			"kind": "Deployment",
+			"kind":     "Deployment",
+			"replicas": replicas,
 		},
+		// Resource requests move Traefik out of BestEffort into Burstable QoS so it is
+		// not the first pod starved/evicted under node pressure. Mirrors control room.
+		"resources": map[string]interface{}{
+			"requests": map[string]interface{}{"cpu": "200m", "memory": "256Mi"},
+			"limits":   map[string]interface{}{"cpu": "1000m", "memory": "512Mi"},
+		},
+		// Spread replicas across nodes so a single node failure cannot take out the edge.
+		"topologySpreadConstraints": []interface{}{
+			map[string]interface{}{
+				"maxSkew":           1,
+				"topologyKey":       "kubernetes.io/hostname",
+				"whenUnsatisfiable": "ScheduleAnyway",
+				"labelSelector": map[string]interface{}{
+					"matchLabels": map[string]interface{}{"app.kubernetes.io/name": "traefik"},
+				},
+			},
+		},
+		"podDisruptionBudget": map[string]interface{}{
+			"enabled":        true,
+			"maxUnavailable": 1,
+		},
+		"priorityClassName": "traefik-critical",
 		"logs": map[string]interface{}{
 			"access":  map[string]interface{}{"enabled": true},
 			"general": map[string]interface{}{"level": "DEBUG"},
@@ -613,7 +657,7 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 			"spec": chartSpec,
 		},
 	}, k8sOpt, withAlias("kubernetes:helm.cattle.io/v1:HelmChart", chartResourceName),
-		pulumi.DependsOn([]pulumi.Resource{ns}))
+		pulumi.DependsOn([]pulumi.Resource{ns, pc}))
 	if err != nil {
 		return fmt.Errorf("helm: failed to create traefik chart: %w", err)
 	}
@@ -1480,6 +1524,26 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 
 		if nodePool.ExpireAfter != nil {
 			nodepoolSpec["template"].(map[string]interface{})["spec"].(map[string]interface{})["expireAfter"] = *nodePool.ExpireAfter
+		}
+
+		// System node pools label their nodes with posit.team/node-role=system so
+		// callers can target or avoid them with node affinity (e.g. keep the image
+		// prepull daemonset off them). Merge into template.metadata.labels rather
+		// than overwriting, so any other metadata/labels a future field may set
+		// survive (same approach as ngTags merging in WithNodeGroup).
+		if nodePool.SystemNodes {
+			template := nodepoolSpec["template"].(map[string]interface{})
+			metadata, ok := template["metadata"].(map[string]interface{})
+			if !ok {
+				metadata = map[string]interface{}{}
+				template["metadata"] = metadata
+			}
+			labels, ok := metadata["labels"].(map[string]interface{})
+			if !ok {
+				labels = map[string]interface{}{}
+				metadata["labels"] = labels
+			}
+			labels[consts.PositTeamNodeRoleLabel] = consts.PositTeamNodeRoleSystem
 		}
 
 		// Build taints: start with explicitly listed taints, then add session taint if session_taints: true.

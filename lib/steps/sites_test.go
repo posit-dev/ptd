@@ -83,7 +83,6 @@ func minimalAWSSiteParams(compoundName string, releases []string, siteNames []st
 		kubeconfigsByRelease: kubeconfigsByRelease,
 		clusters:             clusters,
 		sites:                sites,
-		resourceTags:         map[string]string{},
 	}
 }
 
@@ -320,7 +319,6 @@ func minimalAzureSiteParams(compoundName string, releases []string, siteNames []
 		kubeconfigsByRelease: kubeconfigsByRelease,
 		clusters:             clusters,
 		sites:                sites,
-		resourceTags:         map[string]string{},
 	}
 }
 
