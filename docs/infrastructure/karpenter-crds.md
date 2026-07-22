@@ -1,73 +1,102 @@
 # Karpenter CRD management
 
-How PTD manages Karpenter's CRDs, and why it's done this way. Implemented in
-`awsHelmKarpenter` (`lib/steps/helm_aws.go`).
+How PTD manages Karpenter's CRDs, and the one-time migration existing clusters
+need. Implemented in `awsHelmKarpenter` (`lib/steps/helm_aws.go`).
 
-## The problem
+## Problem
 
 The Karpenter controller chart (`oci://public.ecr.aws/karpenter/karpenter`)
-bundles its CRDs in the chart's `crds/` directory. Helm installs `crds/`
-resources **once, on first install, and never upgrades them** on subsequent
-`helm upgrade`s (this is intentional, documented Helm behavior).
+bundles its CRDs in `crds/`. Helm installs `crds/` **once, on first install, and
+never upgrades them**. So a `karpenter_version` bump upgrades the controller but
+leaves the CRDs frozen. When a controller >= 1.9 emits a `Gte`/`Lte` requirement
+(normalized from a NodePool `Gt`/`Lt` floor) against a pre-1.9 CRD, the API
+server rejects the NodeClaim and no nodes provision.
 
-So historically a `karpenter_version` bump upgraded the controller while leaving
-the CRDs frozen at whatever version was first installed. When a controller
->= 1.9 then emits a `Gte`/`Lte` requirement — normalized from a NodePool
-`Gt`/`Lt` instance floor — against a pre-1.9 CRD whose schema enum lacks those
-operators, the API server rejects the NodeClaim and no nodes provision. The
-break needs all three: controller >= 1.9, a NodePool using a `Gt`/`Lt` floor,
-and a CRD missing `Gte`/`Lte`.
-
-## The fix
+## Fix
 
 Manage the CRDs with the dedicated **`karpenter-crd`** chart, installed as a
 second `helm.cattle.io/v1` HelmChart pinned to the **same `karpenter_version`**
-as the controller. The `karpenter-crd` chart templates the CRDs (rather than
-shipping them in `crds/`), so Helm upgrades them on every version bump. This is
-Karpenter's officially recommended way to manage CRD lifecycle.
+as the controller. Its CRDs are templated, so Helm upgrades them on every bump.
+This is Karpenter's recommended way to manage CRD lifecycle.
 
-### Adopting pre-existing CRDs
+## Why adoption is a manual, one-time step
 
-Every cluster created before this change already has the Karpenter CRDs — the
-controller chart's `crds/` created them — but **without** `karpenter-crd` Helm
-ownership metadata. A plain `karpenter-crd` install would therefore fail with
-`exists and cannot be imported into the current release — invalid ownership
-metadata`.
+Every existing cluster already has the Karpenter CRDs — the controller chart's
+`crds/` created them — but **without Helm ownership metadata**. A plain
+`karpenter-crd` install therefore fails:
 
-We resolve this with the helm-controller's native **`spec.takeOwnership`**
-(maps to `helm upgrade --take-ownership`). It rewrites the ownership label and
-`release-name`/`-namespace` annotations on the existing objects so the
-`karpenter-crd` release becomes their owner. It is scoped to exactly the CRDs
-the `karpenter-crd` chart renders, and is a no-op on greenfield clusters (the
-chart just creates them). This replaced an earlier approach that manually
-pre-stamped ownership metadata via `CustomResourcePatch`.
+```
+Unable to continue with install: CustomResourceDefinition "nodepools.karpenter.sh"
+in namespace "" exists and cannot be imported into the current release: invalid
+ownership metadata; ...
+```
 
-## Version requirements
+Helm's normal escape hatch is `--take-ownership`, but PTD's helm job image is
+pinned to `klipper-helm:v0.9.5-build20250306` (**Helm 3.16.4**), which predates
+that flag. (The pin is deliberate — newer, Helm-4 klipper-helm builds regressed
+install/upgrade detection.) So adoption can't be automated in the chart.
 
-- **helm-controller >= v0.16.14** — adds `spec.takeOwnership` (PTD sets this image
-  in `clusters_aws.go` / `clusters_azure.go`, and the field must also be present
-  in PTD's embedded HelmChart CRD schema in `clusters_helpers.go`, or the API
-  server prunes it).
-- **Helm >= 3.17** in the job image — `--take-ownership` (satisfied by the
-  `klipper-helm` job image PTD pins).
+Instead, adopt the CRDs once per existing cluster by writing the ownership
+metadata Helm expects, so the subsequent `karpenter-crd` install adopts them
+cleanly. This is a **one-time migration**, not steady-state IaC: greenfield
+clusters have no CRDs to adopt and skip it entirely.
 
-## Known limitations
+> ⚠️ **Rollout order matters.** Once this ships, the `helm` step tries to install
+> `karpenter-crd` on every cluster. On an un-migrated existing cluster that
+> install **fails** until the stamp below is applied — non-destructive (running
+> Karpenter is unaffected; the chart just won't reconcile). Migrate each existing
+> cluster before, or immediately alongside, its next `helm`-step apply.
 
-- **The controller chart's bundled `crds/` are left in place.** The k3s
-  helm-controller has no `skipCRDs`/`crds` option and no way to pass Helm's
-  `--skip-crds` (verified against its `HelmChartSpec`), so the controller chart's
-  CRDs can't be disabled. This is benign on existing clusters: Helm skips `crds/`
-  resources that already exist.
-- **Ordering is best-effort.** `dependsOn` orders CR *creation* (CRD chart before
-  the controller chart and the NodePool/EC2NodeClass CRs), but the helm-controller
-  reconciles HelmChart CRs asynchronously, so it doesn't strictly guarantee the
-  CRD helm job finishes first. The CRD changes are additive/backward-compatible
-  and the dependent CRs retry until the CRDs exist.
+## Migration procedure (existing clusters, run once each)
 
-## Rollout
+Run against the target cluster (e.g. inside `ptd workon <cluster>`).
 
-The helm-controller image bump and the embedded HelmChart CRD schema change apply
-to **every** cluster through the `clusters` step, not just Karpenter clusters.
-Validate on a staging cluster (ideally one already in the stale-CRD state) before
-broad rollout — confirm both the brownfield adoption path and a greenfield
-install.
+**1. Confirm the CRDs exist and are not yet Helm-owned** (empty output = unowned):
+
+```bash
+kubectl get crd nodeclaims.karpenter.sh \
+  -o jsonpath='{.metadata.labels.app\.kubernetes\.io/managed-by}{"\n"}'
+```
+
+**2. Stamp Helm ownership.** Release name is the HelmChart CR name
+(`karpenter-crd`); release namespace is its `targetNamespace` (`kube-system`).
+Discovering the CRDs dynamically covers installs that lack `nodeoverlays`:
+
+```bash
+CRDS=$(kubectl get crd -o name | grep 'karpenter\.' | sed 's|customresourcedefinition.apiextensions.k8s.io/||')
+kubectl label    crd $CRDS app.kubernetes.io/managed-by=Helm --overwrite
+kubectl annotate crd $CRDS meta.helm.sh/release-name=karpenter-crd --overwrite
+kubectl annotate crd $CRDS meta.helm.sh/release-namespace=kube-system --overwrite
+```
+
+**3. Apply the chart** — the `karpenter-crd` install now adopts and upgrades the
+CRDs:
+
+```bash
+ptd ensure <cluster> --only-steps helm --dry-run     # review: new karpenter-crd HelmChart
+ptd ensure <cluster> --only-steps helm --auto-apply
+```
+
+**4. Verify:**
+
+```bash
+# adopted → karpenter-crd
+kubectl get crd nodeclaims.karpenter.sh -o jsonpath='{.metadata.annotations.meta\.helm\.sh/release-name}{"\n"}'
+# CRDs upgraded → enum now includes Gte/Lte
+kubectl get crd nodeclaims.karpenter.sh -o jsonpath='{.spec.versions[*].schema.openAPIV3Schema.properties.spec.properties.requirements.items.properties.operator.enum}{"\n"}'
+# existing Karpenter resources intact
+kubectl get nodepools,ec2nodeclasses
+```
+
+**Rollback (before step 3 only):** the stamp is additive metadata; remove it with
+`kubectl label crd $CRDS app.kubernetes.io/managed-by-` and
+`kubectl annotate crd $CRDS meta.helm.sh/release-name- meta.helm.sh/release-namespace-`.
+After step 3 the CRDs are owned by the `karpenter-crd` release.
+
+## Future: dropping the manual step
+
+When the fleet's helm job image moves to a fixed Helm-4 klipper-helm build
+(`>= v0.11.1-build20260615`, which restored install/upgrade detection) paired
+with helm-controller `>= v0.16.14`, set `spec.takeOwnership: true` on the
+`karpenter-crd` HelmChart and adoption becomes automatic — the manual migration
+above is no longer needed. That executor upgrade is tracked separately.

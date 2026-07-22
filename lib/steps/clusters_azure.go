@@ -485,7 +485,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 						Containers: corev1.ContainerArray{
 							&corev1.ContainerArgs{
 								Name:    pulumi.String("helm-controller"),
-								Image:   pulumi.String("ghcr.io/k3s-io/helm-controller:v0.16.14"),
+								Image:   pulumi.String("ghcr.io/k3s-io/helm-controller:v0.16.10"),
 								Command: pulumi.StringArray{pulumi.String("helm-controller")},
 								Args: pulumi.StringArray{
 									pulumi.String("--namespace"),

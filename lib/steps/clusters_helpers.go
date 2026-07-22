@@ -158,7 +158,6 @@ var helmChartsCRDSpec = map[string]interface{}{
 									},
 								},
 								"set":             map[string]interface{}{"nullable": true, "type": "object", "additionalProperties": map[string]interface{}{"x-kubernetes-int-or-string": true}},
-								"takeOwnership":   map[string]interface{}{"type": "boolean"},
 								"targetNamespace": map[string]interface{}{"nullable": true, "type": "string"},
 								"timeout":         map[string]interface{}{"nullable": true, "type": "string"},
 								"valuesContent":   map[string]interface{}{"nullable": true, "type": "string"},
