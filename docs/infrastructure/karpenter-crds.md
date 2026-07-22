@@ -60,7 +60,8 @@ kubectl get crd nodeclaims.karpenter.sh \
 
 **2. Stamp Helm ownership.** Release name is the HelmChart CR name
 (`karpenter-crd`); release namespace is its `targetNamespace` (`kube-system`).
-Discovering the CRDs dynamically covers installs that lack `nodeoverlays`:
+Discovering the CRDs dynamically covers installs that lack `nodeoverlays` (a
+Karpenter CRD added in v1.7.1, so clusters set up on older Karpenter don't have it):
 
 ```bash
 for crd in $(kubectl get crd -o name | grep 'karpenter\.'); do
