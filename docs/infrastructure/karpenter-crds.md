@@ -19,6 +19,12 @@ second `helm.cattle.io/v1` HelmChart pinned to the **same `karpenter_version`**
 as the controller. Its CRDs are templated, so Helm upgrades them on every bump.
 This is Karpenter's recommended way to manage CRD lifecycle.
 
+The chart's CRDs are stamped `helm.sh/resource-policy: keep` (via its
+`additionalAnnotations` value) so that a `helm uninstall` — e.g. the HelmChart CR
+being deleted, renamed, or the code reverted — never cascade-deletes the CRDs and
+every NodePool/NodeClaim/EC2NodeClass. Uninstall leaves the CRDs in place (the safe
+default, matching how the controller chart's bundled `crds/` always behaved).
+
 ## Why adoption is a manual, one-time step
 
 Every existing cluster already has the Karpenter CRDs — the controller chart's

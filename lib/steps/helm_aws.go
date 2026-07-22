@@ -1427,6 +1427,9 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 				"chart":           pulumi.String("oci://public.ecr.aws/karpenter/karpenter-crd"),
 				"targetNamespace": pulumi.String(clustersKubeSystemNamespace),
 				"version":         pulumi.String(version),
+				// resource-policy: keep so a helm uninstall (e.g. this HelmChart CR being
+				// deleted) never cascade-deletes the CRDs and every NodePool/NodeClaim/EC2NodeClass.
+				"valuesContent": pulumi.String("additionalAnnotations:\n  helm.sh/resource-policy: keep\n"),
 			},
 		},
 	}, k8sOpt,
