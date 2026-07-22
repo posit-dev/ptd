@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -151,6 +152,44 @@ func TestCRAwsLbcPolicyAndAttachment(t *testing.T) {
 		crName, crProject, crParentChain, lbcName)
 	assert.NotContains(t, mocks.aliasURNsFor(lbcName), wrongRoleChild,
 		"aws-lbc attachment must NOT alias under the role")
+}
+
+// TestCRAwsLbcImageTag asserts the aws-lbc helm Release only pins
+// values.image.tag when an explicit image tag is supplied, and omits it
+// otherwise. Regression guard for the ImagePullBackOff bug where the
+// aws_lbc_version config default (a chart version like "1.6.0") was injected as
+// the image tag, producing a non-existent
+// public.ecr.aws/eks/aws-load-balancer-controller:1.6.0 image.
+func TestCRAwsLbcImageTag(t *testing.T) {
+	imageTagOf := func(version string) (resource.PropertyValue, bool) {
+		mocks := &eksMocks{}
+		err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+			c, err := NewEKSCluster(ctx, crBaseCfg())
+			require.NoError(t, err)
+			c.WithNodeRole("").WithAwsLbc(version, "")
+			return c.Err()
+		}, pulumi.WithMocks(crProject, crName, mocks))
+		require.NoError(t, err)
+
+		releases := mocks.byType("kubernetes:helm.sh/v3:Release")
+		require.Len(t, releases, 1, "expected exactly one aws-lbc helm Release")
+		values := releases[0].Inputs["values"].ObjectValue()
+		image, hasImage := values["image"]
+		if !hasImage {
+			return resource.PropertyValue{}, false
+		}
+		tag, hasTag := image.ObjectValue()["tag"]
+		return tag, hasTag
+	}
+
+	// Empty version → no image.tag override (chart supplies its default image).
+	_, hasTag := imageTagOf("")
+	assert.False(t, hasTag, "empty version must NOT set values.image.tag")
+
+	// Explicit image tag → pinned verbatim.
+	tag, hasTag := imageTagOf("v2.13.0")
+	require.True(t, hasTag, "explicit version must set values.image.tag")
+	assert.Equal(t, "v2.13.0", tag.StringValue())
 }
 
 // TestCRMimirPolicyAttachmentAndReleaseParent asserts the mimir storage Policy +
