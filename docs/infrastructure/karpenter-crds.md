@@ -63,10 +63,11 @@ kubectl get crd nodeclaims.karpenter.sh \
 Discovering the CRDs dynamically covers installs that lack `nodeoverlays`:
 
 ```bash
-CRDS=$(kubectl get crd -o name | grep 'karpenter\.' | sed 's|customresourcedefinition.apiextensions.k8s.io/||')
-kubectl label    crd $CRDS app.kubernetes.io/managed-by=Helm --overwrite
-kubectl annotate crd $CRDS meta.helm.sh/release-name=karpenter-crd --overwrite
-kubectl annotate crd $CRDS meta.helm.sh/release-namespace=kube-system --overwrite
+for crd in $(kubectl get crd -o name | grep 'karpenter\.'); do
+  kubectl label    "$crd" app.kubernetes.io/managed-by=Helm --overwrite
+  kubectl annotate "$crd" meta.helm.sh/release-name=karpenter-crd --overwrite
+  kubectl annotate "$crd" meta.helm.sh/release-namespace=kube-system --overwrite
+done
 ```
 
 **3. Apply the chart** — the `karpenter-crd` install now adopts and upgrades the
@@ -88,10 +89,16 @@ kubectl get crd nodeclaims.karpenter.sh -o jsonpath='{.spec.versions[*].schema.o
 kubectl get nodepools,ec2nodeclasses
 ```
 
-**Rollback (before step 3 only):** the stamp is additive metadata; remove it with
-`kubectl label crd $CRDS app.kubernetes.io/managed-by-` and
-`kubectl annotate crd $CRDS meta.helm.sh/release-name- meta.helm.sh/release-namespace-`.
-After step 3 the CRDs are owned by the `karpenter-crd` release.
+**Rollback (before step 3 only):** the stamp is additive metadata; undo it (the
+trailing `-` deletes each key). After step 3 the CRDs are owned by the
+`karpenter-crd` release.
+
+```bash
+for crd in $(kubectl get crd -o name | grep 'karpenter\.'); do
+  kubectl label    "$crd" app.kubernetes.io/managed-by-
+  kubectl annotate "$crd" meta.helm.sh/release-name- meta.helm.sh/release-namespace-
+done
+```
 
 ## Future: dropping the manual step
 
