@@ -1410,15 +1410,9 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 		},
 	}
 
-	// Manage the Karpenter CRDs via the karpenter-crd chart, pinned to the same
-	// karpenter_version as the controller so they never drift.
-	//
-	// On existing clusters the CRDs already exist (installed by the controller
-	// chart's crds/) without Helm ownership, and must be adopted with a ONE-TIME
-	// manual step before this chart first applies — see the migration procedure in
-	// docs/infrastructure/karpenter-crds.md. Adoption can't be automated here: the
-	// pinned helm job image runs Helm 3.16.4, which predates --take-ownership.
-	// Greenfield clusters need no migration (the chart just creates the CRDs).
+	// Manage the Karpenter CRDs via the karpenter-crd chart, pinned to karpenter_version.
+	// NOTE: existing clusters need a ONE-TIME manual CRD adoption before first apply —
+	// see docs/infrastructure/karpenter-crds.md.
 	crdChartResourceName := compoundName + "-karpenter-crd-helm-release"
 	crdChart, err := apiextensions.NewCustomResource(ctx, crdChartResourceName, &apiextensions.CustomResourceArgs{
 		ApiVersion: pulumi.String("helm.cattle.io/v1"),
