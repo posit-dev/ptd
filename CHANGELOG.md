@@ -1,3 +1,120 @@
+# [1.40.0](https://github.com/posit-dev/ptd/compare/v1.39.1...v1.40.0) (2026-07-17)
+
+
+### Bug Fixes
+
+* **aws:** warn when refresh can't read config; clarify ignore_tags config lifecycle ([eff9888](https://github.com/posit-dev/ptd/commit/eff9888e2968d18a86edfcad5274747d9e3c1b3b)), closes [pulumi/pulumi#13860](https://github.com/pulumi/pulumi/issues/13860)
+
+
+### Features
+
+* **aws:** add ignore_tags to preserve customer-applied resource tags ([c0ae44d](https://github.com/posit-dev/ptd/commit/c0ae44de3635c1022502d9366d6daea257c25702)), closes [pulumi/pulumi#13860](https://github.com/pulumi/pulumi/issues/13860)
+
+## [1.39.1](https://github.com/posit-dev/ptd/compare/v1.39.0...v1.39.1) (2026-07-17)
+
+
+### Bug Fixes
+
+* **azure:** external-dns extraArgs must be a list, not a map ([099af64](https://github.com/posit-dev/ptd/commit/099af64f838ade04c60120d338756fbae0eb823d))
+
+# [1.39.0](https://github.com/posit-dev/ptd/compare/v1.38.1...v1.39.0) (2026-07-17)
+
+
+### Features
+
+* **azure:** support multiple TLS secrets on Traefik site ingress ([d0de1ef](https://github.com/posit-dev/ptd/commit/d0de1ef87923d333bf18c78a57ac7f0ce17f2c94))
+
+## [1.38.1](https://github.com/posit-dev/ptd/compare/v1.38.0...v1.38.1) (2026-07-16)
+
+
+### Bug Fixes
+
+* **azure:** poll for bastion tunnel port instead of one-shot check ([1040c4b](https://github.com/posit-dev/ptd/commit/1040c4b6dd1a9158d103f321d14184754a14e4a6))
+
+# [1.38.0](https://github.com/posit-dev/ptd/compare/v1.37.3...v1.38.0) (2026-07-16)
+
+
+### Features
+
+* **infra:** allow labeling system nodes with posit.team/node-role=system ([70ec09c](https://github.com/posit-dev/ptd/commit/70ec09cd1fdb4e96302753b338d812caea640367))
+
+## [1.37.3](https://github.com/posit-dev/ptd/compare/v1.37.2...v1.37.3) (2026-07-15)
+
+
+### Bug Fixes
+
+* align review config with claude-code-action's documented pattern ([02a9e26](https://github.com/posit-dev/ptd/commit/02a9e2656fae903642813c3f2a78d10faecc7ab9))
+* **clusters:** pin helm-controller klipper-helm job image ([fd8e217](https://github.com/posit-dev/ptd/commit/fd8e217fa08a0336ccb6d98c14685f27b2a0b81f))
+* set track_progress so the review actually posts ([7cb0ef4](https://github.com/posit-dev/ptd/commit/7cb0ef44a81100f5e49f87c8c9b7690c315c2de2))
+* skip auto-review on draft PRs ([c38604f](https://github.com/posit-dev/ptd/commit/c38604fd98ee6a56df3a1014ca43bfdff515eafe))
+
+## [1.37.2](https://github.com/posit-dev/ptd/compare/v1.37.1...v1.37.2) (2026-07-10)
+
+
+### Bug Fixes
+
+* **alerts:** apply volume attribution to all netapp rules; stop NLB NoData pages ([4b083dd](https://github.com/posit-dev/ptd/commit/4b083dd37d5d7fd98b96aed2bdc011d34f9f94c2))
+* **alerts:** make NetApp throughput rule volume-attributable and burst-tolerant ([a607b1f](https://github.com/posit-dev/ptd/commit/a607b1ff30c45ca42ddffba39eec6f85b0a6e7d5))
+* **alerts:** scrape NetApp throughput metric and add cluster-attributable silent alert ([98d05f5](https://github.com/posit-dev/ptd/commit/98d05f5a08ef2a8c337ff57e4c71ee4a688f47ca))
+* **alerts:** windowed baseline for netapp silent detection (not point-offset) ([36944b8](https://github.com/posit-dev/ptd/commit/36944b8a1448c575abd33db6270123e1234f2579))
+* trigger review on ready_for_review + allow Read/Glob/Grep ([37d12cb](https://github.com/posit-dev/ptd/commit/37d12cb77ee4e0f92827c981f9675f3bfb373c65))
+* use tool denylist instead of allowlist so review posts ([01f629d](https://github.com/posit-dev/ptd/commit/01f629df608f33426cdbc1d22c959c52de9d01b6))
+
+## [1.37.1](https://github.com/posit-dev/ptd/compare/v1.37.0...v1.37.1) (2026-07-09)
+
+
+### Bug Fixes
+
+* default team-operator chart to v1.29.0 ([e83f02d](https://github.com/posit-dev/ptd/commit/e83f02d10b031b8814bc732c81e456ba67229738))
+
+# [1.37.0](https://github.com/posit-dev/ptd/compare/v1.36.3...v1.37.0) (2026-07-09)
+
+
+### Features
+
+* **traefik:** make workload ingress highly available and Burstable ([8acd581](https://github.com/posit-dev/ptd/commit/8acd581960dec0aa1f13f3b46da47a0a1cf13bfa))
+
+## [1.36.3](https://github.com/posit-dev/ptd/compare/v1.36.2...v1.36.3) (2026-07-09)
+
+
+### Bug Fixes
+
+* **eks:** ignore serviceAccountRoleArn on CSI-driver addons ([8b27364](https://github.com/posit-dev/ptd/commit/8b2736459bb2febb4b967ecd5a8b47e982111c9d)), closes [terraform-provider-aws#19402](https://github.com/terraform-provider-aws/issues/19402)
+
+## [1.36.2](https://github.com/posit-dev/ptd/compare/v1.36.1...v1.36.2) (2026-07-09)
+
+
+### Bug Fixes
+
+* **aks:** use stable far-future force-upgrade expiry to stop perpetual diff ([9bd4e0e](https://github.com/posit-dev/ptd/commit/9bd4e0e58a01592627c652b693f2f310d12b253e))
+
+## [1.36.1](https://github.com/posit-dev/ptd/compare/v1.36.0...v1.36.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **aks:** restore user node pool SecurityProfile and drop conflicting powerState ignore ([41d66ce](https://github.com/posit-dev/ptd/commit/41d66cedd0a871771447d39b78bcf1ff2a496913))
+* **aks:** use typed AgentPoolSSHAccess constant for SshAccess ([0ae84fc](https://github.com/posit-dev/ptd/commit/0ae84fc1e69d65749c193b1ff04e3871f2a30a48))
+
+# [1.36.0](https://github.com/posit-dev/ptd/compare/v1.35.2...v1.36.0) (2026-07-08)
+
+
+### Bug Fixes
+
+* **alerts:** add deleteRules entry and opsgenie label for launcher_pod_pending ([5572b9d](https://github.com/posit-dev/ptd/commit/5572b9df8f9d9729f11d66a695f806b7ea8dadb0))
+
+
+### Features
+
+* **alerts:** add Launcher Pod Pending alert for stuck session/content pods ([aaf14fd](https://github.com/posit-dev/ptd/commit/aaf14fd3cf969d63670091642f8c85dd898017ea))
+
+## [1.35.2](https://github.com/posit-dev/ptd/compare/v1.35.1...v1.35.2) (2026-07-06)
+
+
+### Bug Fixes
+
+* **lib:** bump pdfcpu to v0.13.0 to remediate uncontrolled-recursion advisories ([aefb2a3](https://github.com/posit-dev/ptd/commit/aefb2a30309d41fcb7f661e71924326ce4eea4a2)), closes [Hi#severity](https://github.com/Hi/issues/severity)
+
 ## [1.35.1](https://github.com/posit-dev/ptd/compare/v1.35.0...v1.35.1) (2026-07-01)
 
 

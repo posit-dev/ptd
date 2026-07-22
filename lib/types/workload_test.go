@@ -52,6 +52,7 @@ func TestAWSWorkloadConfigSerialization(t *testing.T) {
 			"Environment": "test",
 			"Owner":       "team",
 		},
+		IgnoreTags: []string{"customer:cost-center", "customer:owner"},
 		Sites: map[string]SiteConfig{
 			"main": {Spec: SiteConfigSpec{
 				ZoneID:                "Z123456789",
@@ -93,6 +94,50 @@ func TestAWSWorkloadConfigSerialization(t *testing.T) {
 	assert.Equal(t, config.Sites["main"].Spec.Domain, unmarshaledConfig.Sites["main"].Spec.Domain)
 	assert.Equal(t, config.Clusters["main"].Spec.ClusterName, unmarshaledConfig.Clusters["main"].Spec.ClusterName)
 	assert.Equal(t, config.Clusters["main"].Spec.NodeInstanceType, unmarshaledConfig.Clusters["main"].Spec.NodeInstanceType)
+
+	// IgnoreTags (AWS-only) must survive the round trip
+	assert.Equal(t, config.IgnoreTags, unmarshaledConfig.IgnoreTags)
+}
+
+func TestSystemNodesConfigFromYAML(t *testing.T) {
+	// Verify the snake_case `system_nodes` tag decodes for both the managed
+	// node group (NodeGroupConfig) and the Karpenter node pool (KarpenterNodePool),
+	// and defaults to false when omitted.
+	raw := `
+additional_node_groups:
+  system:
+    min_size: 1
+    max_size: 1
+    system_nodes: true
+  workers:
+    min_size: 1
+    max_size: 3
+karpenter_config:
+  node_pools:
+    - name: system
+      system_nodes: true
+    - name: sessions
+      session_taints: true
+`
+	var spec AWSWorkloadClusterSpec
+	err := yaml.Unmarshal([]byte(raw), &spec)
+	assert.NoError(t, err)
+
+	assert.True(t, spec.AdditionalNodeGroups["system"].SystemNodes)
+	assert.False(t, spec.AdditionalNodeGroups["workers"].SystemNodes)
+
+	assert.Equal(t, "system", spec.KarpenterConfig.NodePools[0].Name)
+	assert.True(t, spec.KarpenterConfig.NodePools[0].SystemNodes)
+	assert.Equal(t, "sessions", spec.KarpenterConfig.NodePools[1].Name)
+	assert.False(t, spec.KarpenterConfig.NodePools[1].SystemNodes)
+
+	// Round-trip: marshal and unmarshal preserves the flag.
+	out, err := yaml.Marshal(spec)
+	assert.NoError(t, err)
+	var rt AWSWorkloadClusterSpec
+	assert.NoError(t, yaml.Unmarshal(out, &rt))
+	assert.True(t, rt.AdditionalNodeGroups["system"].SystemNodes)
+	assert.True(t, rt.KarpenterConfig.NodePools[0].SystemNodes)
 }
 
 func TestAzureWorkloadConfigSerialization(t *testing.T) {
@@ -374,6 +419,28 @@ func TestAzureWorkloadClusterConfig_ForceMaintenanceOmittedWhenFalse(t *testing.
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+func TestResolveAWSComponentsTraefikDeploymentReplicas(t *testing.T) {
+	// Default: nil components resolve to 3 replicas (HA).
+	var components AWSWorkloadClusterComponents
+	assert.Equal(t, 3, components.ResolveAWSComponents().TraefikDeploymentReplicas)
+
+	// Override: explicit value is honored.
+	five := 5
+	components.TraefikDeploymentReplicas = &five
+	assert.Equal(t, 5, components.ResolveAWSComponents().TraefikDeploymentReplicas)
+}
+
+func TestResolveAzureComponentsTraefikDeploymentReplicas(t *testing.T) {
+	// Default: unset resolves to 3 replicas (HA).
+	var components AzureWorkloadClusterComponentConfig
+	assert.Equal(t, 3, components.ResolveAzureComponents().TraefikDeploymentReplicas)
+
+	// Override: explicit value is honored.
+	two := 2
+	components.TraefikDeploymentReplicas = &two
+	assert.Equal(t, 2, components.ResolveAzureComponents().TraefikDeploymentReplicas)
 }
 
 func TestUsesEksAccessEntries(t *testing.T) {

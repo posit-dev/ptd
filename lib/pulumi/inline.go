@@ -39,6 +39,7 @@ func Stack(ctx context.Context, baseName string, target types.Target, program fu
 		BackendURL:      target.PulumiBackendUrl(),
 		SecretsProvider: target.PulumiSecretsProviderKey(),
 		EnvVars:         allEnvVars,
+		IgnoreTags:      target.IgnoreTags(),
 	}
 
 	slog.Info("Pulumi stack", "project", config.ProjectName(), "stack", config.StackName())
@@ -70,7 +71,7 @@ func Stack(ctx context.Context, baseName string, target types.Target, program fu
 		return auto.Stack{}, fmt.Errorf("failed to initialize stack %s: %w", config.StackName(), err)
 	}
 
-	if err := ConfigureStackRegion(ctx, stack, config.Cloud, config.TargetRegion); err != nil {
+	if err := ConfigureStackRegion(ctx, stack, config.Cloud, config.TargetRegion, config.IgnoreTags); err != nil {
 		return auto.Stack{}, err
 	}
 

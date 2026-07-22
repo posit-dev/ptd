@@ -510,8 +510,8 @@ func azureHelmExternalDNS(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, com
 		v := map[string]interface{}{
 			"provider":      "azure",
 			"domainFilters": domainFilters,
-			"extraArgs": map[string]interface{}{
-				"txt-wildcard-replacement": "wildcard",
+			"extraArgs": []interface{}{
+				"--txt-wildcard-replacement=wildcard",
 			},
 			"extraVolumes": []interface{}{
 				map[string]interface{}{

@@ -137,7 +137,8 @@ func TargetFromName(target string) (t types.Target, err error) {
 			conf.(types.AWSWorkloadConfig).TailscaleEnabled,
 			conf.(types.AWSWorkloadConfig).CreateAdminPolicyAsResource,
 			conf.(types.AWSWorkloadConfig).Sites,
-			conf.(types.AWSWorkloadConfig).Clusters), nil
+			conf.(types.AWSWorkloadConfig).Clusters,
+			conf.(types.AWSWorkloadConfig).IgnoreTags), nil
 	case types.AWSControlRoomConfig:
 		return aws.NewTarget(
 			target,
@@ -149,7 +150,8 @@ func TargetFromName(target string) (t types.Target, err error) {
 			conf.(types.AWSControlRoomConfig).TailscaleEnabled,
 			false, // createAdminPolicyAsResource is not relevant for control room targets
 			nil,
-			nil), nil
+			nil,
+			conf.(types.AWSControlRoomConfig).IgnoreTags), nil
 	}
 	return
 }
@@ -178,7 +180,8 @@ func ControlRoomTargetFromName(target string) (t types.Target, err error) {
 			false, // tailscaleEnabled isn't relevant for control room.
 			false, // createAdminPolicyAsResource is not relevant for control room targets
 			nil,
-			nil), nil
+			nil,
+			nil), nil // ignoreTags: control room's own config isn't loaded here
 	case types.AWSWorkloadConfig:
 		c := conf.(types.AWSWorkloadConfig)
 		if c.ControlRoomClusterName == "" {
@@ -194,7 +197,8 @@ func ControlRoomTargetFromName(target string) (t types.Target, err error) {
 			c.TailscaleEnabled,
 			false, // createAdminPolicyAsResource is not relevant for control room targets
 			nil,
-			nil), nil
+			nil,
+			nil), nil // ignoreTags: control room's own config isn't loaded here
 	}
 	return
 }
