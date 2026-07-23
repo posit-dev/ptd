@@ -122,11 +122,13 @@ func newTestClusterParams() awsClusterParams {
 		ResourceTags:     map[string]string{},
 	}
 	return awsClusterParams{
-		compoundName:              cn,
-		clusterName:               cn, // control-room cluster logical name = compound name
-		region:                    "us-east-2",
-		accountID:                 "123456789012",
-		iamPermissionsBoundaryARN: "arn:aws:iam::123456789012:policy/PositTeamDedicatedAdmin",
+		compoundName: cn,
+		clusterName:  cn, // control-room cluster logical name = compound name
+		region:       "us-east-2",
+		accountID:    "123456789012",
+		// Control-room roles carry NO permissions boundary (matches Python + live
+		// state); the step passes empty. See TestAWSClusterDeployNoPermissionsBoundary.
+		iamPermissionsBoundaryARN: "",
 		requiredTags:              buildClusterRequiredTags(cfg),
 		cfg:                       cfg,
 		subnetIDs:                 []string{"subnet-a", "subnet-b"},
@@ -165,6 +167,26 @@ func TestAWSClusterDeployControlPlaneLogicalName(t *testing.T) {
 	// name=self.name=compound_name). NOT "default_{compound}-control-plane".
 	assert.Equal(t, "cr01-staging", clusters[0].Name)
 	assert.Equal(t, resource.NewStringProperty("cr01-staging"), clusters[0].Inputs["name"])
+}
+
+func TestAWSClusterDeployNoPermissionsBoundary(t *testing.T) {
+	mocks := runClusterDeploy(t, newTestClusterParams())
+
+	// Control-room IAM roles must NOT carry a permissions boundary. Python's
+	// control-room _define_eks does not set one, the live control-room roles have
+	// none, and the control-room admin identity cannot call
+	// iam:PutRolePermissionsBoundary. Every role the cluster deploy creates should
+	// therefore have an unset/empty permissionsBoundary input.
+	roles := mocks.byType("aws:iam/role:Role")
+	require.NotEmpty(t, roles)
+	for _, r := range roles {
+		pb, ok := r.Inputs["permissionsBoundary"]
+		if !ok || pb.IsNull() {
+			continue
+		}
+		assert.Equalf(t, "", pb.StringValue(),
+			"control-room role %q must have no permissions boundary", r.Name)
+	}
 }
 
 func TestAWSClusterDeployACMAndValidation(t *testing.T) {

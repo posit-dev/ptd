@@ -66,7 +66,6 @@ type AWSControlRoomConfig struct {
 	TrustedUsers                     []TrustedUser `json:"trusted_users" yaml:"trusted_users"`
 	FrontDoor                        *string       `json:"front_door" yaml:"front_door"`
 	AwsFsxOpenzfsCsiVersion          string        `json:"aws_fsx_openzfs_csi_version" yaml:"aws_fsx_openzfs_csi_version"`
-	AwsLbcVersion                    string        `json:"aws_lbc_version" yaml:"aws_lbc_version"`
 	ExternalDnsVersion               string        `json:"external_dns_version" yaml:"external_dns_version"`
 	GrafanaVersion                   string        `json:"grafana_version" yaml:"grafana_version"`
 	KubeStateMetricsVersion          string        `json:"kube_state_metrics_version" yaml:"kube_state_metrics_version"`
@@ -137,11 +136,6 @@ func (c AWSControlRoomConfig) TraefikDeploymentReplicasOrDefault() int {
 // EBSCsiAddonVersion resolves the EBS CSI addon version (Python default v1.41.0-eksbuild.1).
 func (c AWSControlRoomConfig) EBSCsiAddonVersion() string {
 	return crStringDefault(c.EbsCsiAddonVersion, "v1.41.0-eksbuild.1")
-}
-
-// AWSLbcVersion resolves the aws-load-balancer-controller version (Python default 1.6.0).
-func (c AWSControlRoomConfig) AWSLbcVersion() string {
-	return crStringDefault(c.AwsLbcVersion, "1.6.0")
 }
 
 // MetricsServerVersion resolves the metrics-server chart version (Python default 3.11.0).

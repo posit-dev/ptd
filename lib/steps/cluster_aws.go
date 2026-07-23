@@ -299,7 +299,11 @@ func awsClusterDeploy(ctx *pulumi.Context, _ types.Target, params awsClusterPara
 		// workload path passes the .posit.team-suffixed name explicitly; do NOT
 		// conflate the two. State URN: …$aws:iam/role:Role::<name>-ebs-csi-driver.
 		WithEbsCsiDriver(name+"-ebs-csi-driver", cfg.EBSCsiAddonVersion()).
-		WithAwsLbc(cfg.AWSLbcVersion(), "").
+		// No image-tag or chart-version override: image.tag is omitted so the chart
+		// supplies its own default image, and the chart version defaults to latest.
+		// Do NOT pass a chart version (e.g. "1.6.0") as the image tag here; that
+		// yields a non-existent image and ImagePullBackOff.
+		WithAwsLbc("", "").
 		WithMetricsServer(cfg.MetricsServerVersionOrDefault()).
 		WithSecretStoreCsi(cfg.SecretStoreCsiVersionOrDefault()).
 		WithSecretStoreCsiAwsProvider(cfg.SecretStoreCsiAwsProviderVersionOrDefault())

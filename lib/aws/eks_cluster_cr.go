@@ -221,8 +221,13 @@ func (c *EKSCluster) irsaTrustPolicyForSA(subject string) pulumi.StringOutput {
 // WithAwsLbc installs the aws-load-balancer-controller: an IRSA role
 // (aws-load-balancer-controller SA in kube-system), the controller IAM policy +
 // attachment, the ServiceAccount, and the helm release. Mirrors with_aws_lbc.
-// version is the controller image tag (config aws_lbc_version); chartVersion is
-// the helm chart version (Python passes None → latest, so empty string here).
+// version is the controller image tag override; chartVersion is the helm chart
+// version. Both are optional: an empty version leaves image.tag unset so the
+// chart supplies its own (correct) default image tag, and an empty chartVersion
+// installs the latest chart. Python called with_aws_lbc() with no arguments, so
+// both were None (image.tag omitted, latest chart); passing a non-empty value
+// here would pin image.tag, which must be a real image tag (e.g. "v2.13.0"),
+// NOT a chart version.
 func (c *EKSCluster) WithAwsLbc(version, chartVersion string) *EKSCluster {
 	if c.err != nil {
 		return c
@@ -278,12 +283,17 @@ func (c *EKSCluster) WithAwsLbc(version, chartVersion string) *EKSCluster {
 
 	values := pulumi.Map{
 		"clusterName": pulumi.String(c.cfg.Name),
-		"image":       pulumi.Map{"tag": pulumi.String(version)},
 		"serviceAccount": pulumi.Map{
 			"create": pulumi.Bool(false),
 			"name":   pulumi.String("aws-load-balancer-controller"),
 		},
 		"hostNetwork": pulumi.Bool(true),
+	}
+	// Only pin image.tag when an explicit image tag is provided. Otherwise let the
+	// chart default the image; injecting an invalid tag (e.g. a chart version like
+	// "1.6.0") yields a non-existent image and ImagePullBackOff.
+	if version != "" {
+		values["image"] = pulumi.Map{"tag": pulumi.String(version)}
 	}
 	relArgs := &helmv3.ReleaseArgs{
 		Chart:          pulumi.String("aws-load-balancer-controller"),

@@ -225,11 +225,17 @@ func (s *ClusterStep) runAWSInlineGo(ctx context.Context) error {
 	}
 
 	params := awsClusterParams{
-		compoundName:               compoundName,
-		clusterName:                clusterName,
-		region:                     region,
-		accountID:                  awsCreds.AccountID(),
-		iamPermissionsBoundaryARN:  fmt.Sprintf("arn:aws:iam::%s:policy/PositTeamDedicatedAdmin", awsCreds.AccountID()),
+		compoundName: compoundName,
+		clusterName:  clusterName,
+		region:       region,
+		accountID:    awsCreds.AccountID(),
+		// Python's control-room _define_eks does NOT set a permissions_boundary on the
+		// EKS cluster / node / IRSA roles (unlike the workload paths, which do), so the
+		// live control-room roles carry no boundary. The admin identity used for
+		// control-room applies also cannot set one (iam:PutRolePermissionsBoundary is
+		// denied). Pass empty so the builder omits the boundary — the builder guards
+		// each role with `if IAMPermissionsBoundary != ""`, so this is a no-op diff.
+		iamPermissionsBoundaryARN:  "",
 		requiredTags:               buildClusterRequiredTags(cfg),
 		cfg:                        cfg,
 		credentials:                awsCreds,
