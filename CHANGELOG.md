@@ -1,3 +1,10 @@
+## [1.40.1](https://github.com/posit-dev/ptd/compare/v1.40.0...v1.40.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* **control-room:** drop bogus LBC image tag and CR IAM permissions boundary ([e986fc3](https://github.com/posit-dev/ptd/commit/e986fc3176f7c1921fc7f4cf0f53649439bd225f))
+
 # [1.40.0](https://github.com/posit-dev/ptd/compare/v1.39.1...v1.40.0) (2026-07-17)
 
 
