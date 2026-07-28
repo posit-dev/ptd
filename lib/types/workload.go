@@ -563,6 +563,15 @@ type AzureWorkloadClusterConfig struct {
 	// UseLetsEncrypt controls whether CertManager is deployed for this cluster.
 	UseLetsEncrypt bool `yaml:"use_lets_encrypt"`
 
+	// ExternalSecretsEnabled controls whether the External Secrets Operator (ESO)
+	// is deployed for this cluster. When true, ESO is installed and a
+	// ClusterSecretStore is created pointing at the workload's Azure Key Vault,
+	// authenticated via workload identity. ExternalSecret resources that map
+	// specific Key Vault keys to named k8s Secrets are authored per-workload via
+	// custom_k8s_resources/. AKS only; AWS continues to use the Secrets Store CSI
+	// driver.
+	ExternalSecretsEnabled bool `yaml:"external_secrets_enabled"`
+
 	UserNodePools []AzureUserNodePoolConfig `yaml:"user_node_pools"`
 
 	// Optional: Root disk size for system node pool in GB (defaults to 128)
@@ -591,6 +600,7 @@ type AzureWorkloadClusterConfig struct {
 
 type AzureWorkloadClusterComponentConfig struct {
 	SecretStoreCsiDriverAzureProviderVersion string  `yaml:"secret_store_csi_driver_azure_provider_version"`
+	ExternalSecretsVersion                   *string `yaml:"external_secrets_version"`
 	AlloyVersion                             *string `yaml:"alloy_version"`
 	ExternalDnsVersion                       *string `yaml:"external_dns_version"`
 	GrafanaVersion                           *string `yaml:"grafana_version"`
@@ -606,6 +616,7 @@ type AzureWorkloadClusterComponentConfig struct {
 // ResolvedAzureComponents is the result of resolving AzureWorkloadClusterComponentConfig with defaults applied.
 type ResolvedAzureComponents struct {
 	AlloyVersion              string
+	ExternalSecretsVersion    string
 	ExternalDnsVersion        string
 	GrafanaVersion            string
 	KubeStateMetricsVersion   string
@@ -619,6 +630,7 @@ type ResolvedAzureComponents struct {
 func (c *AzureWorkloadClusterComponentConfig) ResolveAzureComponents() ResolvedAzureComponents {
 	return ResolvedAzureComponents{
 		AlloyVersion:              resolveString(c.AlloyVersion, "0.12.6"),
+		ExternalSecretsVersion:    resolveString(c.ExternalSecretsVersion, "2.8.0"),
 		ExternalDnsVersion:        resolveString(c.ExternalDnsVersion, "1.14.4"),
 		GrafanaVersion:            resolveString(c.GrafanaVersion, "7.0.14"),
 		KubeStateMetricsVersion:   resolveString(c.KubeStateMetricsVersion, "5.30.1"),

@@ -32,8 +32,10 @@ import (
 type azureClustersParams struct {
 	compoundName                 string
 	subscriptionID               string
+	tenantID                     string
 	region                       string
 	resourceGroupName            string
+	keyVaultName                 string
 	clusters                     map[string]types.AzureWorkloadClusterConfig
 	kubeconfigsByCluster         map[string]string
 	dnsForwardDomains            []types.DNSForwardDomainConfig
@@ -191,8 +193,10 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 	params := azureClustersParams{
 		compoundName:                 s.DstTarget.Name(),
 		subscriptionID:               azTarget.SubscriptionID(),
+		tenantID:                     azTarget.TenantID(),
 		region:                       s.DstTarget.Region(),
 		resourceGroupName:            azTarget.ResourceGroupName(),
+		keyVaultName:                 azTarget.VaultName(),
 		clusters:                     cfg.Clusters,
 		kubeconfigsByCluster:         kubeconfigsByCluster,
 		dnsForwardDomains:            cfg.Network.DnsForwardDomains,
@@ -353,7 +357,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				"tag":        pulumi.String(azureTeamOpImgTag),
 			}
 		}
-		_, err = helmv3.NewRelease(ctx, fmt.Sprintf("%s-%s-team-operator", name, release), &helmv3.ReleaseArgs{
+		teamOpHelm, err := helmv3.NewRelease(ctx, fmt.Sprintf("%s-%s-team-operator", name, release), &helmv3.ReleaseArgs{
 			Name:            pulumi.String("team-operator"),
 			Chart:           pulumi.String("oci://ghcr.io/posit-dev/charts/team-operator"),
 			Version:         pulumi.String(azureTeamOpChartVersion),
@@ -661,6 +665,155 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				if err != nil {
 					return fmt.Errorf("clusters: failed to create cluster issuer for %s/%s: %w", release, domain, err)
 				}
+			}
+		}
+
+		// ── External Secrets Operator (optional, AKS only) ─────────────────────
+		// Syncs Azure Key Vault secrets into native k8s Secrets via a
+		// ClusterSecretStore authenticated with workload identity. This is the AKS
+		// counterpart to the AWS Secrets Store CSI driver. team-operator consumes
+		// the resulting native Secrets unchanged (SecretType: kubernetes) and is
+		// unaware of ESO. The ExternalSecret resources that map specific Key Vault
+		// keys to named Secrets are authored per-workload via custom_k8s_resources/
+		// (they reference the ClusterSecretStore created here by name).
+		if clusterCfg.ExternalSecretsEnabled {
+			esoVersion := clusterCfg.Components.ResolveAzureComponents().ExternalSecretsVersion
+
+			// Managed identity for the ESO controller.
+			esoIdentityName := fmt.Sprintf("id-%s-%s-external-secrets", name, release)
+			esoIdentity, err := azmanagedidentity.NewUserAssignedIdentity(ctx,
+				esoIdentityName,
+				&azmanagedidentity.UserAssignedIdentityArgs{
+					ResourceGroupName: pulumi.String(params.resourceGroupName),
+					Location:          pulumi.String(params.region),
+					Tags:              buildAzureRequiredTags(name, params.resourceTags),
+				})
+			if err != nil {
+				return fmt.Errorf("clusters: failed to create external-secrets identity for %s: %w", release, err)
+			}
+
+			// Key Vault Secrets User role scoped to the workload Key Vault.
+			// The vault is RBAC-authorized, so this role assignment (not an access
+			// policy) is what grants ESO read access to secret contents.
+			keyVaultScope := fmt.Sprintf(
+				"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.KeyVault/vaults/%s",
+				params.subscriptionID, params.resourceGroupName, params.keyVaultName)
+			_, err = azauthorization.NewRoleAssignment(ctx,
+				fmt.Sprintf("%s-%s-kv-secrets-user-external-secrets", name, release),
+				&azauthorization.RoleAssignmentArgs{
+					PrincipalId:      esoIdentity.PrincipalId,
+					PrincipalType:    pulumi.StringPtr("ServicePrincipal"),
+					RoleDefinitionId: pulumi.String(fmt.Sprintf("/providers/Microsoft.Authorization/roleDefinitions/%s", azRoleKeyVaultSecretsUser)),
+					Scope:            pulumi.String(keyVaultScope),
+				}, pulumi.Parent(esoIdentity))
+			if err != nil {
+				return fmt.Errorf("clusters: failed to create external-secrets key vault role for %s: %w", release, err)
+			}
+
+			// ESO runs in posit-team-system, alongside team-operator. That namespace is
+			// created by the team-operator Helm release (CreateNamespace: true — i.e.
+			// created only if it does not already exist). We depend on that release so
+			// the namespace exists before these resources, rather than declaring a
+			// second Pulumi resource that would contend with team-operator for
+			// ownership of the namespace.
+
+			// ESO controller ServiceAccount (annotated for workload identity).
+			// The Helm release below is configured with serviceAccount.create=false
+			// and this name, so it binds its controller Deployment to this SA.
+			esoSA, err := corev1.NewServiceAccount(ctx,
+				fmt.Sprintf("%s-%s-external-secrets-sa", name, release),
+				&corev1.ServiceAccountArgs{
+					Metadata: &metav1.ObjectMetaArgs{
+						Name:      pulumi.String(clustersExternalSecretsSA),
+						Namespace: pulumi.String(clustersPositTeamSystemNamespace),
+						Annotations: pulumi.StringMap{
+							"azure.workload.identity/client-id": esoIdentity.ClientId,
+							"azure.workload.identity/tenant-id": pulumi.String(params.tenantID),
+						},
+						Labels: pulumi.StringMap{
+							"azure.workload.identity/use": pulumi.String("true"),
+						},
+					},
+				}, k8sProviderOpt,
+				pulumi.DependsOn([]pulumi.Resource{teamOpHelm, esoIdentity}))
+			if err != nil {
+				return fmt.Errorf("clusters: failed to create external-secrets service account for %s: %w", release, err)
+			}
+
+			// Federated identity credential binding the ESO SA to the identity.
+			if identityInfo != nil && identityInfo.OIDCIssuerURL != "" {
+				_, err = azmanagedidentity.NewFederatedIdentityCredential(ctx,
+					fmt.Sprintf("fedid-%s-%s-external-secrets", name, release),
+					&azmanagedidentity.FederatedIdentityCredentialArgs{
+						ResourceName:                            esoIdentity.Name,
+						FederatedIdentityCredentialResourceName: pulumi.StringPtr(fmt.Sprintf("fedid-%s-%s-external-secrets", name, release)),
+						ResourceGroupName:                       pulumi.String(params.resourceGroupName),
+						Subject:                                 pulumi.String(fmt.Sprintf("system:serviceaccount:%s:%s", clustersPositTeamSystemNamespace, clustersExternalSecretsSA)),
+						Issuer:                                  pulumi.String(identityInfo.OIDCIssuerURL),
+						Audiences:                               pulumi.StringArray{pulumi.String("api://AzureADTokenExchange")},
+					}, pulumi.Parent(esoIdentity))
+				if err != nil {
+					return fmt.Errorf("clusters: failed to create external-secrets federated identity credential for %s: %w", release, err)
+				}
+			}
+
+			// External Secrets Operator Helm release.
+			esoHelm, err := helmv3.NewRelease(ctx,
+				fmt.Sprintf("%s-%s-external-secrets", name, release),
+				&helmv3.ReleaseArgs{
+					Name:      pulumi.String("external-secrets"),
+					Chart:     pulumi.String("external-secrets"),
+					Version:   pulumi.String(esoVersion),
+					Namespace: pulumi.String(clustersPositTeamSystemNamespace),
+					RepositoryOpts: &helmv3.RepositoryOptsArgs{
+						Repo: pulumi.String("https://charts.external-secrets.io"),
+					},
+					Atomic: pulumi.Bool(true),
+					Values: pulumi.Map{
+						"installCRDs": pulumi.Bool(true),
+						"serviceAccount": pulumi.Map{
+							"create": pulumi.Bool(false),
+							"name":   pulumi.String(clustersExternalSecretsSA),
+						},
+						"podLabels": pulumi.Map{
+							"azure.workload.identity/use": pulumi.String("true"),
+						},
+					},
+				}, k8sProviderOpt,
+				pulumi.DependsOn([]pulumi.Resource{teamOpHelm, esoSA}))
+			if err != nil {
+				return fmt.Errorf("clusters: failed to create external-secrets helm release for %s: %w", release, err)
+			}
+
+			// ClusterSecretStore pointing at the workload Key Vault. ExternalSecret
+			// resources reference this store by name to materialize native Secrets.
+			// Depends on the Helm release so the ESO CRDs are registered first.
+			_, err = apiextensions.NewCustomResource(ctx,
+				fmt.Sprintf("%s-%s-external-secrets-store", name, release),
+				&apiextensions.CustomResourceArgs{
+					ApiVersion: pulumi.String("external-secrets.io/v1"),
+					Kind:       pulumi.String("ClusterSecretStore"),
+					Metadata: &metav1.ObjectMetaArgs{
+						Name: pulumi.String(clustersExternalSecretsStoreName),
+					},
+					OtherFields: kubernetes.UntypedArgs{
+						"spec": map[string]interface{}{
+							"provider": map[string]interface{}{
+								"azurekv": map[string]interface{}{
+									"authType": "WorkloadIdentity",
+									"vaultUrl": fmt.Sprintf("https://%s.vault.azure.net", params.keyVaultName),
+									"serviceAccountRef": map[string]interface{}{
+										"name":      clustersExternalSecretsSA,
+										"namespace": clustersPositTeamSystemNamespace,
+									},
+								},
+							},
+						},
+					},
+				}, k8sProviderOpt,
+				pulumi.DependsOn([]pulumi.Resource{esoHelm}))
+			if err != nil {
+				return fmt.Errorf("clusters: failed to create external-secrets cluster store for %s: %w", release, err)
 			}
 		}
 

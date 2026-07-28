@@ -66,6 +66,31 @@ func TestSecretStoreCreateSecretIfNotExists(t *testing.T) {
 	// We can't easily test the remaining cases without mocking Azure functions
 }
 
+func TestEncodeSecretValue(t *testing.T) {
+	// Strings must be stored verbatim — NOT json-quoted — so values sync
+	// cleanly into k8s Secrets via External Secrets. Regression test for the
+	// bug where product secrets (e.g. main-dev-db-password) were stored as
+	// `"value"` with literal surrounding quotes.
+	t.Run("string stored verbatim without quotes", func(t *testing.T) {
+		v, err := encodeSecretValue("p4ssw0rd")
+		assert.NoError(t, err)
+		assert.Equal(t, "p4ssw0rd", v)
+	})
+
+	t.Run("string with special characters is untouched", func(t *testing.T) {
+		v, err := encodeSecretValue("a\"b\nc")
+		assert.NoError(t, err)
+		assert.Equal(t, "a\"b\nc", v)
+	})
+
+	// Non-string payloads keep the JSON-blob behavior.
+	t.Run("struct/map is JSON-encoded", func(t *testing.T) {
+		v, err := encodeSecretValue(map[string]string{"key": "value"})
+		assert.NoError(t, err)
+		assert.Equal(t, `{"key":"value"}`, v)
+	})
+}
+
 func TestSecretStoreGetSecretValue(t *testing.T) {
 	secretStore := NewSecretStore("region", "vault")
 	ctx := context.Background()

@@ -102,14 +102,34 @@ func (s *SecretStore) CreateSecretIfNotExists(ctx context.Context, credentials t
 		return err
 	}
 
-	mSecret, err := json.Marshal(secret)
+	value, err := encodeSecretValue(secret)
 	if err != nil {
 		return err
 	}
 
 	if !s.SecretExists(ctx, azureCreds, secretName) {
-		return createSecret(ctx, azureCreds, s.vaultName, secretName, string(mSecret))
+		return createSecret(ctx, azureCreds, s.vaultName, secretName, value)
 	}
 
 	return
+}
+
+// encodeSecretValue renders a secret payload for storage in Azure Key Vault.
+//
+// Key Vault stores plain string values, and these values are now synced verbatim
+// into Kubernetes Secrets by the External Secrets Operator. A string is therefore
+// stored as-is: json.Marshal would wrap it in literal double quotes (e.g.
+// `"p4ssw0rd"`), which corrupts the value once synced — a DB password would carry
+// the quote characters and fail auth, and cookie-signing keys would mismatch.
+// Non-string values (structs/maps) are still JSON-encoded to preserve the existing
+// blob behavior (e.g. the {fqdn,username,password} database secret).
+func encodeSecretValue(secret any) (string, error) {
+	if str, ok := secret.(string); ok {
+		return str, nil
+	}
+	b, err := json.Marshal(secret)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
