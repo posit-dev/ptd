@@ -408,7 +408,7 @@ ptd ensure {{.WorkloadName}} --only-steps helm --refresh
 ptd ensure {{.WorkloadName}} --only-steps sites --refresh
 ` + "```" + `
 
-A rebuilt cluster has a new OIDC issuer. {{if eq .Cloud "aws"}}The workload IRSA roles now live in the ` + "`eks`" + ` step and build their trust policy from the cluster OIDC provider, so ` + "`eks --refresh`" + ` above re-establishes IRSA trust against the new issuer.{{else}}Workload identity federation is established by the ` + "`clusters`" + ` and ` + "`helm`" + ` steps above, which bind the federated credentials to the new issuer.{{end}} No separate final pass is needed (the former ` + "`persistent_reprise`" + ` step was removed).
+A rebuilt cluster has a new OIDC issuer. {{if eq .Cloud "aws"}}The workload IRSA roles are created by both the ` + "`eks`" + ` step (platform components) and the ` + "`clusters`" + ` step (Team Operator, Chronicle, and the Posit product roles), each building its trust policy from the cluster OIDC provider — so the ` + "`eks --refresh`" + ` and ` + "`clusters --refresh`" + ` runs above re-establish IRSA trust against the new issuer.{{else}}Workload identity federation is established by the ` + "`clusters`" + ` and ` + "`helm`" + ` steps above, which bind the federated credentials to the new issuer.{{end}} No separate final pass is needed (the former ` + "`persistent_reprise`" + ` step was removed).
 
 ### Partial Failure (Node Groups)
 
