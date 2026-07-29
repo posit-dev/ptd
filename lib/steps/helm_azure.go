@@ -116,13 +116,16 @@ func (s *HelmStep) runAzureInlineGo(ctx context.Context, creds types.Credentials
 	}
 	storageAccountName := "stptd" + sanitizedStorageName
 
-	// Fetch mimir auth password from Key Vault.
+	// Fetch mimir auth password from Key Vault. Only used for the alloy mimir-auth Secret,
+	// which is created only when the workload has a control room.
 	mimirPassword := ""
-	mimirSecretName := s.DstTarget.Name() + "-mimir-auth"
-	if mimirPw, secretErr := s.DstTarget.SecretStore().GetSecretValue(ctx, creds, mimirSecretName); secretErr != nil {
-		fmt.Printf("helm azure: warning: failed to get mimir secret %q: %v\n", mimirSecretName, secretErr)
-	} else {
-		mimirPassword = mimirPw
+	if cfg.ControlRoomDomain != "" {
+		mimirSecretName := s.DstTarget.Name() + "-mimir-auth"
+		if mimirPw, secretErr := s.DstTarget.SecretStore().GetSecretValue(ctx, creds, mimirSecretName); secretErr != nil {
+			fmt.Printf("helm azure: warning: failed to get mimir secret %q: %v\n", mimirSecretName, secretErr)
+		} else {
+			mimirPassword = mimirPw
+		}
 	}
 
 	// Fetch grafana admin secret for fqdn.
@@ -970,6 +973,8 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	}
 	alloyConfigStr := buildAlloyConfig(alloyP)
 
+	hasControlRoom := params.cfg.ControlRoomDomain != ""
+
 	// ConfigMap for Alloy. Python named the AlloyConfig component "alloy-config" and the ConfigMap
 	// was a child of that component, so its URN uses the nested AlloyConfig parent type.
 	cmResourceName := compoundName + "-" + release + "-alloy-config-configmap"
@@ -988,20 +993,22 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	}
 
 	// Mimir auth Secret (Azure uses base64-encoded data field unlike AWS which uses stringData).
-	mimirAuthB64 := base64.StdEncoding.EncodeToString([]byte(params.mimirPassword))
-	mimirSecretResourceName := compoundName + "-" + release + "-mimir-auth"
-	_, err = corev1.NewSecret(ctx, mimirSecretResourceName, &corev1.SecretArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Name:      pulumi.String("mimir-auth"),
-			Namespace: pulumi.String(helmAlloyNamespace),
-		},
-		Data: pulumi.StringMap{
-			"password": pulumi.String(mimirAuthB64),
-		},
-	}, k8sOpt, withAlias("kubernetes:core/v1:Secret", mimirSecretResourceName),
-		pulumi.DependsOn([]pulumi.Resource{ns}))
-	if err != nil {
-		return fmt.Errorf("helm azure: failed to create alloy mimir-auth secret for %s: %w", release, err)
+	if hasControlRoom {
+		mimirAuthB64 := base64.StdEncoding.EncodeToString([]byte(params.mimirPassword))
+		mimirSecretResourceName := compoundName + "-" + release + "-mimir-auth"
+		_, err = corev1.NewSecret(ctx, mimirSecretResourceName, &corev1.SecretArgs{
+			Metadata: metav1.ObjectMetaArgs{
+				Name:      pulumi.String("mimir-auth"),
+				Namespace: pulumi.String(helmAlloyNamespace),
+			},
+			Data: pulumi.StringMap{
+				"password": pulumi.String(mimirAuthB64),
+			},
+		}, k8sOpt, withAlias("kubernetes:core/v1:Secret", mimirSecretResourceName),
+			pulumi.DependsOn([]pulumi.Resource{ns}))
+		if err != nil {
+			return fmt.Errorf("helm azure: failed to create alloy mimir-auth secret for %s: %w", release, err)
+		}
 	}
 
 	// Alloy Helm chart values (uses identity.ClientId output).
@@ -1009,6 +1016,19 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	chartResourceName := compoundName + "-" + release + "-grafana-alloy-release"
 
 	valuesYAML := identity.ClientId.ApplyT(func(clientID string) (string, error) {
+		mounts := map[string]interface{}{
+			"varlog": true,
+		}
+		if hasControlRoom {
+			mounts["extra"] = []interface{}{
+				map[string]interface{}{
+					"name":      "mimir-auth",
+					"mountPath": "/etc/mimir/",
+					"readOnly":  true,
+				},
+			}
+		}
+
 		alloyInner := map[string]interface{}{
 			"clustering": map[string]interface{}{"enabled": true},
 			"extraPorts": []interface{}{
@@ -1019,16 +1039,7 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 					"protocol":   "TCP",
 				},
 			},
-			"mounts": map[string]interface{}{
-				"extra": []interface{}{
-					map[string]interface{}{
-						"name":      "mimir-auth",
-						"mountPath": "/etc/mimir/",
-						"readOnly":  true,
-					},
-				},
-				"varlog": true,
-			},
+			"mounts": mounts,
 			"configMap": map[string]interface{}{
 				"create": false,
 				"name":   "alloy-config",
@@ -1037,6 +1048,30 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 		}
 		if !thirdParty {
 			alloyInner["reporting"] = map[string]interface{}{"enabled": false}
+		}
+
+		controller := map[string]interface{}{
+			"podLabels": map[string]interface{}{
+				"azure.workload.identity/use": "true",
+			},
+		}
+		if hasControlRoom {
+			controller["volumes"] = map[string]interface{}{
+				"extra": []interface{}{
+					map[string]interface{}{
+						"name": "mimir-auth",
+						"secret": map[string]interface{}{
+							"secretName": "mimir-auth",
+							"items": []interface{}{
+								map[string]interface{}{
+									"key":  "password",
+									"path": "password",
+								},
+							},
+						},
+					},
+				},
+			}
 		}
 
 		v := map[string]interface{}{
@@ -1050,28 +1085,8 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 					"azure.workload.identity/use": "true",
 				},
 			},
-			"controller": map[string]interface{}{
-				"podLabels": map[string]interface{}{
-					"azure.workload.identity/use": "true",
-				},
-				"volumes": map[string]interface{}{
-					"extra": []interface{}{
-						map[string]interface{}{
-							"name": "mimir-auth",
-							"secret": map[string]interface{}{
-								"secretName": "mimir-auth",
-								"items": []interface{}{
-									map[string]interface{}{
-										"key":  "password",
-										"path": "password",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			"alloy": alloyInner,
+			"controller": controller,
+			"alloy":      alloyInner,
 			"ingress": map[string]interface{}{
 				"enabled":  true,
 				"faroPort": 12347,
