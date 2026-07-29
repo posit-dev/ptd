@@ -99,9 +99,8 @@ func (s *HelmStep) runAWSInlineGo(ctx context.Context, creds types.Credentials, 
 		}
 	}
 
-	// Fetch mimir password from workload secrets. It feeds only the alloy mimir-auth Secret,
-	// which is created only when the workload has a control room to authenticate against — so
-	// skip the secret-store call (and its warning log) entirely when there is no control room.
+	// Fetch mimir password from workload secrets. Only used for the alloy mimir-auth Secret,
+	// which is created only when the workload has a control room.
 	mimirPassword := ""
 	if len(cfg.Clusters) > 0 && cfg.ControlRoomDomain != "" {
 		secretName := s.DstTarget.Name() + ".posit.team"
@@ -1189,10 +1188,6 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	}
 	alloyConfigStr := buildAlloyConfig(alloyParams)
 
-	// The mimir-auth Secret and its volume/mount only exist to feed the control-room
-	// remote_write block in the Alloy config. buildAlloyConfig omits that block when there
-	// is no control room, so gate the credential on the same condition to avoid mounting an
-	// orphaned control-room credential in the Alloy pod.
 	hasControlRoom := params.cfg.ControlRoomDomain != ""
 
 	// ConfigMap
@@ -1217,8 +1212,6 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 		return err
 	}
 
-	// Mimir auth Secret (parent was the namespace in Python). Only created when the workload
-	// has a control room to authenticate against.
 	if hasControlRoom {
 		secretResourceName := compoundName + "-" + release + "-alloy-mimir-auth"
 		_, err = corev1.NewSecret(ctx, secretResourceName, &corev1.SecretArgs{
@@ -1250,10 +1243,6 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	alloyRoleName := "alloy." + compoundName + ".posit.team"
 	thirdParty := isThirdPartyTelemetryEnabled(params.cfg.ThirdPartyTelemetryEnabled)
 
-	// The mimir-auth volume/mount feed the control-room remote_write and only exist when the
-	// workload has a control room. varlog is always present; the mimir-auth mount is added only
-	// when hasControlRoom, and the controller key (whose sole purpose is to carry the mimir-auth
-	// volume) is attached only then.
 	mounts := map[string]interface{}{
 		"varlog": params.cfg.GrafanaScrapeSystemLogs,
 	}

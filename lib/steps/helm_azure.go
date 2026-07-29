@@ -116,9 +116,8 @@ func (s *HelmStep) runAzureInlineGo(ctx context.Context, creds types.Credentials
 	}
 	storageAccountName := "stptd" + sanitizedStorageName
 
-	// Fetch mimir auth password from Key Vault. It feeds only the alloy mimir-auth Secret, which
-	// is created only when the workload has a control room to authenticate against — so skip the
-	// Key Vault call (and its warning log) entirely when there is no control room.
+	// Fetch mimir auth password from Key Vault. Only used for the alloy mimir-auth Secret,
+	// which is created only when the workload has a control room.
 	mimirPassword := ""
 	if cfg.ControlRoomDomain != "" {
 		mimirSecretName := s.DstTarget.Name() + "-mimir-auth"
@@ -974,10 +973,6 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	}
 	alloyConfigStr := buildAlloyConfig(alloyP)
 
-	// The mimir-auth Secret and its volume/mount only exist to feed the control-room
-	// remote_write block in the Alloy config. buildAlloyConfig omits that block when there
-	// is no control room, so gate the credential on the same condition to avoid mounting an
-	// orphaned control-room credential in the Alloy pod.
 	hasControlRoom := params.cfg.ControlRoomDomain != ""
 
 	// ConfigMap for Alloy. Python named the AlloyConfig component "alloy-config" and the ConfigMap
@@ -998,7 +993,6 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	}
 
 	// Mimir auth Secret (Azure uses base64-encoded data field unlike AWS which uses stringData).
-	// Only created when the workload has a control room to authenticate against.
 	if hasControlRoom {
 		mimirAuthB64 := base64.StdEncoding.EncodeToString([]byte(params.mimirPassword))
 		mimirSecretResourceName := compoundName + "-" + release + "-mimir-auth"
@@ -1022,7 +1016,6 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 	chartResourceName := compoundName + "-" + release + "-grafana-alloy-release"
 
 	valuesYAML := identity.ClientId.ApplyT(func(clientID string) (string, error) {
-		// varlog is always present; the mimir-auth mount only exists when there is a control room.
 		mounts := map[string]interface{}{
 			"varlog": true,
 		}
@@ -1057,8 +1050,6 @@ func azureHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 			alloyInner["reporting"] = map[string]interface{}{"enabled": false}
 		}
 
-		// The controller always carries the workload-identity podLabels; the mimir-auth volume
-		// is attached only when the workload has a control room.
 		controller := map[string]interface{}{
 			"podLabels": map[string]interface{}{
 				"azure.workload.identity/use": "true",
