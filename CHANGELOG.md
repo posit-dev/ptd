@@ -1,3 +1,11 @@
+## [1.40.2](https://github.com/posit-dev/ptd/compare/v1.40.1...v1.40.2) (2026-07-29)
+
+
+### Bug Fixes
+
+* **helm:** gate Alloy mimir-auth secret and mount on control room ([9037d0e](https://github.com/posit-dev/ptd/commit/9037d0e9d0fd3e34aa1a4c7d4e140a10b19d880f))
+* **helm:** skip mimir secret lookup when there is no control room ([893ad19](https://github.com/posit-dev/ptd/commit/893ad19ed78121ac5f0636c9fc8e8784f28a9d0f))
+
 ## [1.40.1](https://github.com/posit-dev/ptd/compare/v1.40.0...v1.40.1) (2026-07-23)
 
 
