@@ -99,10 +99,11 @@ func (s *HelmStep) runAWSInlineGo(ctx context.Context, creds types.Credentials, 
 		}
 	}
 
-	// Fetch mimir password from workload secrets. Alloy is always deployed (its version always
-	// resolves to a non-empty default), so we always need this secret.
+	// Fetch mimir password from workload secrets. It feeds only the alloy mimir-auth Secret,
+	// which is created only when the workload has a control room to authenticate against — so
+	// skip the secret-store call (and its warning log) entirely when there is no control room.
 	mimirPassword := ""
-	if len(cfg.Clusters) > 0 {
+	if len(cfg.Clusters) > 0 && cfg.ControlRoomDomain != "" {
 		secretName := s.DstTarget.Name() + ".posit.team"
 		secretJSON, err := s.DstTarget.SecretStore().GetSecretValue(ctx, creds, secretName)
 		if err != nil {

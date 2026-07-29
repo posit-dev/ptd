@@ -116,13 +116,17 @@ func (s *HelmStep) runAzureInlineGo(ctx context.Context, creds types.Credentials
 	}
 	storageAccountName := "stptd" + sanitizedStorageName
 
-	// Fetch mimir auth password from Key Vault.
+	// Fetch mimir auth password from Key Vault. It feeds only the alloy mimir-auth Secret, which
+	// is created only when the workload has a control room to authenticate against — so skip the
+	// Key Vault call (and its warning log) entirely when there is no control room.
 	mimirPassword := ""
-	mimirSecretName := s.DstTarget.Name() + "-mimir-auth"
-	if mimirPw, secretErr := s.DstTarget.SecretStore().GetSecretValue(ctx, creds, mimirSecretName); secretErr != nil {
-		fmt.Printf("helm azure: warning: failed to get mimir secret %q: %v\n", mimirSecretName, secretErr)
-	} else {
-		mimirPassword = mimirPw
+	if cfg.ControlRoomDomain != "" {
+		mimirSecretName := s.DstTarget.Name() + "-mimir-auth"
+		if mimirPw, secretErr := s.DstTarget.SecretStore().GetSecretValue(ctx, creds, mimirSecretName); secretErr != nil {
+			fmt.Printf("helm azure: warning: failed to get mimir secret %q: %v\n", mimirSecretName, secretErr)
+		} else {
+			mimirPassword = mimirPw
+		}
 	}
 
 	// Fetch grafana admin secret for fqdn.
