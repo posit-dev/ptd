@@ -434,12 +434,20 @@ func azureSitesDeploy(ctx *pulumi.Context, _ types.Target, params azureSiteParam
 	return nil
 }
 
+// azureSiteSecretName returns the name of the native Kubernetes Secret that
+// team-operator reads for a site on AKS (secret.type: kubernetes). It is also the
+// target of the site's ExternalSecret (see clusters_azure.go), so both the Site CR
+// and the ExternalSecret derive the name from this single helper and cannot drift.
+func azureSiteSecretName(compoundName, siteName string) string {
+	return fmt.Sprintf("%s-%s-posit-team", compoundName, siteName)
+}
+
 func buildAzureSiteSpec(
 	params azureSiteParams,
 	release, siteName string,
 	siteConfig types.SiteConfigSpec,
 ) map[string]interface{} {
-	siteSecretName := params.compoundName + "-" + siteName + ".posit.team"
+	siteSecretName := azureSiteSecretName(params.compoundName, siteName)
 	workloadSecretName := params.compoundName + ".posit.team"
 
 	return map[string]interface{}{

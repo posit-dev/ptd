@@ -378,7 +378,7 @@ func TestBuildAzureSiteSpec(t *testing.T) {
 
 	secret := spec["secret"].(map[string]interface{})
 	assert.Equal(t, "kubernetes", secret["type"])
-	assert.Equal(t, "myworkload-main.posit.team", secret["vaultName"])
+	assert.Equal(t, "myworkload-main-posit-team", secret["vaultName"])
 
 	workloadSecret := spec["workloadSecret"].(map[string]interface{})
 	assert.Equal(t, "kubernetes", workloadSecret["type"])
