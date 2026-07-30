@@ -279,8 +279,13 @@ func (s *BootstrapStep) runAzure(ctx context.Context, c types.Credentials, _ str
 
 		// Create a KeyVault secret for each populated field in the map since Azure Secret Provider
 		// doesn't support json blobs, we must create a KV entry for each field.
+		//
+		// Names are prefixed with the compound (workload) name so they follow the
+		// <compound>-<site>-<field> convention that the External Secrets Operator
+		// selects per site via `dataFrom.find { name.regexp: "^<compound>-<site>-" }`.
+		// See docs/guides/external-secrets-aks.md.
 		for fieldName, fieldValue := range secretMap {
-			fieldSecretName := fmt.Sprintf("%s-%s", siteName, fieldName)
+			fieldSecretName := fmt.Sprintf("%s-%s-%s", s.DstTarget.Name(), siteName, fieldName)
 			fieldValueStr := fmt.Sprintf("%v", fieldValue)
 			if fieldValueStr == "" {
 				continue
