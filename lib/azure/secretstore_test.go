@@ -67,10 +67,7 @@ func TestSecretStoreCreateSecretIfNotExists(t *testing.T) {
 }
 
 func TestEncodeSecretValue(t *testing.T) {
-	// Strings must be stored verbatim — NOT json-quoted — so values sync
-	// cleanly into k8s Secrets via External Secrets. Regression test for the
-	// bug where product secrets (e.g. main-dev-db-password) were stored as
-	// `"value"` with literal surrounding quotes.
+	// Regression: strings were stored json-quoted, corrupting synced values.
 	t.Run("string stored verbatim without quotes", func(t *testing.T) {
 		v, err := encodeSecretValue("p4ssw0rd")
 		assert.NoError(t, err)

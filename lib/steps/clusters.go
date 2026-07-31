@@ -27,21 +27,15 @@ const (
 	azRoleReader                    = "acdd72a7-3385-48ef-bd42-f606fba81ae7"
 	azRoleDNSZoneContributor        = "befefa01-2a29-4197-83a8-272ff33ce314"
 	azRoleStorageAccountContributor = "17d1049b-9a84-46fb-8f53-869881c3d3ab"
-	// azRoleKeyVaultSecretsUser grants read access to Key Vault secret contents.
-	// Built-in "Key Vault Secrets User" role. Used by the External Secrets Operator
-	// identity to read secrets from the workload Key Vault (RBAC-authorized vault).
+	// Built-in "Key Vault Secrets User" (getSecret + readMetadata).
 	azRoleKeyVaultSecretsUser = "4633458b-17de-408a-b874-0445c86b69e6"
 
 	// Azure K8s namespaces for CertManager and Traefik
 	clustersCertManagerNamespace = "cert-manager"
 	clustersTraefikNamespace     = "traefik"
-	// clustersExternalSecretsSA is the ESO controller service account name (matches
-	// the Helm chart's controller service account) that is federated to the
-	// workload-identity managed identity for Key Vault access. It lives in
-	// posit-team-system alongside team-operator.
+	// ESO controller SA (in posit-team-system) federated for Key Vault access.
 	clustersExternalSecretsSA = "external-secrets"
-	// clustersExternalSecretsStoreName is the ClusterSecretStore name pointing at
-	// the workload Key Vault. ExternalSecret resources reference this store.
+	// ClusterSecretStore that ExternalSecret resources reference by name.
 	clustersExternalSecretsStoreName = "azure-keyvault"
 )
 

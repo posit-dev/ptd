@@ -49,8 +49,7 @@ type azureClustersParams struct {
 	// siteDomains is always the per-site domains (one per site), independent of root_domain.
 	// Used for Traefik Ingresses, which must be created for every site domain.
 	siteDomains []string
-	// siteNames is the sorted list of site names (keys of cfg.Sites). Used to
-	// generate one ExternalSecret per site when external secrets are enabled.
+	// siteNames is the sorted list of site names, for per-site ExternalSecrets.
 	siteNames []string
 	// siteTLSSecrets maps a site domain to its optional per-host TLS secrets.
 	// When a domain has a non-empty entry, the Traefik ingress terminates TLS
@@ -673,17 +672,11 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 		}
 
 		// ── External Secrets Operator (optional, AKS only) ─────────────────────
-		// Syncs Azure Key Vault secrets into native k8s Secrets via a
-		// ClusterSecretStore authenticated with workload identity. This is the AKS
-		// counterpart to the AWS Secrets Store CSI driver. team-operator consumes
-		// the resulting native Secrets unchanged (SecretType: kubernetes) and is
-		// unaware of ESO. The ExternalSecret resources that map specific Key Vault
-		// keys to named Secrets are authored per-workload via custom_k8s_resources/
-		// (they reference the ClusterSecretStore created here by name).
+		// Syncs Key Vault into native k8s Secrets; team-operator is unaware of ESO.
+		// See docs/guides/external-secrets-aks.md.
 		if clusterCfg.ExternalSecretsEnabled {
 			esoVersion := clusterCfg.Components.ResolveAzureComponents().ExternalSecretsVersion
 
-			// Managed identity for the ESO controller.
 			esoIdentityName := fmt.Sprintf("id-%s-%s-external-secrets", name, release)
 			esoIdentity, err := azmanagedidentity.NewUserAssignedIdentity(ctx,
 				esoIdentityName,
@@ -696,9 +689,8 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				return fmt.Errorf("clusters: failed to create external-secrets identity for %s: %w", release, err)
 			}
 
-			// Key Vault Secrets User role scoped to the workload Key Vault.
-			// The vault is RBAC-authorized, so this role assignment (not an access
-			// policy) is what grants ESO read access to secret contents.
+			// The vault is RBAC-authorized, so access is granted by role assignment
+			// rather than an access policy.
 			keyVaultScope := fmt.Sprintf(
 				"/subscriptions/%s/resourceGroups/%s/providers/Microsoft.KeyVault/vaults/%s",
 				params.subscriptionID, params.resourceGroupName, params.keyVaultName)
@@ -714,16 +706,9 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				return fmt.Errorf("clusters: failed to create external-secrets key vault role for %s: %w", release, err)
 			}
 
-			// ESO runs in posit-team-system, alongside team-operator. That namespace is
-			// created by the team-operator Helm release (CreateNamespace: true — i.e.
-			// created only if it does not already exist). We depend on that release so
-			// the namespace exists before these resources, rather than declaring a
-			// second Pulumi resource that would contend with team-operator for
-			// ownership of the namespace.
-
-			// ESO controller ServiceAccount (annotated for workload identity).
-			// The Helm release below is configured with serviceAccount.create=false
-			// and this name, so it binds its controller Deployment to this SA.
+			// ESO runs in posit-team-system, whose namespace the team-operator release
+			// already creates; DependsOn it rather than contending for ownership.
+			// The Helm release below sets serviceAccount.create=false to use this SA.
 			esoSA, err := corev1.NewServiceAccount(ctx,
 				fmt.Sprintf("%s-%s-external-secrets-sa", name, release),
 				&corev1.ServiceAccountArgs{
@@ -761,7 +746,6 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				}
 			}
 
-			// External Secrets Operator Helm release.
 			esoHelm, err := helmv3.NewRelease(ctx,
 				fmt.Sprintf("%s-%s-external-secrets", name, release),
 				&helmv3.ReleaseArgs{
@@ -789,9 +773,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				return fmt.Errorf("clusters: failed to create external-secrets helm release for %s: %w", release, err)
 			}
 
-			// ClusterSecretStore pointing at the workload Key Vault. ExternalSecret
-			// resources reference this store by name to materialize native Secrets.
-			// Depends on the Helm release so the ESO CRDs are registered first.
+			// DependsOn the Helm release so the ESO CRDs are registered first.
 			esoStore, err := apiextensions.NewCustomResource(ctx,
 				fmt.Sprintf("%s-%s-external-secrets-store", name, release),
 				&apiextensions.CustomResourceArgs{
@@ -820,13 +802,9 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				return fmt.Errorf("clusters: failed to create external-secrets cluster store for %s: %w", release, err)
 			}
 
-			// One ExternalSecret per site. Each selects that site's Key Vault entries
-			// (^<compound>-<site>-) and rewrites the key to strip that prefix, so the
-			// resulting native Secret's keys are exactly what team-operator reads
-			// (dev-db-password, dev-license, …). creationPolicy: Owner means ESO owns
-			// the whole Secret — every key must therefore have a Key Vault source.
-			// target.name comes from azureSiteSecretName, the same helper the Site CR
-			// uses for secret.vaultName, so the two can never drift.
+			// One ExternalSecret per site: selects ^<compound>-<site>- and strips the
+			// prefix to produce the keys team-operator reads. Owner policy prunes keys
+			// with no Key Vault source. See docs/guides/external-secrets-aks.md.
 			for _, siteName := range params.siteNames {
 				sitePrefix := fmt.Sprintf("%s-%s-", name, siteName)
 				_, err = apiextensions.NewCustomResource(ctx,
@@ -848,12 +826,8 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 								"target": map[string]interface{}{
 									"name":           azureSiteSecretName(name, siteName),
 									"creationPolicy": "Owner",
-									// Key Vault cannot store an empty value, so these keys have no
-									// Key Vault source and cannot come from `find`. They are emitted
-									// as empty literals to preserve the shape of the existing Secret
-									// (team-operator mounts them only for OIDC Workbench auth, and
-									// their live values are empty). mergePolicy: Merge keeps the
-									// find results and adds these on top.
+									// Key Vault cannot store empty values, so these are emitted as
+									// empty literals to preserve the Secret's shape.
 									"template": map[string]interface{}{
 										"mergePolicy": "Merge",
 										"data": map[string]interface{}{

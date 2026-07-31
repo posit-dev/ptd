@@ -563,13 +563,11 @@ type AzureWorkloadClusterConfig struct {
 	// UseLetsEncrypt controls whether CertManager is deployed for this cluster.
 	UseLetsEncrypt bool `yaml:"use_lets_encrypt"`
 
-	// ExternalSecretsEnabled controls whether the External Secrets Operator (ESO)
-	// is deployed for this cluster. When true, ESO is installed and a
-	// ClusterSecretStore is created pointing at the workload's Azure Key Vault,
-	// authenticated via workload identity. ExternalSecret resources that map
-	// specific Key Vault keys to named k8s Secrets are authored per-workload via
-	// custom_k8s_resources/. AKS only; AWS continues to use the Secrets Store CSI
-	// driver.
+	// ExternalSecretsEnabled deploys the External Secrets Operator and a per-site
+	// ExternalSecret, syncing Azure Key Vault into native k8s Secrets. AKS only;
+	// AWS uses the Secrets Store CSI driver. Requires the Key Vault entries to
+	// already exist under the expected names — see
+	// docs/guides/external-secrets-aks.md.
 	ExternalSecretsEnabled bool `yaml:"external_secrets_enabled"`
 
 	UserNodePools []AzureUserNodePoolConfig `yaml:"user_node_pools"`
