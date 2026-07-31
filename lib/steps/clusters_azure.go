@@ -64,6 +64,16 @@ type azureClustersParams struct {
 	rootDomain string
 }
 
+// emptySiteSecretTemplateData renders clustersAzureEmptySiteSecretKeys as the
+// ExternalSecret target.template data map.
+func emptySiteSecretTemplateData() map[string]interface{} {
+	data := make(map[string]interface{}, len(clustersAzureEmptySiteSecretKeys))
+	for _, k := range clustersAzureEmptySiteSecretKeys {
+		data[k] = ""
+	}
+	return data
+}
+
 // traefikIngressTLSEntry is a plain representation of a single Traefik ingress
 // `tls` entry (hosts + secret name). It is the pure, unit-testable form of the
 // Pulumi `tls` array built by traefikIngressTLS.
@@ -806,6 +816,10 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 			// prefix to produce the keys team-operator reads. Owner policy prunes keys
 			// with no Key Vault source. See docs/guides/external-secrets-aks.md.
 			for _, siteName := range params.siteNames {
+				if siteName == clustersReservedWorkloadSiteName {
+					return fmt.Errorf("clusters: site name %q is reserved when external secrets are enabled: it collides with the %s-%s- Key Vault prefix",
+						siteName, name, clustersReservedWorkloadSiteName)
+				}
 				sitePrefix := fmt.Sprintf("%s-%s-", name, siteName)
 				_, err = apiextensions.NewCustomResource(ctx,
 					fmt.Sprintf("%s-%s-%s-external-secret", name, release, siteName),
@@ -826,14 +840,9 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 								"target": map[string]interface{}{
 									"name":           azureSiteSecretName(name, siteName),
 									"creationPolicy": "Owner",
-									// Key Vault cannot store empty values, so these are emitted as
-									// empty literals to preserve the Secret's shape.
 									"template": map[string]interface{}{
 										"mergePolicy": "Merge",
-										"data": map[string]interface{}{
-											"dev-admin-token": "",
-											"dev-user-token":  "",
-										},
+										"data":        emptySiteSecretTemplateData(),
 									},
 								},
 								"dataFrom": []interface{}{

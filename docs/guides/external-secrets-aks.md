@@ -47,7 +47,7 @@ team-operator reads:
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 spec:
-  refreshInterval: 1m
+  refreshInterval: 1h
   secretStoreRef:
     kind: ClusterSecretStore
     name: azure-keyvault

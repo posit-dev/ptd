@@ -37,7 +37,20 @@ const (
 	clustersExternalSecretsSA = "external-secrets"
 	// ClusterSecretStore that ExternalSecret resources reference by name.
 	clustersExternalSecretsStoreName = "azure-keyvault"
+	// clustersReservedWorkloadSiteName is reserved: workload-level Key Vault entries
+	// use the <compound>-workload- prefix, which a site of this name would collide
+	// with. See docs/guides/external-secrets-aks.md.
+	clustersReservedWorkloadSiteName = "workload"
 )
+
+// clustersAzureEmptySiteSecretKeys are site secret keys that are always empty, so
+// Key Vault (which rejects empty values) holds no entry and `bootstrap` skips them.
+// The site ExternalSecret emits them as empty literals to keep the Secret's shape.
+// Keep in sync with the empty fields of secrets.NewSiteSecret.
+var clustersAzureEmptySiteSecretKeys = []string{
+	"dev-admin-token",
+	"dev-user-token",
+}
 
 // ClustersStep deploys the per-cluster resources (IAM roles, K8s operators, etc.)
 // for both AWS and Azure workloads.

@@ -61,7 +61,10 @@ func (s *SecretStore) EnsureWorkloadSecret(ctx context.Context, credentials type
 	// Create a KeyVault secret for each populated field in the map since Azure Secret Provider
 	// doesn't support json blobs, we must create a KV entry for each field.
 	for fieldName, fieldValue := range secretMap {
-		fieldValueStr := fmt.Sprintf("%v", fieldValue)
+		fieldValueStr, err := encodeSecretValue(fieldValue)
+		if err != nil {
+			return fmt.Errorf("failed to encode field %s: %w", fieldName, err)
+		}
 		if fieldValueStr == "" {
 			continue
 		}
