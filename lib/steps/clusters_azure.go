@@ -848,6 +848,19 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 								"target": map[string]interface{}{
 									"name":           azureSiteSecretName(name, siteName),
 									"creationPolicy": "Owner",
+									// Key Vault cannot store an empty value, so these keys have no
+									// Key Vault source and cannot come from `find`. They are emitted
+									// as empty literals to preserve the shape of the existing Secret
+									// (team-operator mounts them only for OIDC Workbench auth, and
+									// their live values are empty). mergePolicy: Merge keeps the
+									// find results and adds these on top.
+									"template": map[string]interface{}{
+										"mergePolicy": "Merge",
+										"data": map[string]interface{}{
+											"dev-admin-token": "",
+											"dev-user-token":  "",
+										},
+									},
 								},
 								"dataFrom": []interface{}{
 									map[string]interface{}{
