@@ -23,6 +23,7 @@ Welcome to the Posit Team Dedicated (PTD) documentation.
 ### Infrastructure
 
 - [Kubernetes Guide](infrastructure/kubernetes.md) - Kubernetes-specific documentation
+- [External Secrets on AKS](guides/external-secrets-aks.md) - Key Vault → Kubernetes Secret sync, secret ownership (code vs. hand-created), and the existing-cluster migration procedure
 
 ### Misc
 - [Known Issues](KNOWN_ISSUES.md) - Known issues and rough edges
