@@ -442,13 +442,21 @@ func azureSiteSecretName(compoundName, siteName string) string {
 	return fmt.Sprintf("%s-%s-posit-team", compoundName, siteName)
 }
 
+// azureWorkloadSecretName returns the name of the native Kubernetes Secret that
+// team-operator reads for workload-level values on AKS. Hyphenated to match the
+// live cluster naming (and the site secret convention); AWS keeps its own
+// ".posit.team" Secrets Manager naming in buildAWSSiteSpec.
+func azureWorkloadSecretName(compoundName string) string {
+	return fmt.Sprintf("%s-posit-team", compoundName)
+}
+
 func buildAzureSiteSpec(
 	params azureSiteParams,
 	release, siteName string,
 	siteConfig types.SiteConfigSpec,
 ) map[string]interface{} {
 	siteSecretName := azureSiteSecretName(params.compoundName, siteName)
-	workloadSecretName := params.compoundName + ".posit.team"
+	workloadSecretName := azureWorkloadSecretName(params.compoundName)
 
 	return map[string]interface{}{
 		"clusterDate":  release,

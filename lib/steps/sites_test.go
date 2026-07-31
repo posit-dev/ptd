@@ -382,7 +382,7 @@ func TestBuildAzureSiteSpec(t *testing.T) {
 
 	workloadSecret := spec["workloadSecret"].(map[string]interface{})
 	assert.Equal(t, "kubernetes", workloadSecret["type"])
-	assert.Equal(t, "myworkload.posit.team", workloadSecret["vaultName"])
+	assert.Equal(t, "myworkload-posit-team", workloadSecret["vaultName"])
 
 	ppm := spec["packageManager"].(map[string]interface{})
 	azureFiles := ppm["azureFiles"].(map[string]interface{})
