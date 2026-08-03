@@ -813,8 +813,11 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 			}
 
 			// One ExternalSecret per site: selects ^<compound>-<site>- and strips the
-			// prefix to produce the keys team-operator reads. Owner policy prunes keys
-			// with no Key Vault source. See docs/guides/external-secrets-aks.md.
+			// prefix to produce the keys team-operator reads. Orphan policy still
+			// adopts, updates and prunes the Secret, but omits the ownerReference so
+			// deleting the ExternalSecret (e.g. disabling this feature) cannot
+			// cascade-delete a live product Secret.
+			// See docs/guides/external-secrets-aks.md.
 			for _, siteName := range params.siteNames {
 				if siteName == clustersReservedWorkloadSiteName {
 					return fmt.Errorf("clusters: site name %q is reserved when external secrets are enabled: it collides with the %s-%s- Key Vault prefix",
@@ -839,7 +842,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 								},
 								"target": map[string]interface{}{
 									"name":           azureSiteSecretName(name, siteName),
-									"creationPolicy": "Owner",
+									"creationPolicy": "Orphan",
 									"template": map[string]interface{}{
 										"mergePolicy": "Merge",
 										"data":        emptySiteSecretTemplateData(),

@@ -53,7 +53,7 @@ spec:
     name: azure-keyvault
   target:
     name: <compound>-<site>-posit-team   # the Secret team-operator reads
-    creationPolicy: Owner
+    creationPolicy: Orphan
   dataFrom:
     - find:
         name:
@@ -73,6 +73,25 @@ Those remain deploy-time (Pulumi) managed for now.
 > AWS stores the same data as a **single JSON blob** per site
 > (`<compound>-<site>.posit.team`); the ESO equivalent there uses `dataFrom.extract`
 > on that one secret rather than `find`.
+
+## Secret lifecycle policies
+
+The generated ExternalSecret uses `creationPolicy: Orphan` and the default
+`deletionPolicy: Retain`. Together these mean the Kubernetes Secret is adopted, kept
+updated, and pruned of keys with no Key Vault source — but it is never destroyed by ESO:
+
+| Event | Result |
+| --- | --- |
+| Key Vault value changes | Secret is updated on the next refresh |
+| Key has no Key Vault source | Key is pruned from the Secret |
+| Key Vault entry deleted | Secret is **retained** (`deletionPolicy: Retain`) |
+| ExternalSecret deleted (e.g. `external_secrets_enabled: false`) | Secret is **retained** (`creationPolicy: Orphan` sets no `ownerReferences`) |
+
+`creationPolicy: Owner` is ESO's default and would otherwise be the natural choice, but
+it sets an `ownerReference` on the Secret — so deleting the ExternalSecret, or removing
+the ESO CRDs, would garbage-collect a live product Secret and break the workload. The
+trade-off is that a Secret can outlive its ExternalSecret and go stale; deleting it is a
+deliberate manual step.
 
 ## Key Vault secret ownership
 
