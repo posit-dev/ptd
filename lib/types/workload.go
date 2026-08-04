@@ -639,6 +639,19 @@ func (c *AzureWorkloadClusterComponentConfig) ResolveAzureComponents() ResolvedA
 	}
 }
 
+// AnyClusterExternalSecretsEnabled reports whether any cluster in the workload has
+// external secrets enabled. The bootstrap step uses this to decide the Key Vault
+// naming convention for site secrets, so unmigrated workloads are left untouched.
+// See docs/guides/external-secrets-aks.md.
+func (c AzureWorkloadConfig) AnyClusterExternalSecretsEnabled() bool {
+	for _, cluster := range c.Clusters {
+		if cluster.ExternalSecretsEnabled {
+			return true
+		}
+	}
+	return false
+}
+
 type SiteConfig struct {
 	Spec SiteConfigSpec `json:"spec" yaml:"spec"`
 }

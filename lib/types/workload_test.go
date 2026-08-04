@@ -473,3 +473,25 @@ func TestUsesEksAccessEntries(t *testing.T) {
 		})
 	}
 }
+
+func TestAnyClusterExternalSecretsEnabled(t *testing.T) {
+	t.Run("no clusters enabled", func(t *testing.T) {
+		cfg := AzureWorkloadConfig{Clusters: map[string]AzureWorkloadClusterConfig{
+			"20250101": {},
+			"20250201": {},
+		}}
+		assert.False(t, cfg.AnyClusterExternalSecretsEnabled())
+	})
+
+	t.Run("one of several enabled", func(t *testing.T) {
+		cfg := AzureWorkloadConfig{Clusters: map[string]AzureWorkloadClusterConfig{
+			"20250101": {},
+			"20250201": {ExternalSecretsEnabled: true},
+		}}
+		assert.True(t, cfg.AnyClusterExternalSecretsEnabled())
+	})
+
+	t.Run("no clusters at all", func(t *testing.T) {
+		assert.False(t, AzureWorkloadConfig{}.AnyClusterExternalSecretsEnabled())
+	})
+}

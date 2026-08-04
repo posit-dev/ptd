@@ -39,6 +39,13 @@ Product secrets are stored in Key Vault as **1:1 entries** (not JSON blobs) name
 
 Example (illustrative): `<compound>-<site>-dev-db-password`.
 
+> **This convention is gated on `external_secrets_enabled`.** The `bootstrap` step uses
+> it only when at least one cluster in the workload has external secrets enabled;
+> otherwise it keeps the historical `<site>-<field>` name so vaults on unmigrated
+> workloads are left untouched. **Set the flag before running `bootstrap` on a new
+> workload** — otherwise bootstrap writes legacy names that the site's ExternalSecret
+> selector will not match.
+
 A per-site `ExternalSecret` selects everything under `^<compound>-<site>-` and rewrites
 the key to strip that prefix, so the resulting Secret keys match exactly what
 team-operator reads:
@@ -244,8 +251,16 @@ immediately.
 
 ### Greenfield clusters
 
-New clusters built after the naming change need no migration: `bootstrap` generates the
-code-generated secrets under the correct names. Everything in
+New clusters need no migration, provided `external_secrets_enabled: true` is set
+**before** the first `bootstrap` run — that is what selects the
+`<compound>-<site>-<field>` naming. `bootstrap` then generates the code-generated
+secrets under the correct names. (If bootstrap already ran without the flag, the
+secrets exist under `<site>-<field>`; because `CreateSecretIfNotExists` never
+overwrites, enabling the flag and re-running creates a *second* set under the new
+names with fresh random values — seed those from the cluster as in the migration
+above, then delete the legacy entries.)
+
+Everything in
 [Created by hand / CLI](#created-by-hand--cli-never-written-by-code) must still be added
 to Key Vault manually — notably the three licenses, the workload
 `main-database-url`, and `<compound>-grafana-postgres-admin-secret` (the `postgres_config`
