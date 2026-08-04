@@ -97,6 +97,84 @@ func TestAwsHelmTraefikHA(t *testing.T) {
 	assert.Equal(t, "traefik-critical", values["priorityClassName"])
 }
 
+// runAwsHelmAlloy invokes awsHelmAlloy in isolation with no-op providers/aliases.
+func runAwsHelmAlloy(t *testing.T, controlRoomDomain string) *helmAWSMocks {
+	t.Helper()
+	mocks := &helmAWSMocks{}
+	noopOpt := pulumi.Aliases(nil)
+	withAlias := func(string, string) pulumi.ResourceOption { return pulumi.Aliases(nil) }
+	withNestedAlias := func(string, string, string) pulumi.ResourceOption { return pulumi.Aliases(nil) }
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		params := awsHelmParams{
+			compoundName:  "wl01-staging",
+			trueName:      "wl01",
+			environment:   "staging",
+			accountID:     "123456789012",
+			region:        "us-east-1",
+			mimirPassword: "s3cr3t",
+			cfg: types.AWSWorkloadConfig{
+				ControlRoomDomain: controlRoomDomain,
+			},
+		}
+		resolved := types.ResolvedAWSComponents{AlloyVersion: "0.12.6"}
+		return awsHelmAlloy(ctx, noopOpt, "wl01-staging", "20250101", params, resolved,
+			types.AWSWorkloadClusterSpec{}, withAlias, withNestedAlias)
+	}, pulumi.WithMocks("ptd-aws-workload-helm", "wl01-staging", mocks))
+	require.NoError(t, err)
+	return mocks
+}
+
+// alloyChartValues unmarshals the Alloy HelmChart CR's valuesContent for inspection.
+func alloyChartValues(t *testing.T, mocks *helmAWSMocks) map[string]interface{} {
+	t.Helper()
+	chart := mocks.find("wl01-staging-20250101-grafana-alloy-release")
+	require.NotNil(t, chart, "alloy HelmChart CR not created")
+	valuesContent := chart.Inputs["spec"].ObjectValue()["valuesContent"].StringValue()
+	var values map[string]interface{}
+	require.NoError(t, yamlv2.Unmarshal([]byte(valuesContent), &values))
+	return values
+}
+
+func TestAwsHelmAlloyWithControlRoom(t *testing.T) {
+	mocks := runAwsHelmAlloy(t, "ctrl.example.posit.team")
+
+	// The mimir-auth Secret is created when the workload has a control room.
+	secret := mocks.find("wl01-staging-20250101-alloy-mimir-auth")
+	require.NotNil(t, secret, "mimir-auth Secret should be created when a control room is configured")
+
+	values := alloyChartValues(t, mocks)
+
+	// The controller carries the mimir-auth volume.
+	controller, ok := values["controller"].(map[interface{}]interface{})
+	require.True(t, ok, "controller key should be present when a control room is configured")
+	volumes := controller["volumes"].(map[interface{}]interface{})
+	require.Contains(t, volumes, "extra")
+
+	// The alloy mounts include the mimir-auth mount.
+	mounts := values["alloy"].(map[interface{}]interface{})["mounts"].(map[interface{}]interface{})
+	require.Contains(t, mounts, "extra", "mimir-auth mount should be present when a control room is configured")
+	require.Contains(t, mounts, "varlog")
+}
+
+func TestAwsHelmAlloyWithoutControlRoom(t *testing.T) {
+	mocks := runAwsHelmAlloy(t, "")
+
+	// The mimir-auth Secret is NOT created when there is no control room.
+	secret := mocks.find("wl01-staging-20250101-alloy-mimir-auth")
+	require.Nil(t, secret, "mimir-auth Secret should be omitted when there is no control room")
+
+	values := alloyChartValues(t, mocks)
+
+	// The controller key (which only carries the mimir-auth volume on AWS) is omitted entirely.
+	_, hasController := values["controller"]
+	require.False(t, hasController, "controller key should be omitted when there is no control room")
+
+	// varlog is still present but the mimir-auth mount is gone.
+	mounts := values["alloy"].(map[interface{}]interface{})["mounts"].(map[interface{}]interface{})
+	require.NotContains(t, mounts, "extra", "mimir-auth mount should be omitted when there is no control room")
+	require.Contains(t, mounts, "varlog")
+}
+
 func TestAwsHelmTraefikReplicasOverride(t *testing.T) {
 	mocks := runAwsHelmTraefik(t, 5)
 
