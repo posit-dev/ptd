@@ -46,7 +46,12 @@ const (
 // clustersAzureEmptySiteSecretKeys are site secret keys that are always empty, so
 // Key Vault (which rejects empty values) holds no entry and `bootstrap` skips them.
 // The site ExternalSecret emits them as empty literals to keep the Secret's shape.
-// Keep in sync with the empty fields of secrets.NewSiteSecret.
+//
+// This list is deliberately curated, not derived from secrets.SiteSecret: most fields
+// that field-type inspection would report as empty (the licences, the chronicle and
+// OIDC client secrets) DO have hand-created Key Vault entries and must come from
+// `find`, while others (home-auth-map) are deprecated and intentionally dropped.
+// Emitting empty literals for those would add spurious keys or mask real values.
 var clustersAzureEmptySiteSecretKeys = []string{
 	"dev-admin-token",
 	"dev-user-token",

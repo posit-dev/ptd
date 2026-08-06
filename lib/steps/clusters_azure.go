@@ -709,7 +709,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				&azauthorization.RoleAssignmentArgs{
 					PrincipalId:      esoIdentity.PrincipalId,
 					PrincipalType:    pulumi.StringPtr("ServicePrincipal"),
-					RoleDefinitionId: pulumi.String(fmt.Sprintf("/providers/Microsoft.Authorization/roleDefinitions/%s", azRoleKeyVaultSecretsUser)),
+					RoleDefinitionId: pulumi.String(azRoleDefID(azRoleKeyVaultSecretsUser)),
 					Scope:            pulumi.String(keyVaultScope),
 				}, pulumi.Parent(esoIdentity))
 			if err != nil {
@@ -739,7 +739,10 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				return fmt.Errorf("clusters: failed to create external-secrets service account for %s: %w", release, err)
 			}
 
-			// Federated identity credential binding the ESO SA to the identity.
+			// Federated identity credential binding the ESO SA to the identity. Without
+			// it ESO installs but cannot authenticate to Key Vault: the
+			// ClusterSecretStore reports Invalid and Secrets silently go unmanaged.
+			// PTD enables the OIDC issuer on every AKS cluster, so this holds in practice.
 			if identityInfo != nil && identityInfo.OIDCIssuerURL != "" {
 				_, err = azmanagedidentity.NewFederatedIdentityCredential(ctx,
 					fmt.Sprintf("fedid-%s-%s-external-secrets", name, release),

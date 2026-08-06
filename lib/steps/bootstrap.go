@@ -302,7 +302,13 @@ func (s *BootstrapStep) runAzure(ctx context.Context, c types.Credentials, _ str
 		// See docs/guides/external-secrets-aks.md.
 		for fieldName, fieldValue := range secretMap {
 			fieldSecretName := azureSiteSecretKeyVaultName(s.DstTarget.Name(), siteName, fieldName, externalSecretsEnabled)
-			fieldValueStr := fmt.Sprintf("%v", fieldValue)
+			// SiteSecret fields are all strings. Fail loudly rather than storing a
+			// Go-formatted value if that ever changes, since External Secrets syncs
+			// Key Vault values into Kubernetes Secrets byte-for-byte.
+			fieldValueStr, isStr := fieldValue.(string)
+			if !isStr {
+				return fmt.Errorf("site secret field %s has type %T, expected string", fieldName, fieldValue)
+			}
 			if fieldValueStr == "" {
 				continue
 			}
