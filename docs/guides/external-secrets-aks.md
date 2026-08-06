@@ -100,6 +100,19 @@ the ESO CRDs, would garbage-collect a live product Secret and break the workload
 trade-off is that a Secret can outlive its ExternalSecret and go stale; deleting it is a
 deliberate manual step.
 
+### CRDs are retained
+
+The chart renders its CRDs as ordinary templates, so a rollback of a failed `Atomic`
+upgrade would delete them — and deleting a CRD cascade-deletes every `ExternalSecret` and
+`ClusterSecretStore` in the cluster. The release therefore sets
+`crds.annotations."helm.sh/resource-policy": keep` so Helm leaves the CRDs in place
+(the team-operator release does the same via `crd.keep`).
+
+If a `clusters` apply involving ESO does fail, run
+`ptd ensure <target> --only-steps clusters --refresh` before re-applying: a rollback can
+remove resources Pulumi still believes exist, and without a refresh they are not
+recreated — leaving Secrets present but unmanaged.
+
 ## Key Vault secret ownership
 
 Every Key Vault secret is either **created by PTD code** or **created by hand/CLI**.

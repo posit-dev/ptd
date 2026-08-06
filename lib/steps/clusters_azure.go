@@ -769,6 +769,15 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 					Atomic: pulumi.Bool(true),
 					Values: pulumi.Map{
 						"installCRDs": pulumi.Bool(true),
+						// The chart renders CRDs as templates, so an Atomic rollback of a
+						// failed upgrade would delete them — cascade-deleting every
+						// ExternalSecret and ClusterSecretStore in the cluster. Retain them
+						// instead (the team-operator release does the same via crd.keep).
+						"crds": pulumi.Map{
+							"annotations": pulumi.Map{
+								"helm.sh/resource-policy": pulumi.String("keep"),
+							},
+						},
 						"serviceAccount": pulumi.Map{
 							"create": pulumi.Bool(false),
 							"name":   pulumi.String(clustersExternalSecretsSA),
