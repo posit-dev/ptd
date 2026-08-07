@@ -173,21 +173,18 @@ func deployTigeraOperator(
 				// Installation without ComponentResources renders empty resources),
 				// so every value here is newly introduced rather than inherited.
 				//
-				// Memory bounds are set from the highest working set observed across the
-				// fleet over 7 days. Where headroom had to be added it targets ~1.5x,
-				// enough to cover scrape-interval blind spots, Go heap transients, and
-				// growth, without reserving capacity that never gets used; components
-				// already above that were left as they were. calico-node runs Felix,
-				// whose memory scales with the number of endpoints and policies, so it
-				// holds the largest bound — though at ~1.37x of its observed peak it is
-				// also the thinnest margin, accepted because it is the only per-node
-				// DaemonSet and every increment lands on every node. Its 250m CPU
-				// request matches the only reservation upstream itself commits to — the
-				// request set on calico-node in the self-managed manifests/calico.yaml —
-				// and is a new per-node reservation here. It stays at 250m despite
-				// peaking near 750m: with no CPU limit that peak isn't throttled, and
-				// raising the request would take capacity off every node to buy share
-				// weight during transient Felix recalcs.
+				// Memory bounds are round values above the highest working set observed
+				// across the fleet over 7 days. Headroom is kept modest because
+				// request == limit makes it reserved capacity, not just a kill
+				// threshold. calico-node runs Felix, whose memory scales with the
+				// number of endpoints and policies, so it holds the largest bound and
+				// has the least headroom relative to its peak — worth watching, since
+				// it is the only per-node DaemonSet and any increase lands on every
+				// node. Its 250m CPU request matches upstream's, the only resource
+				// value set in the self-managed manifests/calico.yaml, and stays there
+				// despite peaking near 750m: with no CPU limit that peak isn't
+				// throttled, so raising the request would reserve capacity on every
+				// node without preventing anything.
 				"calicoNodeDaemonSet":             calicoComponentOverride(calicoContainer("calico-node", "250m", "512Mi")),
 				"typhaDeployment":                 calicoComponentOverride(calicoContainer("calico-typha", "100m", "256Mi")),
 				"calicoKubeControllersDeployment": calicoComponentOverride(calicoContainer("calico-kube-controllers", "50m", "192Mi")),
