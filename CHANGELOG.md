@@ -1,3 +1,22 @@
+# [1.41.0](https://github.com/posit-dev/ptd/compare/v1.40.2...v1.41.0) (2026-08-07)
+
+
+### Bug Fixes
+
+* **azure:** address PR review comments ([bcaffbe](https://github.com/posit-dev/ptd/commit/bcaffbebb264445f61978f352910316611880e4d))
+* **azure:** address PR review feedback ([7490356](https://github.com/posit-dev/ptd/commit/7490356040b9505893b8ae5763f7a93a6a06ebc5))
+* **azure:** gate site secret rename behind external_secrets_enabled ([0145f64](https://github.com/posit-dev/ptd/commit/0145f642ea61a3303ebca9207c1fe710a693c65f))
+* **azure:** retain External Secrets CRDs on rollback ([ff11f22](https://github.com/posit-dev/ptd/commit/ff11f22412ff34f188b431876aff9c36e5d1d066))
+* **azure:** use creationPolicy Orphan for site ExternalSecret ([80d69b9](https://github.com/posit-dev/ptd/commit/80d69b93ef4f60f3a436c6b826851c0d346c052b))
+
+
+### Features
+
+* **azure:** generate per-site ExternalSecret from Key Vault ([f9108d9](https://github.com/posit-dev/ptd/commit/f9108d96376fcc8d5bde23a2e7a6283023bf954f))
+* **azure:** name bootstrap site secrets <compound>-<site>-<field> ([f28174c](https://github.com/posit-dev/ptd/commit/f28174c1d245ccfb473c391f13372e48f3458b76))
+* **azure:** preserve empty token keys in site ExternalSecret ([f767cf6](https://github.com/posit-dev/ptd/commit/f767cf683efe5042d5db07be936ccf316b870ad6))
+* **azure:** sync Key Vault to AKS via External Secrets Operator ([b1f2d59](https://github.com/posit-dev/ptd/commit/b1f2d59cbe4524f151081d38898c5764c97f6c42))
+
 ## [1.40.2](https://github.com/posit-dev/ptd/compare/v1.40.1...v1.40.2) (2026-07-29)
 
 
