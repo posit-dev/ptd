@@ -1,3 +1,12 @@
+## [1.41.1](https://github.com/posit-dev/ptd/compare/v1.41.0...v1.41.1) (2026-08-07)
+
+
+### Bug Fixes
+
+* **eks:** bound csi-node-driver and correct the calico-node CPU rationale ([1dba167](https://github.com/posit-dev/ptd/commit/1dba1676277f8afd77ab693c156121ce779e5407))
+* **eks:** set resource requests/limits for Calico/Tigera components ([6fa81e6](https://github.com/posit-dev/ptd/commit/6fa81e6bc8d6e141289be7442bb6a09b7f0fd98c))
+* **eks:** size Calico memory bounds from measured usage ([33f64e2](https://github.com/posit-dev/ptd/commit/33f64e2696c53308a15336d5cec4eaa753a785b2))
+
 # [1.41.0](https://github.com/posit-dev/ptd/compare/v1.40.2...v1.41.0) (2026-08-07)
 
 
