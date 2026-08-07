@@ -173,11 +173,15 @@ func deployTigeraOperator(
 				// Installation without ComponentResources renders empty resources),
 				// so every value here is newly introduced rather than inherited.
 				//
-				// Memory bounds are ~1.5x the highest working set observed across the
-				// fleet over 7 days, which covers scrape-interval blind spots, Go heap
-				// transients, and growth, without reserving capacity that never gets
-				// used. calico-node runs Felix, whose memory scales with the number of
-				// endpoints and policies, so it holds the largest bound. Its 250m CPU
+				// Memory bounds are set from the highest working set observed across the
+				// fleet over 7 days. Where headroom had to be added it targets ~1.5x,
+				// enough to cover scrape-interval blind spots, Go heap transients, and
+				// growth, without reserving capacity that never gets used; components
+				// already above that were left as they were. calico-node runs Felix,
+				// whose memory scales with the number of endpoints and policies, so it
+				// holds the largest bound — though at ~1.37x of its observed peak it is
+				// also the thinnest margin, accepted because it is the only per-node
+				// DaemonSet and every increment lands on every node. Its 250m CPU
 				// request matches the only reservation upstream itself commits to — the
 				// request set on calico-node in the self-managed manifests/calico.yaml —
 				// and is a new per-node reservation here. It stays at 250m despite
