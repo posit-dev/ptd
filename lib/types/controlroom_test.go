@@ -41,6 +41,7 @@ func TestAWSControlRoomConfigSerialization(t *testing.T) {
 			"Environment": "staging",
 			"Project":     "ptd",
 		},
+		IgnoreTags: []string{"customer:cost-center", "customer:owner"},
 		TrustedUsers: []TrustedUser{
 			{
 				Email:      "alice@example.com",
@@ -99,6 +100,9 @@ func TestAWSControlRoomConfigSerialization(t *testing.T) {
 	// Check maps
 	assert.Equal(t, config.ResourceTags["Environment"], unmarshaledConfig.ResourceTags["Environment"])
 	assert.Equal(t, config.ResourceTags["Project"], unmarshaledConfig.ResourceTags["Project"])
+
+	// IgnoreTags (AWS-only) must survive the round trip
+	assert.Equal(t, config.IgnoreTags, unmarshaledConfig.IgnoreTags)
 
 	// Check booleans
 	assert.Equal(t, config.ManageEcrRepositories, unmarshaledConfig.ManageEcrRepositories)

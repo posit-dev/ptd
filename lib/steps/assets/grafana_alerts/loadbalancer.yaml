@@ -209,7 +209,12 @@ groups:
                 maxDataPoints: 43200
                 refId: B
                 type: threshold
-          noDataState: NoData
+          # noDataState: OK - the fleet uses ALBs for ingress; Network Load
+          # Balancers are optional and usually absent, so aws_networkelb_* has no
+          # series (confirmed: 0 series across the fleet). Alerting on NoData here
+          # only produced anonymous DatasourceNoData pages with blank labels. Fire
+          # only when an NLB actually exists and has unhealthy targets.
+          noDataState: OK
           execErrState: Error
           for: 5m
           annotations:

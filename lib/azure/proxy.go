@@ -180,9 +180,21 @@ func (p *ProxySession) Start(ctx context.Context) error {
 		return err
 	}
 
-	// wait for the tunnel to be established
-	time.Sleep(3 * time.Second)
-	if !helpers.PortOpen("localhost", "22001") {
+	// wait for the tunnel to be established. `az network bastion tunnel` reliably
+	// takes a few seconds to bind port 22001, so poll rather than doing a single
+	// one-shot check (which fires too early and kills a tunnel that would have
+	// come up).
+	tunnelOpen := false
+	for i := 0; i < 10; i++ {
+		if helpers.PortOpen("localhost", "22001") {
+			slog.Debug("Tunnel port open", "tunnel_port", "22001")
+			tunnelOpen = true
+			break
+		}
+		slog.Debug("Waiting for tunnel port open", "attempt", i+1, "tunnel_port", "22001")
+		time.Sleep(1 * time.Second)
+	}
+	if !tunnelOpen {
 		slog.Error("Tunnel is not listening on port 22001")
 		if killErr := helpers.KillProcess(p.tunnelCommand.Process.Pid); killErr != nil {
 			slog.Warn("Error killing orphaned tunnel command", "pid", p.tunnelCommand.Process.Pid, "error", killErr)

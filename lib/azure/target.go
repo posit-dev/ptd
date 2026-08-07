@@ -149,6 +149,11 @@ func (t Target) TailscaleEnabled() bool {
 	return false
 }
 
+func (t Target) IgnoreTags() []string {
+	// ignore_tags is AWS-only; the Azure provider has no equivalent.
+	return nil
+}
+
 func (t Target) Clusters() map[string]types.AzureWorkloadClusterConfig {
 	return t.clusters
 }

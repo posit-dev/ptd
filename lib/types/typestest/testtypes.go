@@ -67,6 +67,14 @@ func (m *MockTarget) TailscaleEnabled() bool {
 	return args.Bool(0)
 }
 
+func (m *MockTarget) IgnoreTags() []string {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil
+	}
+	return args.Get(0).([]string)
+}
+
 func (m *MockTarget) PulumiBackendUrl() string {
 	args := m.Called()
 	return args.String(0)
@@ -100,6 +108,7 @@ func DefaultAzureTarget() *MockTarget {
 	azt.On("PulumiSecretsProviderKey").Return("example://example/secrets")
 	azt.On("HashName").Return("test-az-staging-hash")
 	azt.On("ResourceTags").Return(map[string]string(nil))
+	azt.On("IgnoreTags").Return([]string(nil))
 	return azt
 }
 

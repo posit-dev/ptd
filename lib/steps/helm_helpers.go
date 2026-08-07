@@ -830,7 +830,7 @@ prometheus.exporter.azure "netapp" {
     subscriptions    = ["%s"]
     resource_type    = "Microsoft.NetApp/netAppAccounts/capacityPools/volumes"
     resource_graph_query_filter = "where resourceGroup == '%s'"
-    metrics          = ["VolumeConsumedSizePercentage", "VolumeLogicalSize", "AverageReadLatency", "AverageWriteLatency", "ReadIops", "WriteIops"]
+    metrics          = ["VolumeConsumedSizePercentage", "VolumeLogicalSize", "AverageReadLatency", "AverageWriteLatency", "ReadIops", "WriteIops", "ThroughputLimitReached"]
 }
 
 prometheus.scrape "azure_netapp" {

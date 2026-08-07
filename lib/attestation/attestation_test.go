@@ -298,7 +298,7 @@ func TestCollectBootstrapResourcesAWS(t *testing.T) {
 	}
 	// createAdminPolicyAsResource is set explicitly so the expected resource
 	// count is deterministic (the admin policy is only emitted when true).
-	target := aws.NewTarget("example01-production", "123456789012", "example-profile", nil, "us-east-2", false, false, true, sites, nil)
+	target := aws.NewTarget("example01-production", "123456789012", "example-profile", nil, "us-east-2", false, false, true, sites, nil, nil)
 
 	res := collectBootstrapResources(target)
 

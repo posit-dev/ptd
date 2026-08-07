@@ -53,7 +53,8 @@ func LocalStack(
 		return stack, err
 	}
 
-	if err := ConfigureStackRegion(ctx, stack, config.Cloud, config.TargetRegion); err != nil {
+	// LocalStack backs state-only workspaces (no pulumi up), so provider ignoreTags is irrelevant.
+	if err := ConfigureStackRegion(ctx, stack, config.Cloud, config.TargetRegion, nil); err != nil {
 		return stack, err
 	}
 

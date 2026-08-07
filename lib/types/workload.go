@@ -138,6 +138,10 @@ type NodeGroupConfig struct {
 	AmiType *string `json:"ami_type" yaml:"ami_type"`
 	// DesiredSize defaults to MinSize when nil (Python default None).
 	DesiredSize *int `json:"desired_size" yaml:"desired_size"`
+	// SystemNodes, when true, labels this node group's Kubernetes nodes with
+	// posit.team/node-role=system. System workloads can target these nodes and
+	// the image prepull daemonset can be kept off them via node affinity.
+	SystemNodes bool `json:"system_nodes" yaml:"system_nodes"`
 }
 
 // NGInstanceType resolves the node group instance type (Python default "t3.large").
@@ -330,6 +334,7 @@ type KarpenterNodePool struct {
 	Weight                        int                      `json:"weight" yaml:"weight"`
 	RootVolumeSize                string                   `json:"root_volume_size" yaml:"root_volume_size"`
 	SessionTaints                 bool                     `json:"session_taints" yaml:"session_taints"`
+	SystemNodes                   bool                     `json:"system_nodes" yaml:"system_nodes"`
 	ConsolidationPolicy           string                   `json:"consolidation_policy" yaml:"consolidation_policy"`
 	ConsolidateAfter              string                   `json:"consolidate_after" yaml:"consolidate_after"`
 	OverprovisioningReplicas      int                      `json:"overprovisioning_replicas" yaml:"overprovisioning_replicas"`
@@ -388,17 +393,21 @@ type AWSWorkloadConfig struct {
 	PublicLoadBalancer               *bool              `json:"public_load_balancer" yaml:"public_load_balancer"`
 	Region                           string             `json:"region" yaml:"region"`
 	ResourceTags                     map[string]string  `json:"resource_tags" yaml:"resource_tags"`
-	RoleArn                          *string            `json:"role_arn" yaml:"role_arn"`
-	TailscaleEnabled                 bool               `json:"tailscale_enabled" yaml:"tailscale_enabled"`
-	SecretsStoreAddonEnabled         *bool              `json:"secrets_store_addon_enabled,omitempty" yaml:"secrets_store_addon_enabled,omitempty"`
-	TrustedPrincipals                []string           `json:"trusted_principals" yaml:"trusted_principals"`
-	HostedZoneID                     *string            `json:"hosted_zone_id" yaml:"hosted_zone_id"`
-	HostedZoneManagementEnabled      *bool              `json:"hosted_zone_management_enabled,omitempty" yaml:"hosted_zone_management_enabled,omitempty"`
-	VpcAzCount                       int                `json:"vpc_az_count" yaml:"vpc_az_count"`
-	VpcCidr                          string             `json:"vpc_cidr" yaml:"vpc_cidr"`
-	ThirdPartyTelemetryEnabled       *bool              `json:"third_party_telemetry_enabled,omitempty" yaml:"third_party_telemetry_enabled,omitempty"`
-	NetworkTrust                     string             `json:"network_trust" yaml:"network_trust"`
-	NvidiaGpuEnabled                 bool               `json:"nvidia_gpu_enabled" yaml:"nvidia_gpu_enabled"`
+	// IgnoreTags is a flat list of exact AWS tag keys that the Pulumi AWS provider should
+	// never add or remove on managed resources. Used so customer-applied tags are left
+	// untouched by our IaC. AWS-only; wired into the provider's ignoreTags.keys.
+	IgnoreTags                  []string `json:"ignore_tags" yaml:"ignore_tags"`
+	RoleArn                     *string  `json:"role_arn" yaml:"role_arn"`
+	TailscaleEnabled            bool     `json:"tailscale_enabled" yaml:"tailscale_enabled"`
+	SecretsStoreAddonEnabled    *bool    `json:"secrets_store_addon_enabled,omitempty" yaml:"secrets_store_addon_enabled,omitempty"`
+	TrustedPrincipals           []string `json:"trusted_principals" yaml:"trusted_principals"`
+	HostedZoneID                *string  `json:"hosted_zone_id" yaml:"hosted_zone_id"`
+	HostedZoneManagementEnabled *bool    `json:"hosted_zone_management_enabled,omitempty" yaml:"hosted_zone_management_enabled,omitempty"`
+	VpcAzCount                  int      `json:"vpc_az_count" yaml:"vpc_az_count"`
+	VpcCidr                     string   `json:"vpc_cidr" yaml:"vpc_cidr"`
+	ThirdPartyTelemetryEnabled  *bool    `json:"third_party_telemetry_enabled,omitempty" yaml:"third_party_telemetry_enabled,omitempty"`
+	NetworkTrust                string   `json:"network_trust" yaml:"network_trust"`
+	NvidiaGpuEnabled            bool     `json:"nvidia_gpu_enabled" yaml:"nvidia_gpu_enabled"`
 	// FilterControlRoomMetrics enables the per-workload metric filter before forwarding to the
 	// control room Mimir remote_write. When true, only metrics referenced by grafana_alerts and
 	// grafana_dashboards are forwarded. Defaults to false so rollout can be done per-workload.
@@ -640,6 +649,20 @@ type SiteConfigSpec struct {
 	VpcAssociations              []string `json:"vpc_associations" yaml:"vpc_associations"`
 	AutoAssociateProvisionedVpc  *bool    `json:"auto_associate_provisioned_vpc" yaml:"auto_associate_provisioned_vpc"`
 	CertificateValidationEnabled *bool    `json:"certificate_validation_enabled" yaml:"certificate_validation_enabled"`
+	// TLSSecrets, when set, replaces the default single wildcard `tls` entry for
+	// this site's Azure Traefik ingress with one entry per listed secret. Each
+	// entry maps a set of hosts to a pre-existing Kubernetes TLS secret, letting
+	// the ingress terminate TLS with multiple certificates instead of the single
+	// wildcard secret. Ignored on AWS (which uses per-site CertificateARN). When
+	// unset, the default single wildcard entry is emitted unchanged.
+	TLSSecrets []SiteTLSSecret `json:"tls_secrets,omitempty" yaml:"tls_secrets,omitempty"`
+}
+
+// SiteTLSSecret maps a set of hostnames to a Kubernetes TLS secret for an
+// Azure Traefik ingress. See SiteConfigSpec.TLSSecrets.
+type SiteTLSSecret struct {
+	Hosts      []string `yaml:"hosts" json:"hosts"`
+	SecretName string   `yaml:"secret_name" json:"secret_name"`
 }
 
 var ValidOutboundTypes = map[string]bool{

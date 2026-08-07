@@ -1,3 +1,87 @@
+## [1.40.2](https://github.com/posit-dev/ptd/compare/v1.40.1...v1.40.2) (2026-07-29)
+
+
+### Bug Fixes
+
+* **helm:** gate Alloy mimir-auth secret and mount on control room ([9037d0e](https://github.com/posit-dev/ptd/commit/9037d0e9d0fd3e34aa1a4c7d4e140a10b19d880f))
+* **helm:** skip mimir secret lookup when there is no control room ([893ad19](https://github.com/posit-dev/ptd/commit/893ad19ed78121ac5f0636c9fc8e8784f28a9d0f))
+
+## [1.40.1](https://github.com/posit-dev/ptd/compare/v1.40.0...v1.40.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* **control-room:** drop bogus LBC image tag and CR IAM permissions boundary ([e986fc3](https://github.com/posit-dev/ptd/commit/e986fc3176f7c1921fc7f4cf0f53649439bd225f))
+
+# [1.40.0](https://github.com/posit-dev/ptd/compare/v1.39.1...v1.40.0) (2026-07-17)
+
+
+### Bug Fixes
+
+* **aws:** warn when refresh can't read config; clarify ignore_tags config lifecycle ([eff9888](https://github.com/posit-dev/ptd/commit/eff9888e2968d18a86edfcad5274747d9e3c1b3b)), closes [pulumi/pulumi#13860](https://github.com/pulumi/pulumi/issues/13860)
+
+
+### Features
+
+* **aws:** add ignore_tags to preserve customer-applied resource tags ([c0ae44d](https://github.com/posit-dev/ptd/commit/c0ae44de3635c1022502d9366d6daea257c25702)), closes [pulumi/pulumi#13860](https://github.com/pulumi/pulumi/issues/13860)
+
+## [1.39.1](https://github.com/posit-dev/ptd/compare/v1.39.0...v1.39.1) (2026-07-17)
+
+
+### Bug Fixes
+
+* **azure:** external-dns extraArgs must be a list, not a map ([099af64](https://github.com/posit-dev/ptd/commit/099af64f838ade04c60120d338756fbae0eb823d))
+
+# [1.39.0](https://github.com/posit-dev/ptd/compare/v1.38.1...v1.39.0) (2026-07-17)
+
+
+### Features
+
+* **azure:** support multiple TLS secrets on Traefik site ingress ([d0de1ef](https://github.com/posit-dev/ptd/commit/d0de1ef87923d333bf18c78a57ac7f0ce17f2c94))
+
+## [1.38.1](https://github.com/posit-dev/ptd/compare/v1.38.0...v1.38.1) (2026-07-16)
+
+
+### Bug Fixes
+
+* **azure:** poll for bastion tunnel port instead of one-shot check ([1040c4b](https://github.com/posit-dev/ptd/commit/1040c4b6dd1a9158d103f321d14184754a14e4a6))
+
+# [1.38.0](https://github.com/posit-dev/ptd/compare/v1.37.3...v1.38.0) (2026-07-16)
+
+
+### Features
+
+* **infra:** allow labeling system nodes with posit.team/node-role=system ([70ec09c](https://github.com/posit-dev/ptd/commit/70ec09cd1fdb4e96302753b338d812caea640367))
+
+## [1.37.3](https://github.com/posit-dev/ptd/compare/v1.37.2...v1.37.3) (2026-07-15)
+
+
+### Bug Fixes
+
+* align review config with claude-code-action's documented pattern ([02a9e26](https://github.com/posit-dev/ptd/commit/02a9e2656fae903642813c3f2a78d10faecc7ab9))
+* **clusters:** pin helm-controller klipper-helm job image ([fd8e217](https://github.com/posit-dev/ptd/commit/fd8e217fa08a0336ccb6d98c14685f27b2a0b81f))
+* set track_progress so the review actually posts ([7cb0ef4](https://github.com/posit-dev/ptd/commit/7cb0ef44a81100f5e49f87c8c9b7690c315c2de2))
+* skip auto-review on draft PRs ([c38604f](https://github.com/posit-dev/ptd/commit/c38604fd98ee6a56df3a1014ca43bfdff515eafe))
+
+## [1.37.2](https://github.com/posit-dev/ptd/compare/v1.37.1...v1.37.2) (2026-07-10)
+
+
+### Bug Fixes
+
+* **alerts:** apply volume attribution to all netapp rules; stop NLB NoData pages ([4b083dd](https://github.com/posit-dev/ptd/commit/4b083dd37d5d7fd98b96aed2bdc011d34f9f94c2))
+* **alerts:** make NetApp throughput rule volume-attributable and burst-tolerant ([a607b1f](https://github.com/posit-dev/ptd/commit/a607b1ff30c45ca42ddffba39eec6f85b0a6e7d5))
+* **alerts:** scrape NetApp throughput metric and add cluster-attributable silent alert ([98d05f5](https://github.com/posit-dev/ptd/commit/98d05f5a08ef2a8c337ff57e4c71ee4a688f47ca))
+* **alerts:** windowed baseline for netapp silent detection (not point-offset) ([36944b8](https://github.com/posit-dev/ptd/commit/36944b8a1448c575abd33db6270123e1234f2579))
+* trigger review on ready_for_review + allow Read/Glob/Grep ([37d12cb](https://github.com/posit-dev/ptd/commit/37d12cb77ee4e0f92827c981f9675f3bfb373c65))
+* use tool denylist instead of allowlist so review posts ([01f629d](https://github.com/posit-dev/ptd/commit/01f629df608f33426cdbc1d22c959c52de9d01b6))
+
+## [1.37.1](https://github.com/posit-dev/ptd/compare/v1.37.0...v1.37.1) (2026-07-09)
+
+
+### Bug Fixes
+
+* default team-operator chart to v1.29.0 ([e83f02d](https://github.com/posit-dev/ptd/commit/e83f02d10b031b8814bc732c81e456ba67229738))
+
 # [1.37.0](https://github.com/posit-dev/ptd/compare/v1.36.3...v1.37.0) (2026-07-09)
 
 

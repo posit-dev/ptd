@@ -181,17 +181,80 @@ ptd ensure {{.WorkloadName}} --only-steps sites
 
 ### Product Licenses
 
-Update the license key in the secret store ({{if eq .Cloud "aws"}}Secrets Manager{{else}}Key Vault{{end}}) and restart the affected product:
+Licenses are stored per site and per product{{if eq .Cloud "aws"}} in the AWS Secrets Manager secret ` + "`" + `{{.WorkloadName}}-<site>.posit.team` + "`" + ` (one secret per site){{else}} in a plain Kubernetes secret ` + "`" + `{{.WorkloadName}}-<site>-posit-team` + "`" + ` in the ` + "`" + `posit-team` + "`" + ` namespace{{end}}, keyed by product:
+
+| Product | Secret key |
+|---|---|
+| Connect | ` + "`" + `pub-license` + "`" + ` |
+| Workbench | ` + "`" + `dev-license` + "`" + ` |
+| Package Manager | ` + "`" + `pkg-license` + "`" + ` |
+
+Update **one site at a time — non-production sites first, then production** — and **back up the current value before overwriting**. Only replace the one product key; leave every other key in the secret untouched.
+
+The license value must be stored as a **single line with all newline characters stripped** — downloaded ` + "`" + `.lic` + "`" + ` files are multi-line PEM, so strip the newlines before storing (the commands below do this).
+{{- if eq .Cloud "aws"}}
+
+The Secrets Store CSI driver syncs this secret into the product pods. Read the secret, overwrite just the one product key, and write it back:
 
 ` + "```" + `bash
-ptd workon {{.WorkloadName}} -- kubectl rollout restart deployment/<site>-<product> -n posit-team
+# Back up the whole secret
+aws secretsmanager get-secret-value --secret-id {{.WorkloadName}}-<site>.posit.team \
+  --region {{.Region}} --query SecretString --output text > <site>-license.bak.json
+
+# Single-line the license (strip newlines), then overwrite only <product-key>
+# (jq preserves every other key) and put it back
+LICENSE=$(tr -d '\n' < <license-file>.lic)
+UPDATED=$(jq --arg key <product-key> --arg val "$LICENSE" '.[$key]=$val' <site>-license.bak.json)
+aws secretsmanager put-secret-value --secret-id {{.WorkloadName}}-<site>.posit.team \
+  --region {{.Region}} --secret-string "$UPDATED"
 ` + "```" + `
+{{- else}}
+
+There is no Key Vault sync for licenses on this workload — the secret is managed directly in the cluster. Back up, then patch only the one key:
+
+` + "```" + `bash
+# Back up the current value
+ptd workon {{.WorkloadName}} -- kubectl get secret {{.WorkloadName}}-<site>-posit-team -n posit-team \
+  -o jsonpath="{.data.<product-key>}" | base64 -d > <site>-<product>-license.bak
+
+# Single-line + base64, then patch the one key (--type merge preserves the others)
+B64=$(tr -d '\n' < <license-file>.lic | base64)
+ptd workon {{.WorkloadName}} -- kubectl patch secret {{.WorkloadName}}-<site>-posit-team -n posit-team \
+  --type merge -p "{\"data\":{\"<product-key>\":\"$B64\"}}"
+` + "```" + `
+{{- end}}
+
+**Recycle the pod to remount the new license.** The license is mounted via a ` + "`" + `subPath` + "`" + ` secret, which does **not** update in place, so the pod must be recreated. Do **not** use ` + "`" + `kubectl rollout restart` + "`" + `: these deployments are managed by the Team Operator, which reverts the restart annotation — no pods recycle, yet ` + "`" + `rollout status` + "`" + ` still reports success. Delete the pod(s) directly so the ReplicaSet recreates them with the new value; on production, delete one at a time, waiting for ready in between:
+
+` + "```" + `bash
+ptd workon {{.WorkloadName}} -- kubectl delete pod -l app.kubernetes.io/instance=<site>-<product> -n posit-team
+ptd workon {{.WorkloadName}} -- kubectl wait --for=condition=ready pod \
+  -l app.kubernetes.io/instance=<site>-<product> -n posit-team --timeout=180s
+` + "```" + `
+
+Verify activation on a running pod (the container name varies by product/image, so discover it first):
+
+` + "```" + `bash
+POD=$(ptd workon {{.WorkloadName}} -- kubectl get pods -n posit-team \
+  -l app.kubernetes.io/instance=<site>-<product> --field-selector=status.phase=Running \
+  -o jsonpath='{.items[0].metadata.name}')
+ptd workon {{.WorkloadName}} -- kubectl get pod $POD -n posit-team -o jsonpath='{.spec.containers[*].name}'
+ptd workon {{.WorkloadName}} -- kubectl exec $POD -n posit-team -c <container> -- <license-manager> status
+` + "```" + `
+
+Confirm ` + "`" + `Status: Activated` + "`" + `, the expected product key, user count, and expiry. The ` + "`" + `<license-manager>` + "`" + ` binary differs by product:
+
+| Product | license-manager binary |
+|---|---|
+| Connect | ` + "`" + `/opt/rstudio-connect/bin/license-manager` + "`" + ` |
+| Workbench | ` + "`" + `rstudio-server license-manager` + "`" + ` |
+| Package Manager | ` + "`" + `/opt/rstudio-pm/bin/license-manager` + "`" + ` |
 
 ### RSA Keys
 
 **Warning:** Rotating these keys makes data the product encrypted with the previous key (e.g. stored credentials and variables) unrecoverable. Plan accordingly.
 
-Update the key in the secret store and restart the affected product.
+Update the key in the secret store, then recycle the pod the same way as for licenses above (delete the pod — do **not** use ` + "`" + `kubectl rollout restart` + "`" + `, which the Team Operator reverts).
 
 ## Checking Workload Health
 
