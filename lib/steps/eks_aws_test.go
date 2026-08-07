@@ -2,6 +2,8 @@ package steps
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"sync"
 	"testing"
 
@@ -17,8 +19,9 @@ import (
 // --- mocks ---
 
 type eksStepMocks struct {
-	mu        sync.Mutex
-	resources []pulumi.MockResourceArgs
+	mu         sync.Mutex
+	resources  []pulumi.MockResourceArgs
+	callTokens []string
 }
 
 func (m *eksStepMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
@@ -45,6 +48,9 @@ func (m *eksStepMocks) NewResource(args pulumi.MockResourceArgs) (string, resour
 }
 
 func (m *eksStepMocks) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
+	m.mu.Lock()
+	m.callTokens = append(m.callTokens, args.Token)
+	m.mu.Unlock()
 	switch args.Token {
 	case "tls:index/getCertificate:getCertificate":
 		return resource.PropertyMap{
@@ -68,6 +74,13 @@ func (m *eksStepMocks) Call(args pulumi.MockCallArgs) (resource.PropertyMap, err
 		return resource.PropertyMap{
 			"arn": resource.NewStringProperty("arn:aws:iam::123456789012:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_PowerUser_abc123"),
 		}, nil
+	case "aws:route53/getZone:getZone":
+		// ExternalDNS IRSA policy resolves each site's hosted-zone ARN.
+		return resource.PropertyMap{
+			"id":     resource.NewStringProperty("Z0123456789ABC"),
+			"zoneId": resource.NewStringProperty("Z0123456789ABC"),
+			"arn":    resource.NewStringProperty("arn:aws:route53:::hostedzone/Z0123456789ABC"),
+		}, nil
 	}
 	return resource.PropertyMap{}, nil
 }
@@ -82,6 +95,18 @@ func (m *eksStepMocks) byType(typeToken string) []pulumi.MockResourceArgs {
 		}
 	}
 	return out
+}
+
+func (m *eksStepMocks) countCalls(token string) int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, t := range m.callTokens {
+		if t == token {
+			n++
+		}
+	}
+	return n
 }
 
 func (m *eksStepMocks) findResource(name string) *pulumi.MockResourceArgs {
@@ -144,12 +169,13 @@ func TestClusterStepUnsupportedCloud(t *testing.T) {
 // --- deploy core ---
 
 func newTestEKSParams() awsEKSParams {
-	return awsEKSParams{
+	p := awsEKSParams{
 		compoundName:              "wl01-staging",
 		region:                    "us-east-1",
 		requiredTags:              map[string]string{"posit.team/managed-by": eksManagedByValue},
 		iamPermissionsBoundaryARN: "arn:aws:iam::123456789012:policy/PositTeamDedicatedAdmin",
 		accountID:                 "123456789012",
+		callerARN:                 "arn:aws:sts::123456789012:assumed-role/admin/x",
 		thirdPartyTelemetry:       true,
 		clusters: map[string]types.AWSWorkloadClusterConfig{
 			// Default to the modern access-entries auth path (avoids the aws-auth
@@ -170,6 +196,15 @@ func newTestEKSParams() awsEKSParams {
 			},
 		},
 	}
+	// Workload-scoped IRSA roles (phase 2). ExternalDNS is off by default here so
+	// the core test doesn't depend on the persistent zone-id output; dedicated
+	// tests exercise the ExternalDNS path. zoneOutputPresent=true so the
+	// (gated-off) ExternalDNS builder wouldn't error even if reached.
+	p.workloadIRSA = buildWorkloadIRSAParams(p, awsWorkloadConfigForIRSA{
+		ExternalDNSEnabled:          false,
+		HostedZoneManagementEnabled: true,
+	}, map[string]string{}, true)
+	return p
 }
 
 func TestAWSEKSDeployCore(t *testing.T) {
@@ -184,8 +219,37 @@ func TestAWSEKSDeployCore(t *testing.T) {
 	assert.Len(t, mocks.byType("aws:eks/nodeGroup:NodeGroup"), 1)
 	assert.Len(t, mocks.byType("aws:iam/openIdConnectProvider:OpenIdConnectProvider"), 1)
 	assert.Len(t, mocks.byType("pulumi:providers:kubernetes"), 1)
-	// IAM roles: cluster + node + EBS CSI IRSA (EFS off, secrets-store off).
-	assert.Len(t, mocks.byType("aws:iam/role:Role"), 3)
+	// IAM roles: cluster + node + EBS CSI add-on IRSA (EFS off, secrets-store off)
+	// = 3 per-cluster roles, PLUS the 7 workload-scoped IRSA roles created in
+	// phase 2 (FSx, LBC, TraefikForwardAuth, Mimir, Loki, EBS-CSI, Alloy;
+	// ExternalDNS is off in this test) = 10 total.
+	assert.Len(t, mocks.byType("aws:iam/role:Role"), 10)
+
+	// The 7 workload-scoped IRSA roles are present by their logical names. NOTE:
+	// the FSx role keeps the persistent-era logical name "aws-fsx-openzfs-csi-driver.posit.team"
+	// (its physical Name is the compound-scoped fsxOpenzfsRoleName); the other six
+	// use the compound-scoped name for both logical and physical.
+	for _, want := range []string{
+		"aws-fsx-openzfs-csi-driver.posit.team",
+		"aws-load-balancer-controller.wl01-staging.posit.team",
+		"traefik-forward-auth.wl01-staging.posit.team",
+		"mimir.wl01-staging.posit.team",
+		"loki.wl01-staging.posit.team",
+		"aws-ebs-csi.wl01-staging.posit.team",
+		"alloy.wl01-staging.posit.team",
+	} {
+		assert.NotNilf(t, mocks.findResource(want), "expected workload IRSA role %q", want)
+	}
+	// ExternalDNS role is gated off in this test.
+	assert.Nil(t, mocks.findResource("external-dns.wl01-staging.posit.team"))
+
+	// The FSx role keeps the persistent-era logical name but its physical IAM
+	// Name is the compound-scoped fsxOpenzfsRoleName (required for state adoption).
+	fsxRole := mocks.findResource("aws-fsx-openzfs-csi-driver.posit.team")
+	require.NotNil(t, fsxRole)
+	assert.Equal(t, resource.NewStringProperty("aws-fsx-openzfs-csi-driver.wl01-staging.posit.team"), fsxRole.Inputs["name"])
+	// Every workload IRSA role carries the workload permissions boundary.
+	assert.Equal(t, resource.NewStringProperty("arn:aws:iam::123456789012:policy/PositTeamDedicatedAdmin"), fsxRole.Inputs["permissionsBoundary"])
 
 	// EBS CSI managed add-on present; EFS add-on absent (not enabled).
 	addons := mocks.byType("aws:eks/addon:Addon")
@@ -322,8 +386,9 @@ func TestAWSEKSDeployEfsEnabled(t *testing.T) {
 	}
 	assert.True(t, addonNames["wl01-staging-20250101-ebs-csi"])
 	assert.True(t, addonNames["wl01-staging-20250101-efs-csi"])
-	// IAM roles: cluster + node + EBS IRSA + EFS IRSA = 4.
-	assert.Len(t, mocks.byType("aws:iam/role:Role"), 4)
+	// IAM roles: cluster + node + EBS add-on IRSA + EFS add-on IRSA = 4 per-cluster
+	// roles, PLUS the 7 workload-scoped IRSA roles (ExternalDNS off) = 11 total.
+	assert.Len(t, mocks.byType("aws:iam/role:Role"), 11)
 }
 
 func TestAWSEKSDeployAdditionalNodeGroups(t *testing.T) {
@@ -348,4 +413,255 @@ func TestAWSEKSDeployAdditionalNodeGroups(t *testing.T) {
 	assert.Len(t, mocks.byType("aws:eks/nodeGroup:NodeGroup"), 2)
 	// The additional node group is named "{compound}-{release}-{ngName}".
 	assert.NotNil(t, mocks.findResource("wl01-staging-20250101-gpu"))
+}
+
+// TestAWSEKSDeployWorkloadIRSAExternalDNS exercises phase 2 with ExternalDNS
+// enabled: the external-dns IRSA role + dns-update policy are created, and the
+// policy grants ChangeResourceRecordSets on the hosted-zone ARN sourced from the
+// persistent hosted_zone_name_servers stack output (no route53 lookup).
+func TestAWSEKSDeployWorkloadIRSAExternalDNS(t *testing.T) {
+	params := newTestEKSParams()
+	params.workloadIRSA = buildWorkloadIRSAParams(params, awsWorkloadConfigForIRSA{
+		ExternalDNSEnabled:          true,
+		HostedZoneManagementEnabled: true,
+	}, map[string]string{"main": "Z0123456789ABC"}, true)
+
+	mocks := &eksStepMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return awsEKSDeploy(ctx, mockAWSWorkloadTarget("wl01-staging"), params)
+	}, pulumi.WithMocks("ptd-aws-workload-eks", "wl01-staging", mocks))
+	require.NoError(t, err)
+
+	// ExternalDNS role present (now 8 workload IRSA roles → 11 total IAM roles:
+	// cluster + node + EBS add-on + 8 workload roles).
+	assert.NotNil(t, mocks.findResource("external-dns.wl01-staging.posit.team"))
+	assert.Len(t, mocks.byType("aws:iam/role:Role"), 11)
+
+	// The dns-update policy embeds the hosted-zone ARN from the stack output.
+	dnsPolicy := mocks.findResource("dns-update.wl01-staging.posit.team")
+	require.NotNil(t, dnsPolicy)
+	assert.Contains(t, dnsPolicy.Inputs["policy"].StringValue(), "arn:aws:route53:::hostedzone/Z0123456789ABC")
+	// Zone ARNs come from the persistent output — NO runtime route53 lookup.
+	assert.Equal(t, 0, mocks.countCalls("aws:route53/getZone:getZone"))
+}
+
+// TestAWSEKSDeployWorkloadIRSAExternalDNSStripsHostedzonePrefix confirms a
+// zone_id arriving with a leading "/hostedzone/" prefix is normalized so the ARN
+// is byte-identical to the bare-id form (no double prefix).
+func TestAWSEKSDeployWorkloadIRSAExternalDNSStripsHostedzonePrefix(t *testing.T) {
+	params := newTestEKSParams()
+	params.workloadIRSA = buildWorkloadIRSAParams(params, awsWorkloadConfigForIRSA{
+		ExternalDNSEnabled:          true,
+		HostedZoneManagementEnabled: true,
+	}, map[string]string{"main": "/hostedzone/ZPREFIXED1"}, true)
+
+	mocks := &eksStepMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return awsEKSDeploy(ctx, mockAWSWorkloadTarget("wl01-staging"), params)
+	}, pulumi.WithMocks("ptd-aws-workload-eks", "wl01-staging", mocks))
+	require.NoError(t, err)
+
+	dnsPolicy := mocks.findResource("dns-update.wl01-staging.posit.team")
+	require.NotNil(t, dnsPolicy)
+	policy := dnsPolicy.Inputs["policy"].StringValue()
+	assert.Contains(t, policy, "arn:aws:route53:::hostedzone/ZPREFIXED1")
+	assert.NotContains(t, policy, "hostedzone//hostedzone/")
+}
+
+// TestAWSEKSDeployWorkloadIRSAExternalDNSSharedDomain confirms persistent's
+// per-site ARN multiplicity is reproduced: two sites sharing a domain carry the
+// SAME zone_id in the persistent output, so that ARN appears once PER SITE in the
+// policy resource list (multiplicity = 2), matching persistent's policy.
+func TestAWSEKSDeployWorkloadIRSAExternalDNSSharedDomain(t *testing.T) {
+	params := newTestEKSParams()
+	// persistent attaches the per-domain primary's zone to every site of the
+	// domain, so the export carries the same zone_id under each site.
+	params.workloadIRSA = buildWorkloadIRSAParams(params, awsWorkloadConfigForIRSA{
+		ExternalDNSEnabled:          true,
+		HostedZoneManagementEnabled: true,
+	}, map[string]string{"main": "Z0123456789ABC", "alt": "Z0123456789ABC"}, true)
+
+	mocks := &eksStepMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return awsEKSDeploy(ctx, mockAWSWorkloadTarget("wl01-staging"), params)
+	}, pulumi.WithMocks("ptd-aws-workload-eks", "wl01-staging", mocks))
+	require.NoError(t, err)
+
+	// No runtime route53 lookups.
+	assert.Equal(t, 0, mocks.countCalls("aws:route53/getZone:getZone"))
+
+	// The zone ARN appears once per site (2x) in the ChangeResourceRecordSets list.
+	dnsPolicy := mocks.findResource("dns-update.wl01-staging.posit.team")
+	require.NotNil(t, dnsPolicy)
+	policy := dnsPolicy.Inputs["policy"].StringValue()
+	assert.Equal(t, 2, strings.Count(policy, "arn:aws:route53:::hostedzone/Z0123456789ABC"))
+}
+
+// TestAWSEKSDeployWorkloadIRSAExternalDNSMissingOutput confirms eks fails loudly
+// when the persistent hosted_zone_name_servers output is absent (persistent has
+// not applied), rather than emitting a silently-empty ExternalDNS policy.
+func TestAWSEKSDeployWorkloadIRSAExternalDNSMissingOutput(t *testing.T) {
+	params := newTestEKSParams()
+	params.workloadIRSA = buildWorkloadIRSAParams(params, awsWorkloadConfigForIRSA{
+		ExternalDNSEnabled:          true,
+		HostedZoneManagementEnabled: true,
+	}, map[string]string{}, false) // present=false → output missing
+
+	mocks := &eksStepMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return awsEKSDeploy(ctx, mockAWSWorkloadTarget("wl01-staging"), params)
+	}, pulumi.WithMocks("ptd-aws-workload-eks", "wl01-staging", mocks))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "hosted_zone_name_servers")
+}
+
+// TestAWSEKSDeployWorkloadIRSAExternalDNSHostedZoneManagementOff locks the
+// documented hosted-zone-management-off state: with ExternalDNS enabled but
+// HostedZoneManagementEnabled=false (and the persistent zone output present but
+// empty), the external-dns role + dns-update policy are still created, but the
+// policy's route53:ChangeResourceRecordSets statement grants NO zone ARNs — its
+// Resource is an empty list (present, not null/missing).
+func TestAWSEKSDeployWorkloadIRSAExternalDNSHostedZoneManagementOff(t *testing.T) {
+	params := newTestEKSParams()
+	// zoneOutputPresent=true (export exists) but empty, and hosted-zone management
+	// off → persistent created no zones, so ChangeResourceRecordSets lists nothing.
+	params.workloadIRSA = buildWorkloadIRSAParams(params, awsWorkloadConfigForIRSA{
+		ExternalDNSEnabled:          true,
+		HostedZoneManagementEnabled: false,
+	}, map[string]string{}, true)
+
+	mocks := &eksStepMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return awsEKSDeploy(ctx, mockAWSWorkloadTarget("wl01-staging"), params)
+	}, pulumi.WithMocks("ptd-aws-workload-eks", "wl01-staging", mocks))
+	require.NoError(t, err)
+
+	// The external-dns role and dns-update policy ARE created even with hosted-zone
+	// management off (they just grant no zone ARNs).
+	assert.NotNil(t, mocks.findResource("external-dns.wl01-staging.posit.team"))
+	dnsPolicy := mocks.findResource("dns-update.wl01-staging.posit.team")
+	require.NotNil(t, dnsPolicy)
+
+	// Parse the policy and assert the ChangeResourceRecordSets statement's Resource
+	// is an empty list — present (not null/missing), with zero ARNs.
+	var doc struct {
+		Statement []struct {
+			Action   []string `json:"Action"`
+			Resource []string `json:"Resource"`
+		} `json:"Statement"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(dnsPolicy.Inputs["policy"].StringValue()), &doc))
+
+	var found bool
+	for _, st := range doc.Statement {
+		if len(st.Action) == 1 && st.Action[0] == "route53:ChangeResourceRecordSets" {
+			found = true
+			require.NotNil(t, st.Resource, "ChangeResourceRecordSets Resource must be present (empty list, not null)")
+			assert.Empty(t, st.Resource, "ChangeResourceRecordSets Resource must be an empty list when hosted-zone management is off")
+		}
+	}
+	require.True(t, found, "expected a route53:ChangeResourceRecordSets statement in the dns-update policy")
+
+	// The empty list serializes as "Resource":[] (present, not null/absent).
+	assert.Contains(t, dnsPolicy.Inputs["policy"].StringValue(), `"Resource":[]`)
+}
+
+// TestAWSEKSDeployWorkloadIRSATrustBoundToOIDC confirms an IRSA role's trust
+// policy is built from the cluster OIDC issuer (the Output-aware path), federating
+// the OIDC provider and constraining the expected service-account subject.
+func TestAWSEKSDeployWorkloadIRSATrustBoundToOIDC(t *testing.T) {
+	mocks := &eksStepMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return awsEKSDeploy(ctx, mockAWSWorkloadTarget("wl01-staging"), newTestEKSParams())
+	}, pulumi.WithMocks("ptd-aws-workload-eks", "wl01-staging", mocks))
+	require.NoError(t, err)
+
+	alloyRole := mocks.findResource("alloy.wl01-staging.posit.team")
+	require.NotNil(t, alloyRole)
+	trust := alloyRole.Inputs["assumeRolePolicy"].StringValue()
+	// The mock cluster issuer is https://oidc.eks.us-east-1.amazonaws.com/id/TEST;
+	// the tail (no scheme) is federated and the alloy SA subject is constrained.
+	assert.Contains(t, trust, "oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/TEST")
+	assert.Contains(t, trust, "system:serviceaccount:alloy:alloy.posit.team")
+	assert.Contains(t, trust, "sts:AssumeRoleWithWebIdentity")
+}
+
+// TestAWSEKSDeployWorkloadIRSATrustGoldenParity locks the byte-parity the whole
+// migration depends on: the Output-aware trust the eks role gets must equal the
+// shared pure irsaTrustPolicyLogic output for the same inputs. If the two ever
+// diverge, the import-based state migration would see a diff and replace.
+func TestAWSEKSDeployWorkloadIRSATrustGoldenParity(t *testing.T) {
+	params := newTestEKSParams()
+	mocks := &eksStepMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return awsEKSDeploy(ctx, mockAWSWorkloadTarget("wl01-staging"), params)
+	}, pulumi.WithMocks("ptd-aws-workload-eks", "wl01-staging", mocks))
+	require.NoError(t, err)
+
+	alloyRole := mocks.findResource("alloy.wl01-staging.posit.team")
+	require.NotNil(t, alloyRole)
+	got := alloyRole.Inputs["assumeRolePolicy"].StringValue()
+
+	// The mock cluster issuer tail (scheme stripped) is the sole OIDC tail.
+	want := irsaTrustPolicyLogic(
+		"alloy",
+		[]string{"alloy.posit.team"},
+		[]string{"oidc.eks.us-east-1.amazonaws.com/id/TEST"},
+		params.accountID,
+		params.callerARN,
+	)
+	assert.Equal(t, want, got)
+}
+
+// TestAWSEKSDeployWorkloadIRSATrustExtraOidcUrls confirms configured
+// extra_cluster_oidc_urls are folded into the IRSA trust (parity with the
+// persistent step, which appended cfg.ExtraClusterOidcUrls before building it).
+func TestAWSEKSDeployWorkloadIRSATrustExtraOidcUrls(t *testing.T) {
+	params := newTestEKSParams()
+	params.workloadIRSA.extraClusterOidcURLs = []string{"https://oidc.example.com/id/EXTRA"}
+
+	mocks := &eksStepMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return awsEKSDeploy(ctx, mockAWSWorkloadTarget("wl01-staging"), params)
+	}, pulumi.WithMocks("ptd-aws-workload-eks", "wl01-staging", mocks))
+	require.NoError(t, err)
+
+	alloyRole := mocks.findResource("alloy.wl01-staging.posit.team")
+	require.NotNil(t, alloyRole)
+	trust := alloyRole.Inputs["assumeRolePolicy"].StringValue()
+	// Both the cluster issuer AND the extra issuer (scheme stripped) are federated.
+	assert.Contains(t, trust, "oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/TEST")
+	assert.Contains(t, trust, "oidc-provider/oidc.example.com/id/EXTRA")
+}
+
+// TestAWSEKSDeployWorkloadIRSAMimirLokiBucketPolicy asserts the Mimir and Loki
+// IRSA permission policies grant read/write on the LIVE bucket ARNs, which carry
+// the persistent "ptd-" prefix (arn:aws:s3:::ptd-<cn>-mimir / -loki). This guards
+// the migration-blocking regression where the ARN omitted the prefix.
+func TestAWSEKSDeployWorkloadIRSAMimirLokiBucketPolicy(t *testing.T) {
+	mocks := &eksStepMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		return awsEKSDeploy(ctx, mockAWSWorkloadTarget("wl01-staging"), newTestEKSParams())
+	}, pulumi.WithMocks("ptd-aws-workload-eks", "wl01-staging", mocks))
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		policyName string
+		bucketARN  string
+	}{
+		{"mimir-s3-bucket.wl01-staging.posit.team", "arn:aws:s3:::ptd-wl01-staging-mimir"},
+		{"loki-s3-bucket.wl01-staging.posit.team", "arn:aws:s3:::ptd-wl01-staging-loki"},
+	} {
+		pol := mocks.findResource(tc.policyName)
+		require.NotNilf(t, pol, "expected policy %q", tc.policyName)
+
+		var doc struct {
+			Statement []struct {
+				Resource []string `json:"Resource"`
+			} `json:"Statement"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(pol.Inputs["policy"].StringValue()), &doc))
+		require.Len(t, doc.Statement, 1)
+		assert.Equal(t, []string{tc.bucketARN, tc.bucketARN + "/*"}, doc.Statement[0].Resource)
+	}
 }

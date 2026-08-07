@@ -1,7 +1,0 @@
-/.coverage
-/dist/
-/htmlcov/
-__pycache__
-coverage.json
-coverage.out
-**/ptd.egg-info/

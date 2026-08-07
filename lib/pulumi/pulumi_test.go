@@ -1,12 +1,10 @@
 package pulumi
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
+	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestBuildProjectName(t *testing.T) {
@@ -58,35 +56,47 @@ func TestK8sEnvVars(t *testing.T) {
 	assert.Equal(t, 3, len(envVars))
 }
 
-func TestWriteMainPy(t *testing.T) {
-	// Create a temporary directory for testing
-	tmpDir, err := os.MkdirTemp("", "pulumi-test")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+// TestAWSIgnoreTagsConfig verifies the pure path-config construction for the AWS
+// provider's ignoreTags.keys list. The SetConfigWithOptions call inside
+// ConfigureStackRegion needs a live automation-API stack (real backend), so only
+// this pure helper is unit-tested; the loop simply feeds these entries to the stack.
+func TestAWSIgnoreTagsConfig(t *testing.T) {
+	t.Run("empty list yields no entries", func(t *testing.T) {
+		assert.Empty(t, awsIgnoreTagsConfig(nil))
+		assert.Empty(t, awsIgnoreTagsConfig([]string{}))
+	})
 
-	module := "aws_workload_cluster"
-	class := "AWSWorkloadCluster"
-
-	// Write the main.py file
-	err = WriteMainPy(tmpDir, module, class)
-	require.NoError(t, err)
-
-	// Verify the file was created
-	mainPyPath := filepath.Join(tmpDir, "__main__.py")
-	_, err = os.Stat(mainPyPath)
-	assert.NoError(t, err)
-
-	// Read the file contents
-	content, err := os.ReadFile(mainPyPath)
-	require.NoError(t, err)
-
-	// Verify the content is as expected
-	expectedContent := "import ptd.pulumi_resources.aws_workload_cluster\n\nptd.pulumi_resources.aws_workload_cluster.AWSWorkloadCluster.autoload()\n"
-	assert.Equal(t, expectedContent, string(content))
+	t.Run("keys become indexed path config", func(t *testing.T) {
+		entries := awsIgnoreTagsConfig([]string{"customer:cost-center", "customer:owner"})
+		assert.Equal(t, []ignoreTagsConfigEntry{
+			{Path: "aws:ignoreTags.keys[0]", Value: "customer:cost-center"},
+			{Path: "aws:ignoreTags.keys[1]", Value: "customer:owner"},
+		}, entries)
+	})
 }
 
-// TestUvRuntime - we're not testing this function because it depends on an external viper configuration
-// and would require significant setup/mocking
+// TestShouldRunProgramOnRefresh verifies the decision gate that enables
+// optrefresh.RunProgram(true) only when aws:ignoreTags is configured with a
+// non-empty value, so refresh behavior is unchanged for every other stack.
+func TestShouldRunProgramOnRefresh(t *testing.T) {
+	t.Run("key absent yields false", func(t *testing.T) {
+		assert.False(t, shouldRunProgramOnRefresh(map[string]auto.ConfigValue{
+			"aws:region": {Value: "us-east-2"},
+		}))
+	})
+
+	t.Run("key present with non-empty value yields true", func(t *testing.T) {
+		assert.True(t, shouldRunProgramOnRefresh(map[string]auto.ConfigValue{
+			"aws:ignoreTags": {Value: "{\"keys\":[\"customer:cost-center\"]}"},
+		}))
+	})
+
+	t.Run("key present with empty value yields false", func(t *testing.T) {
+		assert.False(t, shouldRunProgramOnRefresh(map[string]auto.ConfigValue{
+			"aws:ignoreTags": {Value: ""},
+		}))
+	})
+}
 
 // We're skipping the BackendUrl test as it would require extensive mocking
 // of the types.Target interface. Testing would require creating a fully compliant

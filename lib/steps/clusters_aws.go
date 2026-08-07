@@ -188,23 +188,16 @@ func (s *ClustersStep) runAWSInlineGo(ctx context.Context, creds types.Credentia
 
 // getPostgresConfigStackOutputs reads outputs from the postgres_config stack for the given target.
 func getPostgresConfigStackOutputs(ctx context.Context, target types.Target, envVars map[string]string) (auto.OutputMap, error) {
-	pgStack, err := ptdpulumi.NewPythonPulumiStack(
+	outputs, err := ptdpulumi.ReadStackOutputs(
 		ctx,
 		string(target.CloudProvider()),
 		string(target.Type()),
 		"postgres_config",
 		target.Name(),
-		target.Region(),
 		target.PulumiBackendUrl(),
 		target.PulumiSecretsProviderKey(),
 		envVars,
-		false,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create postgres_config stack handle: %w", err)
-	}
-
-	outputs, err := pgStack.Outputs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get postgres_config outputs: %w", err)
 	}
@@ -712,7 +705,7 @@ func awsClustersDeploy(ctx *pulumi.Context, _ types.Target, params awsClustersPa
 									pulumi.String("--namespace"),
 									pulumi.String(clustersHelmControllerNamespace),
 									pulumi.String("--default-job-image"),
-									pulumi.String("ghcr.io/k3s-io/klipper-helm:latest"),
+									pulumi.String("ghcr.io/k3s-io/klipper-helm:v0.9.5-build20250306"),
 								},
 							},
 						},

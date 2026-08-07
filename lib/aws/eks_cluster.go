@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/posit-dev/ptd/lib/consts"
 	awsec2 "github.com/pulumi/pulumi-aws/sdk/v6/go/aws/ec2"
 	awseks "github.com/pulumi/pulumi-aws/sdk/v6/go/aws/eks"
 	awsiam "github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
@@ -465,6 +466,10 @@ type NodeGroupParams struct {
 	// the node group).
 	Tags   map[string]string
 	Labels map[string]string
+	// SystemNode, when true, applies the posit.team/node-role=system Kubernetes
+	// node label to this node group so system workloads can target it and the
+	// image prepull daemonset can be kept off it via node affinity.
+	SystemNode bool
 	// Taints mirror the Python ptd.Taint list (effect/key/value).
 	Taints []NodeGroupTaint
 }
@@ -553,6 +558,16 @@ func (c *EKSCluster) WithNodeGroup(p NodeGroupParams) *EKSCluster {
 		})
 	}
 
+	// Kubernetes node labels (distinct from ngTags, which are AWS resource tags).
+	// System node groups get posit.team/node-role=system so callers can target
+	// or avoid them with node affinity (e.g. keep the prepull daemonset off them).
+	var nodeLabels pulumi.StringMap
+	if p.SystemNode {
+		nodeLabels = pulumi.StringMap{
+			consts.PositTeamNodeRoleLabel: pulumi.String(consts.PositTeamNodeRoleSystem),
+		}
+	}
+
 	// PULUMI STATE NAME — node group logical name MUST equal Python full_name.
 	ng, err := awseks.NewNodeGroup(c.ctx, p.Name, &awseks.NodeGroupArgs{
 		ClusterName: c.cluster.Name,
@@ -565,6 +580,7 @@ func (c *EKSCluster) WithNodeGroup(p NodeGroupParams) *EKSCluster {
 			MaxSize:     pulumi.Int(p.MaxSize),
 		},
 		AmiType: pulumi.String(p.AmiType),
+		Labels:  nodeLabels,
 		Tags:    ngTags,
 		LaunchTemplate: &awseks.NodeGroupLaunchTemplateArgs{
 			Id:      lt.ID(),
@@ -1108,9 +1124,15 @@ func (c *EKSCluster) WithEbsCsiDriver(roleName, version string) *EKSCluster {
 	// the default -> two default StorageClasses. Adopting the field as-is avoids the
 	// reconcile entirely. See the tracking issue for the proper long-term fix
 	// (stop using the addon's defaultStorageClass feature and own the SCs directly).
+	// serviceAccountRoleArn is also ignored: the AWS provider sets it on create/update
+	// but does not reliably read it back into state (terraform-provider-aws #19402), so
+	// Pulumi re-proposes it on every run. The role ARN is deterministic and set-once, so
+	// ignoring masks nothing real, and it avoids a per-apply addon reconcile (the same
+	// reconcile that re-asserts the default StorageClass, above). Creates are unaffected,
+	// so greenfield clusters still get the role.
 	addon, err := awseks.NewAddon(c.ctx, c.cfg.Name+"-ebs-csi", addonArgs,
 		c.clusterChildAlias("aws:eks/addon:Addon", c.cfg.Name+"-ebs-csi"),
-		pulumi.IgnoreChanges([]string{"configurationValues"}))
+		pulumi.IgnoreChanges([]string{"configurationValues", "serviceAccountRoleArn"}))
 	if err != nil {
 		c.err = fmt.Errorf("eks: failed to create EBS CSI addon for %s: %w", c.cfg.Name, err)
 		return c
@@ -1208,12 +1230,18 @@ func (c *EKSCluster) WithEfsCsiDriver(roleName string) *EKSCluster {
 		return c
 	}
 
+	// IgnoreChanges on serviceAccountRoleArn: the AWS provider sets it on create/update
+	// but does not reliably read it back into state (terraform-provider-aws #19402), so
+	// Pulumi re-proposes it on every run and each apply triggers an addon reconcile. The
+	// role ARN is deterministic and set-once, so ignoring masks nothing real. Creates are
+	// unaffected, so greenfield clusters still get the role.
 	_, err = awseks.NewAddon(c.ctx, c.cfg.Name+"-efs-csi", &awseks.AddonArgs{
 		AddonName:             pulumi.String("aws-efs-csi-driver"),
 		ClusterName:           pulumi.String(c.cfg.Name),
 		ServiceAccountRoleArn: saRole.Arn,
 		Tags:                  c.cluster.Tags,
-	}, c.clusterChildAlias("aws:eks/addon:Addon", c.cfg.Name+"-efs-csi"))
+	}, c.clusterChildAlias("aws:eks/addon:Addon", c.cfg.Name+"-efs-csi"),
+		pulumi.IgnoreChanges([]string{"serviceAccountRoleArn"}))
 	if err != nil {
 		c.err = fmt.Errorf("eks: failed to create EFS CSI addon for %s: %w", c.cfg.Name, err)
 		return c

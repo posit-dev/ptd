@@ -3,7 +3,9 @@ package steps
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -297,7 +299,11 @@ func awsClusterDeploy(ctx *pulumi.Context, _ types.Target, params awsClusterPara
 		// workload path passes the .posit.team-suffixed name explicitly; do NOT
 		// conflate the two. State URN: …$aws:iam/role:Role::<name>-ebs-csi-driver.
 		WithEbsCsiDriver(name+"-ebs-csi-driver", cfg.EBSCsiAddonVersion()).
-		WithAwsLbc(cfg.AWSLbcVersion(), "").
+		// No image-tag or chart-version override: image.tag is omitted so the chart
+		// supplies its own default image, and the chart version defaults to latest.
+		// Do NOT pass a chart version (e.g. "1.6.0") as the image tag here; that
+		// yields a non-existent image and ImagePullBackOff.
+		WithAwsLbc("", "").
 		WithMetricsServer(cfg.MetricsServerVersionOrDefault()).
 		WithSecretStoreCsi(cfg.SecretStoreCsiVersionOrDefault()).
 		WithSecretStoreCsiAwsProvider(cfg.SecretStoreCsiAwsProviderVersionOrDefault())
@@ -409,24 +415,22 @@ func collectWorkloadAccountIDs(controlRoomAccountID string) ([]string, error) {
 }
 
 // loadGrafanaConfigMapFiles reads the alert YAML and dashboard JSON files from the
-// repo, mirroring _create_alert_configmaps / _create_dashboard_configmaps. Alert
-// files keep their raw YAML; dashboard JSON is re-marshalled with uid=<stem> and
-// id=null for idempotency (matching the Python normalization).
-func loadGrafanaConfigMapFiles(ptdRoot string) (alerts, dashboards []aws.GrafanaConfigMapFile, err error) {
-	alertDir := filepath.Join(ptdRoot, "python-pulumi", "src", "ptd", "grafana_alerts")
-	dashDir := filepath.Join(ptdRoot, "python-pulumi", "src", "ptd", "grafana_dashboards")
-
-	alertFiles, err := filepath.Glob(filepath.Join(alertDir, "*.yaml"))
+// embedded grafana assets, mirroring _create_alert_configmaps /
+// _create_dashboard_configmaps. Alert files keep their raw YAML; dashboard JSON is
+// re-marshalled with uid=<stem> and id=null for idempotency (matching the Python
+// normalization).
+func loadGrafanaConfigMapFiles() (alerts, dashboards []aws.GrafanaConfigMapFile, err error) {
+	alertFiles, err := fs.Glob(grafanaAssets, grafanaAlertsDir+"/*.yaml")
 	if err != nil {
 		return nil, nil, err
 	}
 	sort.Strings(alertFiles)
 	for _, f := range alertFiles {
-		content, rerr := os.ReadFile(f)
+		content, rerr := grafanaAssets.ReadFile(f)
 		if rerr != nil {
 			return nil, nil, rerr
 		}
-		stem := strings.TrimSuffix(filepath.Base(f), ".yaml")
+		stem := strings.TrimSuffix(path.Base(f), ".yaml")
 		alerts = append(alerts, aws.GrafanaConfigMapFile{
 			LogicalSuffix: strings.ReplaceAll(stem, "_", "-"),
 			DataKey:       "alerts.yaml",
@@ -434,17 +438,17 @@ func loadGrafanaConfigMapFiles(ptdRoot string) (alerts, dashboards []aws.Grafana
 		})
 	}
 
-	dashFiles, err := filepath.Glob(filepath.Join(dashDir, "*.json"))
+	dashFiles, err := fs.Glob(grafanaAssets, grafanaDashboardsDir+"/*.json")
 	if err != nil {
 		return nil, nil, err
 	}
 	sort.Strings(dashFiles)
 	for _, f := range dashFiles {
-		raw, rerr := os.ReadFile(f)
+		raw, rerr := grafanaAssets.ReadFile(f)
 		if rerr != nil {
 			return nil, nil, rerr
 		}
-		stem := strings.TrimSuffix(filepath.Base(f), ".json")
+		stem := strings.TrimSuffix(path.Base(f), ".json")
 		var dashboard map[string]interface{}
 		if err := json.Unmarshal(raw, &dashboard); err != nil {
 			return nil, nil, fmt.Errorf("invalid JSON in %s: %w", f, err)

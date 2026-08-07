@@ -16,14 +16,14 @@ func generateReadme(m *Metadata, hasConfig bool) string {
 	if m.DryRun {
 		dryRunNote = `
 > **Dry-run mode**: This bundle was generated without modifying any infrastructure.
-> No control room connections were severed.
+> No control room connections were modified.
 `
 	}
 
 	configRows := ""
 	if hasConfig {
 		configRows = `| config/ | Workload configuration files |
-| config/ptd.yaml | Main workload configuration (control_room fields annotated for severance) |
+| config/ptd.yaml | Main workload configuration (control_room fields annotated for eject) |
 | config/site_*/site.yaml | Per-site product configuration |
 | config/customizations/ | Custom Pulumi steps (source + manifest) |
 `

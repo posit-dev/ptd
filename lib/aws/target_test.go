@@ -17,6 +17,7 @@ type MockTarget struct {
 	controlRoom      bool
 	sites            map[string]types.SiteConfig
 	tailscaleEnabled bool
+	ignoreTags       []string
 }
 
 func (m *MockTarget) Name() string {
@@ -57,6 +58,10 @@ func (m *MockTarget) Sites() map[string]types.SiteConfig {
 
 func (m *MockTarget) TailscaleEnabled() bool {
 	return m.tailscaleEnabled
+}
+
+func (m *MockTarget) IgnoreTags() []string {
+	return m.ignoreTags
 }
 
 func (m *MockTarget) PulumiBackendUrl() string {
@@ -164,6 +169,7 @@ func TestTarget(t *testing.T) {
 			}},
 		},
 		nil, // clusters
+		nil, // ignoreTags
 	)
 
 	// Test basic accessor methods
@@ -220,6 +226,7 @@ func TestTargetWithProfile(t *testing.T) {
 			}},
 		},
 		nil, // clusters
+		nil, // ignoreTags
 	)
 
 	// Test that the target is created with the profile

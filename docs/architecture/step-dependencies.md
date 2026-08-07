@@ -4,16 +4,16 @@ This document explains the step execution pipeline for PTD deployments, includin
 
 ## Overview
 
-PTD organizes infrastructure deployment into sequential steps. Each step depends on resources that previous steps create. The Go CLI orchestrates step execution, while most steps use Python Pulumi to create cloud resources.
+PTD organizes infrastructure deployment into sequential steps. Each step depends on resources that previous steps create. The Go CLI orchestrates step execution; each step is an inline-Go Pulumi program (in `lib/steps`) that creates cloud resources.
 
 **Location:** `lib/steps/steps.go`
 
 ## Workload steps (full pipeline)
 
-Workloads use this 8-step pipeline:
+Workloads use this 7-step pipeline:
 
 ```
-bootstrap → persistent → postgres_config → eks/aks → clusters → helm → sites → persistent_reprise
+bootstrap → persistent → postgres_config → eks/aks → clusters → helm → sites
 ```
 
 ### Step 1: bootstrap (Go) {#bootstrap}
@@ -43,7 +43,7 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 **Proxy Required:** No
 
 **Creates:**
-- **AWS:** Virtual Private Cloud (VPC), subnets, NAT gateways, route tables, Relational Database Service (RDS) PostgreSQL, S3 buckets (Loki logs, Mimir metrics, general storage), IAM roles and policies, AWS Certificate Manager (ACM) certificates, FSx for OpenZFS or Elastic File System (EFS), bastion host (optional)
+- **AWS:** Virtual Private Cloud (VPC), subnets, NAT gateways, route tables, Relational Database Service (RDS) PostgreSQL, S3 buckets (Loki logs, Mimir metrics, general storage), the team-operator IAM policy, AWS Certificate Manager (ACM) certificates, Route53 hosted zones, FSx for OpenZFS or Elastic File System (EFS), bastion host (optional). NOTE: the 8 workload-scoped IRSA roles (FSx, LBC, ExternalDNS, Traefik Forward Auth, Mimir, Loki, EBS CSI, Alloy) are created in the `eks` step, not here.
 - **Azure:** VNet, subnets, Azure Database for PostgreSQL, Storage Accounts, Azure Container Registry (ACR), managed identities, Azure Key Vault certificates, Azure NetApp Files, bastion host (optional)
 
 **Post-stack action:** Updates AWS Secrets Manager (AWS) or Azure Key Vault (Azure) with stack outputs (database endpoint, VPC/VNet ID, etc.) for later steps to use.
@@ -57,9 +57,8 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 
 ---
 
-### Step 3: postgres_config (Python) {#postgres-config}
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_workload_postgres_config.py`
-**Language:** Python/Pulumi
+### Step 3: postgres_config {#postgres-config}
+**Implementation:** `lib/steps/postgres_config.go`
 **Proxy Required:** Yes (connects to private RDS)
 
 **Creates:**
@@ -93,9 +92,10 @@ bootstrap → persistent → postgres_config → eks/aks → clusters → helm �
 - Security groups (AWS) or network security groups (Azure)
 - Cluster addons (EBS Container Storage Interface (CSI) driver for AWS, secrets store CSI for both)
 - Karpenter resources (if autoscaling enabled, AWS only)
+- **Workload IAM roles for service accounts (IRSA)** (AWS only): the 8 workload-scoped IRSA roles (FSx OpenZFS CSI, Load Balancer Controller, ExternalDNS, Traefik Forward Auth, Mimir, Loki, EBS CSI, Alloy). Their trust policy is built declaratively from the cluster's OIDC provider, so they belong to the cluster lifecycle. These were previously created in `persistent` (which required a `persistent_reprise` re-run to bind the trust policy to the cluster OIDC issuer once the cluster existed); relocating them here removed the need for `persistent_reprise`.
 
 **Depends on:**
-- `persistent`: Needs VPC/VNet, subnets, IAM roles (AWS) or managed identities (Azure)
+- `persistent`: Needs VPC/VNet, subnets, IAM roles (AWS) or managed identities (Azure), and the Mimir/Loki S3 buckets + Route53 hosted zones the workload IRSA permission policies reference
 
 **Why fourth:** The Kubernetes cluster is the foundation for all application workloads.
 
@@ -197,18 +197,7 @@ Selector("kubernetes", map[types.CloudProvider]Step{
 
 ---
 
-### Step 8: persistent_reprise (Go) {#persistent-reprise}
-**Implementation:** `lib/steps/persistent_reprise.go`
-**Language:** Go
-**Proxy Required:** No
-
-**Purpose:** Re-runs the `persistent` step to update AWS Secrets Manager (AWS) or Azure Key Vault (Azure) with outputs from later steps (e.g., cluster endpoints, load balancer DNS names).
-
-**Why last:** Secrets Manager/Key Vault acts as a cross-step data store. This step makes all outputs from all steps available for future operations or debugging.
-
-**Azure note:** Azure does NOT have control room support (workload-only deployments). This step only applies to Azure workloads, not control rooms.
-
-**Safe to re-run:** Yes, idempotent.
+> **Historical note:** A `persistent_reprise` step (step 8) used to follow `sites`. It re-ran the entire `persistent` program after the cluster existed, solely so the workload IRSA roles' trust policy could pick up the cluster's OIDC issuer (the `persistent` pass before the cluster existed produced a fallback trust). Those IRSA roles were relocated to the `eks` step, where their trust policy is built declaratively from the cluster OIDC provider Output, so the reprise was removed.
 
 ---
 
@@ -241,8 +230,8 @@ Same as workload persistent: VPC, RDS, S3, IAM roles, etc.
 
 ---
 
-### Step 3: postgres_config (Python) {#postgres-config-control-room}
-**Implementation:** `python-pulumi/src/ptd/pulumi_resources/aws_control_room_postgres_config.py`
+### Step 3: postgres_config {#postgres-config-control-room}
+**Implementation:** `lib/steps/postgres_config.go`
 **Proxy Required:** Yes
 
 Same as workload postgres_config: database users, permissions, extensions.
@@ -347,7 +336,6 @@ eks
 clusters
 helm
 sites
-persistent_reprise
 ```
 
 ---
@@ -363,7 +351,6 @@ persistent_reprise
 | `clusters` | ✅ Yes | Namespace creation is idempotent |
 | `helm` | ⚠️ Mostly | Chart upgrades may restart pods |
 | `sites` | ✅ Yes | CRD updates are reconciled by operator |
-| `persistent_reprise` | ✅ Yes | Idempotent secret updates |
 
 ---
 
@@ -380,7 +367,6 @@ Some steps require a proxy to access private resources:
 | `clusters` | **Yes** | Accesses private Kubernetes API |
 | `helm` | **Yes** | Accesses private Kubernetes API |
 | `sites` | **Yes** | Accesses private Kubernetes API |
-| `persistent_reprise` | No | Updates Secrets Manager via AWS API |
 
 **Proxy mechanisms:**
 - **SSM Session Manager:** Via bastion host in the VPC

@@ -29,8 +29,12 @@ func CreateStorageAccount(ctx context.Context, credentials *Credentials, subscri
 	accountsClient := clientFactory.NewAccountsClient()
 	pollerResp, err := accountsClient.BeginCreate(ctx, resourceGroupName, name, armstorage.AccountCreateParameters{
 		Location: to.Ptr(region),
-		Kind:     to.Ptr(armstorage.KindBlobStorage),
-		SKU:      to.Ptr(armstorage.SKU{Name: to.Ptr(armstorage.SKUNameStandardLRS)}), // so many pointers.
+		// StorageV2 is the current general-purpose account kind. The legacy
+		// BlobStorage kind lacks newer security/network properties that customer
+		// security baselines (Azure Policy) evaluate against. StorageV2 is a
+		// superset; Pulumi state (block blobs via azblob://) behaves identically.
+		Kind: to.Ptr(armstorage.KindStorageV2),
+		SKU:  to.Ptr(armstorage.SKU{Name: to.Ptr(armstorage.SKUNameStandardLRS)}), // so many pointers.
 		Properties: &armstorage.AccountPropertiesCreateParameters{
 			AllowBlobPublicAccess: to.Ptr(false),
 			AccessTier:            to.Ptr(armstorage.AccessTierCool),

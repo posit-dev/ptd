@@ -2,6 +2,7 @@ package attestation
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -134,6 +135,11 @@ type InfraConfig struct {
 	CustomerManagedBastionID    string
 	LoadBalancerPerSite         bool
 
+	// ChronicleEnabled is true when any site configures Chronicle telemetry.
+	// Chronicle is optional and frequently not configured, so chronicle-specific
+	// prose (e.g. the Azure storage container) is gated on this flag.
+	ChronicleEnabled bool
+
 	// Sites
 	SiteDomains map[string]string
 }
@@ -202,7 +208,12 @@ func generateAWSPersistentProse(cfg *InfraConfig) string {
 		lines = append(lines, "Integration with customer-managed bastion host for cluster access")
 	}
 
-	return "Provisions the foundational infrastructure layer:\n\n" + BulletList(lines)
+	leadIn := "This stack builds the durable foundation that the rest of the deployment relies on: " +
+		"the private network, the application database, the storage where each Posit product keeps " +
+		"its data, and the security controls that protect them. In plain terms, this is where customer " +
+		"data and configuration physically live. Specifically, it provisions:"
+
+	return leadIn + "\n\n" + BulletList(lines)
 }
 
 func generateAzurePersistentProse(cfg *InfraConfig) string {
@@ -215,19 +226,50 @@ func generateAzurePersistentProse(cfg *InfraConfig) string {
 		lines = append(lines, fmt.Sprintf(
 			"Integration with customer-provisioned VNet (`%s`)", cfg.ProvisionedVnetName))
 	} else if cfg.VnetCidr != "" {
-		lines = append(lines, fmt.Sprintf("VNet with CIDR `%s`, with public, private, database, and NetApp subnets", cfg.VnetCidr))
+		lines = append(lines, fmt.Sprintf("A private network (VNet) with CIDR `%s`, divided into separate subnets for the application, database, and file storage", cfg.VnetCidr))
 	} else {
-		lines = append(lines, "PTD-managed VNet with public, private, database, and NetApp subnets")
+		lines = append(lines, "A private network (VNet) divided into separate subnets for the application, database, and file storage")
 	}
 
-	lines = append(lines, "Azure Database for PostgreSQL Flexible Server")
-	lines = append(lines, "Azure Storage accounts for Loki logs, Mimir metrics, Package Manager cache, and Chronicle telemetry")
-	lines = append(lines, "Azure NetApp Files for persistent session storage")
-	lines = append(lines, "Azure Key Vault for secrets management")
-	lines = append(lines, "Managed identities for all service components")
-	lines = append(lines, "Network security groups for database, AKS, and internal communication")
+	// Databases (application metadata for all three products).
+	lines = append(lines, "An Azure Database for PostgreSQL Flexible Server. This database holds the "+
+		"application metadata for Posit Connect, Posit Workbench, and Posit Package Manager "+
+		"(for example: user accounts, content listings, schedules, and package index records)")
 
-	return "Provisions the foundational infrastructure layer:\n\n" + BulletList(lines)
+	// Storage accounts.
+	lines = append(lines, "A shared Azure Storage account (created during bootstrap) that holds both the "+
+		"Pulumi state files and the observability data described below")
+	lines = append(lines, "A separate premium Azure Storage account used only to host the Azure Files (NFS) "+
+		"share for Posit Package Manager")
+
+	// Observability containers in the shared account.
+	lines = append(lines, "A `loki` blob container in the shared storage account, holding aggregated logs")
+	lines = append(lines, "A `mimir-blocks` blob container in the shared storage account, holding metrics. "+
+		"This container is created by the Mimir application at runtime (it is not provisioned by Pulumi)")
+	if cfg.ChronicleEnabled {
+		lines = append(lines, "A `chronicle` blob container in the shared storage account, holding Chronicle "+
+			"usage telemetry")
+	}
+
+	// File storage for products.
+	lines = append(lines, "An Azure Files (NFS) share for Posit Package Manager. This is where Package Manager "+
+		"stores the actual package files it serves")
+	lines = append(lines, "Azure NetApp Files volumes (one NFS volume per site, per product) for Posit Connect "+
+		"published content and Posit Workbench user home directories")
+
+	// Secrets, identity, and network controls.
+	lines = append(lines, "An Azure Key Vault for securely storing secrets such as database passwords and keys")
+	lines = append(lines, "Managed identities that let each service authenticate to Azure without storing "+
+		"long-lived credentials")
+	lines = append(lines, "Network security groups that restrict traffic to the database, the Kubernetes "+
+		"cluster, and internal communication")
+
+	leadIn := "This stack builds the durable foundation that the rest of the deployment relies on: " +
+		"the private network, the application database, the storage where each Posit product keeps " +
+		"its data, and the security controls that protect them. In plain terms, this is where customer " +
+		"data and configuration physically live. Specifically, it provisions:"
+
+	return leadIn + "\n\n" + BulletList(lines)
 }
 
 // generatePostgresConfigProse generates narrative text for the postgres-config stack
@@ -239,7 +281,11 @@ func generatePostgresConfigProse(cfg *InfraConfig) string {
 		secretsNote = "Passwords generated and stored as Key Vault-encrypted secrets in Pulumi state"
 	}
 
-	return fmt.Sprintf("Configures the %s instance with application-specific databases and credentials:\n\n", dbType) +
+	leadIn := fmt.Sprintf("This stack prepares the %s for use. It creates a separate database and "+
+		"login for each component that needs one, so that the monitoring tools and the Posit products "+
+		"each have their own isolated space and credentials. Specifically, it configures:", dbType)
+
+	return leadIn + "\n\n" +
 		BulletList([]string{
 			"Database users for Grafana and internal services",
 			"Dedicated databases with appropriate grants",
@@ -276,7 +322,12 @@ func generateEKSProse(cfg *InfraConfig) string {
 	lines = append(lines, "GP3 default storage class")
 	lines = append(lines, "IAM access entries for cluster administration")
 
-	return "Provisions the Kubernetes control plane and compute:\n\n" + BulletList(lines)
+	leadIn := "This stack creates the managed Kubernetes cluster that runs the Posit products and the " +
+		"supporting services, along with the pool of virtual machines that provide its computing power. " +
+		"Kubernetes is the industry-standard system for running and coordinating containerized " +
+		"applications. Specifically, it provisions:"
+
+	return leadIn + "\n\n" + BulletList(lines)
 }
 
 func generateAKSProse(cfg *InfraConfig) string {
@@ -297,16 +348,39 @@ func generateAKSProse(cfg *InfraConfig) string {
 	lines = append(lines, "Azure Disk CSI driver for persistent volumes")
 	lines = append(lines, "Managed identity access entries for cluster administration")
 
-	return "Provisions the Kubernetes control plane and compute:\n\n" + BulletList(lines)
+	leadIn := "This stack creates the managed Kubernetes cluster that runs the Posit products and the " +
+		"supporting services, along with the pools of virtual machines that provide its computing power. " +
+		"Kubernetes is the industry-standard system for running and coordinating containerized " +
+		"applications. Specifically, it provisions:"
+
+	return leadIn + "\n\n" + BulletList(lines)
 }
 
 // generateClustersProse generates narrative text for the clusters stack
 func generateClustersProse(cfg *InfraConfig) string {
-	lines := []string{
-		"Namespaces: `posit-team`, `loki`, `grafana`, `mimir`, and supporting namespaces",
-		"Calico network policies restricting inter-namespace traffic",
-		"Team Operator deployment (manages Posit product lifecycle)",
+	var lines []string
+
+	// Namespaces are logical partitions inside the cluster. Enumerate the ones
+	// this stack creates, with a short purpose for each. The remaining
+	// observability namespaces (loki, mimir, alloy, kube-state-metrics) are
+	// created by the helm stack and are described there. The `grafana`
+	// namespace is the exception: on AWS it is created here in the clusters
+	// stack (see lib/steps/clusters_aws.go), so it is enumerated below for the
+	// AWS branch only; on Azure it is created by the helm stack.
+	lines = append(lines, "The `posit-team` namespace, which runs the Posit product workloads (Connect, Workbench, Package Manager, and their TeamSites)")
+	lines = append(lines, "The `posit-team-system` namespace, which runs the Team Operator (the component that manages the lifecycle of the Posit products)")
+	lines = append(lines, "The `helm-controller` namespace, which runs the in-cluster controller that installs Helm charts in response to `HelmChart` custom resources. These custom resources live in this namespace but can target other namespaces, which is why some objects appear grouped here")
+	lines = append(lines, "The `cert-manager` namespace, which manages the lifecycle of TLS certificates (used when Let's Encrypt is configured)")
+	lines = append(lines, "The `traefik` namespace, which runs the ingress controller that routes incoming web traffic to the right product")
+	if !cfg.IsAzure() {
+		lines = append(lines, "The `grafana` namespace, which hosts the Grafana observability stack (the dashboards and data sources for logs and metrics)")
 	}
+	if cfg.IsAzure() {
+		lines = append(lines, "CoreDNS customization (`coredns-custom`) in the AKS-managed `kube-system` namespace; PTD only patches DNS configuration there and does not otherwise manage that namespace")
+	}
+
+	lines = append(lines, "Calico network policies restricting inter-namespace traffic")
+	lines = append(lines, "Team Operator deployment (manages Posit product lifecycle)")
 
 	if cfg.PublicLoadBalancer {
 		lines = append(lines, "Traefik ingress controller with public-facing load balancer")
@@ -314,11 +388,11 @@ func generateClustersProse(cfg *InfraConfig) string {
 		lines = append(lines, "Traefik ingress controller with internal-only load balancer")
 	}
 
-	if !cfg.ExternalDNSEnabled {
-		lines = append(lines, "External DNS disabled (per customer configuration)")
-	} else {
-		if cfg.IsAzure() {
-			lines = append(lines, "External DNS for automatic Azure DNS record management")
+	// On AWS, external-dns is created in the clusters stack and is flag-driven.
+	// On Azure, external-dns is created in the helm stack and is described there.
+	if !cfg.IsAzure() {
+		if !cfg.ExternalDNSEnabled {
+			lines = append(lines, "External DNS disabled (per customer configuration)")
 		} else {
 			lines = append(lines, "External DNS for automatic Route 53 record management")
 		}
@@ -334,15 +408,30 @@ func generateClustersProse(cfg *InfraConfig) string {
 		lines = append(lines, "Keycloak operator for identity management")
 	}
 
-	return "Configures the Kubernetes cluster with the required namespaces, operators, and network policies:\n\n" + BulletList(lines)
+	leadIn := "This stack takes the empty Kubernetes cluster and sets up the shared groundwork that the " +
+		"Posit products need before they can be installed: it divides the cluster into named areas " +
+		"(namespaces), installs the controllers that manage applications and certificates, configures the " +
+		"component that routes incoming web traffic, and applies network rules that limit how those areas " +
+		"can talk to each other. Specifically, it configures:"
+
+	return leadIn + "\n\n" + BulletList(lines)
 }
 
 // generateHelmProse generates narrative text for the helm stack
 func generateHelmProse(cfg *InfraConfig) string {
 	lines := []string{
-		"Grafana, Loki, and Mimir for observability and log aggregation",
-		"Grafana Alloy for metrics and log collection",
+		"Grafana, Loki, and Mimir for observability and log aggregation. These components run in their own namespaces (`grafana`, `loki`, and `mimir`)",
+		"Grafana Alloy for metrics and log collection, in the `alloy` namespace, together with kube-state-metrics in the `kube-state-metrics` namespace",
 		"cert-manager for TLS certificate lifecycle",
+	}
+
+	// On Azure, external-dns is deployed by this stack, unconditionally. The
+	// deploy does not consult the enable flag, so there is no "disabled" branch.
+	// (On AWS, external-dns is part of the clusters stack and is described there.)
+	if cfg.IsAzure() {
+		lines = append(lines, "External DNS for automatic Azure DNS record management, in the `external-dns` "+
+			"namespace. Its `azure-config-file` secret holds the workload-identity configuration that lets "+
+			"it update Azure DNS records on behalf of the cluster")
 	}
 
 	if cfg.SecretsStoreAddonEnabled {
@@ -353,26 +442,47 @@ func generateHelmProse(cfg *InfraConfig) string {
 		}
 	}
 
-	return "Deploys supporting services as Helm charts:\n\n" + BulletList(lines)
+	leadIn := "This stack installs the shared supporting services that the platform depends on, packaged as " +
+		"Helm charts (a standard format for deploying applications onto Kubernetes). These services provide " +
+		"monitoring and log collection, manage TLS certificates, and—on Azure—keep public DNS records up to " +
+		"date. Specifically, it deploys:"
+
+	return leadIn + "\n\n" + BulletList(lines)
 }
 
 // generateSitesProse generates narrative text for the sites stack
 func generateSitesProse(cfg *InfraConfig) string {
 	lines := []string{}
 
-	for name, domain := range cfg.SiteDomains {
-		lines = append(lines, fmt.Sprintf("TeamSite custom resource for the `%s` site at `%s`", name, domain))
+	// Collect site names in a stable order so the per-site config references are
+	// deterministic.
+	siteNames := make([]string, 0, len(cfg.SiteDomains))
+	for name := range cfg.SiteDomains {
+		siteNames = append(siteNames, name)
+	}
+	sort.Strings(siteNames)
+
+	for _, name := range siteNames {
+		domain := cfg.SiteDomains[name]
+		lines = append(lines, fmt.Sprintf("TeamSite custom resource for the `%s` site at `%s`, as declared in `site_%s/site.yaml`", name, domain, name))
 	}
 
-	lines = append(lines, "Posit Connect, Workbench, and Package Manager instances as declared in `site.yaml`")
-	lines = append(lines, "Chronicle observability agent and sidecar")
+	lines = append(lines, "Posit Connect, Workbench, and Package Manager instances at the versions and settings declared in each site's `site_<name>/site.yaml`")
+	if cfg.ChronicleEnabled {
+		lines = append(lines, "Chronicle observability agent and sidecar")
+	}
 	lines = append(lines, "Ingress resources routing traffic from Traefik to each product")
 
 	if cfg.PrivateZone || cfg.HostedZoneManagementEnabled {
 		lines = append(lines, "DNS records in the hosted zone for each product subdomain")
 	}
 
-	return "Deploys the Posit products into the cluster:\n\n" + BulletList(lines)
+	leadIn := "This stack deploys the Posit products themselves into the prepared cluster, one configured " +
+		"site at a time. Each site corresponds to a `site_<name>/site.yaml` file that declares which " +
+		"products run, their versions, and their settings; this stack turns those declarations into " +
+		"running applications reachable at their web addresses. Specifically, it deploys:"
+
+	return leadIn + "\n\n" + BulletList(lines)
 }
 
 // GenerateStackProse generates prose for a stack given its step name and the infrastructure config

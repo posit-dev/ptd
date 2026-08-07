@@ -4,6 +4,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
@@ -139,12 +141,16 @@ var bucketReadWritePolicyActions = []string{
 	"s3:PutObjectTagging",
 }
 
-// persistentIRSATrustPolicy builds the assume-role policy for an IRSA role,
-// mirroring ptd.aws_iam.build_irsa_role_assume_role_policy. When there are no
-// OIDC providers, Python falls back to a statement whose Principal.AWS is the
-// caller identity ARN (aws.get_caller_identity().arn) — NOT account root — so
+// irsaTrustPolicyLogic is the pure JSON-building body for an IRSA assume-role
+// policy, mirroring ptd.aws_iam.build_irsa_role_assume_role_policy. When there
+// are no OIDC providers, Python falls back to a statement whose Principal.AWS is
+// the caller identity ARN (aws.get_caller_identity().arn) — NOT account root — so
 // callerARN is threaded in to match state exactly.
-func persistentIRSATrustPolicy(namespace string, serviceAccounts, oidcURLTails []string, accountID, callerARN string) string {
+//
+// It is the shared, Output-free core used by the eks step's Output-aware wrapper
+// irsaTrustPolicyOutput (the persistent step no longer creates IRSA roles). The
+// logic is unchanged from the original persistentIRSATrustPolicy.
+func irsaTrustPolicyLogic(namespace string, serviceAccounts, oidcURLTails []string, accountID, callerARN string) string {
 	if len(oidcURLTails) == 0 {
 		doc := map[string]interface{}{
 			"Version": "2012-10-17",
@@ -188,6 +194,36 @@ func persistentIRSATrustPolicy(namespace string, serviceAccounts, oidcURLTails [
 	}
 	b, _ := json.Marshal(doc)
 	return string(b)
+}
+
+// irsaTrustPolicyOutput is the Output-aware wrapper around irsaTrustPolicyLogic
+// used by the eks step. It takes the cluster OIDC issuer URLs as Pulumi Outputs
+// (e.g. eksCluster.OidcProvider().Url, one per cluster), strips the "https://"/
+// "http://" scheme prefix to get the OIDC tail, sorts the tails (matching the
+// persistent step's deterministic ordering), and builds the assume-role policy
+// JSON via the shared pure logic. callerARN is the fallback Principal.AWS used
+// only when no OIDC URLs are supplied (it should not be hit in the eks step,
+// where the cluster always exists, but is threaded through for parity).
+//
+// The signature is list-shaped over OIDC URLs so a multi-cluster workload would
+// aggregate every issuer into one trust policy; single-cluster is the norm.
+func irsaTrustPolicyOutput(oidcURLs []pulumi.StringOutput, namespace string, serviceAccounts []string, accountID, callerARN string) pulumi.StringOutput {
+	inputs := make([]interface{}, len(oidcURLs))
+	for i, u := range oidcURLs {
+		inputs[i] = u
+	}
+	return pulumi.All(inputs...).ApplyT(func(args []interface{}) string {
+		var tails []string
+		for _, a := range args {
+			u, _ := a.(string)
+			tail := strings.TrimPrefix(strings.TrimPrefix(u, "https://"), "http://")
+			if tail != "" {
+				tails = append(tails, tail)
+			}
+		}
+		sort.Strings(tails)
+		return irsaTrustPolicyLogic(namespace, serviceAccounts, tails, accountID, callerARN)
+	}).(pulumi.StringOutput)
 }
 
 // awsTagMap converts a string→string tag map to a pulumi.StringMap, merging an

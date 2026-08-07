@@ -205,18 +205,18 @@ func RenderHandoffPDF(outputPath string, data *HandoffData) error {
 		}
 		m.AddRows(row.New(4))
 
-		// Severance Plan
-		att.PdfSection(m, "Severance Plan")
+		// Eject Plan
+		att.PdfSection(m, "Eject Plan")
 		if data.DryRun {
-			att.PdfParagraph(m, severancePlanDryRunText())
+			att.PdfParagraph(m, ejectPlanDryRunText())
 		} else {
-			att.PdfParagraph(m, severancePlanLiveText())
+			att.PdfParagraph(m, ejectPlanLiveText())
 		}
 		m.AddRows(row.New(3))
 
 		m.AddRows(wrappingTableHeader([]string{"Category", "Action"}, []int{4, 8}))
 		for _, conn := range data.ControlRoom.Connections {
-			m.AddRows(wrappingTableRow([]string{conn.Category, conn.SeverAction}, []int{4, 8}))
+			m.AddRows(wrappingTableRow([]string{conn.Category, conn.RemovalAction}, []int{4, 8}))
 		}
 		m.AddRows(row.New(4))
 	}

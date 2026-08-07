@@ -31,13 +31,13 @@ func ownershipOptionsText() string {
 		"The sections below provide detailed instructions for each option."
 }
 
-func severancePlanDryRunText() string {
+func ejectPlanDryRunText() string {
 	return "This bundle was generated in dry-run mode. No infrastructure " +
 		"changes were made. The connections listed below would be severed " +
 		"when eject runs without --dry-run. Review these carefully before proceeding."
 }
 
-func severancePlanLiveText() string {
+func ejectPlanLiveText() string {
 	return "The following control room connections were severed during this " +
 		"eject run. The workload is now operating independently."
 }

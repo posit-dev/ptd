@@ -16,7 +16,7 @@ Below are some helpful directions on getting your environment set up as well as 
 
 Pre-commit hooks run automatically when you commit. They will:
 - Format and lint your code
-- Run tests for the files you changed (e.g., Python tests only if you changed Python files)
+- Run tests for the files you changed (e.g., `lib` tests only if you changed files under `lib/`)
 
 If a hook fails, the commit is blocked. Fix the issue, stage the fix, and commit again.
 
@@ -28,8 +28,8 @@ pre-commit run --all-files
 git commit --no-verify -m "message"
 
 # Skip specific hooks only
-SKIP=test-python-pulumi git commit -m "message"
-SKIP=test-python-pulumi,test-cmd git commit -m "message"
+SKIP=test-lib git commit -m "message"
+SKIP=test-lib,test-cmd git commit -m "message"
 ```
 
 ## Commit Message Format

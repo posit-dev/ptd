@@ -43,20 +43,18 @@ type persistentInternalSite struct {
 // awsWorkloadPersistentParams bundles pre-fetched data for the AWS workload
 // persistent deploy function. Pulumi data sources are used inside deploy for
 // cloud lookups (e.g. the RDS master-user-secret); this struct carries values
-// that have no Pulumi data source (config, secrets, OIDC tails, caller ARN).
+// that have no Pulumi data source (config, secrets, naming).
 type awsWorkloadPersistentParams struct {
 	compoundName string
 	prefix       string // always "ptd"
 	accountID    string
-	callerARN    string
 	region       string
 	environment  string // suffix of compoundName; multi-AZ RDS iff "production"
 	cfg          types.AWSWorkloadConfig
 
 	requiredTags map[string]string // resource_tags + posit.team/{true-name,environment} + managed-by
 
-	oidcURLTails        []string // sorted; from live managed clusters + extra_cluster_oidc_urls
-	iamPermissionsBound string   // arn:aws:iam::<acct>:policy/PositTeamDedicatedAdmin
+	iamPermissionsBound string // arn:aws:iam::<acct>:policy/PositTeamDedicatedAdmin
 
 	// existingDBIdentifier is the already-deployed RDS instance's physical name,
 	// read from this stack's prior "db" output (empty for a greenfield workload).
@@ -72,25 +70,14 @@ type awsWorkloadPersistentParams struct {
 
 	vpcCIDR string // resolved VPC CIDR string
 
-	// IAM resource names (from AWSWorkload naming properties)
-	teamOperatorPolicyName              string
-	fsxOpenzfsRoleName                  string
-	fsxNfsSGName                        string
-	lbcRoleName                         string
-	lbcPolicyName                       string
-	externalDNSRoleName                 string
-	dnsUpdatePolicyName                 string
-	traefikForwardAuthRoleName          string
-	traefikForwardAuthReadSecretsPolicy string
-	mimirRoleName                       string
-	mimirS3BucketName                   string
-	mimirS3BucketPolicyName             string
-	lokiRoleName                        string
-	lokiS3BucketName                    string
-	lokiS3BucketPolicyName              string
-	ebsCsiRoleName                      string
-	alloyRoleName                       string
-	alloyPolicyName                     string
+	// IAM / S3 resource names still consumed by the persistent deploy. The IRSA
+	// role/policy name fields moved to the eks step (eks_irsa_aws.go) along with the
+	// roles themselves; only the team-operator policy, the FSx NFS SG, and the
+	// Mimir/Loki S3 bucket names (the buckets persistent still owns) remain here.
+	teamOperatorPolicyName string
+	fsxNfsSGName           string
+	mimirS3BucketName      string
+	lokiS3BucketName       string
 }
 
 // existingPersistentDBIdentifier reads this target's persistent stack "db"
@@ -160,12 +147,6 @@ func (s *PersistentStep) runAWSInlineGo(ctx context.Context, creds types.Credent
 	}
 	accountID := awsCreds.AccountID()
 
-	caller, err := aws.GetCallerIdentity(ctx)
-	callerARN := ""
-	if err == nil && caller.Arn != nil {
-		callerARN = *caller.Arn
-	}
-
 	compoundName := s.DstTarget.Name()
 	trueName, environment := compoundName, ""
 	if idx := strings.LastIndex(compoundName, "-"); idx >= 0 {
@@ -186,20 +167,12 @@ func (s *PersistentStep) runAWSInlineGo(ctx context.Context, creds types.Credent
 		}
 	}
 
-	// OIDC URL tails: live managed clusters + extra_cluster_oidc_urls.
-	oidcURLs, err := aws.ListManagedEKSClusterOIDCURLs(ctx, awsCreds, s.DstTarget.Region(), compoundName)
-	if err != nil {
-		return fmt.Errorf("persistent: failed to list managed EKS cluster OIDC URLs: %w", err)
-	}
-	oidcURLs = append(oidcURLs, cfg.ExtraClusterOidcUrls...)
-	var oidcURLTails []string
-	for _, u := range oidcURLs {
-		tail := strings.TrimPrefix(strings.TrimPrefix(u, "https://"), "http://")
-		if tail != "" {
-			oidcURLTails = append(oidcURLTails, tail)
-		}
-	}
-	sort.Strings(oidcURLTails)
+	// NOTE: the workload IRSA roles (and the live EKS OIDC-URL + caller-identity
+	// lookups that fed their trust policies) moved to the eks step. The persistent
+	// step no longer needs a managed-cluster OIDC-URL listing or GetCallerIdentity
+	// here; removing them is what let the persistent_reprise step go away (the
+	// reprise existed only to re-run that lookup once the cluster OIDC issuer
+	// existed). The eks step now folds cfg.ExtraClusterOidcUrls into the trust.
 
 	// required_tags = resource_tags | {true-name, environment} then + managed-by.
 	requiredTags := map[string]string{}
@@ -229,37 +202,21 @@ func (s *PersistentStep) runAWSInlineGo(ctx context.Context, creds types.Credent
 	}
 
 	params := awsWorkloadPersistentParams{
-		compoundName:                        compoundName,
-		prefix:                              "ptd",
-		accountID:                           accountID,
-		callerARN:                           callerARN,
-		region:                              s.DstTarget.Region(),
-		environment:                         environment,
-		existingDBIdentifier:                existingPersistentDBIdentifier(ctx, s.DstTarget),
-		resolvedPrivateSubnetIDs:            resolvedPrivateSubnetIDs,
-		cfg:                                 cfg,
-		requiredTags:                        requiredTags,
-		oidcURLTails:                        oidcURLTails,
-		iamPermissionsBound:                 fmt.Sprintf("arn:aws:iam::%s:policy/PositTeamDedicatedAdmin", accountID),
-		vpcCIDR:                             vpcCIDR,
-		teamOperatorPolicyName:              fmt.Sprintf("team-operator.%s.posit.team", compoundName),
-		fsxOpenzfsRoleName:                  fmt.Sprintf("aws-fsx-openzfs-csi-driver.%s.posit.team", compoundName),
-		fsxNfsSGName:                        fmt.Sprintf("fsx-nfs.%s.posit.team", compoundName),
-		lbcRoleName:                         fmt.Sprintf("aws-load-balancer-controller.%s.posit.team", compoundName),
-		lbcPolicyName:                       fmt.Sprintf("lbc.%s.posit.team", compoundName),
-		externalDNSRoleName:                 fmt.Sprintf("external-dns.%s.posit.team", compoundName),
-		dnsUpdatePolicyName:                 fmt.Sprintf("dns-update.%s.posit.team", compoundName),
-		traefikForwardAuthRoleName:          fmt.Sprintf("traefik-forward-auth.%s.posit.team", compoundName),
-		traefikForwardAuthReadSecretsPolicy: fmt.Sprintf("traefik-forward-auth-read-secrets.%s.posit.team", compoundName),
-		mimirRoleName:                       fmt.Sprintf("mimir.%s.posit.team", compoundName),
-		mimirS3BucketName:                   fmt.Sprintf("%s-mimir", compoundName),
-		mimirS3BucketPolicyName:             fmt.Sprintf("mimir-s3-bucket.%s.posit.team", compoundName),
-		lokiRoleName:                        fmt.Sprintf("loki.%s.posit.team", compoundName),
-		lokiS3BucketName:                    fmt.Sprintf("%s-loki", compoundName),
-		lokiS3BucketPolicyName:              fmt.Sprintf("loki-s3-bucket.%s.posit.team", compoundName),
-		ebsCsiRoleName:                      fmt.Sprintf("aws-ebs-csi.%s.posit.team", compoundName),
-		alloyRoleName:                       fmt.Sprintf("alloy.%s.posit.team", compoundName),
-		alloyPolicyName:                     fmt.Sprintf("alloy.%s.posit.team", compoundName),
+		compoundName:             compoundName,
+		prefix:                   "ptd",
+		accountID:                accountID,
+		region:                   s.DstTarget.Region(),
+		environment:              environment,
+		existingDBIdentifier:     existingPersistentDBIdentifier(ctx, s.DstTarget),
+		resolvedPrivateSubnetIDs: resolvedPrivateSubnetIDs,
+		cfg:                      cfg,
+		requiredTags:             requiredTags,
+		iamPermissionsBound:      fmt.Sprintf("arn:aws:iam::%s:policy/PositTeamDedicatedAdmin", accountID),
+		vpcCIDR:                  vpcCIDR,
+		teamOperatorPolicyName:   fmt.Sprintf("team-operator.%s.posit.team", compoundName),
+		fsxNfsSGName:             fmt.Sprintf("fsx-nfs.%s.posit.team", compoundName),
+		mimirS3BucketName:        fmt.Sprintf("%s-mimir", compoundName),
+		lokiS3BucketName:         fmt.Sprintf("%s-loki", compoundName),
 	}
 
 	stack, err := createStack(ctx, s.Name(), s.DstTarget, func(pctx *pulumi.Context, target types.Target) error {
@@ -300,15 +257,6 @@ func awsWorkloadPersistentDeploy(ctx *pulumi.Context, _ types.Target, params aws
 		ctx.Stack(), persistentAWSWorkloadProjectName, persistentAWSVpcOuterCompType, cn)
 	withVPCParentAlias := func() pulumi.ResourceOption {
 		return pulumi.Aliases([]pulumi.Alias{{ParentURN: pulumi.URN(vpcComponentURN)}})
-	}
-
-	// withBucketChildAlias: alias for a policy parented to an S3 bucket that was a
-	// direct child of the persistent component (URN type chain
-	// ptd:AWSWorkloadPersistent$aws:s3/bucket:Bucket::<bucketLogicalName>).
-	withBucketChildAlias := func(bucketLogicalName string) pulumi.ResourceOption {
-		bucketURN := fmt.Sprintf("urn:pulumi:%s::%s::%s$aws:s3/bucket:Bucket::%s",
-			ctx.Stack(), persistentAWSWorkloadProjectName, persistentAWSWorkloadCompType, bucketLogicalName)
-		return pulumi.Aliases([]pulumi.Alias{{ParentURN: pulumi.URN(bucketURN)}})
 	}
 
 	// ── VPC ───────────────────────────────────────────────────────────────────
@@ -407,42 +355,23 @@ func awsWorkloadPersistentDeploy(ctx *pulumi.Context, _ types.Target, params aws
 		return fmt.Errorf("persistent: efs nfs sg: %w", err)
 	}
 
-	// ── LBC IAM ────────────────────────────────────────────────────────────────
-	if err := buildPersistentLBCIAM(ctx, params, withAlias); err != nil {
-		return fmt.Errorf("persistent: LBC IAM: %w", err)
-	}
+	// NOTE: The 8 workload-scoped IRSA roles (FSx, LBC, ExternalDNS,
+	// TraefikForwardAuth, Mimir, Loki, EBS-CSI, Alloy) were relocated to the eks
+	// step (lib/steps/eks_irsa_aws.go), where they belong by lifecycle (the trust
+	// policy binds to the cluster's OIDC issuer). This removed the need for the
+	// persistent_reprise step. The persistent step still owns the Mimir/Loki S3
+	// buckets and the Mimir password (created below); only the IRSA roles and
+	// their permission policies moved.
 
-	// ── ExternalDNS IAM (only if external_dns_enabled, *bool default true) ──────
-	if boolPtrOrDefault(params.cfg.ExternalDNSEnabled, true) {
-		if err := buildPersistentExternalDNSIAM(ctx, params, internalSites, withAlias); err != nil {
-			return fmt.Errorf("persistent: ExternalDNS IAM: %w", err)
-		}
-	}
-
-	// ── Traefik forward-auth IAM ───────────────────────────────────────────────
-	if err := buildPersistentTraefikForwardAuthIAM(ctx, params, withAlias); err != nil {
-		return fmt.Errorf("persistent: traefik-forward-auth IAM: %w", err)
-	}
-
-	// ── Mimir (password + bucket + policy + role) ──────────────────────────────
+	// ── Mimir (password + bucket) ──────────────────────────────────────────────
 	mimirPassword, mimirBucket, err := buildPersistentMimir(ctx, params, protect, withAlias)
 	if err != nil {
 		return fmt.Errorf("persistent: mimir: %w", err)
 	}
 
-	// ── Loki (bucket + policy + role) ──────────────────────────────────────────
-	if err := buildPersistentLoki(ctx, params, protect, withAlias, withBucketChildAlias); err != nil {
+	// ── Loki (bucket) ──────────────────────────────────────────────────────────
+	if err := buildPersistentLoki(ctx, params, protect, withAlias); err != nil {
 		return fmt.Errorf("persistent: loki: %w", err)
-	}
-
-	// ── EBS-CSI IAM ────────────────────────────────────────────────────────────
-	if err := buildPersistentEBSCsiIAM(ctx, params, withAlias); err != nil {
-		return fmt.Errorf("persistent: EBS-CSI IAM: %w", err)
-	}
-
-	// ── Alloy IAM ──────────────────────────────────────────────────────────────
-	if err := buildPersistentAlloyIAM(ctx, params, withAlias); err != nil {
-		return fmt.Errorf("persistent: alloy IAM: %w", err)
 	}
 
 	// ── Outputs (must match Python register_outputs verbatim) ──────────────────
@@ -971,53 +900,6 @@ func defineNamedBucket(
 	return bucket, nil
 }
 
-// defineBucketReadWritePolicy ports aws_bucket.define_bucket_policy with
-// PolicyType.READ_WRITE: a parented IAM policy granting read/write on the bucket
-// and its objects. Logical name = policyName. extraAliasName, when non-empty, is
-// merged as a Name alias (Python passed pulumi.Alias(name=...) for vintage).
-func defineBucketReadWritePolicy(
-	ctx *pulumi.Context,
-	params awsWorkloadPersistentParams,
-	name string,
-	bucket *awss3.Bucket,
-	policyName, policyDescription string,
-	extraAliasName string,
-) (*awsiam.Policy, error) {
-	cn := params.compoundName
-	policyTag := fmt.Sprintf("%s-%s-s3-bucket-policy", cn, name)
-
-	policyJSON := bucket.Arn.ApplyT(func(arn string) (string, error) {
-		doc := map[string]interface{}{
-			"Version": "2012-10-17",
-			"Statement": []map[string]interface{}{
-				{
-					"Effect":   "Allow",
-					"Action":   bucketReadWritePolicyActions,
-					"Resource": []string{arn, arn + "/*"},
-				},
-			},
-		}
-		b, jerr := jsonMarshal(doc)
-		return b, jerr
-	}).(pulumi.StringOutput)
-
-	opts := []pulumi.ResourceOption{pulumi.Parent(bucket)}
-	if extraAliasName != "" {
-		opts = append(opts, pulumi.Aliases([]pulumi.Alias{{Name: pulumi.String(extraAliasName)}}))
-	}
-
-	pol, err := awsiam.NewPolicy(ctx, policyName, &awsiam.PolicyArgs{
-		Name:        pulumi.String(policyName),
-		Description: pulumi.String(policyDescription),
-		Policy:      policyJSON,
-		Tags:        awsTagMap(params.requiredTags, map[string]string{"Name": policyTag}),
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return pol, nil
-}
-
 // persistentFSxResult holds the FSx file system outputs the step exports.
 type persistentFSxResult struct {
 	dnsName      pulumi.StringOutput
@@ -1041,33 +923,9 @@ func buildPersistentFSx(
 	cn := params.compoundName
 	tags := params.requiredTags
 
-	// FSx OpenZFS CSI driver role. Python logical name = str(Roles.AWS_FSX_OPENZFS_CSI_DRIVER)
-	// = "aws-fsx-openzfs-csi-driver.posit.team"; physical name = fsx_openzfs_role_name.
-	fsxRoleLogical := "aws-fsx-openzfs-csi-driver.posit.team"
-	fsxTrust := persistentIRSATrustPolicy("kube-system",
-		[]string{
-			"controller.aws-fsx-openzfs-csi-driver.posit.team",
-			"nodes.aws-fsx-openzfs-csi-driver.posit.team",
-		},
-		params.oidcURLTails, params.accountID, params.callerARN)
-	pb := params.iamPermissionsBound
-	fsxRole, err := awsiam.NewRole(ctx, fsxRoleLogical, &awsiam.RoleArgs{
-		Name:                pulumi.String(params.fsxOpenzfsRoleName),
-		AssumeRolePolicy:    pulumi.String(fsxTrust),
-		PermissionsBoundary: pulumi.String(pb),
-		Tags:                awsTagMap(tags, nil),
-	}, withAlias())
-	if err != nil {
-		return persistentFSxResult{}, nil, err
-	}
-
-	fsxAttachName := fmt.Sprintf("%s-fsx-openzfs", cn)
-	if _, err := awsiam.NewRolePolicyAttachment(ctx, fsxAttachName, &awsiam.RolePolicyAttachmentArgs{
-		Role:      fsxRole.Name,
-		PolicyArn: pulumi.String("arn:aws:iam::aws:policy/AmazonFSxFullAccess"),
-	}, pulumi.Parent(fsxRole)); err != nil {
-		return persistentFSxResult{}, nil, err
-	}
+	// NOTE: the FSx OpenZFS CSI driver IRSA role + AmazonFSxFullAccess attachment
+	// moved to the eks step (deployIRSAFsx in eks_irsa_aws.go). The persistent
+	// step still owns the FSx file system and the per-workload fsx_openzfs SG.
 
 	deploymentType := "SINGLE_AZ_HA_2"
 	if boolPtrOrDefault(params.cfg.FsxOpenzfsMultiAz, true) {
@@ -1295,168 +1153,13 @@ func buildPersistentEFSNfsSG(
 	return err
 }
 
-// buildPersistentLBCIAM ports _define_lbc_iam: LBC role (+ name-alias to
-// Roles.AWS_LOAD_BALANCER_CONTROLLER), the LBC policy (read from the embedded
-// policy JSON), and the attachment. The role uses delete_before_replace.
-func buildPersistentLBCIAM(
-	ctx *pulumi.Context,
-	params awsWorkloadPersistentParams,
-	withAlias func() pulumi.ResourceOption,
-) error {
-	trust := persistentIRSATrustPolicy("kube-system",
-		[]string{"aws-load-balancer-controller.posit.team"},
-		params.oidcURLTails, params.accountID, params.callerARN)
-	pb := params.iamPermissionsBound
-	role, err := awsiam.NewRole(ctx, params.lbcRoleName, &awsiam.RoleArgs{
-		Name:                pulumi.String(params.lbcRoleName),
-		AssumeRolePolicy:    pulumi.String(trust),
-		PermissionsBoundary: pulumi.String(pb),
-		Tags:                awsTagMap(params.requiredTags, nil),
-	},
-		withAlias(),
-		pulumi.DeleteBeforeReplace(true),
-		pulumi.Aliases([]pulumi.Alias{{Name: pulumi.String("aws-load-balancer-controller.posit.team")}}),
-	)
-	if err != nil {
-		return err
-	}
-
-	pol, err := awsiam.NewPolicy(ctx, params.lbcPolicyName, &awsiam.PolicyArgs{
-		Name:   pulumi.String(params.lbcPolicyName),
-		Policy: pulumi.String(lbcPolicyJSON),
-	}, pulumi.Parent(role), pulumi.DeleteBeforeReplace(true))
-	if err != nil {
-		return err
-	}
-
-	attName := fmt.Sprintf("%s-att", params.lbcPolicyName)
-	_, err = awsiam.NewRolePolicyAttachment(ctx, attName, &awsiam.RolePolicyAttachmentArgs{
-		Role:      role.Name,
-		PolicyArn: pol.Arn,
-	}, pulumi.Parent(role), pulumi.DeleteBeforeReplace(true))
-	return err
-}
-
-// buildPersistentExternalDNSIAM ports _define_externaldns_iam: ExternalDNS role
-// (+ name-alias to Roles.EXTERNAL_DNS), the dns-update policy (route53 change on
-// the created zones), and the attachment.
-func buildPersistentExternalDNSIAM(
-	ctx *pulumi.Context,
-	params awsWorkloadPersistentParams,
-	internalSites []persistentInternalSite,
-	withAlias func() pulumi.ResourceOption,
-) error {
-	trust := persistentIRSATrustPolicy("kube-system",
-		[]string{"external-dns.posit.team"},
-		params.oidcURLTails, params.accountID, params.callerARN)
-	pb := params.iamPermissionsBound
-	role, err := awsiam.NewRole(ctx, params.externalDNSRoleName, &awsiam.RoleArgs{
-		Name:                pulumi.String(params.externalDNSRoleName),
-		AssumeRolePolicy:    pulumi.String(trust),
-		PermissionsBoundary: pulumi.String(pb),
-		Tags:                awsTagMap(params.requiredTags, nil),
-	},
-		withAlias(),
-		pulumi.DeleteBeforeReplace(true),
-		pulumi.Aliases([]pulumi.Alias{{Name: pulumi.String("external-dns.posit.team")}}),
-	)
-	if err != nil {
-		return err
-	}
-
-	// Collect zone ARNs (sorted by site name) for the route53:ChangeResourceRecordSets
-	// resource list. Zones are Output[T], so build the policy JSON inside ApplyT.
-	var zoneARNs []pulumi.StringInput
-	sorted := append([]persistentInternalSite(nil), internalSites...)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i].siteName < sorted[j].siteName })
-	for _, s := range sorted {
-		if s.zone != nil {
-			zoneARNs = append(zoneARNs, s.zone.Arn)
-		}
-	}
-
-	policyJSON := pulumi.All(toInterfaceSlice(zoneARNs)...).ApplyT(func(arns []interface{}) (string, error) {
-		zones := make([]string, 0, len(arns))
-		for _, a := range arns {
-			zones = append(zones, fmt.Sprintf("%v", a))
-		}
-		doc := map[string]interface{}{
-			"Version": "2012-10-17",
-			"Statement": []map[string]interface{}{
-				{
-					"Effect":   "Allow",
-					"Action":   []string{"route53:ChangeResourceRecordSets"},
-					"Resource": zones,
-				},
-				{
-					"Effect": "Allow",
-					"Action": []string{
-						"route53:ListHostedZones",
-						"route53:ListResourceRecordSets",
-						"route53:ListTagsForResource",
-					},
-					"Resource": []string{"*"},
-				},
-			},
-		}
-		return jsonMarshal(doc)
-	}).(pulumi.StringOutput)
-
-	pol, err := awsiam.NewPolicy(ctx, params.dnsUpdatePolicyName, &awsiam.PolicyArgs{
-		Name:   pulumi.String(params.dnsUpdatePolicyName),
-		Policy: policyJSON,
-	}, pulumi.Parent(role), pulumi.DeleteBeforeReplace(true))
-	if err != nil {
-		return err
-	}
-
-	attName := fmt.Sprintf("%s-att", params.dnsUpdatePolicyName)
-	_, err = awsiam.NewRolePolicyAttachment(ctx, attName, &awsiam.RolePolicyAttachmentArgs{
-		Role:      role.Name,
-		PolicyArn: pol.Arn,
-	}, pulumi.Parent(role), pulumi.DeleteBeforeReplace(true))
-	return err
-}
-
-// buildPersistentTraefikForwardAuthIAM ports _define_traefik_forward_auth_iam.
-func buildPersistentTraefikForwardAuthIAM(
-	ctx *pulumi.Context,
-	params awsWorkloadPersistentParams,
-	withAlias func() pulumi.ResourceOption,
-) error {
-	trust := persistentIRSATrustPolicy("kube-system",
-		[]string{"traefik-forward-auth.posit.team"},
-		params.oidcURLTails, params.accountID, params.callerARN)
-	pb := params.iamPermissionsBound
-	role, err := awsiam.NewRole(ctx, params.traefikForwardAuthRoleName, &awsiam.RoleArgs{
-		Name:                pulumi.String(params.traefikForwardAuthRoleName),
-		AssumeRolePolicy:    pulumi.String(trust),
-		PermissionsBoundary: pulumi.String(pb),
-		Tags:                awsTagMap(params.requiredTags, nil),
-	}, withAlias(), pulumi.DeleteBeforeReplace(true))
-	if err != nil {
-		return err
-	}
-
-	pol, err := awsiam.NewPolicy(ctx, params.traefikForwardAuthReadSecretsPolicy, &awsiam.PolicyArgs{
-		Name:   pulumi.String(params.traefikForwardAuthReadSecretsPolicy),
-		Policy: pulumi.String(traefikForwardAuthSecretsPolicyJSON(params.region, params.accountID)),
-	}, pulumi.Parent(role))
-	if err != nil {
-		return err
-	}
-
-	attName := fmt.Sprintf("%s-att", params.traefikForwardAuthReadSecretsPolicy)
-	_, err = awsiam.NewRolePolicyAttachment(ctx, attName, &awsiam.RolePolicyAttachmentArgs{
-		Role:      role.Name,
-		PolicyArn: pol.Arn,
-	}, pulumi.Parent(role))
-	return err
-}
-
-// buildPersistentMimir ports _define_mimir: the random mimir password, the mimir
-// bucket (named, with a name-alias to "<cn>-mimir-storage"), its read/write
-// policy, the mimir role, and the attachment. Returns the password and bucket.
+// buildPersistentMimir ports the persistent half of _define_mimir: the random
+// mimir password and the mimir bucket (named, with a name-alias to
+// "<cn>-mimir-storage"). Returns the password and bucket.
+//
+// The mimir IRSA role, its bucket read/write policy, and the attachment moved to
+// the eks step (deployIRSAMimir in eks_irsa_aws.go); the eks-side policy derives
+// the bucket ARN from the deterministic bucket name (arn:aws:s3:::<cn>-mimir).
 func buildPersistentMimir(
 	ctx *pulumi.Context,
 	params awsWorkloadPersistentParams,
@@ -1480,162 +1183,30 @@ func buildPersistentMimir(
 		return nil, nil, err
 	}
 
-	mimirPolicy, err := defineBucketReadWritePolicy(ctx, params, params.mimirS3BucketName, bucket,
-		params.mimirS3BucketPolicyName,
-		fmt.Sprintf("Posit Team Dedicated policy for %s to read the Mimir S3 bucket", cn), "")
-	if err != nil {
-		return nil, nil, err
-	}
-
-	trust := persistentIRSATrustPolicy("mimir",
-		[]string{"mimir.posit.team"},
-		params.oidcURLTails, params.accountID, params.callerARN)
-	pb := params.iamPermissionsBound
-	role, err := awsiam.NewRole(ctx, params.mimirRoleName, &awsiam.RoleArgs{
-		Name:                pulumi.String(params.mimirRoleName),
-		AssumeRolePolicy:    pulumi.String(trust),
-		PermissionsBoundary: pulumi.String(pb),
-		Tags:                awsTagMap(params.requiredTags, nil),
-	}, withAlias(), pulumi.DeleteBeforeReplace(true))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	attName := fmt.Sprintf("%s-att", params.mimirS3BucketPolicyName)
-	if _, err := awsiam.NewRolePolicyAttachment(ctx, attName, &awsiam.RolePolicyAttachmentArgs{
-		Role:      role.Name,
-		PolicyArn: mimirPolicy.Arn,
-	}, pulumi.Parent(role), pulumi.DeleteBeforeReplace(true)); err != nil {
-		return nil, nil, err
-	}
-
 	return pw, bucket, nil
 }
 
-// buildPersistentLoki ports _define_loki_bucket + _define_loki_iam: the loki
-// bucket (named, name-alias "<cn>-loki-bucket"), its read/write policy
-// (name-alias to loki_s3_bucket_policy_name), the loki role, and the attachment.
+// buildPersistentLoki ports _define_loki_bucket: the loki bucket (named,
+// name-alias "<cn>-loki-bucket").
+//
+// The loki bucket read/write policy, the loki IRSA role, and the attachment moved
+// to the eks step (deployIRSALoki in eks_irsa_aws.go); the eks-side policy derives
+// the bucket ARN from the deterministic bucket name (arn:aws:s3:::<cn>-loki).
 func buildPersistentLoki(
 	ctx *pulumi.Context,
 	params awsWorkloadPersistentParams,
 	protect bool,
 	withAlias func() pulumi.ResourceOption,
-	withBucketChildAlias func(string) pulumi.ResourceOption,
 ) error {
 	cn := params.compoundName
 
-	bucket, err := defineNamedBucket(ctx, params, params.lokiS3BucketName, protect, withAlias,
+	_, err := defineNamedBucket(ctx, params, params.lokiS3BucketName, protect, withAlias,
 		fmt.Sprintf("%s-loki-bucket", cn))
 	if err != nil {
 		return err
 	}
 
-	lokiPolicy, err := defineBucketReadWritePolicy(ctx, params, params.lokiS3BucketName, bucket,
-		params.lokiS3BucketPolicyName,
-		fmt.Sprintf("Posit Team Dedicated policy for %s to read the Loki S3 bucket", cn),
-		params.lokiS3BucketPolicyName)
-	if err != nil {
-		return err
-	}
-
-	trust := persistentIRSATrustPolicy("loki",
-		[]string{"loki.posit.team"},
-		params.oidcURLTails, params.accountID, params.callerARN)
-	pb := params.iamPermissionsBound
-	role, err := awsiam.NewRole(ctx, params.lokiRoleName, &awsiam.RoleArgs{
-		Name:                pulumi.String(params.lokiRoleName),
-		AssumeRolePolicy:    pulumi.String(trust),
-		PermissionsBoundary: pulumi.String(pb),
-		Tags:                awsTagMap(params.requiredTags, nil),
-	}, withAlias(), pulumi.DeleteBeforeReplace(true))
-	if err != nil {
-		return err
-	}
-
-	attName := fmt.Sprintf("%s-att", params.lokiS3BucketPolicyName)
-	_, err = awsiam.NewRolePolicyAttachment(ctx, attName, &awsiam.RolePolicyAttachmentArgs{
-		Role:      role.Name,
-		PolicyArn: lokiPolicy.Arn,
-	}, pulumi.Parent(role), pulumi.DeleteBeforeReplace(true))
-	return err
-}
-
-// buildPersistentEBSCsiIAM ports _define_ebs_csi_iam: the EBS-CSI role and the
-// AmazonEBSCSIDriverPolicyV2 attachment (logical name "ebs-csi-driver-policy-att").
-func buildPersistentEBSCsiIAM(
-	ctx *pulumi.Context,
-	params awsWorkloadPersistentParams,
-	withAlias func() pulumi.ResourceOption,
-) error {
-	trust := persistentIRSATrustPolicy("kube-system",
-		[]string{"aws-ebs-csi-driver.posit.team"},
-		params.oidcURLTails, params.accountID, params.callerARN)
-	pb := params.iamPermissionsBound
-	role, err := awsiam.NewRole(ctx, params.ebsCsiRoleName, &awsiam.RoleArgs{
-		Name:                pulumi.String(params.ebsCsiRoleName),
-		AssumeRolePolicy:    pulumi.String(trust),
-		PermissionsBoundary: pulumi.String(pb),
-		Tags:                awsTagMap(params.requiredTags, nil),
-	}, withAlias(), pulumi.DeleteBeforeReplace(true))
-	if err != nil {
-		return err
-	}
-
-	_, err = awsiam.NewRolePolicyAttachment(ctx, "ebs-csi-driver-policy-att", &awsiam.RolePolicyAttachmentArgs{
-		Role:      role.Name,
-		PolicyArn: pulumi.String("arn:aws:iam::aws:policy/AmazonEBSCSIDriverPolicyV2"),
-	}, pulumi.Parent(role), pulumi.DeleteBeforeReplace(true))
-	return err
-}
-
-// buildPersistentAlloyIAM ports _define_alloy_iam: the alloy role (+ name-alias
-// to Roles.ALLOY), the alloy policy, and the attachment.
-func buildPersistentAlloyIAM(
-	ctx *pulumi.Context,
-	params awsWorkloadPersistentParams,
-	withAlias func() pulumi.ResourceOption,
-) error {
-	trust := persistentIRSATrustPolicy("alloy",
-		[]string{"alloy.posit.team"},
-		params.oidcURLTails, params.accountID, params.callerARN)
-	pb := params.iamPermissionsBound
-	role, err := awsiam.NewRole(ctx, params.alloyRoleName, &awsiam.RoleArgs{
-		Name:                pulumi.String(params.alloyRoleName),
-		AssumeRolePolicy:    pulumi.String(trust),
-		PermissionsBoundary: pulumi.String(pb),
-		Tags:                awsTagMap(params.requiredTags, nil),
-	},
-		withAlias(),
-		pulumi.DeleteBeforeReplace(true),
-		pulumi.Aliases([]pulumi.Alias{{Name: pulumi.String("alloy.posit.team")}}),
-	)
-	if err != nil {
-		return err
-	}
-
-	pol, err := awsiam.NewPolicy(ctx, params.alloyPolicyName, &awsiam.PolicyArgs{
-		Name:   pulumi.String(params.alloyPolicyName),
-		Policy: pulumi.String(alloyPolicyJSON()),
-	}, pulumi.Parent(role), pulumi.DeleteBeforeReplace(true))
-	if err != nil {
-		return err
-	}
-
-	attName := fmt.Sprintf("%s-att", params.alloyPolicyName)
-	_, err = awsiam.NewRolePolicyAttachment(ctx, attName, &awsiam.RolePolicyAttachmentArgs{
-		Role:      role.Name,
-		PolicyArn: pol.Arn,
-	}, pulumi.Parent(role), pulumi.DeleteBeforeReplace(true))
-	return err
-}
-
-// toInterfaceSlice converts a []pulumi.StringInput to []interface{} for pulumi.All.
-func toInterfaceSlice(in []pulumi.StringInput) []interface{} {
-	out := make([]interface{}, len(in))
-	for i, v := range in {
-		out[i] = v
-	}
-	return out
+	return nil
 }
 
 // persistentCertValidationRecords maps a domain to its cert validation records

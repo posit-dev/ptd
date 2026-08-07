@@ -12,7 +12,7 @@ var removeAccessAWSTemplate = template.Must(template.New("remove-access-aws").Pa
 		"\n" +
 		"This runbook describes how to remove Posit's ability to access the AWS account\n" +
 		"hosting the {{ .TargetName }} workload. This is the final step in a full\n" +
-		"severance — after the automated eject has disconnected Mimir and Alloy, this\n" +
+		"eject — after the automated eject has disconnected Mimir and Alloy, this\n" +
 		"removes the IAM trust that allows Posit engineers to assume a role in your account.\n" +
 		"\n" +
 		"**This is a one-way operation.** Re-adopting the workload later will require\n" +
@@ -59,7 +59,7 @@ var removeAccessAzureTemplate = template.Must(template.New("remove-access-azure"
 		"\n" +
 		"This runbook describes how to remove Posit's ability to access the Azure\n" +
 		"subscription hosting the {{ .TargetName }} workload. This is the final step in a\n" +
-		"full severance — after the automated eject has disconnected Mimir and Alloy, this\n" +
+		"full eject — after the automated eject has disconnected Mimir and Alloy, this\n" +
 		"removes the RBAC role assignments that grant Posit engineers access to your\n" +
 		"subscription.\n" +
 		"\n" +

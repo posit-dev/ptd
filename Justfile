@@ -3,11 +3,11 @@ all: deps check test build
 
 # Check all
 [group('check')]
-check: check-python-pulumi
+check: check-go
 
 # Format all
 [group('format')]
-format: format-python-pulumi format-go
+format: format-go
 
 alias fmt := format
 
@@ -17,7 +17,7 @@ build: cli
 
 # Test all
 [group('test')]
-test: test-python-pulumi test-lib test-cmd
+test: test-lib test-cmd
 
 # Run the ptd CLI
 ptd *ARGS:
@@ -60,11 +60,7 @@ aws-unset:
 ############################################################################
 alias link-bins := symlink-binaries
 
-deps: python-deps check-session-manager-plugin symlink-binaries install-git-hooks
-
-# install python dependencies (uv handles this automatically, but here if you need it)
-python-deps:
-  uv --directory python-pulumi sync
+deps: check-session-manager-plugin symlink-binaries install-git-hooks
 
 symlink-binaries:
   #!/usr/bin/env bash
@@ -148,10 +144,6 @@ workon-prompt:
 ############################################################################
 
 [group('test')]
-test-python-pulumi *ARGS:
-  cd {{ justfile_directory() }}/python-pulumi && just test {{ARGS}}
-
-[group('test')]
 test-cmd *ARGS:
   cd {{ justfile_directory() }}/cmd && go test ./... {{ARGS}}
 
@@ -217,22 +209,15 @@ cli:
 # Check targets
 #############################################################################
 
+# Vet Go code
 [group('check')]
-check-python-pulumi:
-  cd {{ justfile_directory() }}/python-pulumi && just check
-
-# Validate Go↔Python config field sync
-[group('check')]
-validate-config-sync:
-  python3 {{ justfile_directory() }}/scripts/validate-config-sync.py
+check-go:
+  cd {{ justfile_directory() }}/lib && go vet ./...
+  cd {{ justfile_directory() }}/cmd && go vet ./...
 
 #############################################################################
 # Format targets
 #############################################################################
-
-[group('format')]
-format-python-pulumi:
-  cd {{ justfile_directory() }}/python-pulumi && just format
 
 # Format Go code
 [group('format')]

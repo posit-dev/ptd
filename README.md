@@ -38,8 +38,7 @@ ptd --help
 ```
 ptd/
 ├── cmd/           # Go CLI implementation
-├── lib/           # Shared Go libraries
-├── python-pulumi/ # Pulumi IaC resources (Python)
+├── lib/           # Shared Go libraries (inline-Go Pulumi IaC in lib/steps)
 ├── examples/      # Example configurations
 ├── e2e/           # End-to-end tests
 └── docs/          # Documentation

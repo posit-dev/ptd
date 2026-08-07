@@ -1,6 +1,6 @@
 module github.com/posit-dev/ptd/examples/custom-steps/simple-s3-bucket
 
-go 1.25.3
+go 1.26.4
 
 require (
 	github.com/posit-dev/ptd/lib v0.0.0-20260127184423-6453cc65f826

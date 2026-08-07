@@ -11,7 +11,6 @@ import (
 	"github.com/posit-dev/ptd/lib/proxy"
 	"github.com/posit-dev/ptd/lib/types"
 	awspulumi "github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	"github.com/spf13/viper"
 )
 
 type ClusterStep struct {
@@ -219,19 +218,24 @@ func (s *ClusterStep) runAWSInlineGo(ctx context.Context) error {
 		}
 	}
 
-	// ── Grafana alert + dashboard files (read from the repo, like Python) ───────
-	ptdRoot := viper.GetString("TOP")
-	alerts, dashboards, err := loadGrafanaConfigMapFiles(ptdRoot)
+	// ── Grafana alert + dashboard files (read from the embedded assets) ─────────
+	alerts, dashboards, err := loadGrafanaConfigMapFiles()
 	if err != nil {
 		return fmt.Errorf("cluster: failed to load grafana alert/dashboard files: %w", err)
 	}
 
 	params := awsClusterParams{
-		compoundName:               compoundName,
-		clusterName:                clusterName,
-		region:                     region,
-		accountID:                  awsCreds.AccountID(),
-		iamPermissionsBoundaryARN:  fmt.Sprintf("arn:aws:iam::%s:policy/PositTeamDedicatedAdmin", awsCreds.AccountID()),
+		compoundName: compoundName,
+		clusterName:  clusterName,
+		region:       region,
+		accountID:    awsCreds.AccountID(),
+		// Python's control-room _define_eks does NOT set a permissions_boundary on the
+		// EKS cluster / node / IRSA roles (unlike the workload paths, which do), so the
+		// live control-room roles carry no boundary. The admin identity used for
+		// control-room applies also cannot set one (iam:PutRolePermissionsBoundary is
+		// denied). Pass empty so the builder omits the boundary — the builder guards
+		// each role with `if IAMPermissionsBoundary != ""`, so this is a no-op diff.
+		iamPermissionsBoundaryARN:  "",
 		requiredTags:               buildClusterRequiredTags(cfg),
 		cfg:                        cfg,
 		credentials:                awsCreds,

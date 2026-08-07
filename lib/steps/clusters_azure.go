@@ -22,6 +22,7 @@ import (
 	helmv3 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/helm/v3"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	rbacv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/rbac/v1"
+	schedulingv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/scheduling/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -46,6 +47,10 @@ type azureClustersParams struct {
 	// siteDomains is always the per-site domains (one per site), independent of root_domain.
 	// Used for Traefik Ingresses, which must be created for every site domain.
 	siteDomains []string
+	// siteTLSSecrets maps a site domain to its optional per-host TLS secrets.
+	// When a domain has a non-empty entry, the Traefik ingress terminates TLS
+	// with those secrets instead of the default single wildcard secret.
+	siteTLSSecrets map[string][]types.SiteTLSSecret
 	// thirdPartyTelemetryEnabled controls whether Traefik telemetry arguments are suppressed.
 	thirdPartyTelemetryEnabled bool
 	// workloadDir is the path to the workload's config directory (contains ptd.yaml, custom_k8s_resources/, etc.)
@@ -53,6 +58,52 @@ type azureClustersParams struct {
 	// rootDomain is the dereferenced value of cfg.RootDomain, or empty string if nil.
 	// Used to select the correct ClusterIssuer name in Traefik Ingress annotations.
 	rootDomain string
+}
+
+// traefikIngressTLSEntry is a plain representation of a single Traefik ingress
+// `tls` entry (hosts + secret name). It is the pure, unit-testable form of the
+// Pulumi `tls` array built by traefikIngressTLS.
+type traefikIngressTLSEntry struct {
+	Hosts      []string
+	SecretName string
+}
+
+// traefikIngressTLSEntries returns the ordered `tls` entries for a site's
+// Traefik ingress. When tlsSecrets is non-empty, it yields one entry per
+// configured secret (preserving order); otherwise it yields the default single
+// wildcard entry ([domain, *.domain] → "{name}-{domain}-tls"), matching the
+// historical behavior byte-for-byte.
+func traefikIngressTLSEntries(name, domain string, tlsSecrets []types.SiteTLSSecret) []traefikIngressTLSEntry {
+	if len(tlsSecrets) > 0 {
+		entries := make([]traefikIngressTLSEntry, 0, len(tlsSecrets))
+		for _, s := range tlsSecrets {
+			entries = append(entries, traefikIngressTLSEntry{Hosts: s.Hosts, SecretName: s.SecretName})
+		}
+		return entries
+	}
+	return []traefikIngressTLSEntry{
+		{
+			Hosts:      []string{domain, fmt.Sprintf("*.%s", domain)},
+			SecretName: fmt.Sprintf("%s-%s-tls", name, domain),
+		},
+	}
+}
+
+// traefikIngressTLS renders the Traefik ingress `spec.tls` value as a
+// pulumi.Array from the pure entries produced by traefikIngressTLSEntries.
+func traefikIngressTLS(name, domain string, tlsSecrets []types.SiteTLSSecret) pulumi.Array {
+	tls := pulumi.Array{}
+	for _, e := range traefikIngressTLSEntries(name, domain, tlsSecrets) {
+		hosts := make(pulumi.StringArray, 0, len(e.Hosts))
+		for _, h := range e.Hosts {
+			hosts = append(hosts, pulumi.String(h))
+		}
+		tls = append(tls, pulumi.Map{
+			"hosts":      hosts,
+			"secretName": pulumi.String(e.SecretName),
+		})
+	}
+	return tls
 }
 
 func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credentials, envVars map[string]string) error {
@@ -120,8 +171,12 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 	// siteDomains is always the per-site domains, independent of root_domain.
 	// Used for Traefik Ingresses, which must be created for every site domain.
 	var siteDomains []string
+	siteTLSSecrets := make(map[string][]types.SiteTLSSecret)
 	for _, siteCfg := range cfg.Sites {
 		siteDomains = append(siteDomains, siteCfg.Spec.Domain)
+		if len(siteCfg.Spec.TLSSecrets) > 0 {
+			siteTLSSecrets[siteCfg.Spec.Domain] = siteCfg.Spec.TLSSecrets
+		}
 	}
 	sort.Strings(siteDomains)
 
@@ -146,6 +201,7 @@ func (s *ClustersStep) runAzureInlineGo(ctx context.Context, creds types.Credent
 		clusterIdentityByCluster:     clusterIdentityByCluster,
 		certManagerDomains:           certManagerDomains,
 		siteDomains:                  siteDomains,
+		siteTLSSecrets:               siteTLSSecrets,
 		thirdPartyTelemetryEnabled:   cfg.ThirdPartyTelemetryEnabled == nil || *cfg.ThirdPartyTelemetryEnabled,
 		workloadDir:                  filepath.Join(helpers.GetTargetsConfigPath(), helpers.WorkDir, s.DstTarget.Name()),
 		rootDomain: func() string {
@@ -435,7 +491,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 									pulumi.String("--namespace"),
 									pulumi.String(clustersHelmControllerNamespace),
 									pulumi.String("--default-job-image"),
-									pulumi.String("ghcr.io/k3s-io/klipper-helm:latest"),
+									pulumi.String("ghcr.io/k3s-io/klipper-helm:v0.9.5-build20250306"),
 								},
 							},
 						},
@@ -625,12 +681,40 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 		}
 
 		// Traefik Helm release values — mirrors azure_traefik.py _define_helm_release
+		traefikReplicas := clusterCfg.Components.ResolveAzureComponents().TraefikDeploymentReplicas
 		traefikValues := pulumi.Map{
 			"logs": pulumi.Map{
 				"general": pulumi.Map{
 					"level": pulumi.String("DEBUG"),
 				},
 			},
+			// HA hardening: run multiple replicas spread across nodes with resource
+			// requests (Burstable QoS) and a PDB so no single node failure/saturation
+			// takes down the workload edge. The resource requests mirror the
+			// control-room Traefik; the PDB, topology-spread, and priority class are
+			// new HA hardening beyond it.
+			"deployment": pulumi.Map{
+				"replicas": pulumi.Int(traefikReplicas),
+			},
+			"resources": pulumi.Map{
+				"requests": pulumi.Map{"cpu": pulumi.String("200m"), "memory": pulumi.String("256Mi")},
+				"limits":   pulumi.Map{"cpu": pulumi.String("1000m"), "memory": pulumi.String("512Mi")},
+			},
+			"topologySpreadConstraints": pulumi.Array{
+				pulumi.Map{
+					"maxSkew":           pulumi.Int(1),
+					"topologyKey":       pulumi.String("kubernetes.io/hostname"),
+					"whenUnsatisfiable": pulumi.String("ScheduleAnyway"),
+					"labelSelector": pulumi.Map{
+						"matchLabels": pulumi.Map{"app.kubernetes.io/name": pulumi.String("traefik")},
+					},
+				},
+			},
+			"podDisruptionBudget": pulumi.Map{
+				"enabled":        pulumi.Bool(true),
+				"maxUnavailable": pulumi.Int(1),
+			},
+			"priorityClassName": pulumi.String("traefik-critical"),
 			"ports": pulumi.Map{
 				"web": pulumi.Map{
 					"redirections": pulumi.Map{
@@ -721,12 +805,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 				},
 				"spec": pulumi.Map{
 					"ingressClassName": pulumi.String("traefik"),
-					"tls": pulumi.Array{
-						pulumi.Map{
-							"hosts":      pulumi.StringArray{pulumi.String(domain), pulumi.String(fmt.Sprintf("*.%s", domain))},
-							"secretName": pulumi.String(fmt.Sprintf("%s-%s-tls", name, domain)),
-						},
-					},
+					"tls":              traefikIngressTLS(name, domain, params.siteTLSSecrets[domain]),
 					"rules": pulumi.Array{
 						pulumi.Map{
 							"http": pulumi.Map{
@@ -752,6 +831,25 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 		}
 		traefikValues["extraObjects"] = extraObjects
 
+		// Dedicated cluster-scoped PriorityClass so Traefik ingress pods resist
+		// eviction under node pressure. Value sits below the reserved system-*
+		// range (system-cluster-critical = 2000000000) but outranks ordinary
+		// workload pods. system-cluster-critical cannot be reused: admission
+		// restricts it to the kube-system namespace.
+		traefikPC, err := schedulingv1.NewPriorityClass(ctx, fmt.Sprintf("%s-%s-traefik-critical-priority", name, release), &schedulingv1.PriorityClassArgs{
+			Metadata: metav1.ObjectMetaArgs{
+				Name:   pulumi.String("traefik-critical"),
+				Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.azure_workload_clusters")},
+			},
+			Value:            pulumi.Int(1000000000),
+			GlobalDefault:    pulumi.Bool(false),
+			Description:      pulumi.StringPtr("High priority for workload Traefik ingress pods so they resist eviction under node pressure"),
+			PreemptionPolicy: pulumi.StringPtr("PreemptLowerPriority"),
+		}, k8sProviderOpt)
+		if err != nil {
+			return fmt.Errorf("clusters: failed to create traefik priority class for %s: %w", release, err)
+		}
+
 		_, err = helmv3.NewRelease(ctx, fmt.Sprintf("%s-%s-traefik", name, release), &helmv3.ReleaseArgs{
 			Name:      pulumi.String("traefik"),
 			Chart:     pulumi.String("traefik"),
@@ -762,7 +860,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 			},
 			Atomic: pulumi.Bool(true),
 			Values: traefikValues,
-		}, k8sProviderOpt, withTraefikAlias())
+		}, k8sProviderOpt, withTraefikAlias(), pulumi.DependsOn([]pulumi.Resource{traefikPC}))
 		if err != nil {
 			return fmt.Errorf("clusters: failed to create traefik helm release for %s: %w", release, err)
 		}

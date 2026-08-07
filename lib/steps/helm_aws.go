@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/posit-dev/ptd/lib/aws"
+	"github.com/posit-dev/ptd/lib/consts"
 	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/kube"
 	"github.com/posit-dev/ptd/lib/proxy"
@@ -20,7 +21,6 @@ import (
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	schedulingv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/scheduling/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
-	"github.com/spf13/viper"
 	yamlv2 "gopkg.in/yaml.v2"
 )
 
@@ -99,10 +99,10 @@ func (s *HelmStep) runAWSInlineGo(ctx context.Context, creds types.Credentials, 
 		}
 	}
 
-	// Fetch mimir password from workload secrets. Alloy is always deployed (its version always
-	// resolves to a non-empty default), so we always need this secret.
+	// Fetch mimir password from workload secrets. Only used for the alloy mimir-auth Secret,
+	// which is created only when the workload has a control room.
 	mimirPassword := ""
-	if len(cfg.Clusters) > 0 {
+	if len(cfg.Clusters) > 0 && cfg.ControlRoomDomain != "" {
 		secretName := s.DstTarget.Name() + ".posit.team"
 		secretJSON, err := s.DstTarget.SecretStore().GetSecretValue(ctx, creds, secretName)
 		if err != nil {
@@ -280,7 +280,7 @@ func awsHelmDeploy(ctx *pulumi.Context, params awsHelmParams) error {
 		}
 
 		// 5. Traefik (namespace + helmchart + ingress)
-		if err := awsHelmTraefik(ctx, k8sOpt, name, release, params, routingWeight, resolved.TraefikVersion, withAlias); err != nil {
+		if err := awsHelmTraefik(ctx, k8sOpt, name, release, params, routingWeight, resolved.TraefikVersion, resolved.TraefikDeploymentReplicas, withAlias); err != nil {
 			return err
 		}
 
@@ -533,7 +533,7 @@ func awsHelmSecretStoreCsiAws(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption,
 }
 
 func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName, release string,
-	params awsHelmParams, weight, version string,
+	params awsHelmParams, weight, version string, replicas int,
 	withAlias func(string, string) pulumi.ResourceOption) error {
 
 	nsName := compoundName + "-" + release + "-traefik-ns"
@@ -547,13 +547,56 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 		return fmt.Errorf("helm: failed to create traefik namespace: %w", err)
 	}
 
+	// Dedicated cluster-scoped PriorityClass so Traefik ingress pods are protected
+	// from eviction under node pressure. Value sits below the reserved system-*
+	// range (system-cluster-critical = 2000000000) but high enough to outrank
+	// ordinary workload pods. system-cluster-critical itself cannot be reused here:
+	// admission restricts it to the kube-system namespace.
+	pcResourceName := compoundName + "-" + release + "-traefik-critical-priority"
+	pc, err := schedulingv1.NewPriorityClass(ctx, pcResourceName, &schedulingv1.PriorityClassArgs{
+		Metadata: metav1.ObjectMetaArgs{
+			Name:   pulumi.String("traefik-critical"),
+			Labels: pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
+		},
+		Value:            pulumi.Int(1000000000),
+		GlobalDefault:    pulumi.Bool(false),
+		Description:      pulumi.StringPtr("High priority for workload Traefik ingress pods so they resist eviction under node pressure"),
+		PreemptionPolicy: pulumi.StringPtr("PreemptLowerPriority"),
+	}, k8sOpt, withAlias("kubernetes:scheduling.k8s.io/v1:PriorityClass", pcResourceName))
+	if err != nil {
+		return fmt.Errorf("helm: failed to create traefik priority class: %w", err)
+	}
+
 	traefikValues := map[string]interface{}{
 		"image": map[string]interface{}{
 			"registry": "ghcr.io/traefik",
 		},
 		"deployment": map[string]interface{}{
-			"kind": "Deployment",
+			"kind":     "Deployment",
+			"replicas": replicas,
 		},
+		// Resource requests move Traefik out of BestEffort into Burstable QoS so it is
+		// not the first pod starved/evicted under node pressure. Mirrors control room.
+		"resources": map[string]interface{}{
+			"requests": map[string]interface{}{"cpu": "200m", "memory": "256Mi"},
+			"limits":   map[string]interface{}{"cpu": "1000m", "memory": "512Mi"},
+		},
+		// Spread replicas across nodes so a single node failure cannot take out the edge.
+		"topologySpreadConstraints": []interface{}{
+			map[string]interface{}{
+				"maxSkew":           1,
+				"topologyKey":       "kubernetes.io/hostname",
+				"whenUnsatisfiable": "ScheduleAnyway",
+				"labelSelector": map[string]interface{}{
+					"matchLabels": map[string]interface{}{"app.kubernetes.io/name": "traefik"},
+				},
+			},
+		},
+		"podDisruptionBudget": map[string]interface{}{
+			"enabled":        true,
+			"maxUnavailable": 1,
+		},
+		"priorityClassName": "traefik-critical",
 		"logs": map[string]interface{}{
 			"access":  map[string]interface{}{"enabled": true},
 			"general": map[string]interface{}{"level": "DEBUG"},
@@ -614,7 +657,7 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 			"spec": chartSpec,
 		},
 	}, k8sOpt, withAlias("kubernetes:helm.cattle.io/v1:HelmChart", chartResourceName),
-		pulumi.DependsOn([]pulumi.Resource{ns}))
+		pulumi.DependsOn([]pulumi.Resource{ns, pc}))
 	if err != nil {
 		return fmt.Errorf("helm: failed to create traefik chart: %w", err)
 	}
@@ -1158,9 +1201,10 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 		sites:                      params.cfg.Sites,
 		workloadDir:                params.workloadDir,
 		filterControlRoomMetrics:   params.cfg.FilterControlRoomMetrics,
-		ptdRoot:                    viper.GetString("TOP"),
 	}
 	alloyConfigStr := buildAlloyConfig(alloyParams)
+
+	hasControlRoom := params.cfg.ControlRoomDomain != ""
 
 	// ConfigMap
 	configMapName := compoundName + "-" + release + "-alloy-config"
@@ -1184,35 +1228,45 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 		return err
 	}
 
-	// Mimir auth Secret (parent was the namespace in Python)
-	secretResourceName := compoundName + "-" + release + "-alloy-mimir-auth"
-	_, err = corev1.NewSecret(ctx, secretResourceName, &corev1.SecretArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Name:      pulumi.String("mimir-auth"),
-			Namespace: pulumi.String(helmAlloyNamespace),
-			Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
-		},
-		StringData: pulumi.StringMap{
-			"password": pulumi.String(params.mimirPassword),
-		},
-	}, k8sOpt,
-		// In Python: opts=ResourceOptions(parent=namespace, ...) — so URN path includes Namespace.
-		// Two variants: with and without ptd:AWSWorkloadHelm$ prefix depending on Python state vintage.
-		pulumi.Aliases([]pulumi.Alias{
-			{URN: pulumi.URN(fmt.Sprintf(
-				"urn:pulumi:%s::ptd-aws-workload-helm::ptd:AWSWorkloadHelm$kubernetes:core/v1:Namespace$kubernetes:core/v1:Secret::%s",
-				ctx.Stack(), secretResourceName))},
-			{URN: pulumi.URN(fmt.Sprintf(
-				"urn:pulumi:%s::ptd-aws-workload-helm::kubernetes:core/v1:Namespace$kubernetes:core/v1:Secret::%s",
-				ctx.Stack(), secretResourceName))},
-		}),
-		pulumi.DependsOn([]pulumi.Resource{ns}))
-	if err != nil {
-		return err
+	if hasControlRoom {
+		secretResourceName := compoundName + "-" + release + "-alloy-mimir-auth"
+		_, err = corev1.NewSecret(ctx, secretResourceName, &corev1.SecretArgs{
+			Metadata: metav1.ObjectMetaArgs{
+				Name:      pulumi.String("mimir-auth"),
+				Namespace: pulumi.String(helmAlloyNamespace),
+				Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
+			},
+			StringData: pulumi.StringMap{
+				"password": pulumi.String(params.mimirPassword),
+			},
+		}, k8sOpt,
+			// In Python: opts=ResourceOptions(parent=namespace, ...) — so URN path includes Namespace.
+			// Two variants: with and without ptd:AWSWorkloadHelm$ prefix depending on Python state vintage.
+			pulumi.Aliases([]pulumi.Alias{
+				{URN: pulumi.URN(fmt.Sprintf(
+					"urn:pulumi:%s::ptd-aws-workload-helm::ptd:AWSWorkloadHelm$kubernetes:core/v1:Namespace$kubernetes:core/v1:Secret::%s",
+					ctx.Stack(), secretResourceName))},
+				{URN: pulumi.URN(fmt.Sprintf(
+					"urn:pulumi:%s::ptd-aws-workload-helm::kubernetes:core/v1:Namespace$kubernetes:core/v1:Secret::%s",
+					ctx.Stack(), secretResourceName))},
+			}),
+			pulumi.DependsOn([]pulumi.Resource{ns}))
+		if err != nil {
+			return err
+		}
 	}
 
 	alloyRoleName := "alloy." + compoundName + ".posit.team"
 	thirdParty := isThirdPartyTelemetryEnabled(params.cfg.ThirdPartyTelemetryEnabled)
+
+	mounts := map[string]interface{}{
+		"varlog": params.cfg.GrafanaScrapeSystemLogs,
+	}
+	if hasControlRoom {
+		mounts["extra"] = []interface{}{
+			map[string]interface{}{"name": "mimir-auth", "mountPath": "/etc/mimir/", "readOnly": true},
+		}
+	}
 
 	alloyValues := map[string]interface{}{
 		"serviceAccount": map[string]interface{}{
@@ -1222,32 +1276,12 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 				"eks.amazonaws.com/role-arn": fmt.Sprintf("arn:aws:iam::%s:role/%s", params.accountID, alloyRoleName),
 			},
 		},
-		"controller": map[string]interface{}{
-			"volumes": map[string]interface{}{
-				"extra": []interface{}{
-					map[string]interface{}{
-						"name": "mimir-auth",
-						"secret": map[string]interface{}{
-							"secretName": "mimir-auth",
-							"items": []interface{}{
-								map[string]interface{}{"key": "password", "path": "password"},
-							},
-						},
-					},
-				},
-			},
-		},
 		"alloy": map[string]interface{}{
 			"clustering": map[string]interface{}{"enabled": true},
 			"extraPorts": []interface{}{
 				map[string]interface{}{"name": "faro", "port": 12347, "targetPort": 12347, "protocol": "TCP"},
 			},
-			"mounts": map[string]interface{}{
-				"extra": []interface{}{
-					map[string]interface{}{"name": "mimir-auth", "mountPath": "/etc/mimir/", "readOnly": true},
-				},
-				"varlog": params.cfg.GrafanaScrapeSystemLogs,
-			},
+			"mounts": mounts,
 			"securityContext": map[string]interface{}{
 				"privileged": params.cfg.GrafanaScrapeSystemLogs,
 				"runAsUser":  nil,
@@ -1266,6 +1300,23 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 		"tolerations": []interface{}{
 			map[string]interface{}{"key": "workload-type", "operator": "Equal", "value": "session", "effect": "NoSchedule"},
 		},
+	}
+	if hasControlRoom {
+		alloyValues["controller"] = map[string]interface{}{
+			"volumes": map[string]interface{}{
+				"extra": []interface{}{
+					map[string]interface{}{
+						"name": "mimir-auth",
+						"secret": map[string]interface{}{
+							"secretName": "mimir-auth",
+							"items": []interface{}{
+								map[string]interface{}{"key": "password", "path": "password"},
+							},
+						},
+					},
+				},
+			},
+		}
 	}
 	if !thirdParty {
 		alloyValues["alloy"].(map[string]interface{})["reporting"] = map[string]interface{}{"enabled": false}
@@ -1384,12 +1435,45 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 		},
 	}
 
+	// Manage the Karpenter CRDs via the karpenter-crd chart, pinned to karpenter_version.
+	// NOTE: existing clusters need a ONE-TIME manual CRD adoption before first apply —
+	// see docs/infrastructure/karpenter-crds.md.
+	crdChartResourceName := compoundName + "-karpenter-crd-helm-release"
+	crdChart, err := apiextensions.NewCustomResource(ctx, crdChartResourceName, &apiextensions.CustomResourceArgs{
+		ApiVersion: pulumi.String("helm.cattle.io/v1"),
+		Kind:       pulumi.String("HelmChart"),
+		Metadata: metav1.ObjectMetaArgs{
+			Name:      pulumi.String("karpenter-crd"),
+			Namespace: pulumi.String(clustersHelmControllerNamespace),
+			Labels:    pulumi.StringMap{"posit.team/managed-by": pulumi.String("ptd.pulumi_resources.aws_workload_helm")},
+		},
+		OtherFields: kubernetes.UntypedArgs{
+			"spec": pulumi.Map{
+				"chart":           pulumi.String("oci://public.ecr.aws/karpenter/karpenter-crd"),
+				"targetNamespace": pulumi.String(clustersKubeSystemNamespace),
+				"version":         pulumi.String(version),
+				// resource-policy: keep so a helm uninstall (e.g. this HelmChart CR being
+				// deleted) never cascade-deletes the CRDs and every NodePool/NodeClaim/EC2NodeClass.
+				"valuesContent": pulumi.String("additionalAnnotations:\n  helm.sh/resource-policy: keep\n"),
+			},
+		},
+	}, k8sOpt,
+		withAlias("kubernetes:helm.cattle.io/v1:HelmChart", crdChartResourceName))
+	if err != nil {
+		return err
+	}
+
 	chartResourceName := compoundName + "-karpenter-helm-release"
 	valuesYAML, err := marshalYAML(values)
 	if err != nil {
 		return err
 	}
 
+	// The controller chart depends on the CRD chart so Pulumi creates the CRD
+	// HelmChart CR first. Note: helm-controller reconciles HelmChart CRs
+	// asynchronously, so dependsOn orders CR *creation*, not the underlying helm
+	// jobs — see PR notes on the mitigation (CRDs are additive/backward-compatible,
+	// and the controller chart re-templates CRs that retry until the CRDs exist).
 	_, err = apiextensions.NewCustomResource(ctx, chartResourceName, &apiextensions.CustomResourceArgs{
 		ApiVersion: pulumi.String("helm.cattle.io/v1"),
 		Kind:       pulumi.String("HelmChart"),
@@ -1406,7 +1490,8 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 				"valuesContent":   pulumi.String(string(valuesYAML)),
 			},
 		},
-	}, k8sOpt, withAlias("kubernetes:helm.cattle.io/v1:HelmChart", chartResourceName))
+	}, k8sOpt, pulumi.DependsOn([]pulumi.Resource{crdChart}),
+		withAlias("kubernetes:helm.cattle.io/v1:HelmChart", chartResourceName))
 	if err != nil {
 		return err
 	}
@@ -1466,6 +1551,26 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 			nodepoolSpec["template"].(map[string]interface{})["spec"].(map[string]interface{})["expireAfter"] = *nodePool.ExpireAfter
 		}
 
+		// System node pools label their nodes with posit.team/node-role=system so
+		// callers can target or avoid them with node affinity (e.g. keep the image
+		// prepull daemonset off them). Merge into template.metadata.labels rather
+		// than overwriting, so any other metadata/labels a future field may set
+		// survive (same approach as ngTags merging in WithNodeGroup).
+		if nodePool.SystemNodes {
+			template := nodepoolSpec["template"].(map[string]interface{})
+			metadata, ok := template["metadata"].(map[string]interface{})
+			if !ok {
+				metadata = map[string]interface{}{}
+				template["metadata"] = metadata
+			}
+			labels, ok := metadata["labels"].(map[string]interface{})
+			if !ok {
+				labels = map[string]interface{}{}
+				metadata["labels"] = labels
+			}
+			labels[consts.PositTeamNodeRoleLabel] = consts.PositTeamNodeRoleSystem
+		}
+
 		// Build taints: start with explicitly listed taints, then add session taint if session_taints: true.
 		allTaints := make([]types.KarpenterTaint, 0, len(nodePool.Taints)+1)
 		allTaints = append(allTaints, nodePool.Taints...)
@@ -1520,7 +1625,8 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 			OtherFields: kubernetes.UntypedArgs{
 				"spec": nodepoolSpec,
 			},
-		}, k8sOpt, withAlias("kubernetes:karpenter.sh/v1:NodePool", npResourceName))
+		}, k8sOpt, pulumi.DependsOn([]pulumi.Resource{crdChart}),
+			withAlias("kubernetes:karpenter.sh/v1:NodePool", npResourceName))
 		if err != nil {
 			return err
 		}
@@ -1567,7 +1673,8 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 					},
 				},
 			},
-		}, k8sOpt, withAlias("kubernetes:karpenter.k8s.aws/v1:EC2NodeClass", ec2ResourceName))
+		}, k8sOpt, pulumi.DependsOn([]pulumi.Resource{crdChart}),
+			withAlias("kubernetes:karpenter.k8s.aws/v1:EC2NodeClass", ec2ResourceName))
 		if err != nil {
 			return err
 		}

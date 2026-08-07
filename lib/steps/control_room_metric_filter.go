@@ -3,8 +3,7 @@ package steps
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
+	"io/fs"
 	"regexp"
 	"sort"
 	"strings"
@@ -136,10 +135,10 @@ func walkYAMLNode(node *yaml.Node, out *[]string) {
 	}
 }
 
-// extractExprsFromAlertYAML parses a Grafana alert-rule YAML file and returns
-// all PromQL expressions found in "expr" fields.
+// extractExprsFromAlertYAML parses a Grafana alert-rule YAML file (from the
+// embedded assets) and returns all PromQL expressions found in "expr" fields.
 func extractExprsFromAlertYAML(path string) ([]string, error) {
-	data, err := os.ReadFile(path)
+	data, err := grafanaAssets.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
@@ -177,10 +176,10 @@ func walkJSONValue(v interface{}, out *[]string) {
 	}
 }
 
-// extractExprsFromDashboardJSON parses a Grafana dashboard JSON file and returns
-// all PromQL expressions found in "expr" string fields.
+// extractExprsFromDashboardJSON parses a Grafana dashboard JSON file (from the
+// embedded assets) and returns all PromQL expressions found in "expr" string fields.
 func extractExprsFromDashboardJSON(path string) ([]string, error) {
-	data, err := os.ReadFile(path)
+	data, err := grafanaAssets.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
@@ -193,21 +192,18 @@ func extractExprsFromDashboardJSON(path string) ([]string, error) {
 	return exprs, nil
 }
 
-// BuildControlRoomMetricFilter parses grafana alert rules and dashboard definitions
-// rooted at ptdRoot to extract all metric names that must be forwarded to the
+// BuildControlRoomMetricFilter parses the embedded grafana alert rules and
+// dashboard definitions to extract all metric names that must be forwarded to the
 // control room Mimir. Returns a pipe-separated regex string suitable for use in
 // a prometheus.relabel keep rule, e.g. "metric_a|metric_b|metric_c".
 //
-// Alert YAML files are read from {ptdRoot}/python-pulumi/src/ptd/grafana_alerts/*.yaml.
-// Dashboard JSON files are read from {ptdRoot}/python-pulumi/src/ptd/grafana_dashboards/*.json.
-func BuildControlRoomMetricFilter(ptdRoot string) (string, error) {
-	alertDir := filepath.Join(ptdRoot, "python-pulumi", "src", "ptd", "grafana_alerts")
-	dashDir := filepath.Join(ptdRoot, "python-pulumi", "src", "ptd", "grafana_dashboards")
-
+// Alert YAML files are read from the embedded assets/grafana_alerts/*.yaml.
+// Dashboard JSON files are read from the embedded assets/grafana_dashboards/*.json.
+func BuildControlRoomMetricFilter() (string, error) {
 	var allExprs []string
 
 	// Collect expressions from alert YAML files.
-	alertFiles, err := filepath.Glob(filepath.Join(alertDir, "*.yaml"))
+	alertFiles, err := fs.Glob(grafanaAssets, grafanaAlertsDir+"/*.yaml")
 	if err != nil {
 		return "", fmt.Errorf("globbing alert files: %w", err)
 	}
@@ -220,7 +216,7 @@ func BuildControlRoomMetricFilter(ptdRoot string) (string, error) {
 	}
 
 	// Collect expressions from dashboard JSON files.
-	dashFiles, err := filepath.Glob(filepath.Join(dashDir, "*.json"))
+	dashFiles, err := fs.Glob(grafanaAssets, grafanaDashboardsDir+"/*.json")
 	if err != nil {
 		return "", fmt.Errorf("globbing dashboard files: %w", err)
 	}
@@ -233,7 +229,7 @@ func BuildControlRoomMetricFilter(ptdRoot string) (string, error) {
 	}
 
 	if len(allExprs) == 0 {
-		return "", fmt.Errorf("no PromQL expressions found in %s or %s", alertDir, dashDir)
+		return "", fmt.Errorf("no PromQL expressions found in %s or %s", grafanaAlertsDir, grafanaDashboardsDir)
 	}
 
 	// Extract metric names from all expressions and deduplicate.

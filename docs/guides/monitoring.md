@@ -528,7 +528,7 @@ avg by (pod) (time() - container_start_time_seconds{namespace="posit-team"})
 
 ## Configured Alerts
 
-PTD deploys a set of Grafana alerts to the control room for centralized monitoring of all workload clusters. Alert definitions are stored in `python-pulumi/src/ptd/grafana_alerts/`.
+PTD deploys a set of Grafana alerts to the control room for centralized monitoring of all workload clusters. Alert definitions are stored in `lib/steps/assets/grafana_alerts/` and embedded into the `ptd` binary.
 
 All alerts are configured to send notifications to OpsGenie when triggered.
 
@@ -652,7 +652,7 @@ Pod-related alerts are filtered to only monitor PTD-managed namespaces to preven
 
 ### Adding or Modifying Alerts
 
-To add or modify alerts, edit the YAML files in `python-pulumi/src/ptd/grafana_alerts/`. Each file contains alerts grouped by category:
+To add or modify alerts, edit the YAML files in `lib/steps/assets/grafana_alerts/` (they are embedded into the binary, so a rebuild picks up the changes). Each file contains alerts grouped by category:
 
 - `applications.yaml` - Application-specific alerts (Loki, etc.)
 - `cloudwatch.yaml` - AWS CloudWatch metric alerts (FSx)

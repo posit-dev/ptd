@@ -429,12 +429,13 @@ func protectOpt(protect bool) pulumi.ResourceOption {
 func azureTagMap(tags map[string]string) pulumi.StringMap {
 	out := pulumi.StringMap{}
 	for k, v := range tags {
-		// Azure tag keys cannot contain '/'. Mirror Python azure_tag_key_format,
-		// which replaces '/' with ':' (e.g. posit.team/environment ->
-		// posit.team:environment). Without this every Azure resource's tags churn.
-		// See CLAUDE.md "Resource Naming Conventions / Azure tags"
-		// (azure_tag_key_format) for the canonical key-format rule.
-		out[strings.ReplaceAll(k, "/", ":")] = pulumi.String(v)
+		// Azure tag keys cannot contain '/'. azure.FormatTagKey replaces '/' with
+		// ':' (e.g. posit.team/environment -> posit.team:environment). Without this
+		// every Azure resource's tags churn. It is the single source of truth for the
+		// key-format rule, shared with resource-group creation (CreateResourceGroup)
+		// so RG tags match child-resource tags. See CLAUDE.md "Resource Naming
+		// Conventions / Azure tags" (azure_tag_key_format).
+		out[azure.FormatTagKey(k)] = pulumi.String(v)
 	}
 	return out
 }
@@ -513,6 +514,18 @@ func azureBuildVNet(
 		opts := []pulumi.ResourceOption{protectOpt(protect)}
 		if vnet != nil {
 			opts = append(opts, pulumi.Parent(vnet))
+		}
+		// When the customer's landing zone owns subnet address allocation (e.g. via
+		// Azure Virtual Network Manager / IPAM pools), Azure migrates addressPrefix
+		// to addressPrefixes and populates ipamPoolPrefixAllocations out from under
+		// us. Ignore those fields so Pulumi does not revert the customer's IPAM on
+		// every deploy. Applies to all subnets created here.
+		if net.CustomerManagedNetwork {
+			opts = append(opts, pulumi.IgnoreChanges([]string{
+				"addressPrefix",
+				"addressPrefixes",
+				"ipamPoolPrefixAllocations",
+			}))
 		}
 		return opts
 	}

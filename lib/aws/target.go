@@ -20,12 +20,13 @@ type Target struct {
 	createAdminPolicyAsResource       bool
 	skipControlRoomMimirPasswordWrite bool
 	sites                             map[string]types.SiteConfig
+	ignoreTags                        []string
 
 	// clusters is currently only relevant/supported for aws.
 	Clusters map[string]types.AWSWorkloadClusterConfig
 }
 
-func NewTarget(targetName string, accountID string, profile string, customRole *types.CustomRoleConfig, region string, isControlRoom bool, tailscaleEnabled bool, createAdminPolicyAsResource bool, sites map[string]types.SiteConfig, clusters map[string]types.AWSWorkloadClusterConfig) Target {
+func NewTarget(targetName string, accountID string, profile string, customRole *types.CustomRoleConfig, region string, isControlRoom bool, tailscaleEnabled bool, createAdminPolicyAsResource bool, sites map[string]types.SiteConfig, clusters map[string]types.AWSWorkloadClusterConfig, ignoreTags []string) Target {
 	if region == "" {
 		region = "us-east-2"
 	}
@@ -52,6 +53,7 @@ func NewTarget(targetName string, accountID string, profile string, customRole *
 		createAdminPolicyAsResource: createAdminPolicyAsResource,
 		sites:                       sites,
 		Clusters:                    clusters,
+		ignoreTags:                  ignoreTags,
 	}
 }
 
@@ -102,23 +104,16 @@ func (t Target) BastionId(ctx context.Context) (string, error) {
 	}
 	envVars := creds.EnvVars()
 
-	persistentStack, err := pulumi.NewPythonPulumiStack(
+	persistentOutputs, err := pulumi.ReadStackOutputs(
 		ctx,
 		"aws",
 		"workload",
 		"persistent",
 		t.Name(),
-		t.Region(),
 		t.PulumiBackendUrl(),
 		t.PulumiSecretsProviderKey(),
 		envVars,
-		false,
 	)
-	if err != nil {
-		return "", err
-	}
-
-	persistentOutputs, err := persistentStack.Outputs(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -138,6 +133,10 @@ func (t Target) Sites() map[string]types.SiteConfig {
 
 func (t Target) TailscaleEnabled() bool {
 	return t.tailscaleEnabled
+}
+
+func (t Target) IgnoreTags() []string {
+	return t.ignoreTags
 }
 
 func (t Target) CreateAdminPolicyAsResource() bool {

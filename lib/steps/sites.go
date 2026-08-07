@@ -88,7 +88,6 @@ type awsSiteParams struct {
 	kubeconfigsByRelease map[string]string
 	clusters             map[string]types.AWSWorkloadClusterConfig
 	sites                map[string]types.SiteConfig
-	resourceTags         map[string]string
 }
 
 func (s *SitesStep) runAWSInlineGo(ctx context.Context, creds types.Credentials, envVars map[string]string) error {
@@ -149,7 +148,6 @@ func (s *SitesStep) runAWSInlineGo(ctx context.Context, creds types.Credentials,
 		kubeconfigsByRelease: kubeconfigsByRelease,
 		clusters:             cfg.Clusters,
 		sites:                cfg.Sites,
-		resourceTags:         cfg.ResourceTags,
 	}
 
 	stack, err := createStack(ctx, s.Name(), s.DstTarget, func(pctx *pulumi.Context, target types.Target) error {
@@ -206,7 +204,7 @@ func awsSitesDeploy(ctx *pulumi.Context, _ types.Target, params awsSiteParams) e
 				return err
 			}
 
-			labels := buildSiteLabels(params.resourceTags, siteName, params.compoundName)
+			labels := buildSiteLabels(siteName, params.compoundName)
 
 			oldURN := fmt.Sprintf(
 				"urn:pulumi:%s::ptd-aws-workload-sites::ptd:AWSWorkloadSites$ptd:TeamSite$kubernetes:yaml:ConfigFile$kubernetes:core.posit.team/v1beta1:Site::%s-%s-%s/%s",
@@ -324,7 +322,6 @@ type azureSiteParams struct {
 	kubeconfigsByRelease map[string]string
 	clusters             map[string]types.AzureWorkloadClusterConfig
 	sites                map[string]types.SiteConfig
-	resourceTags         map[string]string
 }
 
 func (s *SitesStep) runAzureInlineGo(ctx context.Context, creds types.Credentials, envVars map[string]string) error {
@@ -376,7 +373,6 @@ func (s *SitesStep) runAzureInlineGo(ctx context.Context, creds types.Credential
 		kubeconfigsByRelease: kubeconfigsByRelease,
 		clusters:             cfg.Clusters,
 		sites:                cfg.Sites,
-		resourceTags:         cfg.ResourceTags,
 	}
 
 	stack, err := createStack(ctx, s.Name(), s.DstTarget, func(pctx *pulumi.Context, target types.Target) error {
@@ -410,7 +406,7 @@ func azureSitesDeploy(ctx *pulumi.Context, _ types.Target, params azureSiteParam
 				return err
 			}
 
-			labels := buildSiteLabels(params.resourceTags, siteName, params.compoundName)
+			labels := buildSiteLabels(siteName, params.compoundName)
 
 			oldURN := fmt.Sprintf(
 				"urn:pulumi:%s::ptd-azure-workload-sites::ptd:AzureWorkloadSites$ptd:TeamSite$kubernetes:yaml:ConfigFile$kubernetes:core.posit.team/v1beta1:Site::%s-%s-%s/%s",
@@ -479,7 +475,7 @@ func buildAzureSiteSpec(
 
 // --- Shared helpers ---
 
-func buildSiteLabels(resourceTags map[string]string, siteName, compoundName string) pulumi.StringMap {
+func buildSiteLabels(siteName, compoundName string) pulumi.StringMap {
 	labels := pulumi.StringMap{
 		"posit.team/managed-by":      pulumi.String(siteManagedByLabel),
 		"posit.team/site-name":       pulumi.String(siteName),
@@ -499,12 +495,11 @@ func buildSiteLabels(resourceTags map[string]string, siteName, compoundName stri
 		labels["posit.team/environment"] = pulumi.String(compoundName[idx+1:])
 	}
 
-	// Include resource tags that are valid K8s label keys (no colon character).
-	for k, v := range resourceTags {
-		if !strings.Contains(k, ":") {
-			labels[k] = pulumi.String(v)
-		}
-	}
+	// Azure/cloud resource tags are intentionally NOT propagated here. They are
+	// cloud inventory metadata with permissive value rules (spaces, '@', '/', etc.)
+	// that are invalid as Kubernetes label values, and they have no meaning as
+	// k8s selectors. Resource tags are applied to cloud resources in the
+	// persistent/clusters steps, not to in-cluster objects.
 	return labels
 }
 

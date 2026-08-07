@@ -80,5 +80,5 @@ func StripControlRoomFields(ptdYamlPath string) error {
 		return parts[1] + `""`
 	})
 
-	return os.WriteFile(ptdYamlPath, []byte(stripped), 0644)
+	return writeFileAtomic(ptdYamlPath, []byte(stripped), 0644)
 }

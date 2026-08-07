@@ -1,9 +1,6 @@
 package steps
 
 import (
-	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -11,30 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// findRepoRoot walks up from the test file's directory until it finds a directory
-// containing python-pulumi/ (which is unique to the ptd repo root).
-func findRepoRoot(t *testing.T) string {
-	t.Helper()
-	_, thisFile, _, ok := runtime.Caller(0)
-	require.True(t, ok, "runtime.Caller failed")
-
-	dir := filepath.Dir(thisFile)
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "python-pulumi")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Fatal("could not find repo root (no python-pulumi/ ancestor directory found)")
-		}
-		dir = parent
-	}
-}
-
 func TestBuildControlRoomMetricFilter(t *testing.T) {
-	repoRoot := findRepoRoot(t)
-
-	result, err := BuildControlRoomMetricFilter(repoRoot)
+	result, err := BuildControlRoomMetricFilter()
 	require.NoError(t, err)
 	require.NotEmpty(t, result, "metric filter should be non-empty")
 
@@ -68,31 +43,30 @@ func TestBuildControlRoomMetricFilter(t *testing.T) {
 	}
 }
 
-// TestBuildAlloyConfigFilterFallback verifies that when filterControlRoomMetrics is true
-// but BuildControlRoomMetricFilter fails (e.g. bad ptdRoot), the generated Alloy config
-// still forwards metrics to the control room remote_write rather than silently dropping them.
-func TestBuildAlloyConfigFilterFallback(t *testing.T) {
+// TestBuildAlloyConfigFilterEnabled verifies that when filterControlRoomMetrics is
+// true, the generated Alloy config builds the control_room_filter relabel component
+// from the embedded grafana assets and forwards through it to the control room
+// remote_write.
+func TestBuildAlloyConfigFilterEnabled(t *testing.T) {
 	config := buildAlloyConfig(alloyConfigParams{
 		compoundName:             "test-workload",
 		controlRoomDomain:        "ctrl.example.posit.team",
 		accountIDOrTenantID:      "123456789012",
 		cloudProvider:            "aws",
 		filterControlRoomMetrics: true,
-		ptdRoot:                  "/nonexistent/path/that/will/cause/an/error",
 	})
 
 	// The control room remote_write block must be present.
 	assert.Contains(t, config, `prometheus.remote_write "control_room"`,
-		"control room remote_write block should be present even when filter fails")
+		"control room remote_write block should be present")
 
-	// The default relabel forward_to must route directly to the remote_write receiver,
-	// not to the (absent) filter component.
-	assert.Contains(t, config, "prometheus.remote_write.control_room.receiver",
-		"forward_to should fall back to direct remote_write receiver when filter build fails")
+	// The filter relabel component must be present — it is built from the embedded assets.
+	assert.Contains(t, config, `prometheus.relabel "control_room_filter"`,
+		"control_room_filter relabel block should be present when filtering is enabled")
 
-	// The filter relabel component must NOT be present — it was never built.
-	assert.NotContains(t, config, `prometheus.relabel "control_room_filter"`,
-		"control_room_filter relabel block should be absent when filter build fails")
+	// Metrics should be routed through the filter component.
+	assert.Contains(t, config, "prometheus.relabel.control_room_filter.receiver",
+		"forward_to should route through the control_room_filter receiver")
 }
 
 func TestExtractMetricNamesFromExpr(t *testing.T) {

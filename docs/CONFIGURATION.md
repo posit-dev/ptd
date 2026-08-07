@@ -55,6 +55,14 @@ spec:
     rs:owner: team@example.com
     rs:project: posit-team
     rs:environment: production
+
+  # AWS tag keys PTD must never add or remove on managed resources (AWS-only).
+  # Wired into the Pulumi AWS provider's ignoreTags.keys so customer-applied tags
+  # (e.g. from an org-wide tagging policy) are left untouched by our IaC. Exact key match.
+  # Honored on every `ptd ensure`, including `--refresh` (state is not polluted with ignored tags).
+  ignore_tags:
+    - customer:cost-center
+    - customer:owner
 ```
 
 ## Workload Configuration
@@ -117,6 +125,14 @@ spec:
         components:
           traefik_forward_auth_version: "0.0.14"
 
+  # AWS tag keys PTD must never add or remove on managed resources (AWS-only).
+  # Wired into the Pulumi AWS provider's ignoreTags.keys so customer-applied tags
+  # (e.g. from an org-wide tagging policy) are left untouched by our IaC. Exact key match.
+  # Honored on every `ptd ensure`, including `--refresh` (state is not polluted with ignored tags).
+  ignore_tags:
+    - customer:cost-center
+    - customer:owner
+
   # Sites in this workload
   sites:
     main:
@@ -127,6 +143,34 @@ spec:
       spec:
         domain: analytics-dev.example.com
 ```
+
+## Adopting `ignore_tags` on an existing target
+
+`ignore_tags` is enforced by the AWS provider's `ignoreTags`, which only takes
+effect after a **state-persisting** `ptd ensure` (an apply) has registered it on
+the target's AWS provider. On the run that first registers it, Pulumi still plans
+against the previously-registered provider — so if a matching tag is *already
+tracked in Pulumi state*, that apply will strip it once. Follow this procedure
+when enabling `ignore_tags` on an existing target:
+
+1. Add the keys to `ignore_tags`, then run `ptd ensure <target> --dry-run`.
+2. **If the preview shows an ignored key being removed** (`- <key>` on a
+   resource), that key is already tracked in state (a prior `--refresh` pulled it
+   in). Do **not** apply — the apply would strip the customer tag. Remove it from
+   state first (a state-only `ptd ensure <target> --refresh` filters ignored keys
+   out of state without modifying AWS), then repeat step 1.
+3. **If the preview is clean**, run `ptd ensure <target>` to apply. This registers
+   `ignoreTags` on the provider with no tag changes.
+
+After this one-time registration, tags matching `ignore_tags` are ignored on
+every subsequent `ptd ensure` (including `--refresh`) — never added, removed, or
+pulled into state. A key added to `ignore_tags` later requires another
+registering `ptd ensure` (on then-clean state) before it is protected.
+
+> **Fleet rollout:** running `ptd ensure` across all targets while their state is
+> clean of the configured keys registers `ignoreTags` everywhere, so customer
+> tags applied afterward are ignored from then on. Use the `--dry-run` check
+> above to catch any target that already has a matching tag in state.
 
 ## Site Configuration
 

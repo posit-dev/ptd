@@ -15,7 +15,7 @@ type ClusterIdentityInfo struct {
 	KubeletPrincipalID string
 	// OIDCIssuerURL is the cluster's OIDC issuer URL (used for federated identity credentials).
 	OIDCIssuerURL string
-	// VNetSubnetID is the subnet resource ID of the first agent pool (used for bastion NSG lookup).
+	// VNetSubnetID is the subnet resource ID of an agent pool (used for bastion NSG lookup).
 	// Format: /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Network/virtualNetworks/{vnet}/subnets/{subnet}
 	VNetSubnetID string
 }
@@ -52,10 +52,17 @@ func GetClusterIdentityInfo(ctx context.Context, creds *Credentials, subscriptio
 		info.OIDCIssuerURL = *result.Properties.OidcIssuerProfile.IssuerURL
 	}
 
-	// VNet subnet ID from the first agent pool profile (used for bastion NSG).
-	if result.Properties != nil && len(result.Properties.AgentPoolProfiles) > 0 {
-		if result.Properties.AgentPoolProfiles[0].VnetSubnetID != nil {
-			info.VNetSubnetID = *result.Properties.AgentPoolProfiles[0].VnetSubnetID
+	// VNet subnet ID for the bastion NSG. Scan all agent pool profiles for the
+	// first non-empty value rather than assuming index 0 carries it: the live
+	// API does not guarantee profile ordering, and pools managed as separate
+	// AgentPool resources may not surface the subnet on the first entry. All
+	// pools are provisioned into the same subnet, so any non-empty value is correct.
+	if result.Properties != nil {
+		for _, pool := range result.Properties.AgentPoolProfiles {
+			if pool.VnetSubnetID != nil && *pool.VnetSubnetID != "" {
+				info.VNetSubnetID = *pool.VnetSubnetID
+				break
+			}
 		}
 	}
 
