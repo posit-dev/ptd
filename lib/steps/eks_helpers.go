@@ -173,27 +173,37 @@ func deployTigeraOperator(
 				// Installation without ComponentResources renders empty resources),
 				// so every value here is newly introduced rather than inherited.
 				//
-				// calico-node runs Felix, whose memory scales with the number of
-				// endpoints and policies, so it gets the largest memory bound. Its
-				// 250m CPU request matches the only reservation upstream itself
-				// commits to — the request set on calico-node in the self-managed
-				// manifests/calico.yaml — and is a new per-node reservation here.
+				// Memory bounds are ~1.5x the highest working set observed across the
+				// fleet over 7 days, which covers scrape-interval blind spots, Go heap
+				// transients, and growth, without reserving capacity that never gets
+				// used. calico-node runs Felix, whose memory scales with the number of
+				// endpoints and policies, so it holds the largest bound. Its 250m CPU
+				// request matches the only reservation upstream itself commits to — the
+				// request set on calico-node in the self-managed manifests/calico.yaml —
+				// and is a new per-node reservation here. It stays at 250m despite
+				// peaking near 750m: with no CPU limit that peak isn't throttled, and
+				// raising the request would take capacity off every node to buy share
+				// weight during transient Felix recalcs.
 				"calicoNodeDaemonSet":             calicoComponentOverride(calicoContainer("calico-node", "250m", "512Mi")),
 				"typhaDeployment":                 calicoComponentOverride(calicoContainer("calico-typha", "100m", "256Mi")),
-				"calicoKubeControllersDeployment": calicoComponentOverride(calicoContainer("calico-kube-controllers", "50m", "128Mi")),
-				// csi-node-driver runs on every node: the operator enables the Calico
-				// CSI plugin unless kubeletVolumePluginPath is "None", and PTD leaves
-				// it at the default. Both containers are small and effectively idle
-				// once the driver is registered with kubelet, so they get the
-				// smallest bounds of any component here.
+				"calicoKubeControllersDeployment": calicoComponentOverride(calicoContainer("calico-kube-controllers", "50m", "192Mi")),
+				// csi-node-driver is bounded for when the Calico CSI plugin is active:
+				// the operator enables it whenever kubeletVolumePluginPath is unset,
+				// which is what PTD leaves it as, so a fresh cluster runs this DaemonSet
+				// on every node. Existing clusters carry an out-of-band
+				// kubeletVolumePluginPath="None" that disables it, so the override is
+				// inert there. Both containers are small and effectively idle once the
+				// driver is registered with kubelet, so they get the smallest bounds.
 				"csiNodeDriverDaemonSet": calicoComponentOverride(
 					calicoContainer("calico-csi", "10m", "64Mi"),
 					calicoContainer("csi-node-driver-registrar", "10m", "64Mi"),
 				),
 			},
 			// Resources for the tigera/operator pod itself. Same
-			// memory-bounded/CPU-unbounded policy as the dataplane components.
-			"resources": calicoResources("100m", "256Mi"),
+			// memory-bounded/CPU-unbounded policy as the dataplane components. Sized
+			// higher than its idle footprint suggests because it peaks during
+			// reconciles; it is a single replica, so the extra costs nothing per node.
+			"resources": calicoResources("250m", "384Mi"),
 			// calico-apiserver lives outside "installation": its resources map to
 			// the APIServer CR (apiServer.apiServerDeployment), a separate CR from
 			// the Installation, so the chart exposes it under a top-level apiServer

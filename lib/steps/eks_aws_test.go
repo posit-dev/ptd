@@ -411,7 +411,7 @@ func TestAWSEKSDeployTigeraResourceRequests(t *testing.T) {
 	installation := values["installation"].ObjectValue()
 	assertMemoryBounded(containerResources(installation, "calicoNodeDaemonSet", "calico-node"), "250m", "512Mi")
 	assertMemoryBounded(containerResources(installation, "typhaDeployment", "calico-typha"), "100m", "256Mi")
-	assertMemoryBounded(containerResources(installation, "calicoKubeControllersDeployment", "calico-kube-controllers"), "50m", "128Mi")
+	assertMemoryBounded(containerResources(installation, "calicoKubeControllersDeployment", "calico-kube-controllers"), "50m", "192Mi")
 
 	// csi-node-driver runs on every node and has two containers; both are bounded.
 	assert.Len(t, componentContainers(installation, "csiNodeDriverDaemonSet"), 2)
@@ -422,7 +422,7 @@ func TestAWSEKSDeployTigeraResourceRequests(t *testing.T) {
 	assertMemoryBounded(containerResources(apiServer, "apiServerDeployment", "calico-apiserver"), "100m", "256Mi")
 
 	// Operator pod itself.
-	assertMemoryBounded(values["resources"].ObjectValue(), "100m", "256Mi")
+	assertMemoryBounded(values["resources"].ObjectValue(), "250m", "384Mi")
 }
 
 func TestAWSEKSDeployEfsEnabled(t *testing.T) {
