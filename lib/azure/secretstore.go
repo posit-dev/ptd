@@ -61,7 +61,10 @@ func (s *SecretStore) EnsureWorkloadSecret(ctx context.Context, credentials type
 	// Create a KeyVault secret for each populated field in the map since Azure Secret Provider
 	// doesn't support json blobs, we must create a KV entry for each field.
 	for fieldName, fieldValue := range secretMap {
-		fieldValueStr := fmt.Sprintf("%v", fieldValue)
+		fieldValueStr, err := encodeSecretValue(fieldValue)
+		if err != nil {
+			return fmt.Errorf("failed to encode field %s: %w", fieldName, err)
+		}
 		if fieldValueStr == "" {
 			continue
 		}
@@ -102,14 +105,29 @@ func (s *SecretStore) CreateSecretIfNotExists(ctx context.Context, credentials t
 		return err
 	}
 
-	mSecret, err := json.Marshal(secret)
+	value, err := encodeSecretValue(secret)
 	if err != nil {
 		return err
 	}
 
 	if !s.SecretExists(ctx, azureCreds, secretName) {
-		return createSecret(ctx, azureCreds, s.vaultName, secretName, string(mSecret))
+		return createSecret(ctx, azureCreds, s.vaultName, secretName, value)
 	}
 
 	return
+}
+
+// encodeSecretValue renders a secret payload for storage in Azure Key Vault.
+// Strings are stored verbatim: External Secrets syncs Key Vault values byte-for-byte
+// into Kubernetes Secrets, so json.Marshal's surrounding quotes would corrupt them.
+// Non-strings are still JSON-encoded (e.g. the {fqdn,username,password} DB secret).
+func encodeSecretValue(secret any) (string, error) {
+	if str, ok := secret.(string); ok {
+		return str, nil
+	}
+	b, err := json.Marshal(secret)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }

@@ -27,11 +27,35 @@ const (
 	azRoleReader                    = "acdd72a7-3385-48ef-bd42-f606fba81ae7"
 	azRoleDNSZoneContributor        = "befefa01-2a29-4197-83a8-272ff33ce314"
 	azRoleStorageAccountContributor = "17d1049b-9a84-46fb-8f53-869881c3d3ab"
+	// Built-in "Key Vault Secrets User" (getSecret + readMetadata).
+	azRoleKeyVaultSecretsUser = "4633458b-17de-408a-b874-0445c86b69e6"
 
 	// Azure K8s namespaces for CertManager and Traefik
 	clustersCertManagerNamespace = "cert-manager"
 	clustersTraefikNamespace     = "traefik"
+	// ESO controller SA (in posit-team-system) federated for Key Vault access.
+	clustersExternalSecretsSA = "external-secrets"
+	// ClusterSecretStore that ExternalSecret resources reference by name.
+	clustersExternalSecretsStoreName = "azure-keyvault"
+	// clustersReservedWorkloadSiteName is reserved: workload-level Key Vault entries
+	// use the <compound>-workload- prefix, which a site of this name would collide
+	// with. See docs/guides/external-secrets-aks.md.
+	clustersReservedWorkloadSiteName = "workload"
 )
+
+// clustersAzureEmptySiteSecretKeys are site secret keys that are always empty, so
+// Key Vault (which rejects empty values) holds no entry and `bootstrap` skips them.
+// The site ExternalSecret emits them as empty literals to keep the Secret's shape.
+//
+// This list is deliberately curated, not derived from secrets.SiteSecret: most fields
+// that field-type inspection would report as empty (the licences, the chronicle and
+// OIDC client secrets) DO have hand-created Key Vault entries and must come from
+// `find`, while others (home-auth-map) are deprecated and intentionally dropped.
+// Emitting empty literals for those would add spurious keys or mask real values.
+var clustersAzureEmptySiteSecretKeys = []string{
+	"dev-admin-token",
+	"dev-user-token",
+}
 
 // ClustersStep deploys the per-cluster resources (IAM roles, K8s operators, etc.)
 // for both AWS and Azure workloads.
