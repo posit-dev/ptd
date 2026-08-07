@@ -563,6 +563,13 @@ type AzureWorkloadClusterConfig struct {
 	// UseLetsEncrypt controls whether CertManager is deployed for this cluster.
 	UseLetsEncrypt bool `yaml:"use_lets_encrypt"`
 
+	// ExternalSecretsEnabled deploys the External Secrets Operator and a per-site
+	// ExternalSecret, syncing Azure Key Vault into native k8s Secrets. AKS only;
+	// AWS uses the Secrets Store CSI driver. Requires the Key Vault entries to
+	// already exist under the expected names — see
+	// docs/guides/external-secrets-aks.md.
+	ExternalSecretsEnabled bool `yaml:"external_secrets_enabled"`
+
 	UserNodePools []AzureUserNodePoolConfig `yaml:"user_node_pools"`
 
 	// Optional: Root disk size for system node pool in GB (defaults to 128)
@@ -591,6 +598,7 @@ type AzureWorkloadClusterConfig struct {
 
 type AzureWorkloadClusterComponentConfig struct {
 	SecretStoreCsiDriverAzureProviderVersion string  `yaml:"secret_store_csi_driver_azure_provider_version"`
+	ExternalSecretsVersion                   *string `yaml:"external_secrets_version"`
 	AlloyVersion                             *string `yaml:"alloy_version"`
 	ExternalDnsVersion                       *string `yaml:"external_dns_version"`
 	GrafanaVersion                           *string `yaml:"grafana_version"`
@@ -606,6 +614,7 @@ type AzureWorkloadClusterComponentConfig struct {
 // ResolvedAzureComponents is the result of resolving AzureWorkloadClusterComponentConfig with defaults applied.
 type ResolvedAzureComponents struct {
 	AlloyVersion              string
+	ExternalSecretsVersion    string
 	ExternalDnsVersion        string
 	GrafanaVersion            string
 	KubeStateMetricsVersion   string
@@ -619,6 +628,7 @@ type ResolvedAzureComponents struct {
 func (c *AzureWorkloadClusterComponentConfig) ResolveAzureComponents() ResolvedAzureComponents {
 	return ResolvedAzureComponents{
 		AlloyVersion:              resolveString(c.AlloyVersion, "0.12.6"),
+		ExternalSecretsVersion:    resolveString(c.ExternalSecretsVersion, "2.8.0"),
 		ExternalDnsVersion:        resolveString(c.ExternalDnsVersion, "1.14.4"),
 		GrafanaVersion:            resolveString(c.GrafanaVersion, "7.0.14"),
 		KubeStateMetricsVersion:   resolveString(c.KubeStateMetricsVersion, "5.30.1"),
@@ -627,6 +637,19 @@ func (c *AzureWorkloadClusterComponentConfig) ResolveAzureComponents() ResolvedA
 		NvidiaDevicePluginVersion: resolveString(c.NvidiaDevicePluginVersion, "0.17.1"),
 		TraefikDeploymentReplicas: resolveInt(c.TraefikDeploymentReplicas, 3),
 	}
+}
+
+// AnyClusterExternalSecretsEnabled reports whether any cluster in the workload has
+// external secrets enabled. The bootstrap step uses this to decide the Key Vault
+// naming convention for site secrets, so unmigrated workloads are left untouched.
+// See docs/guides/external-secrets-aks.md.
+func (c AzureWorkloadConfig) AnyClusterExternalSecretsEnabled() bool {
+	for _, cluster := range c.Clusters {
+		if cluster.ExternalSecretsEnabled {
+			return true
+		}
+	}
+	return false
 }
 
 type SiteConfig struct {

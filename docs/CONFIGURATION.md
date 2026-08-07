@@ -407,8 +407,39 @@ clusters:
 
 **Default:** `false` (safety checks are respected during upgrades)
 
+## Secret Management Options (Azure)
+
+### external_secrets_enabled
+
+Deploys the External Secrets Operator (ESO) to an AKS cluster and generates a per-site
+`ExternalSecret`, so Azure Key Vault secrets sync into native Kubernetes Secrets instead
+of being applied by hand. AKS only — AWS uses the Secrets Store CSI driver.
+
+```yaml
+clusters:
+  "20250115":
+    external_secrets_enabled: true
+    components:
+      external_secrets_version: "2.8.0"  # optional; chart version
+```
+
+Key Vault secrets follow the `<compound>-<site>-<field>` convention; the site's
+`ExternalSecret` selects `^<compound>-<site>-` and strips that prefix so the resulting
+Secret keys match what team-operator reads.
+
+**Before enabling on an existing cluster**, the Key Vault entries must already exist under
+the new names and match the live cluster values — otherwise the `ExternalSecret` (which
+owns the target Secret) will reproduce it incompletely. Some Key Vault secrets are created
+by PTD code and some must be created by hand.
+
+**Default:** `false`
+
+See [External Secrets on AKS](guides/external-secrets-aks.md) for the secret-ownership
+tables, the migration procedure, and the post-migration cleanup checklist.
+
 ## See Also
 
 - [Getting Started](GETTING_STARTED.md)
 - [CLI Reference](cli/PTD_CLI_REFERENCE.md)
+- [External Secrets on AKS](guides/external-secrets-aks.md)
 - [Examples](../examples/)

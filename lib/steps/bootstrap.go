@@ -151,6 +151,18 @@ func (s *BootstrapStep) runAws(ctx context.Context, creds types.Credentials, wor
 	return nil
 }
 
+// azureSiteSecretKeyVaultName returns the Key Vault name for one field of a site
+// secret. With external secrets enabled the name is prefixed with the compound
+// (workload) name so the site's ExternalSecret can select it via
+// `^<compound>-<site>-`; otherwise the historical <site>-<field> name is kept so
+// vaults on unmigrated workloads are left untouched.
+func azureSiteSecretKeyVaultName(compoundName, siteName, fieldName string, externalSecretsEnabled bool) string {
+	if externalSecretsEnabled {
+		return fmt.Sprintf("%s-%s-%s", compoundName, siteName, fieldName)
+	}
+	return fmt.Sprintf("%s-%s", siteName, fieldName)
+}
+
 func (s *BootstrapStep) runAzure(ctx context.Context, c types.Credentials, _ string) error {
 	azureCreds, err := azure.OnlyAzureCredentials(c)
 	if err != nil {
@@ -163,6 +175,9 @@ func (s *BootstrapStep) runAzure(ctx context.Context, c types.Credentials, _ str
 	// resource group at creation time (below). These mirror the tags the persistent
 	// step places on child resources.
 	var resourceTags map[string]string
+	// externalSecretsEnabled selects the site secret Key Vault naming convention
+	// (see the site secrets loop below).
+	externalSecretsEnabled := false
 	if rawConfig, cfgErr := helpers.ConfigForTarget(s.DstTarget); cfgErr != nil {
 		// Don't fail bootstrap on this; the RG is still created (untagged), matching
 		// the previous behavior. But warn so a missing/malformed config doesn't
@@ -170,6 +185,7 @@ func (s *BootstrapStep) runAzure(ctx context.Context, c types.Credentials, _ str
 		s.Log.Warn("could not load workload config for resource_tags; resource group will be created untagged", "err", cfgErr)
 	} else if cfg, ok := rawConfig.(types.AzureWorkloadConfig); ok {
 		resourceTags = cfg.ResourceTags
+		externalSecretsEnabled = cfg.AnyClusterExternalSecretsEnabled()
 	}
 	// Note: runAzure is only invoked for Azure workload targets, so the assertion
 	// above always holds here. Control-room targets won't satisfy AzureWorkloadConfig
@@ -279,9 +295,20 @@ func (s *BootstrapStep) runAzure(ctx context.Context, c types.Credentials, _ str
 
 		// Create a KeyVault secret for each populated field in the map since Azure Secret Provider
 		// doesn't support json blobs, we must create a KV entry for each field.
+		//
+		// Only workloads with external secrets enabled use the
+		// <compound>-<site>-<field> convention that External Secrets selects per
+		// site; others keep <site>-<field> so unmigrated vaults are untouched.
+		// See docs/guides/external-secrets-aks.md.
 		for fieldName, fieldValue := range secretMap {
-			fieldSecretName := fmt.Sprintf("%s-%s", siteName, fieldName)
-			fieldValueStr := fmt.Sprintf("%v", fieldValue)
+			fieldSecretName := azureSiteSecretKeyVaultName(s.DstTarget.Name(), siteName, fieldName, externalSecretsEnabled)
+			// SiteSecret fields are all strings. Fail loudly rather than storing a
+			// Go-formatted value if that ever changes, since External Secrets syncs
+			// Key Vault values into Kubernetes Secrets byte-for-byte.
+			fieldValueStr, isStr := fieldValue.(string)
+			if !isStr {
+				return fmt.Errorf("site secret field %s has type %T, expected string", fieldName, fieldValue)
+			}
 			if fieldValueStr == "" {
 				continue
 			}
