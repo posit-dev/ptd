@@ -413,7 +413,7 @@ func TestAWSEKSDeployTigeraResourceRequests(t *testing.T) {
 	assertMemoryBounded(containerResources(installation, "typhaDeployment", "calico-typha"), "100m", "256Mi")
 	assertMemoryBounded(containerResources(installation, "calicoKubeControllersDeployment", "calico-kube-controllers"), "50m", "192Mi")
 
-	// csi-node-driver runs on every node and has two containers; both are bounded.
+	// csi-node-driver has two containers; both are bounded when the override renders.
 	assert.Len(t, componentContainers(installation, "csiNodeDriverDaemonSet"), 2)
 	assertMemoryBounded(containerResources(installation, "csiNodeDriverDaemonSet", "calico-csi"), "10m", "64Mi")
 	assertMemoryBounded(containerResources(installation, "csiNodeDriverDaemonSet", "csi-node-driver-registrar"), "10m", "64Mi")
