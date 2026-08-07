@@ -15,6 +15,61 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
+// calicoResources builds a Kubernetes resources block following PTD's
+// "memory-bounded, CPU-unbounded" policy for Calico components:
+//   - Memory: request == limit. Memory is non-compressible, so equal request
+//     and limit gives the pod a guaranteed, bounded allocation and prevents a
+//     runaway component from exhausting node memory (which would crash the node).
+//   - CPU: request only, no limit. Omitting the CPU limit avoids Linux CFS
+//     throttling of the dataplane (a throttled calico-node degrades networking
+//     cluster-wide).
+//
+// cpuRequest and memory are Kubernetes quantity strings (e.g. "250m", "512Mi").
+func calicoResources(cpuRequest, memory string) pulumi.Map {
+	return pulumi.Map{
+		"requests": pulumi.Map{
+			"cpu":    pulumi.String(cpuRequest),
+			"memory": pulumi.String(memory),
+		},
+		"limits": pulumi.Map{
+			"memory": pulumi.String(memory),
+		},
+	}
+}
+
+// calicoContainer builds one container entry for a component override: the
+// container's name plus its resources. The operator merges overrides by container
+// name and copies across only resources (and ports), so nothing else is needed.
+func calicoContainer(name, cpuRequest, memory string) pulumi.Map {
+	return pulumi.Map{
+		"name":      pulumi.String(name),
+		"resources": calicoResources(cpuRequest, memory),
+	}
+}
+
+// calicoComponentOverride builds the operator component-deployment override that
+// patches resources onto the named containers. The operator strategically merges
+// them by container name into the rendered DaemonSet/Deployment. Used under
+// installation's calicoNodeDaemonSet / typhaDeployment /
+// calicoKubeControllersDeployment / csiNodeDriverDaemonSet and apiServer's
+// apiServerDeployment. Container names are validated by the CRD against a
+// per-component enum, so a typo fails the apply rather than silently no-opping.
+//
+// Only long-running containers are patched, not initContainers (e.g. calico-node's
+// install-cni). Init containers are ephemeral — they exit after CNI setup and
+// don't contribute to steady-state resource pressure — so they're left alone.
+func calicoComponentOverride(containers ...pulumi.Input) pulumi.Map {
+	return pulumi.Map{
+		"spec": pulumi.Map{
+			"template": pulumi.Map{
+				"spec": pulumi.Map{
+					"containers": pulumi.Array(containers),
+				},
+			},
+		},
+	}
+}
+
 // deployTigeraOperator ports python-pulumi/src/ptd/pulumi_resources/tigera_operator.py
 // (the ptd:TigeraOperator nested ComponentResource created by
 // aws_workload_eks.py:_define_tigera_operator). It installs the Calico/Tigera CNI:
@@ -112,6 +167,51 @@ func deployTigeraOperator(
 					"ipam": pulumi.Map{"type": pulumi.String("Calico")},
 					"type": pulumi.String("Calico"),
 				},
+				// Resource overrides for the operator-managed dataplane
+				// components (memory-bounded, CPU-unbounded — see calicoResources).
+				// The operator ships no resource defaults of its own (an
+				// Installation without ComponentResources renders empty resources),
+				// so every value here is newly introduced rather than inherited.
+				//
+				// Memory bounds are round values above the highest working set observed
+				// across the fleet over 7 days. Headroom is kept modest because
+				// request == limit makes it reserved capacity, not just a kill
+				// threshold. calico-node runs Felix, whose memory scales with the
+				// number of endpoints and policies, so it holds the largest bound and
+				// has the least headroom relative to its peak — worth watching, since
+				// it is the only per-node DaemonSet and any increase lands on every
+				// node. Its 250m CPU request matches upstream's, the only resource
+				// value set in the self-managed manifests/calico.yaml, and stays there
+				// despite peaking near 750m: with no CPU limit that peak isn't
+				// throttled, so raising the request would reserve capacity on every
+				// node without preventing anything.
+				"calicoNodeDaemonSet":             calicoComponentOverride(calicoContainer("calico-node", "250m", "512Mi")),
+				"typhaDeployment":                 calicoComponentOverride(calicoContainer("calico-typha", "100m", "256Mi")),
+				"calicoKubeControllersDeployment": calicoComponentOverride(calicoContainer("calico-kube-controllers", "50m", "192Mi")),
+				// csi-node-driver is bounded for when the Calico CSI plugin is active:
+				// the operator enables it whenever kubeletVolumePluginPath is unset,
+				// which is what PTD leaves it as, so a fresh cluster runs this DaemonSet
+				// on every node. Existing clusters carry an out-of-band
+				// kubeletVolumePluginPath="None" that disables it, so the override is
+				// inert there. Both containers are small and effectively idle once the
+				// driver is registered with kubelet, so they get the smallest bounds.
+				"csiNodeDriverDaemonSet": calicoComponentOverride(
+					calicoContainer("calico-csi", "10m", "64Mi"),
+					calicoContainer("csi-node-driver-registrar", "10m", "64Mi"),
+				),
+			},
+			// Resources for the tigera/operator pod itself. Same
+			// memory-bounded/CPU-unbounded policy as the dataplane components. Sized
+			// higher than its idle footprint suggests because it peaks during
+			// reconciles; it is a single replica, so the extra costs nothing per node.
+			"resources": calicoResources("250m", "384Mi"),
+			// calico-apiserver lives outside "installation": its resources map to
+			// the APIServer CR (apiServer.apiServerDeployment), a separate CR from
+			// the Installation, so the chart exposes it under a top-level apiServer
+			// key rather than under installation. apiServer.enabled defaults to true
+			// in the chart and PTD does not disable it, so this override is live.
+			"apiServer": pulumi.Map{
+				"apiServerDeployment": calicoComponentOverride(calicoContainer("calico-apiserver", "100m", "256Mi")),
 			},
 			"goldmane":                  pulumi.Map{"enabled": pulumi.Bool(false)},
 			"whisker":                   pulumi.Map{"enabled": pulumi.Bool(false)},
