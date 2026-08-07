@@ -378,13 +378,24 @@ func TestAWSEKSDeployTigeraResourceRequests(t *testing.T) {
 	require.NotNil(t, rel, "tigera-operator helm release not found")
 	values := rel.Inputs["values"].ObjectValue()
 
-	// containerResources digs out the resources block for the single container
-	// override under a component-deployment map (calicoNodeDaemonSet etc.).
-	containerResources := func(component resource.PropertyMap, key string) resource.PropertyMap {
-		containers := component[resource.PropertyKey(key)].ObjectValue()["spec"].ObjectValue()["template"].
+	// componentContainers digs out the container override list under a
+	// component-deployment map (calicoNodeDaemonSet etc.).
+	componentContainers := func(component resource.PropertyMap, key string) []resource.PropertyValue {
+		return component[resource.PropertyKey(key)].ObjectValue()["spec"].ObjectValue()["template"].
 			ObjectValue()["spec"].ObjectValue()["containers"].ArrayValue()
-		require.Len(t, containers, 1)
-		return containers[0].ObjectValue()["resources"].ObjectValue()
+	}
+	// containerResources digs out the resources block for the named container
+	// override. Looked up by name rather than position so the assertions don't
+	// depend on the order containers are declared in.
+	containerResources := func(component resource.PropertyMap, key, container string) resource.PropertyMap {
+		for _, c := range componentContainers(component, key) {
+			obj := c.ObjectValue()
+			if obj["name"].StringValue() == container {
+				return obj["resources"].ObjectValue()
+			}
+		}
+		require.Failf(t, "container override not found", "%s: %s", key, container)
+		return nil
 	}
 	// assertMemoryBounded checks CPU request set with no CPU limit, and memory
 	// request == limit at the expected value.
@@ -398,12 +409,17 @@ func TestAWSEKSDeployTigeraResourceRequests(t *testing.T) {
 	}
 
 	installation := values["installation"].ObjectValue()
-	assertMemoryBounded(containerResources(installation, "calicoNodeDaemonSet"), "250m", "512Mi")
-	assertMemoryBounded(containerResources(installation, "typhaDeployment"), "100m", "256Mi")
-	assertMemoryBounded(containerResources(installation, "calicoKubeControllersDeployment"), "50m", "128Mi")
+	assertMemoryBounded(containerResources(installation, "calicoNodeDaemonSet", "calico-node"), "250m", "512Mi")
+	assertMemoryBounded(containerResources(installation, "typhaDeployment", "calico-typha"), "100m", "256Mi")
+	assertMemoryBounded(containerResources(installation, "calicoKubeControllersDeployment", "calico-kube-controllers"), "50m", "128Mi")
+
+	// csi-node-driver runs on every node and has two containers; both are bounded.
+	assert.Len(t, componentContainers(installation, "csiNodeDriverDaemonSet"), 2)
+	assertMemoryBounded(containerResources(installation, "csiNodeDriverDaemonSet", "calico-csi"), "10m", "64Mi")
+	assertMemoryBounded(containerResources(installation, "csiNodeDriverDaemonSet", "csi-node-driver-registrar"), "10m", "64Mi")
 
 	apiServer := values["apiServer"].ObjectValue()
-	assertMemoryBounded(containerResources(apiServer, "apiServerDeployment"), "100m", "256Mi")
+	assertMemoryBounded(containerResources(apiServer, "apiServerDeployment", "calico-apiserver"), "100m", "256Mi")
 
 	// Operator pod itself.
 	assertMemoryBounded(values["resources"].ObjectValue(), "100m", "256Mi")
