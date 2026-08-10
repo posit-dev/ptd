@@ -78,6 +78,24 @@ type AWSControlRoomConfig struct {
 	TraefikForwardAuthVersion        string        `json:"traefik_forward_auth_version" yaml:"traefik_forward_auth_version"`
 	TraefikVersion                   string        `json:"traefik_version" yaml:"traefik_version"`
 	EbsCsiAddonVersion               string        `json:"ebs_csi_addon_version" yaml:"ebs_csi_addon_version"`
+	// WorkspacesEnabled toggles the AWS WorkSpaces (control-room `workspaces`) step.
+	// It is a pointer so an absent field can be distinguished from an explicit false.
+	// The historical behavior is always-on, so an unset value (nil) must resolve to
+	// true; only an explicit `workspaces_enabled: false` disables the step. Resolve
+	// via WorkspacesIsEnabled (nil → true).
+	WorkspacesEnabled *bool `json:"workspaces_enabled" yaml:"workspaces_enabled"`
+}
+
+// WorkspacesIsEnabled resolves the WorkspacesEnabled flag (default true). Returns
+// true when the field is unset (nil) or explicitly true; returns false only when
+// WorkspacesEnabled is explicitly set to false. The nil → true default preserves
+// the historical always-on behavior of the AWS WorkSpaces step, mirroring how
+// EKSAccessEntriesConfig.IsEnabled treats an absent flag as enabled.
+func (c AWSControlRoomConfig) WorkspacesIsEnabled() bool {
+	if c.WorkspacesEnabled == nil {
+		return true
+	}
+	return *c.WorkspacesEnabled
 }
 
 // The following accessor methods return the value from config, or the Python
