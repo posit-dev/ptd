@@ -1,3 +1,10 @@
+# [1.42.0](https://github.com/posit-dev/ptd/compare/v1.41.1...v1.42.0) (2026-08-12)
+
+
+### Features
+
+* **azure:** pin TLS 1.2 and HTTPS-only on state storage account ([ea28ad7](https://github.com/posit-dev/ptd/commit/ea28ad7be81dd48021cc25110744524b2a27fd93))
+
 ## [1.41.1](https://github.com/posit-dev/ptd/compare/v1.41.0...v1.41.1) (2026-08-07)
 
 
