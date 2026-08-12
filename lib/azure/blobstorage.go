@@ -38,6 +38,12 @@ func CreateStorageAccount(ctx context.Context, credentials *Credentials, subscri
 		Properties: &armstorage.AccountPropertiesCreateParameters{
 			AllowBlobPublicAccess: to.Ptr(false),
 			AccessTier:            to.Ptr(armstorage.AccessTierCool),
+			// Azure defaults MinimumTLSVersion to TLS1_0 when unset; pin to TLS1_2
+			// so the account meets customer security baselines (Azure Policy).
+			MinimumTLSVersion: to.Ptr(armstorage.MinimumTLSVersionTLS12),
+			// Require secure transfer (HTTPS). Set explicitly rather than relying
+			// on the API default.
+			EnableHTTPSTrafficOnly: to.Ptr(true),
 		},
 	}, nil)
 	if err != nil {
