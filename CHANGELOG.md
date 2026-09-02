@@ -1,3 +1,13 @@
+## [1.42.1](https://github.com/posit-dev/ptd/compare/v1.42.0...v1.42.1) (2026-09-02)
+
+
+### Bug Fixes
+
+* **deps:** bump Go to 1.26.6 for stdlib security fixes ([501bed0](https://github.com/posit-dev/ptd/commit/501bed04093a7c244979f3ae490debe85f5dee31))
+* **deps:** bump golang.org/x deps to clear Snyk advisories ([c1bcbbe](https://github.com/posit-dev/ptd/commit/c1bcbbe8b6a7c2f343e11dbf9813395ca17ab5e2))
+* **deps:** bump google.golang.org/grpc to v1.83.2 ([e20d6f9](https://github.com/posit-dev/ptd/commit/e20d6f9ef97ec08c1a955742865122bb022ec052)), closes [hi#severity](https://github.com/hi/issues/severity)
+* **deps:** bump klauspost/compress in the example custom step ([83e1f00](https://github.com/posit-dev/ptd/commit/83e1f0083a6bf4b4d98166936a8335c99922f684))
+
 # [1.42.0](https://github.com/posit-dev/ptd/compare/v1.41.1...v1.42.0) (2026-08-12)
 
 
