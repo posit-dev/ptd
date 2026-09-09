@@ -29,7 +29,7 @@ clusters:
         node_pools:
           - name: default-karpenter-node-pool
             session_taints: true  # Enable session isolation
-            expireAfter: 720h
+            expire_after: 720h
             requirements:
               - key: "kubernetes.io/arch"
                 operator: In
@@ -156,7 +156,7 @@ experimentalFeatures:
 
 ### Consolidation Protection
 
-Active sessions are automatically protected from Karpenter's cost-optimization evictions using the `karpenter.sh/do-not-disrupt: "true"` annotation. This prevents sessions from being terminated when Karpenter tries to consolidate underutilized nodes.
+Active sessions are automatically protected from cost-optimization evictions by a PodDisruptionBudget (`maxUnavailable: 0`) that team-operator creates for each product's session pods. This prevents sessions from being terminated when the cluster tries to reclaim underutilized nodes — on both Karpenter (EKS) and cluster-autoscaler (AKS), since both drain nodes through the Kubernetes Eviction API. See [Consolidation and Disruption](#consolidation-and-disruption).
 
 ---
 
@@ -173,7 +173,7 @@ A Karpenter NodePool defines a class of nodes with specific characteristics (ins
 karpenter_config:
   node_pools:
     - name: default-karpenter-node-pool
-      expireAfter: 720h  # Nodes expire after 30 days
+      expire_after: 720h  # Nodes expire after 30 days
       weight: 100        # Higher weight = higher scheduling priority
 
       requirements:
@@ -196,7 +196,7 @@ karpenter_config:
 - **Requirements**: Define what types of EC2 instances Karpenter can provision (architecture, instance families, zones, etc.)
 - **Limits**: Cap the total resources Karpenter can provision for this pool
 - **Weight**: Priority for scheduling (default pool = 100, GPU pool = 10 typically)
-- **expireAfter**: How long nodes live before automatic replacement (reduces drift, applies security updates)
+- **expire_after**: How long nodes live before automatic replacement (reduces drift, applies security updates)
 - **system_nodes**: When `true`, nodes in this pool are labeled `posit.team/node-role=system`. This lets system workloads target these nodes and lets callers keep other workloads off them via node affinity — for example, the Team Operator image prepull daemonset can be configured to avoid system nodes so it does not pull session images onto them. Also available on managed node groups under `additional_node_groups.<name>.system_nodes`.
 
 **Example Multi-Pool Setup:**
@@ -296,7 +296,7 @@ Karpenter actively optimizes costs by consolidating workloads onto fewer nodes w
 - **Disruption Budget**: 10% of nodes can be disrupted at once
 
 **Session Protection:**
-Active Workbench sessions receive the `karpenter.sh/do-not-disrupt: "true"` annotation, which prevents Karpenter from evicting them during consolidation. This ensures users don't experience unexpected interruptions.
+Team-operator creates a PodDisruptionBudget (named `<component>-sessions`, e.g. `main-workbench-sessions`) in the `posit-team` namespace for each product, with `maxUnavailable: 0` and a selector matching that product's launcher-created session pods. Karpenter drains nodes through the standard Kubernetes Eviction API, which the API server enforces against PDBs, so a `maxUnavailable: 0` budget blocks the node hosting an active session from being voluntarily disrupted until the session ends. This is not a Karpenter-specific mechanism — the same PDB protects sessions identically on AKS clusters, which drain nodes the same way via cluster-autoscaler.
 
 ---
 
@@ -387,7 +387,7 @@ When a user starts a GPU session, Workbench interprets the placement constraint 
 
 ### Node Expiration
 
-Nodes are automatically replaced after a configured lifetime (default: 720h/30 days) using the `expireAfter` setting. This ensures:
+Nodes are automatically replaced after a configured lifetime (default: 720h/30 days) using the `expire_after` setting. This ensures:
 - Security updates are applied
 - Configuration drift is minimized
 - Nodes don't run indefinitely with outdated AMIs
@@ -397,7 +397,7 @@ Nodes are automatically replaced after a configured lifetime (default: 720h/30 d
 karpenter_config:
   node_pools:
     - name: default-karpenter-node-pool
-      expireAfter: 720h  # 30 days
+      expire_after: 720h  # 30 days
 ```
 
 ### IAM and Security
