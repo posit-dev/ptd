@@ -326,7 +326,15 @@ func deployControlRoomTraefik(
 			"requests": pulumi.Map{"cpu": pulumi.String("200m"), "memory": pulumi.String("256Mi")},
 			"limits":   pulumi.Map{"cpu": pulumi.String("1000m"), "memory": pulumi.String("512Mi")},
 		},
-		"deployment":     pulumi.Map{"replicas": pulumi.Int(deploymentReplicas)},
+		"deployment": pulumi.Map{"replicas": pulumi.Int(deploymentReplicas)},
+		// The control-room Traefik is the single ingress every workload's metrics
+		// remote-write funnels through, and it was the only Traefik in the fleet
+		// without a PDB: a node drain could evict an arbitrary number of replicas
+		// at once. maxUnavailable 1 forces drains to roll replicas one at a time.
+		"podDisruptionBudget": pulumi.Map{
+			"enabled":        pulumi.Bool(true),
+			"maxUnavailable": pulumi.Int(1),
+		},
 		"livenessProbe":  pulumi.Map{"initialDelaySeconds": pulumi.Int(5), "periodSeconds": pulumi.Int(10), "timeoutSeconds": pulumi.Int(5), "failureThreshold": pulumi.Int(5)},
 		"readinessProbe": pulumi.Map{"initialDelaySeconds": pulumi.Int(5), "periodSeconds": pulumi.Int(10), "timeoutSeconds": pulumi.Int(5), "failureThreshold": pulumi.Int(3)},
 		"logs": pulumi.Map{
