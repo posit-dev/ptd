@@ -53,7 +53,7 @@ func runAwsHelmTraefik(t *testing.T, replicas int) *helmAWSMocks {
 			environment:  "staging",
 			cfg:          types.AWSWorkloadConfig{},
 		}
-		return awsHelmTraefik(ctx, noopOpt, "wl01-staging", "20250101", params, "100", "37.1.2", replicas, withAlias)
+		return awsHelmTraefik(ctx, noopOpt, "wl01-staging", "20250101", params, "100", "41.6.0", replicas, withAlias)
 	}, pulumi.WithMocks("ptd-aws-workload-helm", "wl01-staging", mocks))
 	require.NoError(t, err)
 	return mocks

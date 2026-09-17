@@ -186,7 +186,7 @@ func (c AWSControlRoomConfig) MimirVersionOrDefault() string {
 	return crStringDefault(c.MimirVersion, "5.1.3")
 }
 
-// TraefikVersionOrDefault resolves the traefik chart version (Python default 24.0.0).
+// TraefikVersionOrDefault resolves the traefik chart version.
 func (c AWSControlRoomConfig) TraefikVersionOrDefault() string {
-	return crStringDefault(c.TraefikVersion, "24.0.0")
+	return crStringDefault(c.TraefikVersion, "41.6.0")
 }

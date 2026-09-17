@@ -597,10 +597,8 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 			"maxUnavailable": 1,
 		},
 		"priorityClassName": "traefik-critical",
-		"logs": map[string]interface{}{
-			"access":  map[string]interface{}{"enabled": true},
-			"general": map[string]interface{}{"level": "DEBUG"},
-		},
+		"log":               map[string]interface{}{"level": "DEBUG"},
+		"accessLog":         map[string]interface{}{"enabled": true},
 		"ingressClass": map[string]interface{}{
 			"enabled":        true,
 			"isDefaultClass": true,
@@ -621,12 +619,20 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 				"nodePort": 32090,
 			},
 		},
-		"service": map[string]interface{}{"type": "NodePort"},
+		// chart 41 moved the service type under service.spec. The chart does not
+		// reject a stale top-level service.type (the service block allows unknown
+		// keys), it silently ignores it and falls back to the chart default of
+		// LoadBalancer, which would expose this Traefik publicly instead of keeping
+		// it a NodePort behind the ALB.
+		"service": map[string]interface{}{
+			"spec": map[string]interface{}{"type": "NodePort"},
+		},
 	}
 	if !isThirdPartyTelemetryEnabled(params.cfg.ThirdPartyTelemetryEnabled) {
-		traefikValues["globalArguments"] = []interface{}{
-			"--global.checknewversion=false",
-			"--global.sendanonymoususage=false",
+		// chart 41 replaced the raw globalArguments CLI flags with a typed global block.
+		traefikValues["global"] = map[string]interface{}{
+			"checkNewVersion":    false,
+			"sendAnonymousUsage": false,
 		}
 	}
 

@@ -267,7 +267,7 @@ func (c *AWSWorkloadClusterComponents) ResolveAWSComponents() ResolvedAWSCompone
 		NvidiaDevicePluginVersion:              resolveString(c.NvidiaDevicePluginVersion, "0.17.1"),
 		SecretStoreCsiDriverVersion:            resolveString(c.SecretStoreCsiDriverVersion, "1.3.4"),
 		SecretStoreCsiDriverAwsProviderVersion: resolveString(c.SecretStoreCsiDriverAwsProviderVersion, "0.3.5"),
-		TraefikVersion:                         resolveString(c.TraefikVersion, "37.1.2"),
+		TraefikVersion:                         resolveString(c.TraefikVersion, "41.6.0"),
 		TraefikDeploymentReplicas:              resolveInt(c.TraefikDeploymentReplicas, 3),
 	}
 }
@@ -640,7 +640,7 @@ func (c *AzureWorkloadClusterComponentConfig) ResolveAzureComponents() ResolvedA
 		MimirVersion:              resolveString(c.MimirVersion, "5.2.1"),
 		NvidiaDevicePluginVersion: resolveString(c.NvidiaDevicePluginVersion, "0.17.1"),
 		TraefikDeploymentReplicas: resolveInt(c.TraefikDeploymentReplicas, 3),
-		TraefikVersion:            resolveString(c.TraefikVersion, "33.2.1"),
+		TraefikVersion:            resolveString(c.TraefikVersion, "41.6.0"),
 	}
 }
 

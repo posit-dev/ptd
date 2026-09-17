@@ -295,7 +295,11 @@ func deployControlRoomTraefik(
 
 	values := pulumi.Map{
 		"service": pulumi.Map{
-			"type": pulumi.String("LoadBalancer"),
+			// chart 41 moved the service type under service.spec. The chart does not
+			// reject a stale top-level service.type (the service block allows
+			// unknown keys), it silently ignores it and falls back to the chart
+			// default, so this key has to live under spec.
+			"spec": pulumi.Map{"type": pulumi.String("LoadBalancer")},
 			"annotations": pulumi.Map{
 				"service.beta.kubernetes.io/aws-load-balancer-type":                            pulumi.String("external"),
 				"service.beta.kubernetes.io/aws-load-balancer-scheme":                          pulumi.String("internet-facing"),
@@ -313,13 +317,27 @@ func deployControlRoomTraefik(
 			},
 		},
 		"ports": pulumi.Map{
-			"web":       pulumi.Map{"redirectTo": pulumi.String("websecure")},
-			"websecure": pulumi.Map{"tls": pulumi.Map{"enabled": pulumi.Bool(false)}},
+			"web": pulumi.Map{
+				"http": pulumi.Map{
+					"redirections": pulumi.Map{
+						"entryPoint": pulumi.Map{
+							"to":        pulumi.String("websecure"),
+							"scheme":    pulumi.String("https"),
+							"permanent": pulumi.Bool(true),
+						},
+					},
+				},
+			},
+			// TLS terminates on the NLB (see the ssl-cert annotation above), so the
+			// websecure entrypoint itself stays plain HTTP.
+			"websecure": pulumi.Map{"http": pulumi.Map{"tls": pulumi.Map{"enabled": pulumi.Bool(false)}}},
 		},
 		"providers": pulumi.Map{
-			"kubernetesCRD":     pulumi.Map{"enabled": pulumi.Bool(true)},
-			"kubernetesIngress": pulumi.Map{"enabled": pulumi.Bool(true)},
-			"publishedService":  pulumi.Map{"enabled": pulumi.Bool(true)},
+			"kubernetesCRD": pulumi.Map{"enabled": pulumi.Bool(true)},
+			"kubernetesIngress": pulumi.Map{
+				"enabled":          pulumi.Bool(true),
+				"publishedService": pulumi.Map{"enabled": pulumi.Bool(true)},
+			},
 		},
 		"additionalArguments": pulumi.Array{pulumi.String("--metrics.prometheus=true")},
 		"resources": pulumi.Map{
@@ -337,13 +355,16 @@ func deployControlRoomTraefik(
 		},
 		"livenessProbe":  pulumi.Map{"initialDelaySeconds": pulumi.Int(5), "periodSeconds": pulumi.Int(10), "timeoutSeconds": pulumi.Int(5), "failureThreshold": pulumi.Int(5)},
 		"readinessProbe": pulumi.Map{"initialDelaySeconds": pulumi.Int(5), "periodSeconds": pulumi.Int(10), "timeoutSeconds": pulumi.Int(5), "failureThreshold": pulumi.Int(3)},
-		"logs": pulumi.Map{
-			"general": pulumi.Map{"level": pulumi.String("DEBUG")},
-			"access":  pulumi.Map{"enabled": pulumi.Bool(true)},
-		},
-		"image":        pulumi.Map{"registry": pulumi.String("ghcr.io/traefik")},
-		"ingressClass": pulumi.Map{"enabled": pulumi.Bool(true), "default": pulumi.Bool(true)},
-		"ingressRoute": pulumi.Map{"dashboard": pulumi.Map{"enabled": pulumi.Bool(true)}},
+		"log":            pulumi.Map{"level": pulumi.String("DEBUG")},
+		"accessLog":      pulumi.Map{"enabled": pulumi.Bool(true)},
+		"image":          pulumi.Map{"registry": pulumi.String("ghcr.io/traefik")},
+		"ingressClass":   pulumi.Map{"enabled": pulumi.Bool(true), "isDefaultClass": pulumi.Bool(true)},
+		"ingressRoute":   pulumi.Map{"dashboard": pulumi.Map{"enabled": pulumi.Bool(true)}},
+		// This release jumps Traefik v2 to v3, which defaults to the v3 router rule
+		// syntax. Pin the v2 syntax so the existing router rules keep matching
+		// across the cutover. TODO: drop this once the rules are migrated to v3
+		// syntax in a follow-up change.
+		"core": pulumi.Map{"defaultRuleSyntax": pulumi.String("v2")},
 	}
 
 	opts := []pulumi.ResourceOption{
