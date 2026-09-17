@@ -904,7 +904,8 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 		}
 
 		// Traefik Helm release values — mirrors azure_traefik.py _define_helm_release
-		traefikReplicas := clusterCfg.Components.ResolveAzureComponents().TraefikDeploymentReplicas
+		traefikComponents := clusterCfg.Components.ResolveAzureComponents()
+		traefikReplicas := traefikComponents.TraefikDeploymentReplicas
 		traefikValues := pulumi.Map{
 			"logs": pulumi.Map{
 				"general": pulumi.Map{
@@ -1076,7 +1077,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 		_, err = helmv3.NewRelease(ctx, fmt.Sprintf("%s-%s-traefik", name, release), &helmv3.ReleaseArgs{
 			Name:      pulumi.String("traefik"),
 			Chart:     pulumi.String("traefik"),
-			Version:   pulumi.String("33.2.1"),
+			Version:   pulumi.String(traefikComponents.TraefikVersion),
 			Namespace: pulumi.String(clustersTraefikNamespace),
 			RepositoryOpts: &helmv3.RepositoryOptsArgs{
 				Repo: pulumi.String("https://traefik.github.io/charts"),

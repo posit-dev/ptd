@@ -609,6 +609,9 @@ type AzureWorkloadClusterComponentConfig struct {
 	// TraefikDeploymentReplicas sets the number of workload Traefik ingress replicas.
 	// Defaults to 3 for high availability (resolve via ResolveAzureComponents).
 	TraefikDeploymentReplicas *int `yaml:"traefik_deployment_replicas"`
+	// TraefikVersion pins the Traefik helm chart version (resolve via
+	// ResolveAzureComponents).
+	TraefikVersion *string `yaml:"traefik_version"`
 }
 
 // ResolvedAzureComponents is the result of resolving AzureWorkloadClusterComponentConfig with defaults applied.
@@ -622,6 +625,7 @@ type ResolvedAzureComponents struct {
 	MimirVersion              string
 	NvidiaDevicePluginVersion string
 	TraefikDeploymentReplicas int
+	TraefikVersion            string
 }
 
 // ResolveAzureComponents returns the component versions with defaults applied.
@@ -636,6 +640,7 @@ func (c *AzureWorkloadClusterComponentConfig) ResolveAzureComponents() ResolvedA
 		MimirVersion:              resolveString(c.MimirVersion, "5.2.1"),
 		NvidiaDevicePluginVersion: resolveString(c.NvidiaDevicePluginVersion, "0.17.1"),
 		TraefikDeploymentReplicas: resolveInt(c.TraefikDeploymentReplicas, 3),
+		TraefikVersion:            resolveString(c.TraefikVersion, "33.2.1"),
 	}
 }
 
