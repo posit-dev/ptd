@@ -1,3 +1,17 @@
+# [1.43.0](https://github.com/posit-dev/ptd/compare/v1.42.1...v1.43.0) (2026-09-18)
+
+
+### Bug Fixes
+
+* **traefik:** deduplicate the control-room prometheus metrics flag ([337ca89](https://github.com/posit-dev/ptd/commit/337ca89aac434461e542ad4af96199a9170de5f0))
+
+
+### Features
+
+* **cluster:** add a PodDisruptionBudget to the control-room Traefik ([7432f75](https://github.com/posit-dev/ptd/commit/7432f75dd0613b3e00eb3d9f142268f171beebcb))
+* **traefik:** bump to chart 41.6.0 (Traefik v3.7.13) ([3253763](https://github.com/posit-dev/ptd/commit/3253763a9312e7b3ac37731d92657ef29e6290f9))
+* **traefik:** manage the CRDs as Pulumi resources ([72238e8](https://github.com/posit-dev/ptd/commit/72238e8630d0cdebb76f3fb2e2b19aa466fe655b))
+
 ## [1.42.1](https://github.com/posit-dev/ptd/compare/v1.42.0...v1.42.1) (2026-09-02)
 
 
