@@ -118,7 +118,10 @@ func deployTraefikCRDs(ctx *pulumi.Context, resourceName string, opts ...pulumi.
 	if err != nil {
 		return nil, err
 	}
-	opts = append(opts, pulumi.RetainOnDelete(true))
+	// Prepend into a fresh slice rather than appending into the caller's: a
+	// caller passing a pre-allocated slice with spare capacity would otherwise
+	// have its backing array written to.
+	opts = append([]pulumi.ResourceOption{pulumi.RetainOnDelete(true)}, opts...)
 	crds, err := k8syamlv2.NewConfigGroup(ctx, resourceName, &k8syamlv2.ConfigGroupArgs{
 		Yaml: pulumi.String(manifest),
 	}, opts...)

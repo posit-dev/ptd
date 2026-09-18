@@ -339,7 +339,15 @@ func deployControlRoomTraefik(
 				"publishedService": pulumi.Map{"enabled": pulumi.Bool(true)},
 			},
 		},
-		"additionalArguments": pulumi.Array{pulumi.String("--metrics.prometheus=true")},
+		// This was a raw --metrics.prometheus=true in additionalArguments, which
+		// chart 41 renders a second time because it enables prometheus by
+		// default, so Traefik received the flag twice. Use the structured block
+		// instead: it is schema-validated, it emits the flag once, and stating
+		// it explicitly means an upstream change to that default cannot silently
+		// drop metrics from the ingress the whole fleet reports through.
+		"metrics": pulumi.Map{
+			"prometheus": pulumi.Map{"entryPoint": pulumi.String("metrics")},
+		},
 		"resources": pulumi.Map{
 			"requests": pulumi.Map{"cpu": pulumi.String("200m"), "memory": pulumi.String("256Mi")},
 			"limits":   pulumi.Map{"cpu": pulumi.String("1000m"), "memory": pulumi.String("512Mi")},

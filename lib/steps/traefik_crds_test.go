@@ -13,8 +13,16 @@ func TestTraefikCRDManifest(t *testing.T) {
 	manifest, err := traefikCRDManifest()
 	require.NoError(t, err)
 
+	// Pinned deliberately rather than derived from the embedded directory: if a
+	// refresh silently adds or drops a CRD, deriving the expected count from the
+	// same files would move with it and assert nothing. 10 is the traefik.io CRD
+	// count as of chart 41.6.0, so a change here should be a conscious update.
 	docs := strings.Split(manifest, "---\n")
 	require.Len(t, docs, 10, "expected the 10 vendored traefik.io CRDs")
+
+	entries, err := traefikCRDAssets.ReadDir(traefikCRDsDir)
+	require.NoError(t, err)
+	require.Len(t, docs, len(entries), "every embedded CRD file must reach the manifest")
 
 	var names []string
 	for _, doc := range docs {
