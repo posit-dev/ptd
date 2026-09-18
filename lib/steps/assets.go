@@ -14,3 +14,14 @@ const (
 	grafanaAlertsDir     = "assets/grafana_alerts"
 	grafanaDashboardsDir = "assets/grafana_dashboards"
 )
+
+// traefikCRDAssets embeds the traefik.io CustomResourceDefinitions vendored from
+// the Traefik Helm chart's crds/ directory. Helm installs crds/ once and never
+// upgrades it, so PTD applies these as first-class Pulumi resources instead.
+// Refresh them with `just refresh-traefik-crds <chart-version>` whenever
+// traefik_version moves. See docs/infrastructure/traefik-crds.md.
+//
+//go:embed assets/traefik_crds/*.yaml
+var traefikCRDAssets embed.FS
+
+const traefikCRDsDir = "assets/traefik_crds"
