@@ -367,9 +367,18 @@ func deployControlRoomTraefik(
 		"core": pulumi.Map{"defaultRuleSyntax": pulumi.String("v2")},
 	}
 
+	// The chart's bundled crds/ are install-only, so manage the traefik.io CRDs
+	// here instead. The control-room provider already runs with server-side
+	// apply, so it needs no extra provider of its own.
+	crds, err := deployTraefikCRDs(ctx, clusterName+"-traefik-crds", k8sProvider)
+	if err != nil {
+		return nil, err
+	}
+
 	opts := []pulumi.ResourceOption{
 		k8sProvider,
 		pulumi.DeleteBeforeReplace(true),
+		pulumi.DependsOn([]pulumi.Resource{crds}),
 		traefikAlias(ctx, "kubernetes:helm.sh/v3:Release", clusterName+"-traefik"),
 	}
 	if protect {

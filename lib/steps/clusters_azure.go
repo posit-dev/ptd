@@ -1083,6 +1083,18 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 			return fmt.Errorf("clusters: failed to create traefik priority class for %s: %w", release, err)
 		}
 
+		// The chart's bundled crds/ are install-only, so manage the traefik.io
+		// CRDs here instead, through a dedicated server-side-apply provider.
+		traefikCRDProvider, err := newTraefikCRDProvider(ctx, k8sProviderName, params.kubeconfigsByCluster[release])
+		if err != nil {
+			return err
+		}
+		traefikCRDs, err := deployTraefikCRDs(ctx,
+			fmt.Sprintf("%s-%s-traefik-crds", name, release), pulumi.Provider(traefikCRDProvider))
+		if err != nil {
+			return err
+		}
+
 		_, err = helmv3.NewRelease(ctx, fmt.Sprintf("%s-%s-traefik", name, release), &helmv3.ReleaseArgs{
 			Name:      pulumi.String("traefik"),
 			Chart:     pulumi.String("traefik"),
@@ -1093,7 +1105,7 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 			},
 			Atomic: pulumi.Bool(true),
 			Values: traefikValues,
-		}, k8sProviderOpt, withTraefikAlias(), pulumi.DependsOn([]pulumi.Resource{traefikPC}))
+		}, k8sProviderOpt, withTraefikAlias(), pulumi.DependsOn([]pulumi.Resource{traefikPC, traefikCRDs}))
 		if err != nil {
 			return fmt.Errorf("clusters: failed to create traefik helm release for %s: %w", release, err)
 		}

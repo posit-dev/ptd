@@ -547,6 +547,18 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 		return fmt.Errorf("helm: failed to create traefik namespace: %w", err)
 	}
 
+	// The chart's bundled crds/ are install-only, so manage the traefik.io CRDs
+	// here instead, through a dedicated server-side-apply provider.
+	crdBaseName := compoundName + "-" + release
+	crdProvider, err := newTraefikCRDProvider(ctx, crdBaseName, params.kubeconfigsByCluster[release])
+	if err != nil {
+		return err
+	}
+	crds, err := deployTraefikCRDs(ctx, crdBaseName+"-traefik-crds", pulumi.Provider(crdProvider))
+	if err != nil {
+		return err
+	}
+
 	// Dedicated cluster-scoped PriorityClass so Traefik ingress pods are protected
 	// from eviction under node pressure. Value sits below the reserved system-*
 	// range (system-cluster-critical = 2000000000) but high enough to outrank
@@ -663,7 +675,7 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 			"spec": chartSpec,
 		},
 	}, k8sOpt, withAlias("kubernetes:helm.cattle.io/v1:HelmChart", chartResourceName),
-		pulumi.DependsOn([]pulumi.Resource{ns, pc}))
+		pulumi.DependsOn([]pulumi.Resource{ns, pc, crds}))
 	if err != nil {
 		return fmt.Errorf("helm: failed to create traefik chart: %w", err)
 	}
