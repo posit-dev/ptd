@@ -694,7 +694,7 @@ Located in `/lib/`:
 - `steps/` - Deployment step definitions (bootstrap, cluster, helm, images, persistent, workspaces, sites)
 - `types/` - Core type definitions (Target, Credentials, etc.)
 - `proxy/` - Proxy session management
-- `pulumi/` - Pulumi integration (inline, Python)
+- `pulumi/` - Pulumi integration (inline Go programs, workspace and state management)
 - `helpers/` - Utility functions (file operations, networking, process management)
 - `secrets/` - Secret management
 - `containers/` - Container operations

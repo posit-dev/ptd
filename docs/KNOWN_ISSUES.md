@@ -87,7 +87,7 @@ This command drops you into an authenticated shell session configured for the sp
 **What It Does:**
 - Sets up all necessary authentication (AWS credentials, Pulumi state backend access, etc.)
 - Configures the environment to point to the correct Pulumi stack for that step
-- Activates the Python virtual environment if needed
+- Creates a Go-runtime Pulumi state workspace for that step's stack
 - Allows you to run Pulumi CLI commands directly against the stack
 
 **Common Use Cases:**

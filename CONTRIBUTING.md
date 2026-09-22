@@ -5,7 +5,7 @@ Below are some helpful directions on getting your environment set up as well as 
 ## Prerequisites
 
 - [Go](https://golang.org/dl/) 1.21+
-- [Python](https://www.python.org/downloads/) 3.12+
+- [Python](https://www.python.org/downloads/) 3.12+ (for the e2e test suite)
 - [uv](https://github.com/astral-sh/uv) (Python package manager)
 - [Pulumi](https://www.pulumi.com/docs/get-started/install/)
 - [just](https://github.com/casey/just) (command runner)
