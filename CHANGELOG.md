@@ -1,3 +1,10 @@
+## [1.43.1](https://github.com/posit-dev/ptd/compare/v1.43.0...v1.43.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* **aks:** cordon undrainable nodes instead of failing pool upgrades ([3fbe9b1](https://github.com/posit-dev/ptd/commit/3fbe9b1122106086d4900344a92a9233f66f621f))
+
 # [1.43.0](https://github.com/posit-dev/ptd/compare/v1.42.1...v1.43.0) (2026-09-18)
 
 
