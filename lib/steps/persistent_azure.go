@@ -100,6 +100,12 @@ func (s *PersistentStep) runAzureInlineGo(ctx context.Context, creds types.Crede
 	if !ok {
 		return fmt.Errorf("persistent: expected AzureWorkloadConfig, got %T", rawConfig)
 	}
+	// Skip on --cancel so a bad postgres_version cannot block clearing a stuck lock.
+	if !s.Options.Cancel {
+		if err := validateAzurePostgresVersion(cfg.PostgresVersion); err != nil {
+			return fmt.Errorf("persistent: %w", err)
+		}
+	}
 
 	// Apply Python AzureWorkloadConfig dataclass defaults for fields not set in
 	// ptd.yaml (Go zero-values would otherwise diff live resources / drop protect).
@@ -1041,6 +1047,32 @@ func azureDBSubnetID(params azureWorkloadPersistentParams) pulumi.StringInput {
 	))
 }
 
+// azurePostgresMajorVersions is the set of major versions accepted by the
+// azure-native PostgresMajorVersion enum. The SDK exposes the values only as
+// individual constants (no enumerable list), so they are listed here by name.
+var azurePostgresMajorVersions = map[azpg.PostgresMajorVersion]bool{
+	azpg.PostgresMajorVersion_11: true,
+	azpg.PostgresMajorVersion_12: true,
+	azpg.PostgresMajorVersion_13: true,
+	azpg.PostgresMajorVersion_14: true,
+	azpg.PostgresMajorVersion_15: true,
+	azpg.PostgresMajorVersion_16: true,
+	azpg.PostgresMajorVersion_17: true,
+	azpg.PostgresMajorVersion_18: true,
+}
+
+// validateAzurePostgresVersion rejects a postgres_version that is not a bare
+// supported major version. Empty is allowed (defaults to "14").
+func validateAzurePostgresVersion(v string) error {
+	if v == "" {
+		return nil
+	}
+	if !azurePostgresMajorVersions[azpg.PostgresMajorVersion(v)] {
+		return fmt.Errorf("invalid postgres_version %q: must be a supported Postgres major version only (e.g. \"17\", not \"17.2\")", v)
+	}
+	return nil
+}
+
 // azureBuildPostgresServer mirrors _define_database_resources: random password,
 // private DNS zone + vnet link, the flexible server, and a Key Vault secret.
 func azureBuildPostgresServer(
@@ -1109,7 +1141,7 @@ func azureBuildPostgresServer(
 			StorageSizeGB: pulumi.Int(128),
 			Type:          pulumi.String("Premium_LRS"),
 		},
-		Version: pulumi.String("14"),
+		Version: pulumi.String(params.cfg.PostgresVersionOrDefault()),
 		Tags:    tags,
 		// administratorLoginPassword is write-only (Azure never returns it). Go's
 		// RandomPassword is fresh on the first Go apply (Python's value lived in
