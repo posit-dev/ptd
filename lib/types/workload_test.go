@@ -495,3 +495,12 @@ func TestAnyClusterExternalSecretsEnabled(t *testing.T) {
 		assert.False(t, AzureWorkloadConfig{}.AnyClusterExternalSecretsEnabled())
 	})
 }
+
+func TestAzureWorkloadConfigPostgresVersionOrDefault(t *testing.T) {
+	assert.Equal(t, "14", AzureWorkloadConfig{}.PostgresVersionOrDefault())
+	assert.Equal(t, "17", AzureWorkloadConfig{PostgresVersion: "17"}.PostgresVersionOrDefault())
+
+	var cfg AzureWorkloadConfig
+	assert.NoError(t, yaml.Unmarshal([]byte(`postgres_version: "17"`), &cfg))
+	assert.Equal(t, "17", cfg.PostgresVersionOrDefault())
+}

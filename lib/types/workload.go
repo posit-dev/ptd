@@ -503,6 +503,12 @@ type AzureWorkloadConfig struct {
 	NetworkTrust                        string                                `yaml:"network_trust"`
 	NvidiaGpuEnabled                    bool                                  `yaml:"nvidia_gpu_enabled"`
 	PpmFileShareSizeGib                 int                                   `yaml:"ppm_file_share_size_gib"`
+	// PostgresVersion is the Postgres major version (e.g. "17", not "17.2") of both
+	// the main and grafana Flexible Servers. Raising it performs an in-place,
+	// irreversible major version upgrade with downtime on both servers; preview with
+	// --dry-run first. Must be >= the servers' live major version (Azure rejects
+	// downgrades). Defaults to "14" when unset; resolve via PostgresVersionOrDefault.
+	PostgresVersion string `yaml:"postgres_version"`
 	// RootDomain, when set, is used as the sole cert-manager domain instead of per-site domains.
 	// Mirrors Python: AzureWorkloadConfig.root_domain (via WorkloadConfig.domains fallback).
 	RootDomain *string `yaml:"root_domain"`
@@ -655,6 +661,12 @@ func (c AzureWorkloadConfig) AnyClusterExternalSecretsEnabled() bool {
 		}
 	}
 	return false
+}
+
+// PostgresVersionOrDefault resolves the Postgres Flexible Server major version
+// (default "14").
+func (c AzureWorkloadConfig) PostgresVersionOrDefault() string {
+	return crStringDefault(c.PostgresVersion, "14")
 }
 
 type SiteConfig struct {
