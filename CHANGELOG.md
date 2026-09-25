@@ -1,3 +1,10 @@
+# [1.44.0](https://github.com/posit-dev/ptd/compare/v1.43.1...v1.44.0) (2026-09-25)
+
+
+### Features
+
+* **azure:** make Postgres Flexible Server version configurable via postgres_version ([8eb1030](https://github.com/posit-dev/ptd/commit/8eb1030fb41ad1f17ca82922b90fdce3d892e3bb))
+
 ## [1.43.1](https://github.com/posit-dev/ptd/compare/v1.43.0...v1.43.1) (2026-09-23)
 
 
