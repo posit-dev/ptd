@@ -232,7 +232,7 @@ func TestBuildAWSSiteSpecSessionTolerations(t *testing.T) {
 
 	clusterCfg := types.AWSWorkloadClusterSpec{
 		KarpenterConfig: &types.KarpenterConfig{
-			NodePools: []types.KarpenterNodePool{{SessionTaints: true}},
+			NodePools: []types.KarpenterNodePool{{Name: "session-pool", SessionTaints: true}},
 		},
 	}
 	spec := buildAWSSiteSpec(params, "arn:aws:secretsmanager:us-east-1:123456789012:secret:db", "20250101", "main", types.SiteConfigSpec{Domain: "d.example.com"}, clusterCfg)
@@ -244,6 +244,34 @@ func TestBuildAWSSiteSpecSessionTolerations(t *testing.T) {
 	assert.Equal(t, "Equal", tolerations[0]["operator"])
 	assert.Equal(t, "session", tolerations[0]["value"])
 	assert.Equal(t, "NoSchedule", tolerations[0]["effect"])
+
+	// Connect content pods receive the same toleration plus a nodeSelector
+	// onto the session node pool.
+	connect := spec["connect"].(map[string]interface{})
+	contentTolerations := connect["contentTolerations"].([]map[string]interface{})
+	require.Len(t, contentTolerations, 1)
+	assert.Equal(t, "workload-type", contentTolerations[0]["key"])
+	assert.Equal(t, "Equal", contentTolerations[0]["operator"])
+	assert.Equal(t, "session", contentTolerations[0]["value"])
+	assert.Equal(t, "NoSchedule", contentTolerations[0]["effect"])
+	nodeSelector := connect["contentNodeSelector"].(map[string]string)
+	assert.Equal(t, "session-pool", nodeSelector["karpenter.sh/nodepool"])
+}
+
+func TestBuildAWSSiteSpecNoConnectWithoutSessionTaints(t *testing.T) {
+	params := minimalAWSSiteParams("myworkload", []string{"20250101"}, []string{"main"})
+
+	clusterCfg := types.AWSWorkloadClusterSpec{
+		KarpenterConfig: &types.KarpenterConfig{
+			NodePools: []types.KarpenterNodePool{{Name: "general", SessionTaints: false}},
+		},
+	}
+	spec := buildAWSSiteSpec(params, "arn:aws:secretsmanager:us-east-1:123456789012:secret:db", "20250101", "main", types.SiteConfigSpec{Domain: "d.example.com"}, clusterCfg)
+
+	_, hasWorkbench := spec["workbench"]
+	assert.False(t, hasWorkbench, "workbench should not be set without session taints")
+	_, hasConnect := spec["connect"]
+	assert.False(t, hasConnect, "connect should not be set without session taints")
 }
 
 // --- sessionTolerations unit tests ---
@@ -286,6 +314,36 @@ func TestSessionTolerations(t *testing.T) {
 		}
 		tols := sessionTolerations(kc)
 		require.Len(t, tols, 1)
+	})
+}
+
+// --- sessionPoolName unit tests ---
+
+func TestSessionPoolName(t *testing.T) {
+	t.Run("nil config", func(t *testing.T) {
+		assert.Equal(t, "", sessionPoolName(nil))
+	})
+
+	t.Run("no session taints", func(t *testing.T) {
+		kc := &types.KarpenterConfig{
+			NodePools: []types.KarpenterNodePool{{Name: "general", SessionTaints: false}},
+		}
+		assert.Equal(t, "", sessionPoolName(kc))
+	})
+
+	t.Run("returns name of first session-tainted pool", func(t *testing.T) {
+		kc := &types.KarpenterConfig{
+			NodePools: []types.KarpenterNodePool{
+				{Name: "general", SessionTaints: false},
+				{Name: "session-pool", SessionTaints: true},
+			},
+		}
+		assert.Equal(t, "session-pool", sessionPoolName(kc))
+	})
+
+	t.Run("empty node pools", func(t *testing.T) {
+		kc := &types.KarpenterConfig{NodePools: []types.KarpenterNodePool{}}
+		assert.Equal(t, "", sessionPoolName(kc))
 	})
 }
 
