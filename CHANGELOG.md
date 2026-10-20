@@ -1,3 +1,10 @@
+# [1.45.0](https://github.com/posit-dev/ptd/compare/v1.44.0...v1.45.0) (2026-10-20)
+
+
+### Features
+
+* **karpenter:** add optional overprovisioning_image to node pools ([1cd53c9](https://github.com/posit-dev/ptd/commit/1cd53c9d5f9ef93255f2f3b6e67ddda76c93b4f6))
+
 # [1.44.0](https://github.com/posit-dev/ptd/compare/v1.43.1...v1.44.0) (2026-09-25)
 
 
