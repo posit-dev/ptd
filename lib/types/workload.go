@@ -341,6 +341,7 @@ type KarpenterNodePool struct {
 	OverprovisioningCPURequest    *string                  `json:"overprovisioning_cpu_request" yaml:"overprovisioning_cpu_request"`
 	OverprovisioningMemoryRequest *string                  `json:"overprovisioning_memory_request" yaml:"overprovisioning_memory_request"`
 	OverprovisioningNvidiaGPU     *string                  `json:"overprovisioning_nvidia_gpu_request" yaml:"overprovisioning_nvidia_gpu_request"`
+	OverprovisioningImage         *string                  `json:"overprovisioning_image" yaml:"overprovisioning_image"`
 }
 
 type CustomRoleConfig struct {

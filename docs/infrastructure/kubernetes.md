@@ -258,6 +258,14 @@ karpenter_config:
 
 This configuration maintains 2 placeholder pods, each requesting 2 CPUs and 8GB of memory. Karpenter will provision nodes to accommodate these pods, ensuring spare capacity.
 
+Placeholder pods run `registry.k8s.io/pause:3.9` by default. If the cluster cannot pull from `registry.k8s.io` (for example, when images must come from a private registry or mirror), set `overprovisioning_image` on the NodePool:
+
+```yaml
+    - name: default-karpenter-node-pool
+      overprovisioning_replicas: 2
+      overprovisioning_image: "my-registry.example.com/pause:3.9"
+```
+
 **For GPU Pools:**
 ```yaml
 - name: gpu-g5e-karpenter-node-pool

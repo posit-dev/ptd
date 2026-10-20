@@ -1690,6 +1690,10 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 	return nil
 }
 
+// defaultOverprovisioningImage is the placeholder container used by overprovisioning
+// deployments unless a node pool sets overprovisioning_image.
+const defaultOverprovisioningImage = "registry.k8s.io/pause:3.9"
+
 func awsHelmKarpenterOverprovisioning(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName, release string,
 	karpenterCfg *types.KarpenterConfig, withAlias func(string, string) pulumi.ResourceOption) error {
 
@@ -1732,6 +1736,11 @@ func awsHelmKarpenterOverprovisioning(ctx *pulumi.Context, k8sOpt pulumi.Resourc
 		if nodePool.OverprovisioningNvidiaGPU != nil {
 			requests["nvidia.com/gpu"] = pulumi.String(*nodePool.OverprovisioningNvidiaGPU)
 			limits["nvidia.com/gpu"] = pulumi.String(*nodePool.OverprovisioningNvidiaGPU)
+		}
+
+		image := defaultOverprovisioningImage
+		if nodePool.OverprovisioningImage != nil && *nodePool.OverprovisioningImage != "" {
+			image = *nodePool.OverprovisioningImage
 		}
 
 		ovpTaints := make([]types.KarpenterTaint, 0, len(nodePool.Taints)+1)
@@ -1780,7 +1789,7 @@ func awsHelmKarpenterOverprovisioning(ctx *pulumi.Context, k8sOpt pulumi.Resourc
 						Containers: corev1.ContainerArray{
 							corev1.ContainerArgs{
 								Name:  pulumi.String("pause"),
-								Image: pulumi.String("registry.k8s.io/pause:3.9"),
+								Image: pulumi.String(image),
 								Resources: corev1.ResourceRequirementsArgs{
 									Requests: requests,
 									Limits:   limits,
