@@ -190,7 +190,7 @@ test-e2e URL="":
   echo ""
   echo "Usage:"
   echo "  just test-e2e <url>                    # Test against a specific URL"
-  echo "  just test-e2e ganso01-staging.posit.team  # Example"
+  echo "  just test-e2e testing01-staging.posit.team  # Example"
   echo ""
   echo "Or set PLAYWRIGHT_TEST_BASE_URL environment variable."
   exit 1
