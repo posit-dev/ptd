@@ -1184,7 +1184,7 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	// Build alloy config
 	domain := mainDomain(params.cfg.Sites)
 	// Python's eks_cluster_name() uses "default_{fqn}-control-plane" as the cluster label in
-	// Alloy config, where fqn = compoundName + "-" + release (e.g. ganso01-staging-20250328).
+	// Alloy config, where fqn = compoundName + "-" + release (e.g. <target>-<release>).
 	alloyClusterName := "default_" + compoundName + "-" + release + "-control-plane"
 	trueName, _ := splitCompoundName(compoundName)
 

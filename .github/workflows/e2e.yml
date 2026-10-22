@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       url:
-        description: 'Base URL to test against (e.g., ganso01-staging.posit.team)'
+        description: 'Base URL to test against (e.g., testing01-staging.posit.team)'
         required: true
         type: string
 
