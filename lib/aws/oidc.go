@@ -2,18 +2,16 @@ package aws
 
 // OIDC thumbprint computation for the EKS IAM OpenID Connect provider.
 //
-// This is a Go port of python-pulumi/src/ptd/oidc.py. Python computes the
-// thumbprint by (a) GETting the issuer's /.well-known/openid-configuration,
-// reading the netloc (host[:port]) of its jwks_uri, then (b) shelling out to the
-// `thumbprint` CLI (github.com/rstudio/goex/cmd/thumbprint) which TLS-dials that
-// netloc:443 and SHA1-hashes the LAST peer certificate the server presents.
+// The thumbprint is computed by (a) GETting the issuer's
+// /.well-known/openid-configuration and reading the netloc (host[:port]) of its
+// jwks_uri, then (b) TLS-dialing that netloc:443 and SHA1-hashing the LAST peer
+// certificate the server presents.
 //
-// We replicate that exact algorithm inline (it is ~6 lines: dial, take the last
-// peer cert, SHA1 it). We deliberately do NOT depend on the goex module — it is
-// unmaintained — and we do NOT use the Pulumi tls.GetCertificate data source,
-// which returns a different certificate chain than a raw tls.Dial and yields the
-// wrong thumbprint. The work is done in the step's pre-fetch layer (a plain
-// network dial, like the other live-state AWS lookups).
+// Keep this algorithm stable: existing OIDC providers store the value it
+// produces. Do NOT use the Pulumi tls.GetCertificate data source, which returns
+// a different certificate chain than a raw tls.Dial and yields the wrong
+// thumbprint. The work is done in the step's pre-fetch layer (a plain network
+// dial, like the other live-state AWS lookups).
 
 import (
 	"context"
@@ -28,9 +26,9 @@ import (
 )
 
 // GetOIDCThumbprint computes the CA thumbprint for an EKS cluster's OIDC issuer
-// URL, matching python-pulumi/src/ptd/oidc.py exactly. It resolves the jwks_uri
-// netloc from the issuer's OpenID configuration document, then returns the SHA1
-// fingerprint (hex) of the root certificate served by that netloc on port 443.
+// URL. It resolves the jwks_uri netloc from the issuer's OpenID configuration
+// document, then returns the SHA1 fingerprint (hex) of the root certificate
+// served by that netloc on port 443.
 func GetOIDCThumbprint(ctx context.Context, issuerURL string) (string, error) {
 	netloc, err := getNetworkLocationForOIDCEndpoint(ctx, issuerURL)
 	if err != nil {
@@ -41,11 +39,9 @@ func GetOIDCThumbprint(ctx context.Context, issuerURL string) (string, error) {
 
 // thumbprintForNetloc dials "<netloc>:443" and returns the SHA1 fingerprint (hex)
 // of the LAST peer certificate the server presents (the root/top-most cert in the
-// served chain). This is a dependency-free inline port of
-// github.com/rstudio/goex/crypto/tlsex.Thumbprint, the algorithm Python's
-// `thumbprint` CLI uses, kept identical so the computed value matches Python.
+// served chain).
 func thumbprintForNetloc(netloc string) (string, error) {
-	conn, err := tls.Dial("tcp", netloc+":443", &tls.Config{}) //nolint:gosec // zero-value tls.Config matches Python's thumbprint CLI
+	conn, err := tls.Dial("tcp", netloc+":443", &tls.Config{}) //nolint:gosec // zero-value tls.Config keeps the stored thumbprint stable
 	if err != nil {
 		return "", fmt.Errorf("aws: failed to dial %s:443 for OIDC thumbprint: %w", netloc, err)
 	}
@@ -59,12 +55,12 @@ func thumbprintForNetloc(netloc string) (string, error) {
 	return fmt.Sprintf("%x", sha1.Sum(rootCert.Raw)), nil //nolint:gosec // SHA1 required by IAM OIDC thumbprint
 }
 
-// getNetworkLocationForOIDCEndpoint ports oidc.get_network_location_for_oidc_endpoint:
-// strip trailing slashes from the issuer URL, append /.well-known/openid-configuration,
-// GET it, and return the netloc (host[:port]) of the document's jwks_uri.
+// getNetworkLocationForOIDCEndpoint strips trailing slashes from the issuer URL,
+// appends /.well-known/openid-configuration, GETs it, and returns the netloc
+// (host[:port]) of the document's jwks_uri.
 func getNetworkLocationForOIDCEndpoint(ctx context.Context, issuerURL string) (string, error) {
 	// Remove trailing slashes to avoid double slashes when appending the
-	// well-known path (mirrors Python's url.rstrip("/")).
+	// well-known path.
 	configURL := strings.TrimRight(issuerURL, "/") + "/.well-known/openid-configuration"
 
 	if !strings.HasPrefix(configURL, "http:") && !strings.HasPrefix(configURL, "https:") {
