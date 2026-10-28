@@ -1,3 +1,10 @@
+## [1.45.1](https://github.com/posit-dev/ptd/compare/v1.45.0...v1.45.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* restore helpers.OIDCThumbprint ([b3a4033](https://github.com/posit-dev/ptd/commit/b3a403396d596ab2de7f14ea4ad3aa04e649d549))
+
 # [1.45.0](https://github.com/posit-dev/ptd/compare/v1.44.0...v1.45.0) (2026-10-20)
 
 
