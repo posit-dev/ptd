@@ -1,3 +1,10 @@
+## [1.45.2](https://github.com/posit-dev/ptd/compare/v1.45.1...v1.45.2) (2026-10-29)
+
+
+### Bug Fixes
+
+* disable ECS version consistency on Tailscale subnet router ([c689a98](https://github.com/posit-dev/ptd/commit/c689a9840507e960e6c77b80ea9899fe55d27c95))
+
 ## [1.45.1](https://github.com/posit-dev/ptd/compare/v1.45.0...v1.45.1) (2026-10-28)
 
 
