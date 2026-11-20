@@ -439,6 +439,25 @@ loki.source.kubernetes "karpenter" {
     forward_to = [loki.write.local.receiver]
 }
 
+// Kubernetes events from all namespaces, retained in Loki beyond the ~1h API server event TTL.
+// Alloy runs as a DaemonSet, so every replica watches and ships the same events. Each copy is
+// byte-identical (same labels, event timestamp, and line), so Loki drops the duplicates at
+// ingest and query time. The per-component clustering block that would elect a single
+// collector requires Alloy >= v1.16.0.
+loki.source.kubernetes_events "events" {
+    forward_to = [loki.relabel.kubernetes_events.receiver]
+}
+
+loki.relabel "kubernetes_events" {
+    forward_to = [loki.write.local.receiver]
+
+    rule {
+        action       = "replace"
+        target_label = "cluster"
+        replacement  = "%s"
+    }
+}
+
 %s
 
 loki.write "local" {
@@ -481,6 +500,8 @@ loki.write "local" {
 		// pod_logs cluster label
 		params.clusterName,
 		// karpenter_logs cluster label
+		params.clusterName,
+		// kubernetes_events cluster label
 		params.clusterName,
 		// system logs config
 		systemLogsConfig,
