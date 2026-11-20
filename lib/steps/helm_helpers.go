@@ -448,6 +448,8 @@ loki.source.kubernetes_events "events" {
     forward_to = [loki.relabel.kubernetes_events.receiver]
 }
 
+// Unlike the pod and Karpenter log sources, kubernetes_events has no discovery stage and no
+// __meta_* labels, so the cluster label is added with loki.relabel instead of discovery.relabel.
 loki.relabel "kubernetes_events" {
     forward_to = [loki.write.local.receiver]
 

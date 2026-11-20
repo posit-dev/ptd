@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestBuildAlloyConfigKubernetesEvents verifies that the generated Alloy config ships
@@ -22,10 +23,10 @@ func TestBuildAlloyConfigKubernetesEvents(t *testing.T) {
 
 			assert.NotContains(t, config, "%!", "config should have no fmt verb/argument mismatches")
 
-			assert.Contains(t, config, `loki.source.kubernetes_events "events" {
+			require.Contains(t, config, `loki.source.kubernetes_events "events" {
     forward_to = [loki.relabel.kubernetes_events.receiver]
 }`)
-			assert.Contains(t, config, `loki.relabel "kubernetes_events" {
+			require.Contains(t, config, `loki.relabel "kubernetes_events" {
     forward_to = [loki.write.local.receiver]
 
     rule {
