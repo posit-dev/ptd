@@ -418,12 +418,12 @@ Starting interactive shell in /path/to/stack with session identity arn:aws:sts::
 To exit the shell, type 'exit' or press Ctrl+D
 
 # One-shot command
-$ ptd workon ganso01-staging -- kubectl get nodes
+$ ptd workon testing01-staging -- kubectl get nodes
 NAME                                          STATUS   ROLES    AGE   VERSION
 ip-10-152-102-54.us-east-2.compute.internal   Ready    <none>   9d    v1.32.9-eks-ecaa3a6
 
 # Exit code propagation
-$ ptd workon ganso01-staging -- kubectl get nonexistent; echo $?
+$ ptd workon testing01-staging -- kubectl get nonexistent; echo $?
 1
 ```
 
