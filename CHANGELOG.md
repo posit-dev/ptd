@@ -1,3 +1,10 @@
+## [1.45.3](https://github.com/posit-dev/ptd/compare/v1.45.2...v1.45.3) (2026-11-23)
+
+
+### Bug Fixes
+
+* **deps:** bump Go to 1.26.10, otel to v1.47.0, grpc-gateway to v2.32.0 ([58ed43a](https://github.com/posit-dev/ptd/commit/58ed43ac405d40f95c122359a8459513d67a0e54))
+
 ## [1.45.2](https://github.com/posit-dev/ptd/compare/v1.45.1...v1.45.2) (2026-10-29)
 
 
