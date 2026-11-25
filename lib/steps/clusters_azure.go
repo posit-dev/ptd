@@ -904,12 +904,11 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 		}
 
 		// Traefik Helm release values — mirrors azure_traefik.py _define_helm_release
-		traefikReplicas := clusterCfg.Components.ResolveAzureComponents().TraefikDeploymentReplicas
+		traefikComponents := clusterCfg.Components.ResolveAzureComponents()
+		traefikReplicas := traefikComponents.TraefikDeploymentReplicas
 		traefikValues := pulumi.Map{
-			"logs": pulumi.Map{
-				"general": pulumi.Map{
-					"level": pulumi.String("DEBUG"),
-				},
+			"log": pulumi.Map{
+				"level": pulumi.String("DEBUG"),
 			},
 			// HA hardening: run multiple replicas spread across nodes with resource
 			// requests (Burstable QoS) and a PDB so no single node failure/saturation
@@ -940,17 +939,21 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 			"priorityClassName": pulumi.String("traefik-critical"),
 			"ports": pulumi.Map{
 				"web": pulumi.Map{
-					"redirections": pulumi.Map{
-						"entryPoint": pulumi.Map{
-							"to":        pulumi.String("websecure"),
-							"scheme":    pulumi.String("https"),
-							"permanent": pulumi.Bool(true),
+					"http": pulumi.Map{
+						"redirections": pulumi.Map{
+							"entryPoint": pulumi.Map{
+								"to":        pulumi.String("websecure"),
+								"scheme":    pulumi.String("https"),
+								"permanent": pulumi.Bool(true),
+							},
 						},
 					},
 				},
 				"websecure": pulumi.Map{
-					"tls": pulumi.Map{
-						"enabled": pulumi.Bool(true),
+					"http": pulumi.Map{
+						"tls": pulumi.Map{
+							"enabled": pulumi.Bool(true),
+						},
 					},
 				},
 			},
@@ -972,17 +975,24 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 					"enabled": pulumi.Bool(true),
 				},
 			},
+			// chart 41 moved the service type under service.spec. The chart does not
+			// reject a stale top-level service.type (the service block allows
+			// unknown keys), it silently ignores it and falls back to the chart
+			// default, so this key has to live under spec.
 			"service": pulumi.Map{
 				"annotations": pulumi.Map{
 					"service.beta.kubernetes.io/azure-load-balancer-internal": pulumi.String("true"),
 				},
-				"type": pulumi.String("LoadBalancer"),
+				"spec": pulumi.Map{
+					"type": pulumi.String("LoadBalancer"),
+				},
 			},
 		}
 		if !params.thirdPartyTelemetryEnabled {
-			traefikValues["globalArguments"] = pulumi.Array{
-				pulumi.String("--global.checknewversion=false"),
-				pulumi.String("--global.sendanonymoususage=false"),
+			// chart 41 replaced the raw globalArguments CLI flags with a typed global block.
+			traefikValues["global"] = pulumi.Map{
+				"checkNewVersion":    pulumi.Bool(false),
+				"sendAnonymousUsage": pulumi.Bool(false),
 			}
 		}
 
@@ -1073,17 +1083,29 @@ func azureClustersDeploy(ctx *pulumi.Context, _ types.Target, params azureCluste
 			return fmt.Errorf("clusters: failed to create traefik priority class for %s: %w", release, err)
 		}
 
+		// The chart's bundled crds/ are install-only, so manage the traefik.io
+		// CRDs here instead, through a dedicated server-side-apply provider.
+		traefikCRDProvider, err := newTraefikCRDProvider(ctx, k8sProviderName, params.kubeconfigsByCluster[release])
+		if err != nil {
+			return err
+		}
+		traefikCRDs, err := deployTraefikCRDs(ctx,
+			fmt.Sprintf("%s-%s-traefik-crds", name, release), pulumi.Provider(traefikCRDProvider))
+		if err != nil {
+			return err
+		}
+
 		_, err = helmv3.NewRelease(ctx, fmt.Sprintf("%s-%s-traefik", name, release), &helmv3.ReleaseArgs{
 			Name:      pulumi.String("traefik"),
 			Chart:     pulumi.String("traefik"),
-			Version:   pulumi.String("33.2.1"),
+			Version:   pulumi.String(traefikComponents.TraefikVersion),
 			Namespace: pulumi.String(clustersTraefikNamespace),
 			RepositoryOpts: &helmv3.RepositoryOptsArgs{
 				Repo: pulumi.String("https://traefik.github.io/charts"),
 			},
 			Atomic: pulumi.Bool(true),
 			Values: traefikValues,
-		}, k8sProviderOpt, withTraefikAlias(), pulumi.DependsOn([]pulumi.Resource{traefikPC}))
+		}, k8sProviderOpt, withTraefikAlias(), pulumi.DependsOn([]pulumi.Resource{traefikPC, traefikCRDs}))
 		if err != nil {
 			return fmt.Errorf("clusters: failed to create traefik helm release for %s: %w", release, err)
 		}

@@ -144,6 +144,19 @@ spec:
         domain: analytics-dev.example.com
 ```
 
+### Azure Postgres version (`postgres_version`)
+
+For `AzureWorkloadConfig`, `postgres_version` sets the Postgres Flexible Server major version for both the main and grafana servers. It takes a major version only (e.g. `"17"`, not `"17.2"`) and defaults to `"14"` when unset.
+
+```yaml
+spec:
+  postgres_version: "17"
+```
+
+Raising it performs an in-place, irreversible major version upgrade with downtime on both servers. The value must be greater than or equal to the servers' live major version (Azure rejects downgrades).
+
+Preview first with `ptd ensure <target> --only-steps persistent --dry-run`. If the step has unrelated pending changes, scope the apply to the two servers with `--target-resources <main Server URN>,<grafana Server URN>`.
+
 ## Adopting `ignore_tags` on an existing target
 
 `ignore_tags` is enforced by the AWS provider's `ignoreTags`, which only takes

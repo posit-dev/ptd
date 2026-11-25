@@ -9,8 +9,8 @@ This guide walks you through setting up PTD to deploy Posit Team products on AWS
 | Tool | Version | Description |
 |------|---------|-------------|
 | [Go](https://golang.org/dl/) | 1.21+ | For building the CLI |
-| [Python](https://www.python.org/downloads/) | 3.12+ | For Pulumi IaC |
-| [uv](https://github.com/astral-sh/uv) | Latest | Python package manager |
+| [Python](https://www.python.org/downloads/) | 3.12+ | For the Playwright e2e test suite |
+| [uv](https://github.com/astral-sh/uv) | Latest | Python package manager (e2e tests) |
 | [Pulumi](https://www.pulumi.com/docs/get-started/install/) | 3.x | Infrastructure as Code |
 | [just](https://github.com/casey/just) | Latest | Command runner |
 | [goreleaser](https://goreleaser.com/install/) | Latest | For building releases |
@@ -44,7 +44,6 @@ just deps
 ```
 
 This installs:
-- Python dependencies via uv
 - Go dependencies
 - Required CLI tools symlinked to `.local/bin/`
 

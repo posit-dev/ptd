@@ -1,3 +1,85 @@
+## [1.45.3](https://github.com/posit-dev/ptd/compare/v1.45.2...v1.45.3) (2026-11-23)
+
+
+### Bug Fixes
+
+* **deps:** bump Go to 1.26.10, otel to v1.47.0, grpc-gateway to v2.32.0 ([58ed43a](https://github.com/posit-dev/ptd/commit/58ed43ac405d40f95c122359a8459513d67a0e54))
+
+## [1.45.2](https://github.com/posit-dev/ptd/compare/v1.45.1...v1.45.2) (2026-10-29)
+
+
+### Bug Fixes
+
+* disable ECS version consistency on Tailscale subnet router ([c689a98](https://github.com/posit-dev/ptd/commit/c689a9840507e960e6c77b80ea9899fe55d27c95))
+
+## [1.45.1](https://github.com/posit-dev/ptd/compare/v1.45.0...v1.45.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* restore helpers.OIDCThumbprint ([b3a4033](https://github.com/posit-dev/ptd/commit/b3a403396d596ab2de7f14ea4ad3aa04e649d549))
+
+# [1.45.0](https://github.com/posit-dev/ptd/compare/v1.44.0...v1.45.0) (2026-10-20)
+
+
+### Features
+
+* **karpenter:** add optional overprovisioning_image to node pools ([1cd53c9](https://github.com/posit-dev/ptd/commit/1cd53c9d5f9ef93255f2f3b6e67ddda76c93b4f6))
+
+# [1.44.0](https://github.com/posit-dev/ptd/compare/v1.43.1...v1.44.0) (2026-09-25)
+
+
+### Features
+
+* **azure:** make Postgres Flexible Server version configurable via postgres_version ([8eb1030](https://github.com/posit-dev/ptd/commit/8eb1030fb41ad1f17ca82922b90fdce3d892e3bb))
+
+## [1.43.1](https://github.com/posit-dev/ptd/compare/v1.43.0...v1.43.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* **aks:** cordon undrainable nodes instead of failing pool upgrades ([3fbe9b1](https://github.com/posit-dev/ptd/commit/3fbe9b1122106086d4900344a92a9233f66f621f))
+
+# [1.43.0](https://github.com/posit-dev/ptd/compare/v1.42.1...v1.43.0) (2026-09-18)
+
+
+### Bug Fixes
+
+* **traefik:** deduplicate the control-room prometheus metrics flag ([337ca89](https://github.com/posit-dev/ptd/commit/337ca89aac434461e542ad4af96199a9170de5f0))
+
+
+### Features
+
+* **cluster:** add a PodDisruptionBudget to the control-room Traefik ([7432f75](https://github.com/posit-dev/ptd/commit/7432f75dd0613b3e00eb3d9f142268f171beebcb))
+* **traefik:** bump to chart 41.6.0 (Traefik v3.7.13) ([3253763](https://github.com/posit-dev/ptd/commit/3253763a9312e7b3ac37731d92657ef29e6290f9))
+* **traefik:** manage the CRDs as Pulumi resources ([72238e8](https://github.com/posit-dev/ptd/commit/72238e8630d0cdebb76f3fb2e2b19aa466fe655b))
+
+## [1.42.1](https://github.com/posit-dev/ptd/compare/v1.42.0...v1.42.1) (2026-09-02)
+
+
+### Bug Fixes
+
+* **deps:** bump Go to 1.26.6 for stdlib security fixes ([501bed0](https://github.com/posit-dev/ptd/commit/501bed04093a7c244979f3ae490debe85f5dee31))
+* **deps:** bump golang.org/x deps to clear Snyk advisories ([c1bcbbe](https://github.com/posit-dev/ptd/commit/c1bcbbe8b6a7c2f343e11dbf9813395ca17ab5e2))
+* **deps:** bump google.golang.org/grpc to v1.83.2 ([e20d6f9](https://github.com/posit-dev/ptd/commit/e20d6f9ef97ec08c1a955742865122bb022ec052)), closes [hi#severity](https://github.com/hi/issues/severity)
+* **deps:** bump klauspost/compress in the example custom step ([83e1f00](https://github.com/posit-dev/ptd/commit/83e1f0083a6bf4b4d98166936a8335c99922f684))
+
+# [1.42.0](https://github.com/posit-dev/ptd/compare/v1.41.1...v1.42.0) (2026-08-12)
+
+
+### Features
+
+* **azure:** pin TLS 1.2 and HTTPS-only on state storage account ([ea28ad7](https://github.com/posit-dev/ptd/commit/ea28ad7be81dd48021cc25110744524b2a27fd93))
+
+## [1.41.1](https://github.com/posit-dev/ptd/compare/v1.41.0...v1.41.1) (2026-08-07)
+
+
+### Bug Fixes
+
+* **eks:** bound csi-node-driver and correct the calico-node CPU rationale ([1dba167](https://github.com/posit-dev/ptd/commit/1dba1676277f8afd77ab693c156121ce779e5407))
+* **eks:** set resource requests/limits for Calico/Tigera components ([6fa81e6](https://github.com/posit-dev/ptd/commit/6fa81e6bc8d6e141289be7442bb6a09b7f0fd98c))
+* **eks:** size Calico memory bounds from measured usage ([33f64e2](https://github.com/posit-dev/ptd/commit/33f64e2696c53308a15336d5cec4eaa753a785b2))
+
 # [1.41.0](https://github.com/posit-dev/ptd/compare/v1.40.2...v1.41.0) (2026-08-07)
 
 

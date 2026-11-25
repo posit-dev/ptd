@@ -2,14 +2,20 @@ package steps
 
 import (
 	"context"
+	"errors"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/posit-dev/ptd/lib/helpers"
 	"github.com/posit-dev/ptd/lib/types"
 	"github.com/posit-dev/ptd/lib/types/typestest"
 )
@@ -456,4 +462,61 @@ func TestWorkspacesStepNotControlRoom(t *testing.T) {
 	step.Set(tgt, nil, StepOptions{})
 	err := step.Run(context.Background())
 	assert.ErrorContains(t, err, "control room")
+}
+
+// writeControlRoomConfig writes a control-room ptd.yaml with the given spec body
+// into a temp targets dir and points viper at it for the duration of the test, so
+// helpers.ConfigForTarget(target) loads it. specBody is the YAML under `spec:`.
+func writeControlRoomConfig(t *testing.T, name, specBody string) {
+	t.Helper()
+	dir := t.TempDir()
+	crDir := filepath.Join(dir, helpers.CtrlDir, name)
+	require.NoError(t, os.MkdirAll(crDir, 0o755))
+	body := "apiVersion: ptd/v1\nkind: AWSControlRoomConfig\nspec:\n" + specBody
+	require.NoError(t, os.WriteFile(filepath.Join(crDir, "ptd.yaml"), []byte(body), 0o644))
+
+	orig := viper.GetString("targets_config_dir")
+	viper.Set("targets_config_dir", dir)
+	t.Cleanup(func() { viper.Set("targets_config_dir", orig) })
+}
+
+// TestWorkspacesStepDisabledNoOp verifies that a control room with
+// workspaces_enabled: false cleanly no-ops: Run returns nil and never fetches
+// credentials or creates a Pulumi stack. This gate covers both the apply and
+// destroy paths, since it precedes any credential fetch or stack creation.
+func TestWorkspacesStepDisabledNoOp(t *testing.T) {
+	writeControlRoomConfig(t, "main01-staging", "  workspaces_enabled: false\n")
+
+	tgt := mockAWSControlRoomTarget("main01-staging")
+
+	step := &WorkspacesStep{}
+	step.Set(tgt, nil, StepOptions{})
+	err := step.Run(context.Background())
+
+	require.NoError(t, err)
+	// The gate must short-circuit before any credential fetch (and therefore
+	// before any Pulumi stack create/preview/destroy).
+	tgt.AssertNotCalled(t, "Credentials")
+}
+
+// TestWorkspacesStepEnabledGetsPastGate verifies that a control room with the
+// toggle unset (default on) does NOT short-circuit: Run proceeds past the gate and
+// attempts to fetch credentials. Credentials are stubbed to fail so the test does
+// not need real cloud/Pulumi wiring; asserting Credentials is called proves the
+// gate did not skip the step.
+func TestWorkspacesStepEnabledGetsPastGate(t *testing.T) {
+	// No workspaces_enabled key => nil => WorkspacesIsEnabled() true (default on).
+	writeControlRoomConfig(t, "main01-staging", "  region: us-east-1\n")
+
+	tgt := mockAWSControlRoomTarget("main01-staging")
+	tgt.On("Credentials", mock.Anything).
+		Return(typestest.DefaultCredentials(), errors.New("creds unavailable in unit test"))
+
+	step := &WorkspacesStep{}
+	step.Set(tgt, nil, StepOptions{})
+	err := step.Run(context.Background())
+
+	// It got past the gate and tried (and failed) to fetch credentials.
+	require.ErrorContains(t, err, "creds unavailable in unit test")
+	tgt.AssertCalled(t, "Credentials", mock.Anything)
 }

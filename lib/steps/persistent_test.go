@@ -598,3 +598,70 @@ func TestAWSWorkloadPersistentDeploy_SingleAZFSx(t *testing.T) {
 	// Single-AZ FSx uses the bare "<cn>" logical name (not "<cn>-filesystem").
 	assert.False(t, names[cn+"-filesystem"], "single-AZ must not create the multi-AZ <cn>-filesystem")
 }
+
+func TestAzureWorkloadPersistentDeploy_PostgresVersion(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		configured string
+		want       string
+	}{
+		{name: "unset defaults to 14", configured: "", want: "14"},
+		{name: "14", configured: "14", want: "14"},
+		{name: "17", configured: "17", want: "17"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mocks := &azurePersistentMocks{}
+			params := baseAzureWorkloadPersistentParams()
+			params.cfg.PostgresVersion = tc.configured
+
+			err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+				tgt := mockAWSWorkloadTarget(params.compoundName)
+				return azureWorkloadPersistentDeploy(ctx, tgt, params)
+			}, pulumi.WithMocks("ptd-azure-workload-persistent", "demo01-staging", mocks))
+			require.NoError(t, err)
+
+			mocks.mu.Lock()
+			defer mocks.mu.Unlock()
+			servers := 0
+			for _, r := range mocks.resources {
+				if r.TypeToken == "azure-native:dbforpostgresql:Server" {
+					servers++
+					v := r.Inputs["version"]
+					assert.True(t, v.IsString(), "%s: version must be a string", r.Name)
+					assert.Equal(t, tc.want, v.StringValue(), "%s: postgres version", r.Name)
+				}
+			}
+			assert.Equal(t, 2, servers, "main and grafana postgres servers")
+		})
+	}
+}
+
+func TestValidateAzurePostgresVersion(t *testing.T) {
+	for _, tc := range []struct {
+		version string
+		wantErr bool
+	}{
+		{version: "", wantErr: false},
+		{version: "13", wantErr: false},
+		{version: "14", wantErr: false},
+		{version: "17", wantErr: false},
+		{version: "18", wantErr: false},
+		{version: "17.2", wantErr: true},
+		{version: "10", wantErr: true},
+		{version: "abc", wantErr: true},
+		{version: "v17", wantErr: true},
+		{version: " 17", wantErr: true},
+	} {
+		t.Run(tc.version, func(t *testing.T) {
+			err := validateAzurePostgresVersion(tc.version)
+			if tc.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "postgres_version")
+				assert.Contains(t, err.Error(), `"`+tc.version+`"`)
+				assert.Contains(t, err.Error(), "major version only")
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

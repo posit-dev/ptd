@@ -547,6 +547,18 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 		return fmt.Errorf("helm: failed to create traefik namespace: %w", err)
 	}
 
+	// The chart's bundled crds/ are install-only, so manage the traefik.io CRDs
+	// here instead, through a dedicated server-side-apply provider.
+	crdBaseName := compoundName + "-" + release
+	crdProvider, err := newTraefikCRDProvider(ctx, crdBaseName, params.kubeconfigsByCluster[release])
+	if err != nil {
+		return err
+	}
+	crds, err := deployTraefikCRDs(ctx, crdBaseName+"-traefik-crds", pulumi.Provider(crdProvider))
+	if err != nil {
+		return err
+	}
+
 	// Dedicated cluster-scoped PriorityClass so Traefik ingress pods are protected
 	// from eviction under node pressure. Value sits below the reserved system-*
 	// range (system-cluster-critical = 2000000000) but high enough to outrank
@@ -597,10 +609,8 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 			"maxUnavailable": 1,
 		},
 		"priorityClassName": "traefik-critical",
-		"logs": map[string]interface{}{
-			"access":  map[string]interface{}{"enabled": true},
-			"general": map[string]interface{}{"level": "DEBUG"},
-		},
+		"log":               map[string]interface{}{"level": "DEBUG"},
+		"accessLog":         map[string]interface{}{"enabled": true},
 		"ingressClass": map[string]interface{}{
 			"enabled":        true,
 			"isDefaultClass": true,
@@ -621,12 +631,20 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 				"nodePort": 32090,
 			},
 		},
-		"service": map[string]interface{}{"type": "NodePort"},
+		// chart 41 moved the service type under service.spec. The chart does not
+		// reject a stale top-level service.type (the service block allows unknown
+		// keys), it silently ignores it and falls back to the chart default of
+		// LoadBalancer, which would expose this Traefik publicly instead of keeping
+		// it a NodePort behind the ALB.
+		"service": map[string]interface{}{
+			"spec": map[string]interface{}{"type": "NodePort"},
+		},
 	}
 	if !isThirdPartyTelemetryEnabled(params.cfg.ThirdPartyTelemetryEnabled) {
-		traefikValues["globalArguments"] = []interface{}{
-			"--global.checknewversion=false",
-			"--global.sendanonymoususage=false",
+		// chart 41 replaced the raw globalArguments CLI flags with a typed global block.
+		traefikValues["global"] = map[string]interface{}{
+			"checkNewVersion":    false,
+			"sendAnonymousUsage": false,
 		}
 	}
 
@@ -657,7 +675,7 @@ func awsHelmTraefik(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundN
 			"spec": chartSpec,
 		},
 	}, k8sOpt, withAlias("kubernetes:helm.cattle.io/v1:HelmChart", chartResourceName),
-		pulumi.DependsOn([]pulumi.Resource{ns, pc}))
+		pulumi.DependsOn([]pulumi.Resource{ns, pc, crds}))
 	if err != nil {
 		return fmt.Errorf("helm: failed to create traefik chart: %w", err)
 	}
@@ -1182,7 +1200,7 @@ func awsHelmAlloy(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundNam
 	// Build alloy config
 	domain := mainDomain(params.cfg.Sites)
 	// Python's eks_cluster_name() uses "default_{fqn}-control-plane" as the cluster label in
-	// Alloy config, where fqn = compoundName + "-" + release (e.g. ganso01-staging-20250328).
+	// Alloy config, where fqn = compoundName + "-" + release (e.g. <target>-<release>).
 	alloyClusterName := "default_" + compoundName + "-" + release + "-control-plane"
 	trueName, _ := splitCompoundName(compoundName)
 
@@ -1688,6 +1706,10 @@ func awsHelmKarpenter(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoun
 	return nil
 }
 
+// defaultOverprovisioningImage is the placeholder container used by overprovisioning
+// deployments unless a node pool sets overprovisioning_image.
+const defaultOverprovisioningImage = "registry.k8s.io/pause:3.9"
+
 func awsHelmKarpenterOverprovisioning(ctx *pulumi.Context, k8sOpt pulumi.ResourceOption, compoundName, release string,
 	karpenterCfg *types.KarpenterConfig, withAlias func(string, string) pulumi.ResourceOption) error {
 
@@ -1730,6 +1752,11 @@ func awsHelmKarpenterOverprovisioning(ctx *pulumi.Context, k8sOpt pulumi.Resourc
 		if nodePool.OverprovisioningNvidiaGPU != nil {
 			requests["nvidia.com/gpu"] = pulumi.String(*nodePool.OverprovisioningNvidiaGPU)
 			limits["nvidia.com/gpu"] = pulumi.String(*nodePool.OverprovisioningNvidiaGPU)
+		}
+
+		image := defaultOverprovisioningImage
+		if nodePool.OverprovisioningImage != nil && *nodePool.OverprovisioningImage != "" {
+			image = *nodePool.OverprovisioningImage
 		}
 
 		ovpTaints := make([]types.KarpenterTaint, 0, len(nodePool.Taints)+1)
@@ -1778,7 +1805,7 @@ func awsHelmKarpenterOverprovisioning(ctx *pulumi.Context, k8sOpt pulumi.Resourc
 						Containers: corev1.ContainerArray{
 							corev1.ContainerArgs{
 								Name:  pulumi.String("pause"),
-								Image: pulumi.String("registry.k8s.io/pause:3.9"),
+								Image: pulumi.String(image),
 								Resources: corev1.ResourceRequirementsArgs{
 									Requests: requests,
 									Limits:   limits,

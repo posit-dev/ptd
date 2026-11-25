@@ -156,8 +156,19 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 				},
 				Tags: buildResourceTags(config.ResourceTags),
 				Type: pulumi.String(containerservice.AgentPoolTypeVirtualMachineScaleSets),
+				// A node whose pods cannot be evicted (e.g. Workbench session pods
+				// covered by a PodDisruptionBudget that never permits a disruption)
+				// otherwise fails the whole upgrade after the 30m default drain
+				// timeout, wedging the pool in a Failed state. Cordon and skip such
+				// nodes instead, and give up on draining them sooner.
+				//
+				// NOTE: agentPoolProfiles is added to ignoreChanges below, so these
+				// values only apply when a cluster is first created. Existing
+				// clusters keep whatever their system pool already has.
 				UpgradeSettings: &containerservice.AgentPoolUpgradeSettingsArgs{
-					MaxSurge: pulumi.String("10%"),
+					DrainTimeoutInMinutes:   pulumi.Int(10),
+					MaxSurge:                pulumi.String("10%"),
+					UndrainableNodeBehavior: pulumi.String(containerservice.UndrainableNodeBehaviorCordon),
 				},
 				VmSize:       pulumi.String(clusterConfig.SystemNodePoolInstanceType),
 				VnetSubnetID: pulumi.String(subnetId),
@@ -354,8 +365,15 @@ func (s *AKSStep) deploy(ctx *pulumi.Context, target types.Target) error {
 					},
 					Tags: buildResourceTags(config.ResourceTags),
 					Type: pulumi.String(containerservice.AgentPoolTypeVirtualMachineScaleSets),
+					// A node whose pods cannot be evicted (e.g. Workbench session pods
+					// covered by a PodDisruptionBudget that never permits a disruption)
+					// otherwise fails the whole upgrade after the 30m default drain
+					// timeout, wedging the pool in a Failed state. Cordon and skip such
+					// nodes instead, and give up on draining them sooner.
 					UpgradeSettings: &containerservice.AgentPoolUpgradeSettingsArgs{
-						MaxSurge: pulumi.String("10%"),
+						DrainTimeoutInMinutes:   pulumi.Int(10),
+						MaxSurge:                pulumi.String("10%"),
+						UndrainableNodeBehavior: pulumi.String(containerservice.UndrainableNodeBehaviorCordon),
 					},
 					VmSize:       pulumi.String(poolConfig.VMSize),
 					VnetSubnetID: pulumi.String(subnetId),

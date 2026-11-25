@@ -262,7 +262,7 @@ organization/<project>/<stack>
 ```
 
 **Where:**
-- `organization`: Always `"organization"` (hardcoded in `lib/pulumi/python.go:40`)
+- `organization`: Always `"organization"` (hardcoded in `lib/pulumi/common.go:40`)
 - `project`: `ptd-<cloud>-<target-type>-<step-name>`
   - Example: `ptd-aws-workload-persistent`
 - `stack`: `<target-name>`
@@ -273,7 +273,7 @@ organization/<project>/<stack>
 organization/ptd-aws-workload-persistent/myworkload-staging
 ```
 
-**Code location:** `lib/pulumi/python.go:38-40`
+**Code location:** `lib/pulumi/common.go:38-40`
 
 ---
 
@@ -402,5 +402,5 @@ See [CLAUDE.md](../../CLAUDE.md) for more debugging commands.
 ---
 
 ## Related documentation
-- [Config Flow](./config-flow.md) - How configuration flows from YAML to Go to Python
+- [Config Flow](./config-flow.md) - How configuration flows from YAML through the Go CLI into the inline-Go Pulumi steps
 - [Pulumi Conventions](./pulumi-conventions.md) - Pulumi-specific patterns

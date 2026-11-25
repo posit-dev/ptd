@@ -6,7 +6,7 @@ This document explains how configuration flows from YAML files through the Go CL
 
 PTD configuration is parsed once, by the Go CLI. The Go structs in `lib/types/*.go` are the sole source of truth for ptd.yaml config. The parsed structs drive both orchestration decisions (which steps to run, credentials, backend) and the inline-Go Pulumi programs that create cloud resources.
 
-There is no longer a second parser. (Historically a parallel Python layer re-read the same YAML into dataclasses; that layer and its Go↔Python parity linter were removed when Python was deleted from the repo.)
+There is no longer a second parser. (Historically a parallel Python layer re-read the same YAML into dataclasses; that layer and its Go↔Python parity linter were removed when the Python Pulumi layer was deleted from the repo.)
 
 ## Configuration flow diagram
 

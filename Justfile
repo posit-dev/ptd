@@ -190,7 +190,7 @@ test-e2e URL="":
   echo ""
   echo "Usage:"
   echo "  just test-e2e <url>                    # Test against a specific URL"
-  echo "  just test-e2e ganso01-staging.posit.team  # Example"
+  echo "  just test-e2e testing01-staging.posit.team  # Example"
   echo ""
   echo "Or set PLAYWRIGHT_TEST_BASE_URL environment variable."
   exit 1
@@ -204,6 +204,31 @@ cli:
   mkdir -p .local/bin
   goreleaser build --single-target --snapshot --clean -o .local/bin/ptd
   {{ if os() == "macos" { "codesign --force --sign - .local/bin/ptd 2>/dev/null" } else { "true" } }}
+
+# Run this whenever traefik_version moves; see docs/infrastructure/traefik-crds.md.
+# Re-vendor the traefik.io CRDs from a Traefik chart version
+[group('build')]
+refresh-traefik-crds version:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  dir='{{ justfile_directory() }}/lib/steps/assets/traefik_crds'
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+
+  helm pull traefik \
+    --repo https://traefik.github.io/charts \
+    --version '{{ version }}' --untar --untardir "$tmp"
+
+  # Copy the chart's own crds/ files verbatim, so the vendored copies match
+  # upstream byte for byte and a refresh diff shows exactly what changed.
+  # The hub.traefik.io CRDs are skipped: PTD does not use Traefik Hub.
+  mkdir -p "$dir"
+  rm -f "$dir"/*.yaml
+  cp "$tmp"/traefik/crds/traefik.io_*.yaml "$dir"/
+
+  printf 'Vendored Traefik %s CRDs into %s:\n' '{{ version }}' "$dir"
+  ls -1 "$dir"
 
 #############################################################################
 # Check targets

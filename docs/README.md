@@ -11,7 +11,7 @@ Welcome to the Posit Team Dedicated (PTD) documentation.
 
 ### Architecture
 
-- [Config Flow](architecture/config-flow.md) - How configuration flows from YAML through Go to Python
+- [Config Flow](architecture/config-flow.md) - How configuration flows from YAML through the Go CLI into the inline-Go Pulumi steps
 - [Step Dependencies](architecture/step-dependencies.md) - The step execution pipeline and dependencies
 - [Pulumi Conventions](architecture/pulumi-conventions.md) - Pulumi-specific patterns and resource naming
 

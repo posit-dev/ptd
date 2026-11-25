@@ -53,7 +53,7 @@ func runAwsHelmTraefik(t *testing.T, replicas int) *helmAWSMocks {
 			environment:  "staging",
 			cfg:          types.AWSWorkloadConfig{},
 		}
-		return awsHelmTraefik(ctx, noopOpt, "wl01-staging", "20250101", params, "100", "37.1.2", replicas, withAlias)
+		return awsHelmTraefik(ctx, noopOpt, "wl01-staging", "20250101", params, "100", "41.6.0", replicas, withAlias)
 	}, pulumi.WithMocks("ptd-aws-workload-helm", "wl01-staging", mocks))
 	require.NoError(t, err)
 	return mocks
@@ -240,4 +240,46 @@ func TestGrafanaIngressValues(t *testing.T) {
 		assert.Equal(t, []interface{}{"grafana.example.com"}, ingress["hosts"])
 		assert.Equal(t, "/", ingress["path"])
 	})
+}
+
+// runAwsHelmKarpenterOverprovisioning invokes awsHelmKarpenterOverprovisioning in isolation.
+func runAwsHelmKarpenterOverprovisioning(t *testing.T, nodePools []types.KarpenterNodePool) *helmAWSMocks {
+	t.Helper()
+	mocks := &helmAWSMocks{}
+	noopOpt := pulumi.Aliases(nil)
+	withAlias := func(string, string) pulumi.ResourceOption { return pulumi.Aliases(nil) }
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		cfg := &types.KarpenterConfig{NodePools: nodePools}
+		return awsHelmKarpenterOverprovisioning(ctx, noopOpt, "wl01-staging", "20250101", cfg, withAlias)
+	}, pulumi.WithMocks("ptd-aws-workload-helm", "wl01-staging", mocks))
+	require.NoError(t, err)
+	return mocks
+}
+
+// overprovisioningImage returns the container image of an overprovisioning Deployment.
+func overprovisioningImage(t *testing.T, mocks *helmAWSMocks, name string) string {
+	t.Helper()
+	dep := mocks.find(name)
+	require.NotNil(t, dep, "overprovisioning Deployment %s not created", name)
+	podSpec := dep.Inputs["spec"].ObjectValue()["template"].ObjectValue()["spec"].ObjectValue()
+	containers := podSpec["containers"].ArrayValue()
+	require.Len(t, containers, 1)
+	return containers[0].ObjectValue()["image"].StringValue()
+}
+
+func TestAwsHelmKarpenterOverprovisioningImage(t *testing.T) {
+	custom := "my-registry.example.com/pause:3.9"
+	empty := ""
+	mocks := runAwsHelmKarpenterOverprovisioning(t, []types.KarpenterNodePool{
+		{Name: "default-pool", OverprovisioningReplicas: 1},
+		{Name: "custom-pool", OverprovisioningReplicas: 1, OverprovisioningImage: &custom},
+		{Name: "empty-pool", OverprovisioningReplicas: 1, OverprovisioningImage: &empty},
+	})
+
+	assert.Equal(t, defaultOverprovisioningImage,
+		overprovisioningImage(t, mocks, "wl01-staging-20250101-default-pool-overprovisioning"))
+	assert.Equal(t, custom,
+		overprovisioningImage(t, mocks, "wl01-staging-20250101-custom-pool-overprovisioning"))
+	assert.Equal(t, defaultOverprovisioningImage,
+		overprovisioningImage(t, mocks, "wl01-staging-20250101-empty-pool-overprovisioning"))
 }

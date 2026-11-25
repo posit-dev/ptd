@@ -1614,6 +1614,9 @@ func buildPersistentTailscale(
 				"name":      "tailscale",
 				"image":     "tailscale/tailscale:stable",
 				"essential": true,
+				// Without this, ECS pins the image tag to a digest and
+				// maintenance no longer pulls the latest stable release.
+				"versionConsistency": "disabled",
 				"environment": []map[string]interface{}{
 					{"name": "TS_HOSTNAME", "value": fmt.Sprintf("%s-%s-%s", cn, regionName, params.accountID)},
 					{"name": "TS_ROUTES", "value": cidr},
