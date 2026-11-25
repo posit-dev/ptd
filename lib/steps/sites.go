@@ -281,11 +281,21 @@ func buildAWSSiteSpec(
 		}
 	}
 
-	// Karpenter session tolerations.
+	// Karpenter session placement: allow and direct both Workbench session pods and
+	// Connect content pods onto the session node pool.
 	if tolerations := sessionTolerations(clusterCfg.KarpenterConfig); len(tolerations) > 0 {
 		spec["workbench"] = map[string]interface{}{
 			"sessionTolerations": tolerations,
 		}
+		connectSpec := map[string]interface{}{
+			"contentTolerations": tolerations,
+		}
+		if pool := sessionPoolName(clusterCfg.KarpenterConfig); pool != "" {
+			connectSpec["contentNodeSelector"] = map[string]string{
+				"karpenter.sh/nodepool": pool,
+			}
+		}
+		spec["connect"] = connectSpec
 	}
 
 	return spec
@@ -311,6 +321,21 @@ func sessionTolerations(kc *types.KarpenterConfig) []map[string]interface{} {
 		}
 	}
 	return nil
+}
+
+// sessionPoolName returns the Name of the first node pool that has
+// session_taints=true, or an empty string if none. This mirrors the
+// selection logic in sessionTolerations.
+func sessionPoolName(kc *types.KarpenterConfig) string {
+	if kc == nil {
+		return ""
+	}
+	for _, pool := range kc.NodePools {
+		if pool.SessionTaints {
+			return pool.Name
+		}
+	}
+	return ""
 }
 
 // --- Azure ---
