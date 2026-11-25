@@ -1,3 +1,10 @@
+# [1.46.0](https://github.com/posit-dev/ptd/compare/v1.45.3...v1.46.0) (2026-11-25)
+
+
+### Features
+
+* **alloy:** ship Kubernetes events to in-cluster Loki ([be368d2](https://github.com/posit-dev/ptd/commit/be368d2498233ec6f5922b5177f2faa9fd7b2689))
+
 ## [1.45.3](https://github.com/posit-dev/ptd/compare/v1.45.2...v1.45.3) (2026-11-23)
 
 
