@@ -267,7 +267,7 @@ func (c *AWSWorkloadClusterComponents) ResolveAWSComponents() ResolvedAWSCompone
 		NvidiaDevicePluginVersion:              resolveString(c.NvidiaDevicePluginVersion, "0.17.1"),
 		SecretStoreCsiDriverVersion:            resolveString(c.SecretStoreCsiDriverVersion, "1.3.4"),
 		SecretStoreCsiDriverAwsProviderVersion: resolveString(c.SecretStoreCsiDriverAwsProviderVersion, "0.3.5"),
-		TraefikVersion:                         resolveString(c.TraefikVersion, "37.1.2"),
+		TraefikVersion:                         resolveString(c.TraefikVersion, "41.6.0"),
 		TraefikDeploymentReplicas:              resolveInt(c.TraefikDeploymentReplicas, 3),
 	}
 }
@@ -504,6 +504,12 @@ type AzureWorkloadConfig struct {
 	NetworkTrust                        string                                `yaml:"network_trust"`
 	NvidiaGpuEnabled                    bool                                  `yaml:"nvidia_gpu_enabled"`
 	PpmFileShareSizeGib                 int                                   `yaml:"ppm_file_share_size_gib"`
+	// PostgresVersion is the Postgres major version (e.g. "17", not "17.2") of both
+	// the main and grafana Flexible Servers. Raising it performs an in-place,
+	// irreversible major version upgrade with downtime on both servers; preview with
+	// --dry-run first. Must be >= the servers' live major version (Azure rejects
+	// downgrades). Defaults to "14" when unset; resolve via PostgresVersionOrDefault.
+	PostgresVersion string `yaml:"postgres_version"`
 	// RootDomain, when set, is used as the sole cert-manager domain instead of per-site domains.
 	// Mirrors Python: AzureWorkloadConfig.root_domain (via WorkloadConfig.domains fallback).
 	RootDomain *string `yaml:"root_domain"`
@@ -610,6 +616,9 @@ type AzureWorkloadClusterComponentConfig struct {
 	// TraefikDeploymentReplicas sets the number of workload Traefik ingress replicas.
 	// Defaults to 3 for high availability (resolve via ResolveAzureComponents).
 	TraefikDeploymentReplicas *int `yaml:"traefik_deployment_replicas"`
+	// TraefikVersion pins the Traefik helm chart version (resolve via
+	// ResolveAzureComponents).
+	TraefikVersion *string `yaml:"traefik_version"`
 }
 
 // ResolvedAzureComponents is the result of resolving AzureWorkloadClusterComponentConfig with defaults applied.
@@ -623,6 +632,7 @@ type ResolvedAzureComponents struct {
 	MimirVersion              string
 	NvidiaDevicePluginVersion string
 	TraefikDeploymentReplicas int
+	TraefikVersion            string
 }
 
 // ResolveAzureComponents returns the component versions with defaults applied.
@@ -637,6 +647,7 @@ func (c *AzureWorkloadClusterComponentConfig) ResolveAzureComponents() ResolvedA
 		MimirVersion:              resolveString(c.MimirVersion, "5.2.1"),
 		NvidiaDevicePluginVersion: resolveString(c.NvidiaDevicePluginVersion, "0.17.1"),
 		TraefikDeploymentReplicas: resolveInt(c.TraefikDeploymentReplicas, 3),
+		TraefikVersion:            resolveString(c.TraefikVersion, "41.6.0"),
 	}
 }
 
@@ -651,6 +662,12 @@ func (c AzureWorkloadConfig) AnyClusterExternalSecretsEnabled() bool {
 		}
 	}
 	return false
+}
+
+// PostgresVersionOrDefault resolves the Postgres Flexible Server major version
+// (default "14").
+func (c AzureWorkloadConfig) PostgresVersionOrDefault() string {
+	return crStringDefault(c.PostgresVersion, "14")
 }
 
 type SiteConfig struct {
